@@ -112,12 +112,12 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Job Grader</label>
-                        <input type="text" name="job_grader" value="{{ old('job_grader', $employee->job_grader) }}"
+                        <input type="number" name="job_grader" value="{{ old('job_grader', $employee->job_grader) }}"
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Person Grade</label>
-                        <input type="text" name="person_grade"
+                        <input type="number" name="person_grade"
                             value="{{ old('person_grade', $employee->person_grade) }}" class="w-full border p-2 rounded">
                     </div>
                     <div>

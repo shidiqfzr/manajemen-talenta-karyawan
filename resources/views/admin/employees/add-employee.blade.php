@@ -91,11 +91,11 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Job Grader</label>
-                        <input type="text" name="job_grader" class="w-full border p-2 rounded">
+                        <input type="number" name="job_grader" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Person Grade</label>
-                        <input type="text" name="person_grade" class="w-full border p-2 rounded">
+                        <input type="numbe" name="person_grade" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Tanggal Dalam Jabatan</label>

@@ -25,13 +25,14 @@ return new class extends Migration
             $table->date('tmt_bekerja')->nullable();
             $table->date('tanggal_diangkat_staf')->nullable();
             $table->text('susunan_keluarga')->nullable();
-            $table->string('job_grader')->nullable();
-            $table->string('person_grade')->nullable();
+            $table->integer('job_grader')->nullable();
+            $table->integer('person_grade')->nullable();
             $table->date('tanggal_mbt')->nullable();
             $table->date('tanggal_pensiun')->nullable();
             $table->string('agama')->nullable();
             $table->string('pendidikan_terakhir')->nullable();
             $table->string('sekolah')->nullable();
+            $table->string('foto')->nullable();
             $table->timestamps();
         });
     }

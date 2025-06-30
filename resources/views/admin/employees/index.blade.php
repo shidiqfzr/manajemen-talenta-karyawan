@@ -15,11 +15,11 @@
             </div>
             <div class="space-y-6">
 
-                <!-- CSV Import Form, Template, and Export Button -->
+                <!-- Excel Import Form, Template, and Export Button -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fas fa-file-csv text-blue-500 mr-2"></i> Import & Export Data
+                            <i class="fas fa-file-excel text-blue-500 mr-2"></i> Import & Export Data
                         </h2>
                     </div>
                     <div class="p-6">
@@ -33,7 +33,7 @@
                                         <i class="fas fa-download text-blue-600"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-800">Template CSV</h3>
+                                        <h3 class="font-semibold text-gray-800">Template Data</h3>
                                         <p class="text-xs text-gray-500">Download format yang benar</p>
                                     </div>
                                 </div>
@@ -47,7 +47,7 @@
                                             <div>
                                                 <p class="text-sm font-medium text-blue-800 mb-1">Langkah Import:</p>
                                                 <ol class="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-                                                    <li>Download template CSV</li>
+                                                    <li>Download template Excel</li>
                                                     <li>Isi data sesuai format</li>
                                                     <li>Upload file yang sudah diisi</li>
                                                 </ol>
@@ -68,7 +68,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Button Area (fixed at bottom) -->
+                                <!-- Button Area -->
                                 <div class="mt-4">
                                     <a href="{{ route('admin.employees.downloadTemplate') }}"
                                         class="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 
@@ -88,39 +88,41 @@
                                     </div>
                                     <div>
                                         <h3 class="font-semibold text-gray-800">Import Data</h3>
-                                        <p class="text-xs text-gray-500">Upload file CSV karyawan</p>
+                                        <p class="text-xs text-gray-500">Upload file Excel karyawan</p>
                                     </div>
                                 </div>
 
-                                <!-- Content Area (grows to fill space) -->
+                                <!-- Content Area -->
                                 <div class="flex-grow space-y-4">
                                     <form action="{{ route('admin.employees.import') }}" method="POST"
                                         enctype="multipart/form-data" id="importForm">
                                         @csrf
                                         <div class="relative">
                                             <label for="import_file" class="block text-sm font-medium text-gray-700 mb-2">
-                                                Pilih File CSV
+                                                Pilih File Excel
                                             </label>
-                                            <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors duration-200 cursor-pointer"
-                                                onclick="document.getElementById('import_file').click()">
-                                                <input type="file" name="import_file" id="import_file" accept=".csv,.xls,.xlsx" required
+                                            <div
+                                                class="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors duration-200 cursor-pointer">
+                                                <input type="file" name="import_file" id="import_file"
+                                                    accept=".xls,.xlsx" required
                                                     class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                     onchange="updateFileName(this)">
                                                 <div id="file-upload-content">
                                                     <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
                                                     <p class="text-sm font-medium text-gray-700">Klik untuk pilih file</p>
-                                                    <p class="text-xs text-gray-500 mt-1">atau drag & drop file CSV di sini
+                                                    <p class="text-xs text-gray-500 mt-1">atau drag & drop file Excel di
+                                                        sini
                                                     </p>
                                                 </div>
                                                 <div id="file-selected" class="hidden">
-                                                    <i class="fas fa-file-csv text-2xl text-green-500 mb-2"></i>
+                                                    <i class="fas fa-file-excel text-2xl text-green-500 mb-2"></i>
                                                     <p class="text-sm font-medium text-gray-700" id="file-name"></p>
                                                     <p class="text-xs text-green-600 mt-1">File siap untuk diupload</p>
                                                 </div>
                                             </div>
                                             <div class="mt-2 flex items-center text-xs text-gray-500">
                                                 <i class="fas fa-info-circle mr-1"></i>
-                                                <span>Format: CSV (.csv), Maksimal: 10MB</span>
+                                                <span>Format: Excel (.xlsx, .xls), Maksimal: 10MB</span>
                                             </div>
                                         </div>
                                     </form>
@@ -152,7 +154,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Content Area (grows to fill space) -->
+                                <!-- Content Area -->
                                 <div class="flex-grow space-y-4">
                                     <!-- Filter Info -->
                                     <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
@@ -209,14 +211,13 @@
                                         <div class="flex items-start">
                                             <i class="fas fa-check-circle text-green-600 mr-2 mt-0.5 flex-shrink-0"></i>
                                             <p class="text-xs text-green-700">
-                                                File CSV akan otomatis terdownload dengan nama berdasarkan filter yang
-                                                diterapkan.
+                                                File Excel akan otomatis terdownload berdasarkan filter yang diterapkan.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Button Area (fixed at bottom) -->
+                                <!-- Button Area -->
                                 <div class="mt-4">
                                     <form action="{{ route('admin.employees.export') }}" method="GET" id="exportForm">
                                         <input type="hidden" name="search" value="{{ request('search') }}">
@@ -459,125 +460,127 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="8" class="px-6 py-12 text-center">
-                                                <div class="flex flex-col items-center">
-                                                    <div class="bg-gray-100 rounded-full p-3 mb-4">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-12 w-12 text-gray-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="1.5"
-                                                                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                                        </svg>
-                                                    </div>
-                                                    <h3 class="text-lg font-medium text-gray-900 mb-1">Tidak ada data karyawan
-                                                    </h3>
-                                                    <p class="text-gray-500 max-w-sm text-center mb-4">
-                                                        Belum ada data karyawan yang tersedia untuk ditampilkan saat ini.
-                                                    </p>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="px-6 py-12 text-center">
+                                            <div class="flex flex-col items-center">
+                                                <div class="bg-gray-100 rounded-full p-3 mb-4">
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="h-12 w-12 text-gray-400" fill="none"
+                                                        viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="1.5"
+                                                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                                    </svg>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                                                <h3 class="text-lg font-medium text-gray-900 mb-1">Tidak ada data karyawan
+                                                </h3>
+                                                <p class="text-gray-500 max-w-sm text-center mb-4">
+                                                    Belum ada data karyawan yang tersedia untuk ditampilkan saat ini.
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
 
-                        <!-- Pagination -->
-                        <div class="px-4 py-2">
-                            {{ $employees->appends(request()->query())->links('pagination::tailwind') }}
-                        </div>
+                    <!-- Pagination -->
+                    <div class="px-4 py-4">
+                        {{ $employees->appends(request()->query())->links('pagination::tailwind') }}
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- JavaScript for Enhanced UX -->
-            <script>
-                // File upload enhancement
-                function updateFileName(input) {
-                    const fileContent = document.getElementById('file-upload-content');
-                    const fileSelected = document.getElementById('file-selected');
-                    const fileName = document.getElementById('file-name');
+        <!-- JavaScript for Enhanced UX -->
+        <script>
+            // File upload enhancement
+            function updateFileName(input) {
+                const fileContent = document.getElementById('file-upload-content');
+                const fileSelected = document.getElementById('file-selected');
+                const fileName = document.getElementById('file-name');
 
-                    if (input.files && input.files[0]) {
-                        const file = input.files[0];
-                        fileName.textContent = file.name;
-                        fileContent.classList.add('hidden');
-                        fileSelected.classList.remove('hidden');
-                    } else {
-                        fileContent.classList.remove('hidden');
-                        fileSelected.classList.add('hidden');
-                    }
+                if (input.files && input.files[0]) {
+                    const file = input.files[0];
+                    fileName.textContent = file.name;
+                    fileContent.classList.add('hidden');
+                    fileSelected.classList.remove('hidden');
+                } else {
+                    fileContent.classList.remove('hidden');
+                    fileSelected.classList.add('hidden');
                 }
+            }
 
-                // Form submission loading states
-                document.getElementById('importForm').addEventListener('submit', function(e) {
-                    const btn = document.getElementById('importBtn');
-                    const btnText = document.getElementById('importBtnText');
-                    const spinner = document.getElementById('importSpinner');
+            // Form submission loading states
+            document.getElementById('importForm').addEventListener('submit', function(e) {
+                const btn = document.getElementById('importBtn');
+                const btnText = document.getElementById('importBtnText');
+                const spinner = document.getElementById('importSpinner');
 
-                    btn.disabled = true;
-                    btnText.textContent = 'Mengimport...';
-                    spinner.classList.remove('hidden');
-                });
+                btn.disabled = true;
+                btnText.textContent = 'Mengimport...';
+                spinner.classList.remove('hidden');
+            });
 
-                document.getElementById('exportForm').addEventListener('submit', function(e) {
-                    const btn = document.getElementById('exportBtn');
-                    const btnText = document.getElementById('exportBtnText');
-                    const spinner = document.getElementById('exportSpinner');
+            document.getElementById('exportForm').addEventListener('submit', function(e) {
+                const btn = document.getElementById('exportBtn');
+                const btnText = document.getElementById('exportBtnText');
+                const spinner = document.getElementById('exportSpinner');
 
-                    btn.disabled = true;
-                    btnText.textContent = 'Mengexport...';
-                    spinner.classList.remove('hidden');
+                btn.disabled = true;
+                btnText.textContent = 'Mengexport...';
+                spinner.classList.remove('hidden');
 
-                    // Re-enable button after 3 seconds (typical download time)
-                    setTimeout(function() {
-                        btn.disabled = false;
-                        btnText.textContent = 'Export Data Karyawan';
-                        spinner.classList.add('hidden');
-                    }, 3000);
-                });
+                // Re-enable button after 3 seconds (typical download time)
+                setTimeout(function() {
+                    btn.disabled = false;
+                    btnText.textContent = 'Export Data Karyawan';
+                    spinner.classList.add('hidden');
+                }, 3000);
+            });
 
-                // Drag and drop functionality
-                const dropZone = document.querySelector('[onclick="document.getElementById(\'import_file\').click()"]');
+            // Drag and drop functionality
+            const dropZone = document.querySelector('[onclick="document.getElementById(\'import_file\').click()"]');
 
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, preventDefaults, false);
-                });
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
 
-                function preventDefaults(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                dropZone.classList.add('border-blue-500', 'bg-blue-50');
+            }
+
+            function unhighlight(e) {
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            }
+
+            dropZone.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+
+                if (files.length > 0) {
+                    document.getElementById('import_file').files = files;
+                    updateFileName(document.getElementById('import_file'));
                 }
+            }
+        </script>
 
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, highlight, false);
-                });
-
-                ['dragleave', 'drop'].forEach(eventName => {
-                    dropZone.addEventListener(eventName, unhighlight, false);
-                });
-
-                function highlight(e) {
-                    dropZone.classList.add('border-blue-500', 'bg-blue-50');
-                }
-
-                function unhighlight(e) {
-                    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
-                }
-
-                dropZone.addEventListener('drop', handleDrop, false);
-
-                function handleDrop(e) {
-                    const dt = e.dataTransfer;
-                    const files = dt.files;
-
-                    if (files.length > 0) {
-                        document.getElementById('import_file').files = files;
-                        updateFileName(document.getElementById('import_file'));
-                    }
-                }
-            </script>
-        @endsection
+        @include('admin.components.toast')
+    @endsection

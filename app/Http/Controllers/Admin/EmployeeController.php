@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Exports\EmployeesExport;
+use App\Exports\EmployeeTemplateExport;
 use App\Imports\EmployeesImport;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -72,8 +73,8 @@ class EmployeeController extends Controller
             'tmt_bekerja' => 'nullable|date',
             'tanggal_diangkat_staf' => 'nullable|date',
             'susunan_keluarga' => 'nullable|string|max:255',
-            'job_grader' => 'nullable|string|max:100',
-            'person_grade' => 'nullable|string|max:100',
+            'job_grader' => 'nullable|integer|max:100',
+            'person_grade' => 'nullable|integer|max:100',
             'tanggal_mbt' => 'nullable|date',
             'tanggal_pensiun' => 'nullable|date',
             'agama' => 'nullable|string|max:50',
@@ -96,20 +97,23 @@ class EmployeeController extends Controller
         $employee = Employee::where('nik', $nik)->firstOrFail();
         return view('admin.employees.show', compact('employee'));
     }
- 
+
     public function import(Request $request)
     {
         $request->validate([
-            'import_file' => 'required|file|mimes:xlsx,xls,csv,txt|max:2048',
+            'import_file' => 'required|file|mimes:xlsx,xls|max:2048',
         ]);
 
-        $import = new EmployeesImport;
+        $import = new EmployeesImport();
         Excel::import($import, $request->file('import_file'));
 
-        return redirect()->route('admin.employees.index')
+        $summary = $import->getImportSummary();
+
+        return redirect()
+            ->route('admin.employees.index')
             ->with([
-                'success' => "{$import->created} data baru ditambahkan, {$import->updated} data diperbarui, {$import->skipped} baris dilewati karena error.",
-                'import_errors' => $import->errors,
+                'success' => "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, {$summary['skipped']} rows skipped.",
+                'import_summary' => $summary,
             ]);
     }
 
@@ -123,75 +127,12 @@ class EmployeeController extends Controller
             'golongan_2024',
         ]);
 
-        return Excel::download(new EmployeesExport($filters), 'data_karyawan.csv');
+        return Excel::download(new EmployeesExport($filters), 'data_karyawan.xlsx');
     }
 
-    public function downloadTemplate(): StreamedResponse
+    public function downloadTemplate()
     {
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="employee_import_template.csv"',
-        ];
-
-        $columns = [
-            'nik',
-            'nama',
-            'jabatan',
-            'level',
-            'unit_kerja',
-            'golongan_2024',
-            'tanggal_dalam_jabatan',
-            'tmt_unit_kerja',
-            'tempat_lahir',
-            'tanggal_lahir',
-            'tmt_bekerja',
-            'tanggal_diangkat_staf',
-            'susunan_keluarga',
-            'job_grader',
-            'person_grade',
-            'tanggal_mbt',
-            'tanggal_pensiun',
-            'agama',
-            'pendidikan_terakhir',
-            'sekolah'
-        ];
-
-        $callback = function () use ($columns) {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, $columns);
-            // Optional example row (you can remove this if you want a blank file)
-            fputcsv($handle, [
-                '1234567890',
-                'John Doe',
-                'Staff',
-                'IIIa',
-                'IT Dept',
-                'A1',
-                '2022-01-01',
-                1,
-                6,
-                '2021-06-01',
-                2,
-                3,
-                30,
-                5,
-                'Jakarta',
-                '1995-05-05',
-                '2020-01-01',
-                '2020-12-01',
-                'Menikah',
-                'JG1',
-                'PG2',
-                '2023-08-01',
-                '2055-05-01',
-                'Islam',
-                'S1 Teknik',
-                'Universitas Indonesia'
-            ]);
-            fclose($handle);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return Excel::download(new EmployeeTemplateExport, 'karyawan_import_template.xlsx');
     }
 
     public function create()

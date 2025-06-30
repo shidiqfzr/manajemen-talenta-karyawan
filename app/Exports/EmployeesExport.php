@@ -5,12 +5,13 @@ namespace App\Exports;
 use App\Models\Employee;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
 
-class EmployeesExport implements FromCollection, WithHeadings
+class EmployeesExport implements FromCollection, WithHeadings, WithEvents
 {
     protected $filters;
 
-    // Define the columns to export
     protected $columns = [
         'nik',
         'nama',
@@ -46,7 +47,7 @@ class EmployeesExport implements FromCollection, WithHeadings
         if (!empty($this->filters['search'])) {
             $query->where(function ($q) {
                 $q->where('nik', 'like', '%' . $this->filters['search'] . '%')
-                  ->orWhere('nama', 'like', '%' . $this->filters['search'] . '%');
+                    ->orWhere('nama', 'like', '%' . $this->filters['search'] . '%');
             });
         }
 
@@ -73,25 +74,44 @@ class EmployeesExport implements FromCollection, WithHeadings
     {
         return [
             'NIK',
-            'Nama',
-            'Jabatan',
-            'Level',
-            'Unit Kerja',
-            'Golongan 2024',
-            'Tanggal Dalam Jabatan',
-            'TMT Unit Kerja',
-            'Tempat Lahir',
-            'Tanggal Lahir',
-            'TMT Bekerja',
-            'Tanggal Diangkat Staf',
-            'Susunan Keluarga',
-            'Job Grader',
-            'Person Grade',
-            'Tanggal MBT',
-            'Tanggal Pensiun',
-            'Agama',
-            'Pendidikan Terakhir',
-            'Sekolah',
+            'NAMA',
+            'JABATAN',
+            'LEVEL',
+            'UNIT KERJA',
+            'GOLONGAN 2024',
+            'TANGGAL DALAM JABATAN',
+            'TMT UNIT KERJA',
+            'TEMPAT LAHIR',
+            'TANGGAL LAHIR',
+            'TMT BEKERJA',
+            'TANGGAL DIANGKAT STAF',
+            'SUSUNAN KELUARGA',
+            'JOB GRADER',
+            'PERSON GRADE',
+            'TANGGAL MBT',
+            'TANGGAL PENSIUN',
+            'AGAMA',
+            'PENDIDIKAN TERAKHIR',
+            'SEKOLAH',
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+
+                $sheet->getStyle('A1:T1')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                    ],
+                ]);
+
+                foreach (range('A', 'T') as $col) {
+                    $sheet->getColumnDimension($col)->setAutoSize(true);
+                }
+            },
         ];
     }
 }
