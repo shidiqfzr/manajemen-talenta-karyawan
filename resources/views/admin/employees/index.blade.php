@@ -164,7 +164,7 @@
                                                 <p class="text-sm font-medium text-indigo-800 mb-1">Export Berdasarkan
                                                     Filter:</p>
                                                 <div class="text-xs text-indigo-700 space-y-1">
-                                                    @if (request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan_2024']))
+                                                    @if (request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan']))
                                                         @if (request('search'))
                                                             <div class="flex items-center">
                                                                 <i class="fas fa-search mr-1"></i>
@@ -189,10 +189,10 @@
                                                                 <span>Level: {{ request('level') }}</span>
                                                             </div>
                                                         @endif
-                                                        @if (request('golongan_2024'))
+                                                        @if (request('golongan'))
                                                             <div class="flex items-center">
                                                                 <i class="fas fa-tags mr-1"></i>
-                                                                <span>Golongan: {{ request('golongan_2024') }}</span>
+                                                                <span>Golongan: {{ request('golongan') }}</span>
                                                             </div>
                                                         @endif
                                                     @else
@@ -224,8 +224,8 @@
                                         <input type="hidden" name="jabatan" value="{{ request('jabatan') }}">
                                         <input type="hidden" name="level" value="{{ request('level') }}">
                                         <input type="hidden" name="unit_kerja" value="{{ request('unit_kerja') }}">
-                                        <input type="hidden" name="golongan_2024"
-                                            value="{{ request('golongan_2024') }}">
+                                        <input type="hidden" name="golongan"
+                                            value="{{ request('golongan') }}">
 
                                         <button type="submit" id="exportBtn"
                                             class="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 
@@ -336,14 +336,14 @@
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-gray-600 mb-1">Golongan</label>
-                                        <select name="golongan_2024"
+                                        <select name="golongan"
                                             class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
                                                 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors
                                                 bg-white">
                                             <option value="">Semua Golongan</option>
                                             @foreach ($golongans as $golongan)
                                                 <option value="{{ $golongan }}"
-                                                    {{ request('golongan_2024') == $golongan ? 'selected' : '' }}>
+                                                    {{ request('golongan') == $golongan ? 'selected' : '' }}>
                                                     {{ $golongan }}
                                                 </option>
                                             @endforeach
@@ -352,7 +352,7 @@
                                 </div>
                             </div>
                             <!-- Active Filters Display -->
-                            @if (request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan_2024']))
+                            @if (request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan']))
                                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="text-sm font-medium text-blue-700">Filter Aktif:</span>
@@ -380,10 +380,10 @@
                                                 Level: {{ request('level') }}
                                             </span>
                                         @endif
-                                        @if (request('golongan_2024'))
+                                        @if (request('golongan'))
                                             <span
                                                 class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                                Golongan: {{ request('golongan_2024') }}
+                                                Golongan: {{ request('golongan') }}
                                             </span>
                                         @endif
                                     </div>
@@ -433,7 +433,7 @@
                                         <td class="p-3">{{ $employee->jabatan }}</td>
                                         <td class="p-3">{{ $employee->unit_kerja }}</td>
                                         <td class="p-3">{{ $employee->level ?? '-' }}</td>
-                                        <td class="p-3">{{ $employee->golongan_2024 ?? '-' }}</td>
+                                        <td class="p-3">{{ $employee->golongan ?? '-' }}</td>
                                         <td class="p-3">
                                             <div class="flex items-center gap-2 justify-center">
                                                 <a href="{{ route('admin.employees.show', $employee->nik) }}"

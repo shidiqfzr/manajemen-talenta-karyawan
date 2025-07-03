@@ -34,7 +34,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
         'jabatan' => 'required|string|max:255',
         'level' => 'required|string|max:255',
         'unit_kerja' => 'required|string|max:255',
-        'golongan_2024' => 'nullable|string|max:255',
+        'golongan' => 'nullable|string|max:255',
         'tanggal_dalam_jabatan' => 'nullable|date',
         'tmt_unit_kerja' => 'nullable|date',
         'tempat_lahir' => 'nullable|string|max:255',

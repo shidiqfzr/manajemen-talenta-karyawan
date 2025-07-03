@@ -41,8 +41,8 @@ class EmployeeController extends Controller
             $query->where('unit_kerja', $request->unit_kerja);
         }
 
-        if ($request->filled('golongan_2024')) {
-            $query->where('golongan_2024', $request->golongan_2024);
+        if ($request->filled('golongan')) {
+            $query->where('golongan', $request->golongan);
         }
 
         $employees = $query->paginate(20);
@@ -51,7 +51,7 @@ class EmployeeController extends Controller
         $jabatans = Employee::select('jabatan')->distinct()->pluck('jabatan');
         $levels = Employee::select('level')->distinct()->pluck('level');
         $units = Employee::select('unit_kerja')->distinct()->pluck('unit_kerja');
-        $golongans = Employee::select('golongan_2024')->distinct()->pluck('golongan_2024');
+        $golongans = Employee::select('golongan')->distinct()->pluck('golongan');
 
         return view('admin.employees.index', compact('employees', 'jabatans', 'levels', 'units', 'golongans'));
     }
@@ -65,7 +65,7 @@ class EmployeeController extends Controller
             'jabatan' => 'required|string|max:255',
             'level' => 'required|string|max:255',
             'unit_kerja' => 'required|string|max:255',
-            'golongan_2024' => 'nullable|string|max:50',
+            'golongan' => 'nullable|string|max:50',
             'tanggal_dalam_jabatan' => 'nullable|date',
             'tmt_unit_kerja' => 'nullable|date',
             'tempat_lahir' => 'nullable|string|max:100',
@@ -124,7 +124,7 @@ class EmployeeController extends Controller
             'jabatan',
             'level',
             'unit_kerja',
-            'golongan_2024',
+            'golongan',
         ]);
 
         return Excel::download(new EmployeesExport($filters), 'data_karyawan.xlsx');
@@ -157,7 +157,7 @@ class EmployeeController extends Controller
             'jabatan' => 'required',
             'level' => 'required',
             'unit_kerja' => 'required',
-            'golongan_2024' => 'nullable',
+            'golongan' => 'nullable',
             'tanggal_dalam_jabatan' => 'nullable|date',
             'tmt_unit_kerja' => 'nullable|date',
             'tempat_lahir' => 'nullable',

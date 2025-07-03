@@ -100,7 +100,7 @@
                         </div>
                         <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
                             <label class="text-sm font-medium text-green-700 block mb-1">Golongan 2024</label>
-                            <p class="text-green-900 font-semibold">{{ $employee->golongan_2024 }}</p>
+                            <p class="text-green-900 font-semibold">{{ $employee->golongan }}</p>
                         </div>
                         <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
                             <label class="text-sm font-medium text-purple-700 block mb-1">Job Grader</label>

@@ -87,7 +87,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Golongan 2024</label>
-                        <input type="text" name="golongan_2024" class="w-full border p-2 rounded">
+                        <input type="text" name="golongan" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Job Grader</label>

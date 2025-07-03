@@ -18,7 +18,7 @@ class Employee extends Model
         'jabatan',
         'level',
         'unit_kerja',
-        'golongan_2024',
+        'golongan',
         'tanggal_dalam_jabatan',
         'tmt_unit_kerja',
         'tempat_lahir',

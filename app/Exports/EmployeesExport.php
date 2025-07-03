@@ -18,7 +18,7 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
         'jabatan',
         'level',
         'unit_kerja',
-        'golongan_2024',
+        'golongan',
         'tanggal_dalam_jabatan',
         'tmt_unit_kerja',
         'tempat_lahir',
@@ -63,8 +63,8 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
             $query->where('unit_kerja', $this->filters['unit_kerja']);
         }
 
-        if (!empty($this->filters['golongan_2024'])) {
-            $query->where('golongan_2024', $this->filters['golongan_2024']);
+        if (!empty($this->filters['golongan'])) {
+            $query->where('golongan', $this->filters['golongan']);
         }
 
         return $query->select($this->columns)->get();

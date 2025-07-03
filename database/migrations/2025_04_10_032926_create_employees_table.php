@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('jabatan');
             $table->string('level');
             $table->string('unit_kerja');
-            $table->string('golongan_2024')->nullable();
+            $table->string('golongan')->nullable();
             $table->date('tanggal_dalam_jabatan')->nullable();
             $table->date('tmt_unit_kerja')->nullable();
             $table->string('tempat_lahir')->nullable();

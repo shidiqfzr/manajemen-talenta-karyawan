@@ -2,149 +2,254 @@
 <html lang="en">
 
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name', 'Admin Panel') }}</title>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+
+    <!-- Vite Assets -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
-        .submenu {
-            display: none;
-        }
-
-        .submenu.open {
-            display: block;
-        }
-
-        /* Scrollbar Styling */
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
         }
 
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
         ::-webkit-scrollbar-thumb {
-            background: #94a3b8;
+            background: #cbd5e1;
             border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Smooth Transitions */
+        .transition-smooth {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Mobile Sidebar Animation */
+        .sidebar-mobile {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar-mobile.open {
+            transform: translateX(0);
+        }
+
+        /* Dropdown Animation */
+        .dropdown-menu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+
+        .dropdown-menu.open {
+            max-height: 200px;
         }
     </style>
 
     @stack('styles')
 </head>
 
-<body class="bg-gray-100 text-gray-800 min-h-screen flex">
-
-    <!-- Sidebar -->
-    <aside id="sidebar"
-        class="w-56 bg-white shadow-lg border-r border-gray-200 hidden md:flex flex-col fixed h-screen z-50 sidebar">
-        <div class="p-6 text-2xl font-bold text-blue-600 border-b border-gray-100 flex justify-between items-center">
-            <span>Admin Panel</span>
-            <button id="sidebarToggle" class="md:hidden text-gray-600">
-                <i class="fas fa-bars"></i>
-            </button>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+    <div class="lg:flex">
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileOverlay"
+            class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden hidden transition-opacity duration-300">
         </div>
-        <nav class="flex-1 overflow-y-auto p-4 space-y-2">
 
-            <!-- Karyawan Menu -->
-            <div class="space-y-1">
-                <button id="karyawanDropdownToggle" class="flex items-center w-full px-4 py-2 rounded-lg transition
-                    {{ request()->routeIs('admin.employees.*') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' }}">
-                    <i class="fas fa-users mr-2"></i> Karyawan
-                    <i class="fas fa-chevron-down ml-auto transition-transform duration-200" id="karyawanChevron"></i>
-                </button>
-                <div id="karyawanDropdown" class="submenu pl-6 space-y-1">
-                    <a href="{{ route('admin.employees.index') }}"
-                        class="flex items-center px-3 py-2 rounded-lg transition text-sm
-                        {{ request()->routeIs('admin.employees.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' }}">
-                        <i class="fas fa-cogs mr-2 text-sm"></i> Manajemen
-                    </a>
-                    <a href="{{ route('admin.employees.statistics.index') }}"
-                        class="flex items-center px-3 py-2 rounded-lg transition text-sm
-                        {{ request()->routeIs('admin.employees.statistics.*') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' }}">
-                        <i class="fas fa-chart-line mr-2 text-sm"></i> Statistik
-                    </a>
-                </div>
-            </div>
+        <!-- Sidebar -->
+        <aside id="sidebar"
+            class="fixed top-0 left-0 z-50 w-56 h-screen bg-white shadow-xl border-r border-gray-200 
+                    sidebar-mobile lg:translate-x-0 lg:static lg:z-auto">
 
-            <!-- Pelatihan -->
-            <a href="{{ route('admin.trainings.index') }}"
-                class="flex items-center px-4 py-2 rounded-lg transition
-                    {{ request()->routeIs('admin.trainings.*') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' }}">
-                <i class="fas fa-chalkboard-teacher mr-2"></i> Pelatihan
-            </a>
-
-            <!-- Penilaian -->
-            <a href="{{ route('admin.evaluations.index') }}"
-                class="flex items-center px-4 py-2 rounded-lg transition
-                    {{ request()->routeIs('admin.evaluations.*') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700' }}">
-                <i class="fas fa-clipboard-check mr-2"></i> Penilaian
-            </a>
-        </nav>
-    </aside>
-
-    <!-- Mobile Sidebar Overlay -->
-    <div id="mobileSidebar" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
-        <div class="w-64 bg-white h-full p-4 space-y-2 shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <span class="text-lg font-bold text-blue-600">Menu</span>
-                <button id="closeMobileSidebar" class="text-gray-600">
+            <!-- Sidebar Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-100">
+                <h1 class="text-xl font-bold text-blue-600">Admin Panel</h1>
+                <button id="closeSidebar"
+                    class="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <a href="{{ route('admin.employees.index') }}"
-                class="flex items-center px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                <i class="fas fa-users mr-2"></i> Karyawan
-            </a>
-            <a href="{{ route('admin.trainings.index') }}"
-                class="flex items-center px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                <i class="fas fa-chalkboard-teacher mr-2"></i> Pelatihan
-            </a>
-            <a href="{{ route('admin.evaluations.index') }}"
-                class="flex items-center px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                <i class="fas fa-clipboard-check mr-2"></i> Penilaian
-            </a>
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <!-- Karyawan Dropdown -->
+                <div class="space-y-1">
+                    <button id="karyawanToggle"
+                        class="flex items-center justify-between w-full px-4 py-3 rounded-lg text-left 
+                                transition-smooth group
+                                {{ request()->routeIs('admin.employees.*')
+                                    ? 'bg-blue-50 text-blue-700 shadow-sm'
+                                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                        <div class="flex items-center">
+                            <i class="fas fa-users w-5 text-center mr-3 text-sm"></i>
+                            <span class="font-medium">Karyawan</span>
+                        </div>
+                        <i id="karyawanChevron" class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
+                    </button>
+
+                    <div id="karyawanDropdown" class="dropdown-menu pl-4">
+                        <div class="space-y-1 py-2">
+                            <a href="{{ route('admin.employees.index') }}"
+                                class="flex items-center px-4 py-2 rounded-lg text-sm transition-smooth
+                                    {{ request()->routeIs('admin.employees.index')
+                                        ? 'bg-blue-100 text-blue-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600' }}">
+                                <i class="fas fa-cogs w-4 text-center mr-3 text-xs"></i>
+                                Manajemen
+                            </a>
+                            <a href="{{ route('admin.employees.statistics.index') }}"
+                                class="flex items-center px-4 py-2 rounded-lg text-sm transition-smooth
+                                    {{ request()->routeIs('admin.employees.statistics.*')
+                                        ? 'bg-blue-100 text-blue-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600' }}">
+                                <i class="fas fa-chart-line w-4 text-center mr-3 text-xs"></i>
+                                Statistik
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pelatihan -->
+                <a href="{{ route('admin.trainings.index') }}"
+                    class="flex items-center px-4 py-3 rounded-lg transition-smooth group
+                        {{ request()->routeIs('admin.trainings.*')
+                            ? 'bg-blue-50 text-blue-700 shadow-sm font-medium'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                    <i class="fas fa-chalkboard-teacher w-5 text-center mr-3 text-sm"></i>
+                    <span class="font-medium">Pelatihan</span>
+                </a>
+
+                <!-- Penilaian -->
+                <a href="{{ route('admin.evaluations.index') }}"
+                    class="flex items-center px-4 py-3 rounded-lg transition-smooth group
+                        {{ request()->routeIs('admin.evaluations.*')
+                            ? 'bg-blue-50 text-blue-700 shadow-sm font-medium'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                    <i class="fas fa-clipboard-check w-5 text-center mr-3 text-sm"></i>
+                    <span class="font-medium">Penilaian</span>
+                </a>
+            </nav>
+
+            <!-- Logout Button -->
+            <form method="POST" action="{{ route('logout') }}" id="logoutForm">
+                @csrf
+                <button type="submit"
+                    class="flex items-center w-full px-4 py-3 rounded-lg transition-smooth
+                text-red-700 hover:bg-gray-50 hover:text-red-600"
+                    id="logoutButton">
+                    <i class="fas fa-sign-out-alt w-5 text-center mr-3 text-sm"></i>
+                    <span class="font-medium">Logout</span>
+                </button>
+            </form>
+
+        </aside>
+
+        <!-- Main Layout -->
+        <div class="flex-1 h-screen overflow-y-auto">
+            <!-- Top Navigation Bar (Mobile) -->
+            <header class="lg:hidden bg-white shadow-sm border-b border-gray-200 p-4">
+                <div class="flex items-center justify-between">
+                    <button id="openSidebar" class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="text-xl font-bold text-gray-900">Admin Panel</h1>
+                    <div class="w-10"></div> <!-- Spacer for centering -->
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="min-h-screen p-4 lg:p-6">
+                <div class="max-w-7xl mx-auto">
+                    @yield('content')
+                </div>
+            </main>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <main class="flex-1 ml-0 md:ml-56 p-6 transition-all">
-        <div class="max-w-7xl mx-auto">
-            @yield('content')
-        </div>
-    </main>
-
-    <!-- Scripts -->
+    <!-- JavaScript -->
     <script>
-        const karyawanDropdownToggle = document.getElementById('karyawanDropdownToggle');
-        const karyawanDropdown = document.getElementById('karyawanDropdown');
-        const karyawanChevron = document.getElementById('karyawanChevron');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const openSidebar = document.getElementById('openSidebar');
+            const closeSidebar = document.getElementById('closeSidebar');
+            const sidebar = document.getElementById('sidebar');
+            const mobileOverlay = document.getElementById('mobileOverlay');
+            const karyawanToggle = document.getElementById('karyawanToggle');
+            const karyawanDropdown = document.getElementById('karyawanDropdown');
+            const karyawanChevron = document.getElementById('karyawanChevron');
+            const logoutBtn = document.getElementById('logoutButton');
+            const logoutForm = document.getElementById('logoutForm');
 
-        karyawanDropdownToggle?.addEventListener('click', () => {
-            karyawanDropdown.classList.toggle('open');
-            karyawanChevron.classList.toggle('rotate-180');
-        });
-
-        // Mobile sidebar toggling
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        const mobileSidebar = document.getElementById('mobileSidebar');
-        const closeMobileSidebar = document.getElementById('closeMobileSidebar');
-
-        sidebarToggle?.addEventListener('click', () => {
-            mobileSidebar.classList.remove('hidden');
-        });
-
-        closeMobileSidebar?.addEventListener('click', () => {
-            mobileSidebar.classList.add('hidden');
-        });
-
-        // Close sidebar on outside click
-        window.addEventListener('click', (e) => {
-            if (mobileSidebar && !mobileSidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
-                mobileSidebar.classList.add('hidden');
+            // Mobile Sidebar Controls
+            function openMobileSidebar() {
+                sidebar.classList.add('open');
+                mobileOverlay.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
             }
+
+            function closeMobileSidebar() {
+                sidebar.classList.remove('open');
+                mobileOverlay.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            // Event Listeners
+            openSidebar?.addEventListener('click', openMobileSidebar);
+            closeSidebar?.addEventListener('click', closeMobileSidebar);
+            mobileOverlay?.addEventListener('click', closeMobileSidebar);
+
+            // Dropdown Toggle
+            karyawanToggle?.addEventListener('click', function() {
+                const isOpen = karyawanDropdown.classList.contains('open');
+
+                if (isOpen) {
+                    karyawanDropdown.classList.remove('open');
+                    karyawanChevron.classList.remove('rotate-180');
+                } else {
+                    karyawanDropdown.classList.add('open');
+                    karyawanChevron.classList.add('rotate-180');
+                }
+            });
+
+            // Auto-open dropdown if current route is inside
+            if ({{ request()->routeIs('admin.employees.*') ? 'true' : 'false' }}) {
+                karyawanDropdown?.classList.add('open');
+                karyawanChevron?.classList.add('rotate-180');
+            }
+
+            // Close sidebar on window resize (desktop)
+            window.addEventListener('resize', function() {
+                if (window.innerWidth >= 1024) {
+                    closeMobileSidebar();
+                }
+            });
+
+            // Escape key to close sidebar
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !mobileOverlay.classList.contains('hidden')) {
+                    closeMobileSidebar();
+                }
+            });
+
+            logoutBtn?.addEventListener('click', function(e) {
+                const confirmed = confirm("Apakah Anda yakin ingin keluar?");
+                if (!confirmed) {
+                    e.preventDefault();
+                }
+            });
         });
     </script>
 
