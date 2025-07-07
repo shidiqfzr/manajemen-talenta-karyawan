@@ -12,7 +12,7 @@ class EvaluationController extends Controller
     // Tampilkan daftar evaluasi
     public function index()
     {
-        $evaluations = Evaluation::with('employee')->latest()->get();
+        $evaluations = Evaluation::with('employee')->latest()->paginate(20);;
         return view('admin.evaluations.index', compact('evaluations'));
     }
 

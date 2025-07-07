@@ -38,7 +38,7 @@
                                 'Jabatan' => $employee->jabatan,
                                 'Level' => $employee->level,
                                 'Unit Kerja' => $employee->unit_kerja,
-                                'Golongan 2024' => $employee->golongan,
+                                'Golongan' => $employee->golongan,
                                 'Job Grader' => $employee->job_grader,
                                 'Person Grade' => $employee->person_grade,
                                 'Tanggal Dalam Jabatan' => $employee->tanggal_dalam_jabatan,

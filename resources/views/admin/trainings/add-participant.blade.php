@@ -10,13 +10,16 @@
 
             {{-- Pilih Karyawan --}}
             <div>
-                <label for="nik" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
-                <select name="nik" id="nik" class="tom-input">
-                    <option value=""></option>
+                <label for="employee_niks" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
+                <select name="employee_niks[]" id="employee_niks" multiple
+                    class="w-full tom-input border border-gray-300 rounded px-3 py-2 focus:ring focus:ring-blue-200 focus:border-blue-500">
                     @foreach ($employees as $emp)
                         <option value="{{ $emp->nik }}">{{ $emp->nik }} - {{ $emp->nama }}</option>
                     @endforeach
                 </select>
+                @error('employee_niks')
+                    <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                @enderror
             </div>
 
             <!-- Upload Sertifikat -->
@@ -48,24 +51,12 @@
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>
-        new TomSelect("#nik", {
-            placeholder: "Cari nama atau NIK...",
-            create: false,
-            allowEmptyOption: true,
-            maxOptions: 200,
-            closeAfterSelect: true,
-            render: {
-                option: function(data, escape) {
-                    retur@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
-@endpush
-
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-    <script>
-        new TomSelect("#nik", {
-            placeholder: "Cari NIK atau nama",
-            create: false,
+        new TomSelect("#employee_niks", {
+            placeholder: "Pilih beberapa karyawan...",
+            plugins: ['remove_button'],
+            persist: false,
+            maxOptions: 500,
+            closeAfterSelect: false,
             sortField: {
                 field: "text",
                 direction: "asc"
@@ -73,4 +64,3 @@
         });
     </script>
 @endpush
-

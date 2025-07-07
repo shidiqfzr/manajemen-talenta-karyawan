@@ -57,8 +57,8 @@
                                             title="Edit Data">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <form action="{{ route('admin.evaluations.destroy', $eval->id) }}"
-                                            method="POST" onsubmit="return confirm('Hapus penilaian ini?')" class="inline">
+                                        <form action="{{ route('admin.evaluations.destroy', $eval->id) }}" method="POST"
+                                            onsubmit="return confirm('Hapus penilaian ini?')" class="inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
@@ -79,9 +79,9 @@
                 </table>
             </div>
 
-            {{-- <div class="mt-6">
-            {{ $evaluations->links('pagination::tailwind') }}
-        </div> --}}
+            <!-- Pagination -->
+            <x-pagination-ui :data="$evaluations" />
         </div>
+    </div>
     </div>
 @endsection

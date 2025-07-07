@@ -224,8 +224,7 @@
                                         <input type="hidden" name="jabatan" value="{{ request('jabatan') }}">
                                         <input type="hidden" name="level" value="{{ request('level') }}">
                                         <input type="hidden" name="unit_kerja" value="{{ request('unit_kerja') }}">
-                                        <input type="hidden" name="golongan"
-                                            value="{{ request('golongan') }}">
+                                        <input type="hidden" name="golongan" value="{{ request('golongan') }}">
 
                                         <button type="submit" id="exportBtn"
                                             class="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 
@@ -465,17 +464,11 @@
                                         <td colspan="8" class="px-6 py-12 text-center">
                                             <div class="flex flex-col items-center">
                                                 <div class="bg-gray-100 rounded-full p-3 mb-4">
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="h-12 w-12 text-gray-400" fill="none"
-                                                        viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="1.5"
-                                                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                                    </svg>
+                                                    <i class="fas fa-inbox text-gray-400 text-5xl"></i>
                                                 </div>
                                                 <h3 class="text-lg font-medium text-gray-900 mb-1">Tidak ada data karyawan
                                                 </h3>
-                                                <p class="text-gray-500 max-w-sm text-center mb-4">
+                                                <p class="text-gray-500 max-w-full text-center mb-4">
                                                     Belum ada data karyawan yang tersedia untuk ditampilkan saat ini.
                                                 </p>
                                             </div>
@@ -487,100 +480,97 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="px-4 py-4">
-                        {{ $employees->appends(request()->query())->links('pagination::tailwind') }}
-                    </div>
+                    <x-pagination-ui :data="$employees" /> 
                 </div>
             </div>
-        </div>
 
-        <!-- JavaScript for Enhanced UX -->
-        <script>
-            // File upload enhancement
-            function updateFileName(input) {
-                const fileContent = document.getElementById('file-upload-content');
-                const fileSelected = document.getElementById('file-selected');
-                const fileName = document.getElementById('file-name');
+            <!-- JavaScript for Enhanced UX -->
+            <script>
+                // File upload enhancement
+                function updateFileName(input) {
+                    const fileContent = document.getElementById('file-upload-content');
+                    const fileSelected = document.getElementById('file-selected');
+                    const fileName = document.getElementById('file-name');
 
-                if (input.files && input.files[0]) {
-                    const file = input.files[0];
-                    fileName.textContent = file.name;
-                    fileContent.classList.add('hidden');
-                    fileSelected.classList.remove('hidden');
-                } else {
-                    fileContent.classList.remove('hidden');
-                    fileSelected.classList.add('hidden');
+                    if (input.files && input.files[0]) {
+                        const file = input.files[0];
+                        fileName.textContent = file.name;
+                        fileContent.classList.add('hidden');
+                        fileSelected.classList.remove('hidden');
+                    } else {
+                        fileContent.classList.remove('hidden');
+                        fileSelected.classList.add('hidden');
+                    }
                 }
-            }
 
-            // Form submission loading states
-            document.getElementById('importForm').addEventListener('submit', function(e) {
-                const btn = document.getElementById('importBtn');
-                const btnText = document.getElementById('importBtnText');
-                const spinner = document.getElementById('importSpinner');
+                // Form submission loading states
+                document.getElementById('importForm').addEventListener('submit', function(e) {
+                    const btn = document.getElementById('importBtn');
+                    const btnText = document.getElementById('importBtnText');
+                    const spinner = document.getElementById('importSpinner');
 
-                btn.disabled = true;
-                btnText.textContent = 'Mengimport...';
-                spinner.classList.remove('hidden');
-            });
+                    btn.disabled = true;
+                    btnText.textContent = 'Mengimport...';
+                    spinner.classList.remove('hidden');
+                });
 
-            document.getElementById('exportForm').addEventListener('submit', function(e) {
-                const btn = document.getElementById('exportBtn');
-                const btnText = document.getElementById('exportBtnText');
-                const spinner = document.getElementById('exportSpinner');
+                document.getElementById('exportForm').addEventListener('submit', function(e) {
+                    const btn = document.getElementById('exportBtn');
+                    const btnText = document.getElementById('exportBtnText');
+                    const spinner = document.getElementById('exportSpinner');
 
-                btn.disabled = true;
-                btnText.textContent = 'Mengexport...';
-                spinner.classList.remove('hidden');
+                    btn.disabled = true;
+                    btnText.textContent = 'Mengexport...';
+                    spinner.classList.remove('hidden');
 
-                // Re-enable button after 3 seconds (typical download time)
-                setTimeout(function() {
-                    btn.disabled = false;
-                    btnText.textContent = 'Export Data Karyawan';
-                    spinner.classList.add('hidden');
-                }, 3000);
-            });
+                    // Re-enable button after 3 seconds (typical download time)
+                    setTimeout(function() {
+                        btn.disabled = false;
+                        btnText.textContent = 'Export Data Karyawan';
+                        spinner.classList.add('hidden');
+                    }, 3000);
+                });
 
-            // Drag and drop functionality
-            const dropZone = document.querySelector('[onclick="document.getElementById(\'import_file\').click()"]');
+                // Drag and drop functionality
+                const dropZone = document.querySelector('[onclick="document.getElementById(\'import_file\').click()"]');
 
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-            });
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, preventDefaults, false);
+                });
 
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, highlight, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, unhighlight, false);
-            });
-
-            function highlight(e) {
-                dropZone.classList.add('border-blue-500', 'bg-blue-50');
-            }
-
-            function unhighlight(e) {
-                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
-            }
-
-            dropZone.addEventListener('drop', handleDrop, false);
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-
-                if (files.length > 0) {
-                    document.getElementById('import_file').files = files;
-                    updateFileName(document.getElementById('import_file'));
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
-            }
-        </script>
 
-        @include('admin.components.toast')
-    @endsection
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, highlight, false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, unhighlight, false);
+                });
+
+                function highlight(e) {
+                    dropZone.classList.add('border-blue-500', 'bg-blue-50');
+                }
+
+                function unhighlight(e) {
+                    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                }
+
+                dropZone.addEventListener('drop', handleDrop, false);
+
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+
+                    if (files.length > 0) {
+                        document.getElementById('import_file').files = files;
+                        updateFileName(document.getElementById('import_file'));
+                    }
+                }
+            </script>
+
+            <x-toast />
+        @endsection

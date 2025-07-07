@@ -285,13 +285,8 @@
                         </table>
                     </div>
 
-
                     <!-- Pagination -->
-                    @if ($trainings->isNotEmpty() && method_exists($trainings, 'links'))
-                        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                            {{ $trainings->links() }}
-                        </div>
-                    @endif
+                    <x-pagination-ui :data="$trainings" />
                 </div>
             </div>
         </div>

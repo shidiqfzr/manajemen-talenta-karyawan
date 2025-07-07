@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             TrainingSeeder::class,
             EmployeeTrainingSeeder::class,
             EvaluationSeeder::class,
-            EmployeeSeeder::class,
             EmployeeStatisticSeeder::class
         ]);
     }

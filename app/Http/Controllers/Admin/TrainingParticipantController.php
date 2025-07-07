@@ -5,11 +5,19 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Training;
 use App\Models\Employee;
+use App\Services\TrainingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class TrainingParticipantController extends Controller
 {
+    protected $trainingService;
+
+    public function __construct(TrainingService $trainingService)
+    {
+        $this->trainingService = $trainingService;
+    }
+
     /**
      * Show the form for creating a new participant.
      */
@@ -25,7 +33,8 @@ class TrainingParticipantController extends Controller
     public function store(Request $request, Training $training)
     {
         $request->validate([
-            'employee_nik' => 'required|exists:employees,nik',
+            'employee_niks' => 'required|array|min:1',
+            'employee_niks.*' => 'exists:employees,nik',
             'sertifikat' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
 
@@ -37,11 +46,15 @@ class TrainingParticipantController extends Controller
         }
 
         // Simpan ke pivot table
-        $training->employees()->syncWithoutDetaching([
-            $request->employee_nik => [
-                'sertifikat' => $sertifikatPath,
-            ],
-        ]);
+        foreach ($request->employee_niks as $nik) {
+            $training->employees()->syncWithoutDetaching([
+                $nik => [
+                    'sertifikat' => $sertifikatPath,
+                ],
+            ]);
+        }
+
+        $this->trainingService->recalculateManHours($training);
 
         return redirect()->route('admin.trainings.show', $training->id)
             ->with('success', 'Peserta berhasil ditambahkan.');
@@ -54,7 +67,7 @@ class TrainingParticipantController extends Controller
     {
         $pivotData = $training->employees()->where('employee_nik', $employee->nik)->firstOrFail()->pivot;
 
-        return view('admin.trainings.participants.edit', compact('training', 'employee', 'pivotData'));
+        return view('admin.trainings.edit-participant', compact('training', 'employee', 'pivotData'));
     }
 
     /**
@@ -63,19 +76,29 @@ class TrainingParticipantController extends Controller
     public function update(Request $request, Training $training, Employee $employee)
     {
         $request->validate([
-            'jam_belajar_per_hari' => 'required|integer|min:1',
-            'keterangan' => 'nullable|string',
+            'sertifikat' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
 
-        $jamBelajar = $request->jam_belajar_per_hari;
+        $sertifikatPath = null;
 
-        $training->employees()->updateExistingPivot($employee->nik, [
-            'jam_belajar_per_hari' => $jamBelajar,
-            'keterangan' => $request->keterangan,
-        ]);
+        // Simpan file jika ada
+        if ($request->hasFile('sertifikat')) {
+            $sertifikatPath = $request->file('sertifikat')->store('sertifikat', 'public');
+
+            // Hapus sertifikat lama jika ada
+            $existing = $training->employees()->where('employee_nik', $employee->nik)->first();
+            if ($existing && $existing->pivot->sertifikat) {
+                Storage::disk('public')->delete($existing->pivot->sertifikat);
+            }
+
+            // Update sertifikat pada pivot table
+            $training->employees()->updateExistingPivot($employee->nik, [
+                'sertifikat' => $sertifikatPath,
+            ]);
+        }
 
         return redirect()->route('admin.trainings.show', $training->id)
-            ->with('success', 'Data peserta berhasil diperbarui.');
+            ->with('success', 'Sertifikat peserta berhasil diperbarui.');
     }
 
     /**
@@ -84,6 +107,8 @@ class TrainingParticipantController extends Controller
     public function destroy(Training $training, Employee $employee)
     {
         $training->employees()->detach($employee->nik);
+
+        $this->trainingService->recalculateManHours($training);
 
         return back()->with('success', 'Peserta berhasil dihapus.');
     }

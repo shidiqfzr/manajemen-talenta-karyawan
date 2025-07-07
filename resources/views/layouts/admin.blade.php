@@ -75,8 +75,10 @@
                     sidebar-mobile lg:translate-x-0 lg:static lg:z-auto">
 
             <!-- Sidebar Header -->
-            <div class="flex items-center justify-between p-6 border-b border-gray-100">
-                <h1 class="text-xl font-bold text-blue-600">Admin Panel</h1>
+            <div class="relative flex items-center justify-between p-6 border-b border-gray-100">
+                <div class="flex-1 text-center">
+                    <h1 class="text-xl font-bold text-center text-blue-600">Admin Panel</h1>
+                </div>
                 <button id="closeSidebar"
                     class="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
                     <i class="fas fa-times"></i>
@@ -97,7 +99,8 @@
                             <i class="fas fa-users w-5 text-center mr-3 text-sm"></i>
                             <span class="font-medium">Karyawan</span>
                         </div>
-                        <i id="karyawanChevron" class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
+                        <i id="karyawanChevron"
+                            class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
                     </button>
 
                     <div id="karyawanDropdown" class="dropdown-menu pl-4">
@@ -154,7 +157,6 @@
                     <span class="font-medium">Logout</span>
                 </button>
             </form>
-
         </aside>
 
         <!-- Main Layout -->
@@ -165,7 +167,7 @@
                     <button id="openSidebar" class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <h1 class="text-xl font-bold text-gray-900">Admin Panel</h1>
+                    <h1 class="text-xl font-bold text-center text-gray-900">Admin Panel</h1>
                     <div class="w-10"></div> <!-- Spacer for centering -->
                 </div>
             </header>

@@ -6,23 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Training;
 use App\Models\Employee;
 use App\Models\EmployeeStatistic;
+use App\Services\TrainingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class TrainingController extends Controller
 {
-    /**
-     * Hitung jumlah man hours berdasarkan peserta & lama pelatihan
-     */
-    protected function calculateManHours(Training $training)
-    {
-        $jumlahPeserta = $training->employees()->count();
-        $jumlahHari = Carbon::parse($training->tanggal_mulai)->diffInDays(Carbon::parse($training->tanggal_akhir)) + 1;
-        $jamPerHari = $training->jam_belajar_per_hari;
+    protected $trainingService;
 
-        $training->jumlah_man_hours = $jumlahHari * $jamPerHari * $jumlahPeserta;
-        $training->save();
+    public function __construct(TrainingService $trainingService)
+    {
+        $this->trainingService = $trainingService;
     }
 
     // Display training
@@ -32,14 +27,14 @@ class TrainingController extends Controller
         $end = $request->end_date;
 
         $trainings = Training::withCount('employees')
-            ->when($start && $end, function ($query) use ($start, $end) {
-                $query->whereBetween('tanggal_mulai', [$start, $end]);
-            })
-            ->get();
+            ->when($start && $end, fn($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))
+            ->paginate(20);
 
-        $totalManHours = $trainings->sum('jumlah_man_hours');
-        $totalTiketPeserta = $trainings->sum('biaya_tiket_peserta');
-        $totalBiayaPelatihan = $trainings->sum('biaya_pelatihan');
+        $summary = Training::when($start && $end, fn($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))->get();
+
+        $totalManHours = $summary->sum('jumlah_man_hours');
+        $totalTiketPeserta = $summary->sum('biaya_tiket_peserta');
+        $totalBiayaPelatihan = $summary->sum('biaya_pelatihan');
 
         $totalKaryawan = null;
         if ($start && $end) {
@@ -69,7 +64,7 @@ class TrainingController extends Controller
             'metode' => 'required|string|max:255',
             'tanggal_mulai' => 'required|date',
             'tanggal_akhir' => 'required|date',
-            'tiket_peserta' => 'required|integer|min:0',
+            'biaya_tiket_peserta' => 'required|integer|min:0',
             'biaya_pelatihan' => 'required|integer|min:0',
             'penyelenggara' => 'required|string|max:255',
             'nomor_surat' => 'required|string|max:255',
@@ -80,7 +75,7 @@ class TrainingController extends Controller
         ]);
 
         $training = Training::create($validated);
-        $this->calculateManHours($training);
+        $this->trainingService->recalculateManHours($training);
 
         return redirect()->route('admin.trainings.index')->with('success', 'Pelatihan berhasil ditambahkan');
     }
@@ -95,10 +90,9 @@ class TrainingController extends Controller
      */
     public function show(Training $training)
     {
-        $training->load('employees');
-        $allEmployees = \App\Models\Employee::all();
+        $participants = $training->employees()->paginate(20);
 
-        return view('admin.trainings.show', compact('training', 'allEmployees'));
+        return view('admin.trainings.show', compact('training', 'participants'));
     }
 
     public function edit(Training $training)
@@ -114,7 +108,7 @@ class TrainingController extends Controller
             'metode' => 'required|string|max:255',
             'tanggal_mulai' => 'required|date',
             'tanggal_akhir' => 'required|date',
-            'tiket_peserta' => 'required|integer|min:0',
+            'biaya_tiket_peserta' => 'required|integer|min:0',
             'biaya_pelatihan' => 'required|integer|min:0',
             'penyelenggara' => 'required|string|max:255',
             'nomor_surat' => 'required|string|max:255',
@@ -125,7 +119,7 @@ class TrainingController extends Controller
         ]);
 
         $training->update($validated);
-        $this->calculateManHours($training);
+        $this->trainingService->recalculateManHours($training);
 
         return redirect()->route('admin.trainings.show', $training->id)->with('success', 'Data pelatihan berhasil diperbarui.');
     }

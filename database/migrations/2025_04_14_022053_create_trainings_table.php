@@ -25,8 +25,8 @@ return new class extends Migration
             $table->date('tanggal_surat');
             $table->text('keterangan');
             $table->string('bidang_pelatihan');
-            $table->string('jam_belajar_per_hari');
-            $table->string('jumlah_man_hours');
+            $table->integer('jam_belajar_per_hari');
+            $table->integer('jumlah_man_hours')->nullable();
             $table->timestamps();
         });
     }

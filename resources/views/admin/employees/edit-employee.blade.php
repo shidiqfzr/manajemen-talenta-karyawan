@@ -106,7 +106,7 @@
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Golongan 2024</label>
+                        <label class="block text-sm font-medium">Golongan</label>
                         <input type="text" name="golongan"
                             value="{{ old('golongan', $employee->golongan) }}" class="w-full border p-2 rounded">
                     </div>
