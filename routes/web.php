@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
 use App\Http\Controllers\Admin\TrainingParticipantController as AdminTrainingParticipantController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
 use App\Http\Controllers\Admin\EmployeeStatisticController as AdminEmployeeStatisticController;
+use App\Http\Controllers\Admin\TrainingExportController as AdminTrainingExportController;
 
 use App\Http\Controllers\DataController;
 
@@ -79,6 +80,7 @@ Route::prefix('admin')
             Route::get('/{training}/edit', [AdminTrainingController::class, 'edit'])->name('edit');
             Route::put('/{training}', [AdminTrainingController::class, 'update'])->name('update');
             Route::delete('/{training}', [AdminTrainingController::class, 'destroy'])->name('destroy');
+            Route::get('/{training}/surat-tugas', [AdminTrainingExportController::class, 'exportSuratTugas'])->name('surat-tugas');
         });
 
         // Routes for training participants

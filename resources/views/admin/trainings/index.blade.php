@@ -197,11 +197,7 @@
                         <!-- Only show count if have trainings -->
                         @if ($trainings->isNotEmpty())
                             <div class="mt-2 sm:mt-0 text-sm text-gray-500">
-                                @if (method_exists($trainings, 'total') && method_exists($trainings, 'count'))
-                                    Menampilkan {{ $trainings->count() }} dari {{ $trainings->total() }} data
-                                @else
-                                    Menampilkan {{ $trainings->count() }} data
-                                @endif
+                                Menampilkan {{ $trainings->count() }} dari {{ $trainings->total() }} data
                             </div>
                         @endif
                     </div>
