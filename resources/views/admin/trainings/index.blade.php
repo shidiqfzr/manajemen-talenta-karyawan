@@ -142,47 +142,97 @@
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fas fa-filter text-blue-500 mr-2"></i> Filter Data Pelatihan
+                            <i class="fas fa-filter text-blue-500 mr-2"></i> Filter & Export Data
                         </h2>
                     </div>
-
                     <div class="p-6">
-                        <form method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                            <div class="md:col-span-3">
-                                <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Dari
-                                    Tanggal</label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                        <i class="fas fa-calendar-alt text-gray-400"></i>
+                        <form method="GET" action="{{ route('admin.trainings.index') }}" id="filterForm">
+                            <!-- Inline Filter Row -->
+                            <div class="flex flex-col lg:flex-row gap-4 items-end">
+                                <!-- Start Date -->
+                                <div class="flex-1 min-w-0">
+                                    <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                        <i class="fas fa-calendar-day text-gray-400 mr-1"></i>
+                                        Dari Tanggal
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <i class="fas fa-calendar-alt text-gray-400 text-sm"></i>
+                                        </div>
+                                        <input type="date" name="start_date" id="start_date"
+                                            value="{{ request('start_date') }}"
+                                            class="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg shadow-sm text-sm 
+                                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                                      hover:border-gray-400 transition-colors duration-200
+                                      bg-white placeholder-gray-400">
                                     </div>
-                                    <input type="date" name="start_date" id="start_date"
-                                        value="{{ request('start_date') }}"
-                                        class="w-full pl-10 border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+
+                                <!-- End Date -->
+                                <div class="flex-1 min-w-0">
+                                    <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                        <i class="fas fa-calendar-week text-gray-400 mr-1"></i>
+                                        Sampai Tanggal
+                                    </label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <i class="fas fa-calendar-alt text-gray-400 text-sm"></i>
+                                        </div>
+                                        <input type="date" name="end_date" id="end_date"
+                                            value="{{ request('end_date') }}"
+                                            class="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg shadow-sm text-sm 
+                                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                                      hover:border-gray-400 transition-colors duration-200
+                                      bg-white placeholder-gray-400">
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                                    <button type="submit"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg text-sm font-medium
+                                   transition-all duration-200 flex justify-center items-center
+                                   shadow-sm hover:shadow-md whitespace-nowrap">
+                                        <i class="fas fa-search mr-2"></i>
+                                        <span>Terapkan Filter</span>
+                                    </button>
+
+                                    <button type="submit" formaction="{{ route('admin.trainings.export') }}"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-sm font-medium
+                                   transition-all duration-200 flex justify-center items-center
+                                   shadow-sm hover:shadow-md whitespace-nowrap">
+                                        <i class="fas fa-file-excel mr-2"></i>
+                                        <span>Export Excel</span>
+                                    </button>
+
+                                    @if (request('start_date') || request('end_date'))
+                                        <a href="{{ route('admin.trainings.index') }}"
+                                            class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg text-sm font-medium
+                                  transition-all duration-200 flex justify-center items-center
+                                  border border-gray-300 hover:border-gray-400 whitespace-nowrap">
+                                            <i class="fas fa-undo mr-2"></i>
+                                            <span>Reset Filter</span>
+                                        </a>
+                                    @endif
                                 </div>
                             </div>
-                            <div class="md:col-span-3">
-                                <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">Sampai
-                                    Tanggal</label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                        <i class="fas fa-calendar-alt text-gray-400"></i>
+
+                            <!-- Current Filter Display -->
+                            @if (request('start_date') || request('end_date'))
+                                <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div class="flex items-center text-sm text-blue-700">
+                                            <i class="fas fa-info-circle mr-2"></i>
+                                            <span class="font-medium">Filter aktif:</span>
+                                            <span class="ml-2">
+                                                {{ request('start_date') ? \Carbon\Carbon::parse(request('start_date'))->format('d M Y') : 'Semua waktu' }}
+                                                -
+                                                {{ request('end_date') ? \Carbon\Carbon::parse(request('end_date'))->format('d M Y') : 'Sekarang' }}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}"
-                                        class="w-full pl-10 border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
-                            </div>
-                            <div class="md:col-span-4 flex items-end space-x-2">
-                                <button type="submit"
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm transition flex-1 md:flex-none flex justify-center items-center">
-                                    <i class="fas fa-search mr-2"></i> Terapkan Filter
-                                </button>
-                                @if (request('start_date') || request('end_date'))
-                                    <a href="{{ route('admin.trainings.index') }}"
-                                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm transition flex justify-center items-center">
-                                        <i class="fas fa-undo mr-2"></i> Reset
-                                    </a>
-                                @endif
-                            </div>
+                            @endif
                         </form>
                     </div>
                 </div>
@@ -260,17 +310,11 @@
                                         <td colspan="8" class="px-6 py-12 text-center">
                                             <div class="flex flex-col items-center">
                                                 <div class="bg-gray-100 rounded-full p-3 mb-4">
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="h-12 w-12 text-gray-400" fill="none"
-                                                        viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="1.5"
-                                                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                                    </svg>
+                                                    <i class="fas fa-inbox text-gray-400 text-5xl"></i>
                                                 </div>
                                                 <h3 class="text-lg font-medium text-gray-900 mb-1">Tidak ada data pelatihan
                                                 </h3>
-                                                <p class="text-gray-500 max-w-sm text-center mb-4">
+                                                <p class="text-gray-500 max-w-full text-center mb-4">
                                                     Belum ada data pelatihan yang tersedia untuk ditampilkan saat ini.
                                                 </p>
                                             </div>

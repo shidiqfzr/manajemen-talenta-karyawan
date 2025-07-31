@@ -76,6 +76,7 @@ Route::prefix('admin')
             Route::get('/', [AdminTrainingController::class, 'index'])->name('index');
             Route::get('/create', [AdminTrainingController::class, 'create'])->name('create');
             Route::post('/', [AdminTrainingController::class, 'store'])->name('store');
+            Route::get('/export', [AdminTrainingExportController::class, 'exportExcel'])->name('export');
             Route::get('/{training}', [AdminTrainingController::class, 'show'])->name('show');
             Route::get('/{training}/edit', [AdminTrainingController::class, 'edit'])->name('edit');
             Route::put('/{training}', [AdminTrainingController::class, 'update'])->name('update');
