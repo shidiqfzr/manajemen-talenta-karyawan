@@ -1,5 +1,4 @@
 @extends('layouts.admin')
-
 @section('content')
     <div class="bg-gray-100 min-h-screen">
         <div class="max-w-7xl mx-auto bg-white p-6 rounded-xl shadow-lg">
@@ -8,7 +7,6 @@
                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
                     <h1 class="text-xl sm:text-2xl font-bold text-white">Detail Penilaian Karyawan</h1>
                 </div>
-
                 <!-- Employee Information -->
                 <div class="p-6">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -27,16 +25,11 @@
                     </div>
                 </div>
             </div>
-
             <!-- Evaluation Scores Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
                 <div class="border-b border-gray-200 px-6 py-4">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-                            </path>
-                        </svg>
+                        <i class="fas fa-chart-bar w-5 h-5 mr-2 text-blue-600"></i>
                         Nilai Per Kriteria
                     </h2>
                 </div>
@@ -68,16 +61,11 @@
                     </div>
                 </div>
             </div>
-
             <!-- 9 Box Score Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
                 <div class="border-b border-gray-200 px-6 py-4">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z">
-                            </path>
-                        </svg>
+                        <i class="fas fa-heart w-5 h-5 mr-2 text-green-600"></i>
                         Skor 9 Box
                     </h2>
                 </div>
@@ -98,16 +86,11 @@
                     </div>
                 </div>
             </div>
-
             <!-- Assessment Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="border-b border-gray-200 px-6 py-4">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
+                        <i class="fas fa-file-alt w-5 h-5 mr-2 text-purple-600"></i>
                         Informasi Asesmen
                     </h2>
                 </div>
@@ -152,15 +135,11 @@
                     </div>
                 </div>
             </div>
-
             <!-- Back Button -->
             <div class="mt-8 flex justify-center sm:justify-start">
                 <a href="{{ route('admin.employees.index') }}"
                     class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-medium rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                    </svg>
+                    <i class="fas fa-arrow-left w-5 h-5 mr-2"></i>
                     Kembali ke Daftar
                 </a>
             </div>

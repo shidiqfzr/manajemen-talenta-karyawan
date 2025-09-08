@@ -194,7 +194,7 @@
                                    transition-all duration-200 flex justify-center items-center
                                    shadow-sm hover:shadow-md whitespace-nowrap">
                                         <i class="fas fa-search mr-2"></i>
-                                        <span>Terapkan Filter</span>
+                                        <span>Filter</span>
                                     </button>
 
                                     <button type="submit" formaction="{{ route('admin.trainings.export') }}"
@@ -202,7 +202,7 @@
                                    transition-all duration-200 flex justify-center items-center
                                    shadow-sm hover:shadow-md whitespace-nowrap">
                                         <i class="fas fa-file-excel mr-2"></i>
-                                        <span>Export Excel</span>
+                                        <span>Export</span>
                                     </button>
 
                                     @if (request('start_date') || request('end_date'))

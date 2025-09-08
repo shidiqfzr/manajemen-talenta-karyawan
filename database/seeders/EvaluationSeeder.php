@@ -11,7 +11,7 @@ class EvaluationSeeder extends Seeder
 {
     public function run(): void
     {
-        $employees = Employee::take(10)->get(); // Seed for first 10 employees
+        $employees = Employee::take(10)->get(); 
 
         foreach ($employees as $employee) {
             $nilai_kepemimpinan = rand(60, 100);
@@ -35,7 +35,7 @@ class EvaluationSeeder extends Seeder
                 'nilai_tertimbang' => $nilai_tertimbang,
                 'skor_smkbk_9box' => rand(1, 9),
                 'skor_cli_9box' => rand(1, 9),
-                'kategori_9box' => collect(['High Potential', 'Core Performer', 'Low Performer'])->random(),
+                'kategori_9box' => collect(['High Potential', 'Promotable', 'Sleeping Tiger', 'Solid Contributor', 'Unfit'])->random(),
                 'bidang_tugas' => 'Bidang ' . rand(1, 3),
                 'lembaga_asesmen' => collect(['Lembaga A', 'Lembaga B', 'Lembaga C'])->random(),
                 'tanggal_pelaksanaan_asesmen' => now()->subMonths(rand(1, 24)),

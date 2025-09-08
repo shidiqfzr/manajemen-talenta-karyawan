@@ -49,7 +49,7 @@ class Employee extends Model
     public function trainings()
     {
         return $this->belongsToMany(Training::class, 'employee_training', 'employee_nik', 'training_id')
-            ->withPivot(['sertifikat', 'jam_belajar_per_hari', 'jam_pembelajaran', 'keterangan'])
+            ->withPivot(['sertifikat'])
             ->withTimestamps();
     }
 

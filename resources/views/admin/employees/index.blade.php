@@ -399,17 +399,14 @@
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
                             <i class="fa-solid fa-clipboard-list text-yellow-500 mr-2"></i>Daftar Karyawan
                         </h2>
-                        <!-- Only show count if have employees -->
+
                         @if ($employees->isNotEmpty())
                             <div class="mt-2 sm:mt-0 text-sm text-gray-500">
-                                @if (method_exists($employees, 'total') && method_exists($employees, 'count'))
-                                    Menampilkan {{ $employees->count() }} dari {{ $employees->total() }} data
-                                @else
-                                    Menampilkan {{ $employees->count() }} data
-                                @endif
+                                Menampilkan {{ $employees->count() }} dari {{ $employees->total() }} data
                             </div>
                         @endif
                     </div>
+
                     <div class="overflow-x-auto bg-white shadow rounded-lg">
                         <table
                             class="min-w-full bg-white border divide-gray-200 rounded-lg overflow-hidden shadow-md table-auto">
@@ -480,7 +477,7 @@
                     </div>
 
                     <!-- Pagination -->
-                    <x-pagination-ui :data="$employees" /> 
+                    <x-pagination-ui :data="$employees" />
                 </div>
             </div>
 
@@ -526,7 +523,7 @@
                     // Re-enable button after 3 seconds (typical download time)
                     setTimeout(function() {
                         btn.disabled = false;
-                        btnText.textContent = 'Export Data Karyawan';
+                        btnText.textContent = 'Export Data';
                         spinner.classList.add('hidden');
                     }, 3000);
                 });

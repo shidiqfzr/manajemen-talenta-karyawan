@@ -80,7 +80,7 @@ class EmployeeController extends Controller
             'agama' => 'nullable|string|max:50',
             'pendidikan_terakhir' => 'nullable|string|max:100',
             'sekolah' => 'nullable|string|max:255',
-            'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'foto' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
         if ($request->hasFile('foto')) {
@@ -95,7 +95,11 @@ class EmployeeController extends Controller
     public function show($nik)
     {
         $employee = Employee::where('nik', $nik)->firstOrFail();
-        return view('admin.employees.show', compact('employee'));
+
+        $trainings = $employee->trainings()->paginate(10);
+        $evaluations = $employee->evaluations()->latest()->paginate(5);
+
+        return view('admin.employees.show', compact('employee', 'trainings', 'evaluations'));
     }
 
     public function import(Request $request)
