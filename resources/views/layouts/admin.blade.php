@@ -76,8 +76,9 @@
 
             <!-- Sidebar Header -->
             <div class="relative flex items-center justify-between p-6 border-b border-gray-100">
-                <div class="flex-1 text-center">
-                    <h1 class="text-xl font-bold text-center text-blue-600">Admin Panel</h1>
+                <div class="flex-1 flex items-center justify-center gap-3">
+                    <img src="{{ asset('images/logo-ptpn4.png') }}" alt="Logo" class="h-8 w-auto object-contain">
+                    <h1 class="text-xl font-bold text-green-600">Admin Panel</h1>
                 </div>
                 <button id="closeSidebar"
                     class="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
@@ -93,8 +94,8 @@
                         class="flex items-center justify-between w-full px-4 py-3 rounded-lg text-left 
                                 transition-smooth group
                                 {{ request()->routeIs('admin.employees.*')
-                                    ? 'bg-blue-50 text-blue-700 shadow-sm'
-                                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                                    ? 'bg-green-50 text-green-700 shadow-sm'
+                                    : 'text-gray-700 hover:bg-gray-50 hover:text-green-600' }}">
                         <div class="flex items-center">
                             <i class="fas fa-users w-5 text-center mr-3 text-sm"></i>
                             <span class="font-medium">Karyawan</span>
@@ -108,16 +109,16 @@
                             <a href="{{ route('admin.employees.index') }}"
                                 class="flex items-center px-4 py-2 rounded-lg text-sm transition-smooth
                                     {{ request()->routeIs('admin.employees.index')
-                                        ? 'bg-blue-100 text-blue-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600' }}">
+                                        ? 'bg-green-100 text-green-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-green-600' }}">
                                 <i class="fas fa-cogs w-4 text-center mr-3 text-xs"></i>
                                 Manajemen
                             </a>
                             <a href="{{ route('admin.employees.statistics.index') }}"
                                 class="flex items-center px-4 py-2 rounded-lg text-sm transition-smooth
                                     {{ request()->routeIs('admin.employees.statistics.*')
-                                        ? 'bg-blue-100 text-blue-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600' }}">
+                                        ? 'bg-green-100 text-green-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-green-600' }}">
                                 <i class="fas fa-chart-line w-4 text-center mr-3 text-xs"></i>
                                 Statistik
                             </a>
@@ -129,8 +130,8 @@
                 <a href="{{ route('admin.trainings.index') }}"
                     class="flex items-center px-4 py-3 rounded-lg transition-smooth group
                         {{ request()->routeIs('admin.trainings.*')
-                            ? 'bg-blue-50 text-blue-700 shadow-sm font-medium'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                            ? 'bg-green-50 text-green-700 shadow-sm font-medium'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-green-600' }}">
                     <i class="fas fa-chalkboard-teacher w-5 text-center mr-3 text-sm"></i>
                     <span class="font-medium">Pelatihan</span>
                 </a>
@@ -139,8 +140,8 @@
                 <a href="{{ route('admin.evaluations.index') }}"
                     class="flex items-center px-4 py-3 rounded-lg transition-smooth group
                         {{ request()->routeIs('admin.evaluations.*')
-                            ? 'bg-blue-50 text-blue-700 shadow-sm font-medium'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600' }}">
+                            ? 'bg-green-50 text-green-700 shadow-sm font-medium'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-green-600' }}">
                     <i class="fas fa-clipboard-check w-5 text-center mr-3 text-sm"></i>
                     <span class="font-medium">Penilaian</span>
                 </a>

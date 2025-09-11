@@ -67,8 +67,21 @@
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal Lahir</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tanggal_lahir }}</p>
+                            @if ($employee->tanggal_lahir)
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-900 font-semibold">
+                                        {{ $employee->tanggal_lahir->translatedFormat('d M Y') }}
+                                    </span>
+                                    <span
+                                        class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                                        {{ $employee->tanggal_lahir->age }} tahun
+                                    </span>
+                                </div>
+                            @else
+                                <span class="text-gray-400">–</span>
+                            @endif
                         </div>
+
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Agama</label>
                             <p class="text-gray-900 font-semibold">{{ $employee->agama }}</p>
@@ -117,31 +130,158 @@
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal Dalam Jabatan</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tanggal_dalam_jabatan }}</p>
+                            <p class="text-gray-900 font-semibold">
+                                {{ $employee->tanggal_dalam_jabatan?->format('d M Y') ?? '–' }}</p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal MBT</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tanggal_mbt }}</p>
+                            <p class="text-gray-900 font-semibold">{{ $employee->tanggal_mbt?->format('d M Y') ?? '–' }}
+                            </p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">TMT Bekerja</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tmt_bekerja }}</p>
+                            <p class="text-gray-900 font-semibold">{{ $employee->tmt_bekerja?->format('d M Y') ?? '–' }}
+                            </p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal Diangkat Staf</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tanggal_diangkat_staf }}</p>
+                            <p class="text-gray-900 font-semibold">
+                                {{ $employee->tanggal_diangkat_staf?->format('d M Y') ?? '–' }}</p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">TMT Unit Kerja</label>
-                            <p class="text-gray-900 font-semibold">{{ $employee->tmt_unit_kerja }}</p>
+                            <p class="text-gray-900 font-semibold">{{ $employee->tmt_unit_kerja?->format('d M Y') ?? '–' }}
+                            </p>
                         </div>
                         <div class="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
                             <label class="text-sm font-medium text-red-700 block mb-1">Tanggal Pensiun</label>
-                            <p class="text-red-900 font-semibold">{{ $employee->tanggal_pensiun }}</p>
+                            <p class="text-red-900 font-semibold">{{ $employee->tanggal_pensiun?->format('d M Y') ?? '–' }}
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {{-- Riwayat Jabatan --}}
+            <section id="riwayat-jabatan" class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
+                <div
+                    class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-briefcase text-green-600 mr-2"></i>
+                        Riwayat Jabatan
+                    </h3>
+
+                    <a href="{{ route('admin.employees.job-history.create', $employee) }}"
+                        class="inline-flex items-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition">
+                        <i class="fas fa-plus mr-2"></i> Tambah Riwayat
+                    </a>
+                </div>
+
+                {{-- Jabatan aktif (jika ada) --}}
+                @if ($employee->currentJob)
+                    <div class="px-6 pt-4">
+                        <div class="rounded-lg border border-green-200 bg-green-50 p-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <div class="text-sm text-green-700 font-medium">Jabatan Aktif</div>
+                                    <div class="mt-1 font-semibold text-green-900">
+                                        {{ $employee->currentJob->jabatan }} — {{ $employee->currentJob->unit_kerja }}
+                                    </div>
+                                    <div class="mt-1 text-sm text-green-800">
+                                        Periode:
+                                        {{ $employee->currentJob->tmt_awal?->format('d M Y') }}
+                                        –
+                                        {{ $employee->currentJob->tmt_akhir?->format('d M Y') ?? 'Sekarang' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Tabel Riwayat --}}
+                <div>
+                    @if ($histories->whereNotNull('tmt_akhir')->isEmpty())
+                        <!-- Empty State -->
+                        <div class="text-center py-12">
+                            <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-briefcase text-3xl text-gray-400"></i>
+                            </div>
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Jabatan</h4>
+                            <p class="text-gray-500 max-w-sm mx-auto">
+                                Karyawan ini belum memiliki riwayat sebelumnya. Riwayat jabatan akan muncul di sini ketika
+                                tersedia.
+                            </p>
+                        </div>
+                    @else
+                        <div class="p-6 overflow-x-auto">
+                            <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+                                <thead class="bg-gray-50 text-gray-700">
+                                    <tr class="text-sm">
+                                        <th class="px-4 py-3 text-left">Periode</th>
+                                        <th class="px-4 py-3 text-left">Jabatan</th>
+                                        <th class="px-4 py-3 text-left">Unit</th>
+                                        <th class="px-4 py-3 text-left">Level</th>
+                                        <th class="px-4 py-3 text-left">Gol</th>
+                                        <th class="px-4 py-3 text-left">Mutasi</th>
+                                        <th class="px-4 py-3 text-left">SK</th>
+                                        <th class="px-4 py-3 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 text-sm text-gray-800">
+                                    @foreach ($histories->whereNotNull('tmt_akhir') as $row)
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-3 whitespace-nowrap">
+                                                {{ $row->tmt_awal?->format('d M Y') }} –
+                                                {{ $row->tmt_akhir?->format('d M Y') }}
+                                            </td>
+                                            <td class="px-4 py-3">{{ $row->jabatan }}</td>
+                                            <td class="px-4 py-3">{{ $row->unit_kerja }}</td>
+                                            <td class="px-4 py-3">{{ $row->level ?? '–' }}</td>
+                                            <td class="px-4 py-3">{{ $row->golongan ?? '–' }}</td>
+                                            <td class="px-4 py-3">{{ $row->jenis_mutasi ?? '–' }}</td>
+                                            <td class="px-4 py-3">
+                                                @if ($row->nomor_sk || $row->tanggal_sk)
+                                                    {{ $row->nomor_sk ?? '–' }} /
+                                                    {{ $row->tanggal_sk?->format('d M Y') ?? '–' }}
+                                                @else
+                                                    –
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <div class="inline-flex items-center gap-2">
+                                                    <a href="{{ route('admin.employees.job-history.edit', [$employee, $row->id]) }}"
+                                                        class="px-3 py-1.5 rounded-md bg-yellow-400 text-white hover:bg-yellow-500 transition"
+                                                        title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <form
+                                                        action="{{ route('admin.employees.job-history.destroy', [$employee, $row->id]) }}"
+                                                        method="POST" class="inline"
+                                                        onsubmit="return confirm('Hapus riwayat jabatan ini?')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit"
+                                                            class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
+                                                            title="Hapus">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+
+                            {{-- Pagination --}}
+                            <div class="mt-4">
+                                {{ $histories->links() }}
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </section>
 
             <!-- Training Information -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
@@ -262,8 +402,8 @@
                 <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
-                            <i class="fas fa-chart-line text-emerald-600 mr-2"></i>
-                            Evaluasi Kinerja & Potensi
+                            <i class="fas fa-clipboard-check text-emerald-600 mr-2"></i>
+                            Riwayat Penilaian
                         </h3>
                         @isset($evaluations)
                             @if ($evaluations->count())
@@ -283,10 +423,10 @@
                             <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                                 <i class="fas fa-clipboard-list text-3xl text-gray-400"></i>
                             </div>
-                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Data Evaluasi</h4>
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Penilaian</h4>
                             <p class="text-gray-500 max-w-sm mx-auto">
-                                Tambahkan data evaluasi karyawan untuk melihat ringkasan nilai, 9-Box, dan informasi asesmen
-                                di sini.
+                                Karyawan ini belum mengikuti penialian apapun. Riwayat penilaian akan muncul di sini ketika
+                                tersedia.
                             </p>
                         </div>
                     @else

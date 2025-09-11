@@ -9,7 +9,7 @@
                     <p class="text-gray-500 mt-1">Kelola data karyawan</p>
                 </div>
                 <a href="{{ route('admin.employees.create') }}"
-                    class="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition ease-in-out duration-200 flex items-center justify-center shadow-sm">
+                    class="w-full sm:w-auto bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition ease-in-out duration-200 flex items-center justify-center shadow-sm">
                     <i class="fas fa-plus mr-2"></i> Tambah Karyawan
                 </a>
             </div>
@@ -17,9 +17,9 @@
 
                 <!-- Excel Import Form, Template, and Export Button -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-200">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-white border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fas fa-file-excel text-blue-500 mr-2"></i> Import & Export Data
+                            <i class="fas fa-file-excel text-green-500 mr-2"></i> Import & Export Data
                         </h2>
                     </div>
                     <div class="p-6">
@@ -242,9 +242,9 @@
 
                 <!-- Search & Filter Form -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 bg-gradient-to-r from-purple-50 to-white border-b border-gray-200">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-white border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fas fa-filter text-purple-500 mr-2"></i> Pencarian & Filter Data
+                            <i class="fas fa-filter text-green-500 mr-2"></i> Pencarian & Filter Data
                         </h2>
                     </div>
                     <div class="p-6">
@@ -395,9 +395,9 @@
                 <!-- Employee Table -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div
-                        class="px-6 py-4 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        class="px-6 py-4 bg-gradient-to-r from-green-50 to-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fa-solid fa-clipboard-list text-yellow-500 mr-2"></i>Daftar Karyawan
+                            <i class="fa-solid fa-clipboard-list text-green-500 mr-2"></i>Daftar Karyawan
                         </h2>
 
                         @if ($employees->isNotEmpty())

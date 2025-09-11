@@ -96,10 +96,11 @@ class EmployeeController extends Controller
     {
         $employee = Employee::where('nik', $nik)->firstOrFail();
 
+        $histories   = $employee->jobHistories()->paginate(10);
         $trainings = $employee->trainings()->paginate(10);
         $evaluations = $employee->evaluations()->latest()->paginate(5);
 
-        return view('admin.employees.show', compact('employee', 'trainings', 'evaluations'));
+        return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations'));
     }
 
     public function import(Request $request)

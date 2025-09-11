@@ -24,7 +24,7 @@ class EvaluationController extends Controller
             return view('admin.evaluations.add-evaluation', compact('employee'));
         }
 
-        $employees = Employee::all(); // untuk dropdown pilih karyawan
+        $employees = Employee::all(); 
         return view('admin.evaluations.add-evaluation', compact('employees'));
     }
 

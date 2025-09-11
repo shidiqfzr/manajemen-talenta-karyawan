@@ -44,7 +44,8 @@
                     <div>
                         <label class="block text-sm font-medium">Tanggal Lahir</label>
                         <input type="date" name="tanggal_lahir"
-                            value="{{ old('tanggal_lahir', $employee->tanggal_lahir) }}" class="w-full border p-2 rounded">
+                            value="{{ old('tanggal_lahir', $employee->tanggal_lahir?->format('Y-m-d')) }}"
+                            class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Agama</label>
@@ -123,41 +124,41 @@
                     <div>
                         <label class="block text-sm font-medium">Tanggal Dalam Jabatan</label>
                         <input type="date" name="tanggal_dalam_jabatan"
-                            value="{{ old('tanggal_dalam_jabatan', $employee->tanggal_dalam_jabatan) }}"
+                            value="{{ old('tanggal_dalam_jabatan', $employee->tanggal_dalam_jabatan?->format('Y-m-d')) }}"
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Tanggal MBT</label>
-                        <input type="date" name="tanggal_mbt" value="{{ old('tanggal_mbt', $employee->tanggal_mbt) }}"
+                        <input type="date" name="tanggal_mbt" value="{{ old('tanggal_mbt', $employee->tanggal_mbt?->format('Y-m-d')) }}"
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">TMT Bekerja</label>
                         <input type="date" name="tmt_bekerja"
-                            value="{{ old('tmt_bekerja', $employee->tmt_bekerja) }}" class="w-full border p-2 rounded">
+                            value="{{ old('tmt_bekerja', $employee->tmt_bekerja?->format('Y-m-d')) }}" 
+                            class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Tanggal Diangkat Staf</label>
                         <input type="date" name="tanggal_diangkat_staf"
-                            value="{{ old('tanggal_diangkat_staf', $employee->tanggal_diangkat_staf) }}"
+                            value="{{ old('tanggal_diangkat_staf', $employee->tanggal_diangkat_staf?->format('Y-m-d')) }}"
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">TMT Unit Kerja</label>
                         <input type="date" name="tmt_unit_kerja"
-                            value="{{ old('tmt_unit_kerja', $employee->tmt_unit_kerja) }}"
+                            value="{{ old('tmt_unit_kerja', $employee->tmt_unit_kerja?->format('Y-m-d')) }}"
                             class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Tanggal Pensiun</label>
                         <input type="date" name="tanggal_pensiun"
-                            value="{{ old('tanggal_pensiun', $employee->tanggal_pensiun) }}"
+                            value="{{ old('tanggal_pensiun', $employee->tanggal_pensiun?->format('Y-m-d')) }}"
                             class="w-full border p-2 rounded">
                     </div>
                 </div>
             </div>
 
-            {{-- Actions --}}
             <div class="flex justify-end space-x-3">
                 <a href="{{ route('admin.employees.index') }}"
                     class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Batal</a>

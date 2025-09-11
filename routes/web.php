@@ -8,10 +8,11 @@ use App\Http\Controllers\User\EmployeeController as UserEmployeeController;
 use App\Http\Controllers\User\TrainingController as UserTrainingController;
 
 use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
+use App\Http\Controllers\Admin\EmployeeStatisticController as AdminEmployeeStatisticController;
+use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
 use App\Http\Controllers\Admin\TrainingParticipantController as AdminTrainingParticipantController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
-use App\Http\Controllers\Admin\EmployeeStatisticController as AdminEmployeeStatisticController;
 use App\Http\Controllers\Admin\TrainingExportController as AdminTrainingExportController;
 
 use App\Http\Controllers\DataController;
@@ -45,6 +46,7 @@ Route::prefix('user')
 Route::prefix('admin')
     ->name('admin.')
     ->middleware(['auth', 'role:admin'])
+    ->scopeBindings()
     ->group(function () {
 
         // Employees
@@ -68,6 +70,16 @@ Route::prefix('admin')
                 Route::get('/{statistic}/edit', [AdminEmployeeStatisticController::class, 'edit'])->name('edit');
                 Route::put('/{statistic}', [AdminEmployeeStatisticController::class, 'update'])->name('update');
                 Route::delete('/{statistic}', [AdminEmployeeStatisticController::class, 'destroy'])->name('destroy');
+            });
+
+            // Employee Job History
+            Route::prefix('{employee}/job-history')->name('job-history.')->group(function () {
+                Route::get('/', [AdminJobHistoryController::class, 'index'])->name('index');
+                Route::get('/create', [AdminJobHistoryController::class, 'create'])->name('create');
+                Route::post('/', [AdminJobHistoryController::class, 'store'])->name('store');
+                Route::get('/{job_history}/edit', [AdminJobHistoryController::class, 'edit'])->name('edit');
+                Route::put('/{job_history}', [AdminJobHistoryController::class, 'update'])->name('update');
+                Route::delete('/{job_history}', [AdminJobHistoryController::class, 'destroy'])->name('destroy');
             });
         });
 

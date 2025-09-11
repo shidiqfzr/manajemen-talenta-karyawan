@@ -140,9 +140,9 @@
 
                 <!-- Filter Card -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-200">
+                    <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-white border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fas fa-filter text-blue-500 mr-2"></i> Filter & Export Data
+                            <i class="fas fa-filter text-green-500 mr-2"></i> Filter & Export Data
                         </h2>
                     </div>
                     <div class="p-6">
@@ -240,9 +240,9 @@
                 <!-- Training Table -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div
-                        class="px-6 py-4 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        class="px-6 py-4 bg-gradient-to-r from-green-50 to-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                            <i class="fa-solid fa-clipboard-list text-yellow-500 mr-2"></i>Daftar Pelatihan
+                            <i class="fa-solid fa-clipboard-list text-green-500 mr-2"></i>Daftar Pelatihan
                         </h2>
                         <!-- Only show count if have trainings -->
                         @if ($trainings->isNotEmpty())

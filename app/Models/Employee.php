@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Evaluation;
-use Carbon\Carbon;
+use App\Models\Training;
+use App\Models\JobHistory;
 
 class Employee extends Model
 {
@@ -36,14 +37,14 @@ class Employee extends Model
         'foto',
     ];
 
-    protected $dates = [
-        'tanggal_dalam_jabatan',
-        'tmt_unit_kerja',
-        'tanggal_lahir',
-        'tmt_bekerja',
-        'tanggal_diangkat_staf',
-        'tanggal_mbt',
-        'tanggal_pensiun',
+    protected $casts = [
+        'tanggal_dalam_jabatan' => 'date',
+        'tmt_unit_kerja'        => 'date',
+        'tanggal_lahir'         => 'date',
+        'tmt_bekerja'           => 'date',
+        'tanggal_diangkat_staf' => 'date',
+        'tanggal_mbt'           => 'date',
+        'tanggal_pensiun'       => 'date',
     ];
 
     public function trainings()
@@ -56,5 +57,18 @@ class Employee extends Model
     public function evaluations()
     {
         return $this->hasMany(Evaluation::class, 'nik', 'nik');
+    }
+
+    public function jobHistories()
+    {
+        return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->orderByDesc('tmt_awal');
+    }
+
+    public function currentJob()
+    {
+        return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
+            ->whereNull('tmt_akhir')
+            ->latestOfMany('tmt_awal');
     }
 }

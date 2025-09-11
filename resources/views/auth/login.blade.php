@@ -170,7 +170,7 @@
                 <!-- Logo badge -->
                 <div
                     class="mx-auto mb-8 h-24 w-24 rounded-full bg-white flex items-center justify-center shadow-2xl ring-4 ring-white/20">
-                    <img src="{{ asset('images/logo-PTPN4.png') }}" alt="Logo PTPN IV" class="h-16 w-16 object-contain"
+                    <img src="{{ asset('images/logo-ptpn4.png') }}" alt="Logo PTPN IV" class="h-16 w-16 object-contain"
                         loading="eager" decoding="async" />
                 </div>
 
