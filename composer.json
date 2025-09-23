@@ -10,8 +10,10 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
+        "livewire/livewire": "^3.6",
         "maatwebsite/excel": "3.1.55",
-        "phpoffice/phpword": "^1.4"
+        "phpoffice/phpword": "^1.4",
+        "rappasoft/laravel-livewire-tables": "^3.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

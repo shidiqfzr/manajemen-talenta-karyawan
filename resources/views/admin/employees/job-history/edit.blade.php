@@ -100,7 +100,7 @@
                     <!-- TMT Akhir -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">TMT Akhir</label>
-                        <input type="date" name="tmt_akhir" value="{{ old('tmt_akhir', $jobHistory->tmt_akhir->format('Y-m-d')) }}"
+                        <input type="date" name="tmt_akhir" value="{{ old('tmt_akhir', $jobHistory->tmt_akhir?->format('Y-m-d') ?? '') }}"
                             class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         <p class="text-xs text-gray-500 mt-1">Kosongkan jika jabatan ini masih aktif.</p>
                     </div>
@@ -133,7 +133,7 @@
                     <!-- Tanggal SK -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal SK</label>
-                        <input type="date" name="tanggal_sk" value="{{ old('tanggal_sk', $jobHistory->tanggal_sk->format('Y-m-d')) }}"
+                        <input type="date" name="tanggal_sk" value="{{ old('tanggal_sk', $jobHistory->tanggal_sk?->format('Y-m-d') ?? '') }}"
                             class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
 

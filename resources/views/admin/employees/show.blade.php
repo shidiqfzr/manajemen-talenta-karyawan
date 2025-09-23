@@ -162,8 +162,8 @@
                 </div>
             </div>
 
-            {{-- Riwayat Jabatan --}}
-            <section id="riwayat-jabatan" class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
+            <!-- Job History Information -->
+            <section id="riwayat-jabatan" class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
                 <div
                     class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h3 class="text-lg font-semibold text-gray-900 flex items-center">
@@ -200,86 +200,12 @@
                 @endif
 
                 {{-- Tabel Riwayat --}}
-                <div>
-                    @if ($histories->whereNotNull('tmt_akhir')->isEmpty())
-                        <!-- Empty State -->
-                        <div class="text-center py-12">
-                            <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-briefcase text-3xl text-gray-400"></i>
-                            </div>
-                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Jabatan</h4>
-                            <p class="text-gray-500 max-w-sm mx-auto">
-                                Karyawan ini belum memiliki riwayat sebelumnya. Riwayat jabatan akan muncul di sini ketika
-                                tersedia.
-                            </p>
-                        </div>
-                    @else
-                        <div class="p-6 overflow-x-auto">
-                            <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-                                <thead class="bg-gray-50 text-gray-700">
-                                    <tr class="text-sm">
-                                        <th class="px-4 py-3 text-left">Periode</th>
-                                        <th class="px-4 py-3 text-left">Jabatan</th>
-                                        <th class="px-4 py-3 text-left">Unit</th>
-                                        <th class="px-4 py-3 text-left">Level</th>
-                                        <th class="px-4 py-3 text-left">Gol</th>
-                                        <th class="px-4 py-3 text-left">Mutasi</th>
-                                        <th class="px-4 py-3 text-left">SK</th>
-                                        <th class="px-4 py-3 text-center">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 text-sm text-gray-800">
-                                    @foreach ($histories->whereNotNull('tmt_akhir') as $row)
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-4 py-3 whitespace-nowrap">
-                                                {{ $row->tmt_awal?->format('d M Y') }} –
-                                                {{ $row->tmt_akhir?->format('d M Y') }}
-                                            </td>
-                                            <td class="px-4 py-3">{{ $row->jabatan }}</td>
-                                            <td class="px-4 py-3">{{ $row->unit_kerja }}</td>
-                                            <td class="px-4 py-3">{{ $row->level ?? '–' }}</td>
-                                            <td class="px-4 py-3">{{ $row->golongan ?? '–' }}</td>
-                                            <td class="px-4 py-3">{{ $row->jenis_mutasi ?? '–' }}</td>
-                                            <td class="px-4 py-3">
-                                                @if ($row->nomor_sk || $row->tanggal_sk)
-                                                    {{ $row->nomor_sk ?? '–' }} /
-                                                    {{ $row->tanggal_sk?->format('d M Y') ?? '–' }}
-                                                @else
-                                                    –
-                                                @endif
-                                            </td>
-                                            <td class="px-4 py-3 text-center">
-                                                <div class="inline-flex items-center gap-2">
-                                                    <a href="{{ route('admin.employees.job-history.edit', [$employee, $row->id]) }}"
-                                                        class="px-3 py-1.5 rounded-md bg-yellow-400 text-white hover:bg-yellow-500 transition"
-                                                        title="Edit">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <form
-                                                        action="{{ route('admin.employees.job-history.destroy', [$employee, $row->id]) }}"
-                                                        method="POST" class="inline"
-                                                        onsubmit="return confirm('Hapus riwayat jabatan ini?')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit"
-                                                            class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
-                                                            title="Hapus">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-
-                            {{-- Pagination --}}
-                            <div class="mt-4">
-                                {{ $histories->links() }}
-                            </div>
-                        </div>
+                <div class="p-6">
+                    @if (session()->has('message'))
+                        <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
                     @endif
+
+                    @livewire('tables.job-history-table', ['employeeId' => $employee->nik], key('riwayat-jabatan-' . $employee->nik))
                 </div>
             </section>
 

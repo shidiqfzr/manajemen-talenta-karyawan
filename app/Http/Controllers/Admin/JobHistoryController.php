@@ -89,7 +89,7 @@ class JobHistoryController extends Controller
         $mutasiOptions = JobHistory::MUTASI_TYPES;
         return view('admin.employees.job-history.edit', [
             'employee'     => $employee,
-            'jobHistory'   => $job_history,       
+            'jobHistory'   => $job_history,
             'mutasiOptions' => $mutasiOptions,
         ]);
     }
@@ -126,7 +126,9 @@ class JobHistoryController extends Controller
             ]);
         }
 
-        return back()->with('success', 'Riwayat jabatan diperbarui.');
+        return redirect()
+            ->to(route('admin.employees.show', $employee->nik) . '#riwayat-jabatan')
+            ->with('success', 'Riwayat jabatan diperbarui.');
     }
 
     /**
