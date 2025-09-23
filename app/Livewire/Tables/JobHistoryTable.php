@@ -54,14 +54,17 @@ class JobHistoryTable extends DataTableComponent
                 ->searchable(),
 
             Column::make('Mutasi', 'jenis_mutasi')
-                ->format(fn($value, $row) => $row->jenis_mutasi_label ?? '–'),
+                ->format(fn($value, $row) => $row->jenis_mutasi_label ?? '–')
+                ->deselected(),
 
             Column::make('Level', 'level')
                 ->sortable()
+                ->searchable()
                 ->deselected(),
 
             Column::make('Golongan', 'golongan')
                 ->sortable()
+                ->searchable()
                 ->deselected(),
 
             Column::make('SK', 'nomor_sk')

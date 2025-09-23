@@ -23,6 +23,11 @@ class Training extends Model
         'jumlah_man_hours',
     ];
 
+    protected $casts = [
+        'tanggal_mulai'  => 'date',   
+        'tanggal_akhir'  => 'date',
+    ];
+
     public function employees()
     {
         return $this->belongsToMany(Employee::class, 'employee_training', 'training_id', 'employee_nik')

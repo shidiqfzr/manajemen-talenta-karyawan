@@ -163,7 +163,8 @@
             </div>
 
             <!-- Job History Information -->
-            <section id="riwayat-jabatan" class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
+            <section id="riwayat-jabatan"
+                class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
                 <div
                     class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h3 class="text-lg font-semibold text-gray-900 flex items-center">
@@ -210,7 +211,7 @@
             </section>
 
             <!-- Training Information -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
                 <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-indigo-50 to-purple-50">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
@@ -231,7 +232,7 @@
                         <!-- Empty State -->
                         <div class="text-center py-12">
                             <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-graduation-cap text-3xl text-gray-400"></i>
+                                <i class="fas fa-chalkboard-teacher text-3xl text-gray-400"></i>
                             </div>
                             <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Pelatihan</h4>
                             <p class="text-gray-500 max-w-sm mx-auto">
@@ -240,85 +241,13 @@
                             </p>
                         </div>
                     @else
-                        <!-- Training Table -->
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col"
-                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            No
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Judul Pelatihan
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Tanggal
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Sertifikat
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach ($trainings as $index => $training)
-                                        <tr class="hover:bg-gray-50 transition-colors duration-150">
-                                            <!-- Number -->
-                                            <td class="px-4 py-4 whitespace-nowrap text-sm text-left text-gray-700">
-                                                {{ $trainings->firstItem() + $index }}
-                                            </td>
+                        <div class="p-6">
+                            @if (session()->has('message'))
+                                <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
+                            @endif
 
-                                            <!-- Training Title -->
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <div>
-                                                        <a href="{{ route('admin.trainings.show', $training->id) }}"
-                                                            class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors duration-150 cursor-pointer">
-                                                            {{ $training->judul }}
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <!-- Date -->
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                <div class="flex items-center">
-                                                    {{ \Carbon\Carbon::parse($training->tanggal_mulai)->format('d M Y') }}
-                                                    -
-                                                    {{ \Carbon\Carbon::parse($training->tanggal_akhir)->format('d M Y') }}
-                                                </div>
-                                            </td>
-
-                                            <!-- Certificate -->
-                                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                                                @if ($training->pivot->sertifikat)
-                                                    <a href="{{ asset('storage/' . $training->pivot->sertifikat) }}"
-                                                        target="_blank"
-                                                        class="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 text-xs font-medium rounded-full hover:bg-green-200 transition-colors duration-150"
-                                                        title="Unduh Sertifikat">
-                                                        <i class="fas fa-download mr-1"></i>
-                                                        Unduh
-                                                    </a>
-                                                @else
-                                                    <span
-                                                        class="inline-flex items-center px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full"
-                                                        title="Sertifikat belum tersedia">
-                                                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                                                        Tidak Ada
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                            @livewire('tables.training-table', ['employeeId' => $employee->nik], key('riwayat-pelatihan-' . $employee->nik))
                         </div>
-
-                        <!-- Pagination -->
-                        <x-pagination-ui :data="$trainings" />
                     @endif
                 </div>
             </div>
