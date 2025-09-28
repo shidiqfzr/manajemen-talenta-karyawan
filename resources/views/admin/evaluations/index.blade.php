@@ -54,7 +54,7 @@
                         <tbody class="text-sm text-gray-800">
                             @forelse($evaluations as $eval)
                                 <tr class="border-t hover:bg-gray-50 transition duration-150">
-                                    <td class="p-3">{{ $eval->nik }}</td>
+                                    <td class="p-3">{{ $eval->employee_nik  }}</td>
                                     <td class="p-3">{{ $eval->employee->nama ?? '-' }}</td>
                                     <td class="p-3">{{ $eval->employee->jabatan ?? '-' }}</td>
                                     <td class="p-3">{{ $eval->employee->unit_kerja ?? '-' }}</td>

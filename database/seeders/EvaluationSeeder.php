@@ -27,7 +27,7 @@ class EvaluationSeeder extends Seeder
             );
 
             Evaluation::create([
-                'nik' => $employee->nik,
+                'employee_nik' => $employee->nik,
                 'nilai_kepemimpinan' => $nilai_kepemimpinan,
                 'nilai_perilaku_budaya' => $nilai_perilaku_budaya,
                 'nilai_pengalaman_teknis' => $nilai_pengalaman_teknis,

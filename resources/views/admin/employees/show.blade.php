@@ -53,7 +53,7 @@
 
             <!-- Personal Information Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
-                <div class="border-b border-gray-200 px-6 py-4">
+                <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-orange-50 to-orange-50">
                     <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                         <i class="fas fa-id-card text-orange-600 mr-2"></i>
                         Informasi Pribadi
@@ -104,7 +104,7 @@
 
             <!-- Work Information Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
-                <div class="border-b border-gray-200 px-6 py-4">
+                <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-50">
                     <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                         <i class="fas fa-briefcase text-blue-600 mr-2"></i>
                         Informasi Pekerjaan
@@ -124,9 +124,10 @@
                             <label class="text-sm font-medium text-purple-700 block mb-1">Job Grader</label>
                             <p class="text-purple-900 font-semibold">{{ $employee->job_grader }}</p>
                         </div>
-                        <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-                            <label class="text-sm font-medium text-orange-700 block mb-1">Person Grade</label>
-                            <p class="text-orange-900 font-semibold">{{ $employee->person_grade }}</p>
+                        <div class="bg-gray-50 p-4 rounded-lg border">
+                            <label class="text-sm font-medium text-gray-600 block mb-1">Person Grade</label>
+                            <p class="text-gray-900 font-semibold">
+                                {{ $employee->person_grade }}</p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal Dalam Jabatan</label>
@@ -163,361 +164,443 @@
             </div>
 
             <!-- Job History Information -->
-            <section id="riwayat-jabatan"
-                class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
-                <div
-                    class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                        <i class="fas fa-briefcase text-green-600 mr-2"></i>
-                        Riwayat Jabatan
-                    </h3>
+                <section id="riwayat-jabatan"
+                    class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
+                    <div
+                        class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-green-50 to-green-50 flex items-center justify-between gap-3">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-briefcase text-green-600 mr-2"></i>
+                            Riwayat Jabatan
+                        </h3>
 
-                    <a href="{{ route('admin.employees.job-history.create', $employee) }}"
-                        class="inline-flex items-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition">
-                        <i class="fas fa-plus mr-2"></i> Tambah Riwayat
-                    </a>
-                </div>
+                        <a href="{{ route('admin.employees.job-history.create', $employee) }}"
+                            class="inline-flex items-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition">
+                            <i class="fas fa-plus mr-2"></i> Tambah Riwayat
+                        </a>
+                    </div>
 
-                {{-- Jabatan aktif (jika ada) --}}
-                @if ($employee->currentJob)
-                    <div class="px-6 pt-4">
-                        <div class="rounded-lg border border-green-200 bg-green-50 p-4">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <div class="text-sm text-green-700 font-medium">Jabatan Aktif</div>
-                                    <div class="mt-1 font-semibold text-green-900">
-                                        {{ $employee->currentJob->jabatan }} — {{ $employee->currentJob->unit_kerja }}
-                                    </div>
-                                    <div class="mt-1 text-sm text-green-800">
-                                        Periode:
-                                        {{ $employee->currentJob->tmt_awal?->format('d M Y') }}
-                                        –
-                                        {{ $employee->currentJob->tmt_akhir?->format('d M Y') ?? 'Sekarang' }}
+                    @if ($employee->currentJob)
+                        <div class="px-6 pt-4">
+                            <div class="rounded-lg border border-green-200 bg-green-50 p-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <div class="text-sm text-green-700 font-medium">Jabatan Aktif</div>
+                                        <div class="mt-1 font-semibold text-green-900">
+                                            {{ $employee->currentJob->jabatan }} — {{ $employee->currentJob->unit_kerja }}
+                                        </div>
+                                        <div class="mt-1 text-sm text-green-800">
+                                            Periode:
+                                            {{ $employee->currentJob->tmt_awal?->format('d M Y') }}
+                                            –
+                                            {{ $employee->currentJob->tmt_akhir?->format('d M Y') ?? 'Sekarang' }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                @endif
-
-                {{-- Tabel Riwayat --}}
-                <div class="p-6">
-                    @if (session()->has('message'))
-                        <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
                     @endif
 
-                    @livewire('tables.job-history-table', ['employeeId' => $employee->nik], key('riwayat-jabatan-' . $employee->nik))
-                </div>
-            </section>
+                    <!-- History Table -->
+                    <div class="p-6">
+                        @if (session()->has('message'))
+                            <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
+                        @endif
 
-            <!-- Training Information -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
-                <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-indigo-50 to-purple-50">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
-                            <i class="fas fa-chalkboard-teacher text-indigo-600 mr-2"></i>
-                            Riwayat Pelatihan
-                        </h3>
-                        @if ($trainings->count())
-                            <div class="flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
-                                <i class="fas fa-certificate text-indigo-500 mr-1"></i>
-                                {{ $trainings->total() }} Pelatihan
+                        @livewire('tables.job-history-table', ['employeeId' => $employee->nik], key('riwayat-jabatan-' . $employee->nik))
+                    </div>
+                </section>
+
+                <!-- Training History Information -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
+                    <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-indigo-50 to-purple-50">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
+                                <i class="fas fa-chalkboard-teacher text-indigo-600 mr-2"></i>
+                                Riwayat Pelatihan
+                            </h3>
+                            @if ($trainings->count())
+                                <div
+                                    class="flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
+                                    <i class="fas fa-certificate text-indigo-500 mr-1"></i>
+                                    {{ $trainings->total() }} Pelatihan
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div>
+                        @if ($trainings->isEmpty())
+                            <!-- Empty State -->
+                            <div class="text-center py-12">
+                                <div
+                                    class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-chalkboard-teacher text-3xl text-gray-400"></i>
+                                </div>
+                                <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Pelatihan</h4>
+                                <p class="text-gray-500 max-w-sm mx-auto">
+                                    Karyawan ini belum mengikuti pelatihan apapun. Riwayat pelatihan akan muncul di sini
+                                    ketika
+                                    tersedia.
+                                </p>
+                            </div>
+                        @else
+                            <div class="p-6">
+                                @if (session()->has('message'))
+                                    <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
+                                @endif
+
+                                @livewire('tables.training-table', ['employeeId' => $employee->nik], key('riwayat-pelatihan-' . $employee->nik))
                             </div>
                         @endif
                     </div>
                 </div>
 
-                <div>
-                    @if ($trainings->isEmpty())
-                        <!-- Empty State -->
-                        <div class="text-center py-12">
-                            <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-chalkboard-teacher text-3xl text-gray-400"></i>
-                            </div>
-                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Pelatihan</h4>
-                            <p class="text-gray-500 max-w-sm mx-auto">
-                                Karyawan ini belum mengikuti pelatihan apapun. Riwayat pelatihan akan muncul di sini ketika
-                                tersedia.
-                            </p>
+                <!-- Evaluation History Information -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-visible">
+                    <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
+                                <i class="fas fa-clipboard-check text-emerald-600 mr-2"></i>
+                                Riwayat Penilaian
+                            </h3>
+                            @isset($evaluations)
+                                @if ($evaluations->count())
+                                    <div
+                                        class="flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
+                                        <i class="fas fa-certificate text-emerald-500 mr-1"></i>
+                                        {{ $evaluations->total() }} Penilaian
+                                    </div>
+                                @endif
+                            @endisset
                         </div>
-                    @else
-                        <div class="p-6">
-                            @if (session()->has('message'))
-                                <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
-                            @endif
+                    </div>
 
-                            @livewire('tables.training-table', ['employeeId' => $employee->nik], key('riwayat-pelatihan-' . $employee->nik))
-                        </div>
-                    @endif
-                </div>
-            </div>
-
-            {{-- === Evaluations Section === --}}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6 overflow-hidden">
-                <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center mb-2 sm:mb-0">
-                            <i class="fas fa-clipboard-check text-emerald-600 mr-2"></i>
-                            Riwayat Penilaian
-                        </h3>
-                        @isset($evaluations)
-                            @if ($evaluations->count())
-                                <div class="flex items-center text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
-                                    <i class="fas fa-file-alt text-emerald-500 mr-1"></i>
-                                    {{ $evaluations->total() }} Data Evaluasi
+                    <div>
+                        @if (empty($evaluations) || $evaluations->isEmpty())
+                            {{-- Empty State --}}
+                            <div class="text-center py-12">
+                                <div
+                                    class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-clipboard-list text-3xl text-gray-400"></i>
                                 </div>
-                            @endif
-                        @endisset
+                                <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Penilaian</h4>
+                                <p class="text-gray-500 max-w-sm mx-auto">
+                                    Karyawan ini belum mengikuti penialian apapun. Riwayat penilaian akan muncul di sini
+                                    ketika
+                                    tersedia.
+                                </p>
+                            </div>
+                        @else
+                            @php
+                                $ev = $evaluations->first();
+                            @endphp
+
+                            {{-- Ringkasan Evaluasi Terbaru --}}
+                            <div class="p-6">
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                                    {{-- Nilai Tertimbang Card --}}
+                                    <div
+                                        class="bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 rounded-xl border border-emerald-200 hover:shadow-md transition-all duration-200">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <i class="fas fa-balance-scale text-emerald-600 text-lg"></i>
+                                            <span class="text-3xl font-extrabold text-emerald-900">
+                                                {{ number_format($ev->nilai_tertimbang ?? 0, 1) }}
+                                            </span>
+                                        </div>
+
+                                        <div class="flex items-center space-x-2 mb-3">
+                                            <span class="text-sm font-semibold text-emerald-700">
+                                                Nilai Tertimbang
+                                            </span>
+                                            <span class="relative inline-block group">
+                                                <button type="button"
+                                                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-200 text-emerald-700 text-sm leading-none focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                                    aria-describedby="tooltip-nilai-tertimbang"
+                                                    aria-label="Info tentang nilai tertimbang">
+                                                    <i class="fas fa-info-circle text-[0.8rem] align-middle"
+                                                        aria-hidden="true"></i>
+                                                </button>
+                                                <div id="tooltip-nilai-tertimbang" role="tooltip"
+                                                    class="pointer-events-none absolute left-1/2 transform -translate-x-1/2 top-full mt-2 w-64 max-w-xs rounded-md bg-gray-800 text-white text-xs leading-snug p-3 opacity-0 scale-95 group-hover:opacity-100 group-focus-within:opacity-100 group-hover:scale-100 transition-all duration-150 shadow-lg z-50">
+                                                    Ringkasan gabungan bobot (Kepemimpinan 40%, Perilaku 30%, Pengalaman
+                                                    20%,
+                                                    Kematangan 10%).
+                                                </div>
+                                            </span>
+                                        </div>
+
+                                        @if (!is_null($ev->nilai_tertimbang))
+                                            @php
+                                                $pct = max(0, min(100, (float) $ev->nilai_tertimbang));
+                                            @endphp
+                                            <div class="space-y-2">
+                                                <div class="w-full bg-white/60 rounded-full h-2 overflow-hidden">
+                                                    <div class="h-2 rounded-full bg-emerald-600 transition-all duration-500 ease-out"
+                                                        style="width: {{ $pct }}%"></div>
+                                                </div>
+                                                <div class="flex justify-between items-center">
+                                                    <span
+                                                        class="text-xs text-emerald-700 opacity-75">{{ $pct }}%</span>
+                                                    <span class="text-xs text-emerald-700 font-medium">
+                                                        @if ($pct >= 90)
+                                                            Outstanding
+                                                        @elseif($pct >= 80)
+                                                            Excellent
+                                                        @elseif($pct >= 70)
+                                                            Good
+                                                        @elseif($pct >= 60)
+                                                            Fair
+                                                        @else
+                                                            Needs Improvement
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- 9-Box Card --}}
+                                    <div
+                                        class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200 hover:shadow-md transition-all duration-200">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <i class="fas fa-th text-indigo-600 text-lg"></i>
+                                            <span
+                                                class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium {{ $ev->kategori_9box ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700' }}">
+                                                {{ $ev->kategori_9box ?? 'Tidak dikategorikan' }}
+                                            </span>
+                                        </div>
+
+                                        <h5 class="text-sm font-semibold text-indigo-700 mb-3">9-Box Performance</h5>
+
+                                        <div class="space-y-3">
+                                            {{-- SMKBK Progress --}}
+                                            <div class="space-y-1">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-xs font-medium text-indigo-700">SMKBK</span>
+                                                    <span
+                                                        class="text-xs font-semibold text-indigo-900">{{ number_format($ev->skor_smkbk_9box ?? 0, 1) }}</span>
+                                                </div>
+                                                @if (!is_null($ev->skor_smkbk_9box))
+                                                    @php $smkbk_pct = max(0, min(100, (float) $ev->skor_smkbk_9box)); @endphp
+                                                    <div class="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+                                                        <div class="h-1.5 rounded-full bg-indigo-600 transition-all duration-500 ease-out"
+                                                            style="width: {{ $smkbk_pct }}%"></div>
+                                                    </div>
+                                                @endif
+                                            </div>
+
+                                            {{-- CLI Progress --}}
+                                            <div class="space-y-1">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-xs font-medium text-indigo-700">CLI</span>
+                                                    <span
+                                                        class="text-xs font-semibold text-indigo-900">{{ number_format($ev->skor_cli_9box ?? 0, 1) }}</span>
+                                                </div>
+                                                @if (!is_null($ev->skor_cli_9box))
+                                                    @php $cli_pct = max(0, min(100, (float) $ev->skor_cli_9box)); @endphp
+                                                    <div class="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+                                                        <div class="h-1.5 rounded-full bg-indigo-500 transition-all duration-500 ease-out"
+                                                            style="width: {{ $cli_pct }}%"></div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bidang Tugas Card -->
+                                    <div
+                                        class="bg-gradient-to-br from-amber-50 to-amber-100 p-5 rounded-xl border border-amber-200 hover:shadow-md transition-all duration-200">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <i class="fas fa-briefcase text-amber-700 text-lg"></i>
+                                            <div class="flex items-center space-x-1">
+                                                @if ($ev->bidang_tugas && $ev->bidang_tugas !== '-')
+                                                    <span
+                                                        class="inline-flex items-center justify-center w-2 h-2 bg-amber-600 rounded-full"></span>
+                                                    <span class="text-xs text-amber-700 font-medium">Active</span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center justify-center w-2 h-2 bg-gray-400 rounded-full"></span>
+                                                    <span class="text-xs text-gray-600 font-medium">Unassigned</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <h5 class="text-sm font-semibold text-amber-700 mb-3">Bidang Tugas</h5>
+
+                                        <div class="space-y-2">
+                                            <div class="bg-white/60 rounded-lg p-3">
+                                                <p class="text-amber-900 font-semibold text-sm leading-tight">
+                                                    {{ $ev->bidang_tugas ?? 'Belum ditentukan' }}
+                                                </p>
+                                            </div>
+
+                                            @if ($ev->bidang_tugas && $ev->bidang_tugas !== '-')
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-amber-700 opacity-75">Status</span>
+                                                    <span class="text-xs text-amber-900 font-medium">Assigned</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Performance Breakdown -->
+                                <div class="mb-6">
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                        <i class="fas fa-chart-bar text-teal-600 mr-2"></i>
+                                        Penilaian Per Kriteria
+                                    </h4>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                                        @php
+                                            $kriterias = [
+                                                [
+                                                    'label' => 'Kepemimpinan',
+                                                    'value' => $ev->nilai_kepemimpinan,
+                                                    'color_class' => 'bg-blue-500',
+                                                    'bg_class' => 'from-blue-50 to-blue-100',
+                                                    'border_class' => 'border-blue-200',
+                                                    'text_class' => 'text-blue-900',
+                                                    'icon' => 'fas fa-users',
+                                                ],
+                                                [
+                                                    'label' => 'Perilaku Budaya',
+                                                    'value' => $ev->nilai_perilaku_budaya,
+                                                    'color_class' => 'bg-green-500',
+                                                    'bg_class' => 'from-green-50 to-green-100',
+                                                    'border_class' => 'border-green-200',
+                                                    'text_class' => 'text-green-900',
+                                                    'icon' => 'fas fa-heart',
+                                                ],
+                                                [
+                                                    'label' => 'Pengalaman Teknis',
+                                                    'value' => $ev->nilai_pengalaman_teknis,
+                                                    'color_class' => 'bg-purple-500',
+                                                    'bg_class' => 'from-purple-50 to-purple-100',
+                                                    'border_class' => 'border-purple-200',
+                                                    'text_class' => 'text-purple-900',
+                                                    'icon' => 'fas fa-cogs',
+                                                ],
+                                                [
+                                                    'label' => 'Kematangan Pribadi',
+                                                    'value' => $ev->nilai_kematangan_pribadi,
+                                                    'color_class' => 'bg-orange-500',
+                                                    'bg_class' => 'from-orange-50 to-orange-100',
+                                                    'border_class' => 'border-orange-200',
+                                                    'text_class' => 'text-orange-900',
+                                                    'icon' => 'fas fa-user-check',
+                                                ],
+                                            ];
+                                        @endphp
+
+                                        @foreach ($kriterias as $kr)
+                                            <div
+                                                class="bg-gradient-to-br {{ $kr['bg_class'] }} p-5 rounded-xl border {{ $kr['border_class'] }} hover:shadow-md transition-all duration-200">
+                                                <div class="flex items-center justify-between mb-3">
+                                                    <i class="{{ $kr['icon'] }} {{ $kr['text_class'] }} text-lg"></i>
+                                                    <span class="text-lg font-bold {{ $kr['text_class'] }}">
+                                                        {{ is_null($kr['value']) ? '-' : number_format($kr['value'], 1) }}
+                                                    </span>
+                                                </div>
+                                                <h5 class="text-sm font-semibold {{ $kr['text_class'] }} mb-3">
+                                                    {{ $kr['label'] }}</h5>
+
+                                                @if (!is_null($kr['value']))
+                                                    @php
+                                                        $pct = max(0, min(100, (float) $kr['value']));
+                                                        $barClass = $kr['color_class'] ?? 'bg-blue-500';
+                                                    @endphp
+
+                                                    <div class="space-y-2">
+                                                        <div class="w-full bg-white/60 rounded-full h-2 overflow-hidden">
+                                                            <div class="h-2 rounded-full {{ $barClass }} transition-all duration-500 ease-out"
+                                                                style="width: {{ $pct }}%"></div>
+                                                        </div>
+                                                        <div class="flex justify-between items-center">
+                                                            <span
+                                                                class="text-xs {{ $kr['text_class'] }} opacity-75">{{ $pct }}%</span>
+                                                            <span class="text-xs {{ $kr['text_class'] }} font-medium">
+                                                                @if ($pct >= 90)
+                                                                    Excellent
+                                                                @elseif($pct >= 80)
+                                                                    Very Good
+                                                                @elseif($pct >= 70)
+                                                                    Good
+                                                                @else
+                                                                    Needs Improvement
+                                                                @endif
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+
+                                {{-- Informasi Asesmen --}}
+                                <div class="mb-6">
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                        <i class="fas fa-user-check text-teal-600 mr-2"></i>
+                                        Informasi Asesmen
+                                    </h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Lembaga
+                                                Asesmen</label>
+                                            <p class="text-gray-900 font-semibold">{{ $ev->lembaga_asesmen ?? '-' }}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal
+                                                Pelaksanaan</label>
+                                            <p class="text-gray-900 font-semibold">
+                                                {{ $ev->tanggal_pelaksanaan_asesmen ? \Carbon\Carbon::parse($ev->tanggal_pelaksanaan_asesmen)->format('d M Y') : '-' }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Hasil Skor</label>
+                                            <p class="text-gray-900 font-semibold">
+                                                {{ is_null($ev->hasil_skor_asesmen) ? '-' : number_format($ev->hasil_skor_asesmen, 2) }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Kategori
+                                                Asesmen</label>
+                                            <p class="text-gray-900 font-semibold">{{ $ev->kategori_asesmen ?? '-' }}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Keterangan</label>
+                                            <p class="text-gray-900">{{ $ev->keterangan_asesmen ?? '-' }}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border">
+                                            <label class="text-sm font-medium text-gray-600 block mb-1">Masa
+                                                Berlaku</label>
+                                            <p class="text-gray-900 font-semibold">
+                                                {{ $ev->expired_asesmen ? \Carbon\Carbon::parse($ev->expired_asesmen)->format('d M Y') : '-' }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto px-6 pb-6">
+                                @if (session()->has('message'))
+                                    <div class="text-sm text-green-600 mb-4 px-2">{{ session('message') }}</div>
+                                @endif
+
+                                <div class="livewire-evaluation-table overflow-auto relative">
+                                    @livewire('tables.evaluation-table', ['employeeId' => $employee->nik], key('riwayat-evaluasi-' . $employee->nik))
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
-                <div>
-                    @if (empty($evaluations) || $evaluations->isEmpty())
-                        {{-- Empty State --}}
-                        <div class="text-center py-12">
-                            <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-clipboard-list text-3xl text-gray-400"></i>
-                            </div>
-                            <h4 class="text-lg font-medium text-gray-900 mb-2">Belum Ada Riwayat Penilaian</h4>
-                            <p class="text-gray-500 max-w-sm mx-auto">
-                                Karyawan ini belum mengikuti penialian apapun. Riwayat penilaian akan muncul di sini ketika
-                                tersedia.
-                            </p>
-                        </div>
-                    @else
-                        @php
-                            // Ambil evaluasi terbaru untuk ringkasan kartu atas
-                            $ev = $evaluations->first();
-                        @endphp
-
-                        {{-- Ringkasan Evaluasi Terbaru --}}
-                        <div class="p-6">
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                {{-- Kartu Nilai Tertimbang --}}
-                                <div
-                                    class="bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 rounded-lg border border-emerald-200">
-                                    <label class="text-sm font-medium text-emerald-700 block mb-1">Nilai Tertimbang</label>
-                                    <p class="text-3xl font-extrabold text-emerald-900">
-                                        {{ number_format($ev->nilai_tertimbang ?? 0, 2) }}
-                                    </p>
-                                    <p class="text-xs text-emerald-800 mt-1">
-                                        Ringkasan gabungan bobot (Kepemimpinan 40%, Perilaku 30%, Pengalaman 20%, Kematangan
-                                        10%).
-                                    </p>
-                                </div>
-
-                                {{-- Kartu 9-Box --}}
-                                <div
-                                    class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-lg border border-indigo-200">
-                                    <label class="text-sm font-medium text-indigo-700 block mb-1">9-Box</label>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <p class="text-sm text-indigo-900">
-                                                SMKBK: <span
-                                                    class="font-semibold">{{ number_format($ev->skor_smkbk_9box ?? 0, 2) }}</span>
-                                            </p>
-                                            <p class="text-sm text-indigo-900">
-                                                CLI: <span
-                                                    class="font-semibold">{{ number_format($ev->skor_cli_9box ?? 0, 2) }}</span>
-                                            </p>
-                                        </div>
-                                        <span
-                                            class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium
-                                {{ $ev->kategori_9box ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700' }}">
-                                            {{ $ev->kategori_9box ?? 'Tidak dikategorikan' }}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {{-- Kartu Bidang Tugas --}}
-                                <div
-                                    class="bg-gradient-to-br from-amber-50 to-amber-100 p-5 rounded-lg border border-amber-200">
-                                    <label class="text-sm font-medium text-amber-700 block mb-1">Bidang Tugas</label>
-                                    <p class="text-amber-900 font-semibold">
-                                        {{ $ev->bidang_tugas ?? '-' }}
-                                    </p>
-                                    @if ($ev->tanggal_pelaksanaan_asesmen)
-                                        <p class="text-xs text-amber-800 mt-1">
-                                            Terakhir asesmen:
-                                            {{ \Carbon\Carbon::parse($ev->tanggal_pelaksanaan_asesmen)->format('d M Y') }}
-                                        </p>
-                                    @endif
-                                </div>
-                            </div>
-
-                            {{-- Breakdown Nilai Per Kriteria --}}
-                            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                @php
-                                    $kriterias = [
-                                        [
-                                            'label' => 'Kepemimpinan',
-                                            'value' => $ev->nilai_kepemimpinan,
-                                            'color' => 'blue',
-                                        ],
-                                        [
-                                            'label' => 'Perilaku Budaya',
-                                            'value' => $ev->nilai_perilaku_budaya,
-                                            'color' => 'green',
-                                        ],
-                                        [
-                                            'label' => 'Pengalaman Teknis',
-                                            'value' => $ev->nilai_pengalaman_teknis,
-                                            'color' => 'purple',
-                                        ],
-                                        [
-                                            'label' => 'Kematangan Pribadi',
-                                            'value' => $ev->nilai_kematangan_pribadi,
-                                            'color' => 'orange',
-                                        ],
-                                    ];
-                                @endphp
-
-                                @foreach ($kriterias as $kr)
-                                    <div class="bg-gray-50 p-4 rounded-lg border">
-                                        <label
-                                            class="text-sm font-medium text-gray-600 block mb-1">{{ $kr['label'] }}</label>
-                                        <p class="text-gray-900 font-semibold mb-2">
-                                            {{ is_null($kr['value']) ? '-' : number_format($kr['value'], 2) }}
-                                        </p>
-                                        @if (!is_null($kr['value']))
-                                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                                @php $pct = max(0, min(100, (float)$kr['value'])); @endphp
-                                                <div class="h-2 rounded-full bg-{{ $kr['color'] }}-500"
-                                                    style="width: {{ $pct }}%"></div>
-                                            </div>
-                                            <p class="text-xs text-gray-500 mt-1">{{ $pct }}%</p>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            {{-- Informasi Asesmen --}}
-                            <div class="mt-6">
-                                <h4 class="text-md font-semibold text-gray-900 mb-3 flex items-center">
-                                    <i class="fas fa-user-check text-teal-600 mr-2"></i>
-                                    Informasi Asesmen
-                                </h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Lembaga Asesmen</label>
-                                        <p class="text-gray-900 font-semibold">{{ $ev->lembaga_asesmen ?? '-' }}</p>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Tanggal
-                                            Pelaksanaan</label>
-                                        <p class="text-gray-900 font-semibold">
-                                            {{ $ev->tanggal_pelaksanaan_asesmen ? \Carbon\Carbon::parse($ev->tanggal_pelaksanaan_asesmen)->format('d M Y') : '-' }}
-                                        </p>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Hasil Skor</label>
-                                        <p class="text-gray-900 font-semibold">
-                                            {{ is_null($ev->hasil_skor_asesmen) ? '-' : number_format($ev->hasil_skor_asesmen, 2) }}
-                                        </p>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Kategori
-                                            Asesmen</label>
-                                        <p class="text-gray-900 font-semibold">{{ $ev->kategori_asesmen ?? '-' }}</p>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Keterangan</label>
-                                        <p class="text-gray-900">{{ $ev->keterangan_asesmen ?? '-' }}</p>
-                                    </div>
-                                    <div class="bg-white p-4 rounded-lg border">
-                                        <label class="text-sm font-medium text-gray-600 block mb-1">Masa Berlaku</label>
-                                        <p class="text-gray-900 font-semibold">
-                                            {{ $ev->expired_asesmen ? \Carbon\Carbon::parse($ev->expired_asesmen)->format('d M Y') : '-' }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Catatan Umum --}}
-                            @if (!empty($ev->keterangan))
-                                <div class="mt-6 bg-gray-50 p-4 rounded-lg border">
-                                    <label class="text-sm font-medium text-gray-600 block mb-1">Catatan</label>
-                                    <p class="text-gray-900">{{ $ev->keterangan }}</p>
-                                </div>
-                            @endif
-                        </div>
-
-                        {{-- Tabel Riwayat Evaluasi --}}
-                        <div class="border-t border-gray-200">
-                            <div class="px-6 py-4">
-                                <h4 class="text-md font-semibold text-gray-900 flex items-center">
-                                    <i class="fas fa-history text-gray-600 mr-2"></i>
-                                    Riwayat Evaluasi
-                                </h4>
-                            </div>
-                            <div class="overflow-x-auto px-6 pb-6">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No
-                                            </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Tanggal Input</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Nilai Tertimbang</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                                9-Box</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                                Asesmen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        @foreach ($evaluations as $i => $e)
-                                            <tr class="hover:bg-gray-50">
-                                                <td class="px-4 py-4 text-sm text-gray-700">
-                                                    {{ $evaluations->firstItem() + $i }}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-900">
-                                                    {{ $e->created_at?->timezone('Asia/Pontianak')->format('d M Y H:i') }}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-900">
-                                                    {{ is_null($e->nilai_tertimbang) ? '-' : number_format($e->nilai_tertimbang, 2) }}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-900">
-                                                    SMKBK {{ number_format($e->skor_smkbk_9box ?? 0, 2) }} /
-                                                    CLI {{ number_format($e->skor_cli_9box ?? 0, 2) }}
-                                                    @if ($e->kategori_9box)
-                                                        <span
-                                                            class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-600 text-white">
-                                                            {{ $e->kategori_9box }}
-                                                        </span>
-                                                    @endif
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-900">
-                                                    {{ $e->lembaga_asesmen ?? '-' }}
-                                                    @if ($e->tanggal_pelaksanaan_asesmen)
-                                                        <span class="text-gray-500">
-                                                            ({{ \Carbon\Carbon::parse($e->tanggal_pelaksanaan_asesmen)->format('d M Y') }})
-                                                        </span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-
-                                {{-- Pagination --}}
-                                <div class="mt-4">
-                                    <x-pagination-ui :data="$evaluations" />
-                                </div>
-                            </div>
-                        </div>
-                    @endif
+                <!-- Back Button -->
+                <div class="mt-8 flex justify-center sm:justify-start">
+                    <a href="{{ route('admin.employees.index') }}"
+                        class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                        <i class="fas fa-arrow-left mr-2"></i> Kembali
+                    </a>
                 </div>
             </div>
-
-            <!-- Back Button -->
-            <div class="mt-8 flex justify-center sm:justify-start">
-                <a href="{{ route('admin.employees.index') }}"
-                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-medium rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                    Kembali
-                </a>
-            </div>
         </div>
-    </div>
-@endsection
+    @endsection

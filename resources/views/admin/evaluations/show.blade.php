@@ -16,7 +16,7 @@
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <label class="text-sm font-medium text-gray-600 block mb-1">NIK</label>
-                            <p class="text-gray-900 font-semibold">{{ $evaluation->nik }}</p>
+                            <p class="text-gray-900 font-semibold">{{ $evaluation->employee_nik  }}</p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Bidang Tugas</label>

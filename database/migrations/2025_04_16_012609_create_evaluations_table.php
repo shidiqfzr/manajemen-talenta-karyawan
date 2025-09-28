@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('evaluations', function (Blueprint $table) {
             $table->id(); //PK
-            $table->string('nik'); // Foreign key to employees.nik
-            $table->foreign('nik')->references('nik')->on('employees')->onDelete('cascade'); // relasi ke tabel employees
+            $table->string('employee_nik'); 
+            $table->foreign('employee_nik')->references('nik')->on('employees')->onDelete('cascade');
 
             // Nilai per kriteria
             $table->decimal('nilai_kepemimpinan', 5, 2)->nullable(); // 40%

@@ -146,21 +146,3 @@
         </form>
     </div>
 @endsection
-
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
-@endpush
-
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-    <script>
-        new TomSelect("#nik", {
-            placeholder: "Cari nama atau NIK",
-            create: false,
-            sortField: {
-                field: "text",
-                direction: "asc"
-            }
-        });
-    </script>
-@endpush

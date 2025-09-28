@@ -9,30 +9,38 @@ use Illuminate\Http\Request;
 
 class EvaluationController extends Controller
 {
-    // Tampilkan daftar evaluasi
+    /**
+     * Display a paginated listing of evaluations.
+     */
     public function index()
     {
-        $evaluations = Evaluation::with('employee')->latest()->paginate(20);;
+        $evaluations = Evaluation::with('employee')->latest()->paginate(20);
+
         return view('admin.evaluations.index', compact('evaluations'));
     }
 
-    // Tampilkan form tambah evaluasi
-    public function create($nik = null)
+    /**
+     * Show the form for creating a new evaluation.
+     * If $employee_nik is provided, pre-fill employee.
+     */
+    public function create(string $employee_nik)
     {
-        if ($nik) {
-            $employee = Employee::where('nik', $nik)->firstOrFail();
+        if ($employee_nik) {
+            $employee = Employee::where('nik', $employee_nik)->firstOrFail();
             return view('admin.evaluations.add-evaluation', compact('employee'));
         }
 
-        $employees = Employee::all(); 
+        $employees = Employee::all();
         return view('admin.evaluations.add-evaluation', compact('employees'));
     }
 
-    // Simpan data evaluasi
+    /**
+     * Store a newly created evaluation in storage.
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'nik' => 'required|exists:employees,nik',
+        $data = $request->validate([
+            'employee_nik' => 'required|exists:employees,nik',
             'nilai_kepemimpinan' => 'nullable|numeric',
             'nilai_perilaku_budaya' => 'nullable|numeric',
             'nilai_pengalaman_teknis' => 'nullable|numeric',
@@ -50,51 +58,46 @@ class EvaluationController extends Controller
             'keterangan' => 'nullable|string',
         ]);
 
-        $nilaiTertimbang =
-            ($request->nilai_kepemimpinan * 0.4) +
-            ($request->nilai_perilaku_budaya * 0.3) +
-            ($request->nilai_pengalaman_teknis * 0.2) +
-            ($request->nilai_kematangan_pribadi * 0.1);
+        // Ensure numeric values are floats and default to 0 when null
+        $nk = (float) ($data['nilai_kepemimpinan'] ?? 0.0);
+        $npb = (float) ($data['nilai_perilaku_budaya'] ?? 0.0);
+        $npt = (float) ($data['nilai_pengalaman_teknis'] ?? 0.0);
+        $nkp = (float) ($data['nilai_kematangan_pribadi'] ?? 0.0);
 
-        Evaluation::create($request->only([
-            'nik',
-            'nilai_kepemimpinan',
-            'nilai_perilaku_budaya',
-            'nilai_pengalaman_teknis',
-            'nilai_kematangan_pribadi',
-            'skor_smkbk_9box',
-            'skor_cli_9box',
-            'kategori_9box',
-            'bidang_tugas',
-            'lembaga_asesmen',
-            'tanggal_pelaksanaan_asesmen',
-            'hasil_skor_asesmen',
-            'kategori_asesmen',
-            'keterangan_asesmen',
-            'expired_asesmen',
-            'keterangan',
-        ]) + ['nilai_tertimbang' => $nilaiTertimbang]);
+        $data['nilai_tertimbang'] = ($nk * 0.4) + ($npb * 0.3) + ($npt * 0.2) + ($nkp * 0.1);
+
+        Evaluation::create($data);
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil disimpan.');
     }
 
+    /**
+     * Display the specified evaluation.
+     */
     public function show(Evaluation $evaluation)
     {
-        $employee = Employee::where('nik', $evaluation->nik)->first();
+        // Use the relation to fetch employee (relation uses employee_nik)
+        $employee = $evaluation->employee;
+
         return view('admin.evaluations.show', compact('evaluation', 'employee'));
     }
 
-    // Tampilkan form edit evaluasi
+    /**
+     * Show the form for editing the specified evaluation.
+     */
     public function edit(Evaluation $evaluation)
     {
-        $employee = Employee::where('nik', $evaluation->nik)->first();
+        $employee = $evaluation->employee;
+
         return view('admin.evaluations.edit-evaluation', compact('evaluation', 'employee'));
     }
 
-    // Update evaluasi
+    /**
+     * Update the specified evaluation in storage.
+     */
     public function update(Request $request, Evaluation $evaluation)
     {
-        $request->validate([
+        $data = $request->validate([
             'nilai_kepemimpinan' => 'nullable|numeric',
             'nilai_perilaku_budaya' => 'nullable|numeric',
             'nilai_pengalaman_teknis' => 'nullable|numeric',
@@ -115,40 +118,25 @@ class EvaluationController extends Controller
             'keterangan' => 'nullable|string',
         ]);
 
-        $nilaiTertimbang =
-            ($request->nilai_kepemimpinan * 0.4) +
-            ($request->nilai_perilaku_budaya * 0.3) +
-            ($request->nilai_pengalaman_teknis * 0.2) +
-            ($request->nilai_kematangan_pribadi * 0.1);
+        $nk = (float) ($data['nilai_kepemimpinan'] ?? 0.0);
+        $npb = (float) ($data['nilai_perilaku_budaya'] ?? 0.0);
+        $npt = (float) ($data['nilai_pengalaman_teknis'] ?? 0.0);
+        $nkp = (float) ($data['nilai_kematangan_pribadi'] ?? 0.0);
 
-        $evaluation->update($request->only([
-            'nilai_kepemimpinan',
-            'nilai_perilaku_budaya',
-            'nilai_pengalaman_teknis',
-            'nilai_kematangan_pribadi',
-            'skor_smkbk_9box',
-            'skor_cli_9box',
-            'kategori_9box',
-            'bidang_tugas',
-            'tanggal_diangkat_staf',
-            'masa_kerja_tahun',
-            'masa_kerja_bulan',
-            'lembaga_asesmen',
-            'tanggal_pelaksanaan_asesmen',
-            'hasil_skor_asesmen',
-            'kategori_asesmen',
-            'keterangan_asesmen',
-            'expired_asesmen',
-            'keterangan',
-        ]) + ['nilai_tertimbang' => $nilaiTertimbang]);
+        $data['nilai_tertimbang'] = ($nk * 0.4) + ($npb * 0.3) + ($npt * 0.2) + ($nkp * 0.1);
+
+        $evaluation->update($data);
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil diperbarui.');
     }
 
-    // Hapus evaluasi
+    /**
+     * Remove the specified evaluation from storage.
+     */
     public function destroy(Evaluation $evaluation)
     {
         $evaluation->delete();
+
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil dihapus.');
     }
 }

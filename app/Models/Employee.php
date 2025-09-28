@@ -56,7 +56,7 @@ class Employee extends Model
 
     public function evaluations()
     {
-        return $this->hasMany(Evaluation::class, 'nik', 'nik');
+        return $this->hasMany(Evaluation::class, 'employee_nik', 'nik');
     }
 
     public function jobHistories()

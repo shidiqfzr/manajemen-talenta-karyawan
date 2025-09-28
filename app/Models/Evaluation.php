@@ -36,6 +36,6 @@ class Evaluation extends Model
 
     public function employee()
     {
-        return $this->belongsTo(Employee::class, 'nik', 'nik');
+        return $this->belongsTo(Employee::class, 'employee_nik', 'nik');
     }
 }

@@ -9,8 +9,8 @@
 
             {{-- Pilih Karyawan --}}
             <div>
-                <label for="nik" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
-                <select name="nik" id="nik" class="tom-input">
+                <label for="employee_nik" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
+                <select name="employee_nik" id="employee_nik" class="tom-input">
                     <option value=""></option>
                     @foreach ($employees as $emp)
                         <option value="{{ $emp->nik }}">{{ $emp->nik }} - {{ $emp->nama }}</option>
@@ -133,7 +133,7 @@
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>
-        new TomSelect("#nik", {
+        new TomSelect("#employee_nik", {
             placeholder: "Cari NIK atau nama",
             create: false,
             sortField: {
