@@ -23,7 +23,7 @@ class EvaluationController extends Controller
      * Show the form for creating a new evaluation.
      * If $employee_nik is provided, pre-fill employee.
      */
-    public function create(string $employee_nik)
+    public function create(?string $employee_nik = null)
     {
         if ($employee_nik) {
             $employee = Employee::where('nik', $employee_nik)->firstOrFail();
@@ -40,7 +40,7 @@ class EvaluationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'employee_nik' => 'required|exists:employees,nik',
+            'employee_nik' => ['required', 'exists:employees,nik'],
             'nilai_kepemimpinan' => 'nullable|numeric',
             'nilai_perilaku_budaya' => 'nullable|numeric',
             'nilai_pengalaman_teknis' => 'nullable|numeric',

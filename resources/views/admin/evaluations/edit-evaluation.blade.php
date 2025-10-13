@@ -7,13 +7,12 @@
         <form action="{{ route('admin.evaluations.update', $evaluation->id) }}" method="POST" class="space-y-6">
             @csrf
             @method('PUT')
-            
+
             {{-- Basic Info --}}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium">NIK</label>
-                    <input type="text" value="{{ $employee->nik }}" disabled
-                        class="w-full border p-2 rounded bg-gray-100">
+                    <input type="text" value="{{ $employee->nik }}" disabled class="w-full border p-2 rounded bg-gray-100">
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Nama</label>
@@ -22,6 +21,11 @@
                     @error('nama')
                         <p class="text-red-500 text-sm">{{ $message }}</p>
                     @enderror
+                </div>
+                <div>
+                    <label for="bidang_tugas" class="block text-sm font-medium">Bidang Tugas</label>
+                    <input type="text" name="bidang_tugas" id="bidang_tugas" class="w-full border p-2 rounded"
+                        value="{{ old('bidang_tugas', $evaluation->bidang_tugas) }}">
                 </div>
             </div>
 
@@ -136,12 +140,11 @@
                 </div>
             </div>
 
-            {{-- Tombol --}}
-            <div class="flex justify-end pt-6">
-                <button type="submit"
-                    class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow">
-                    Update
-                </button>
+            <!-- Actions -->
+            <div class="flex justify-end space-x-3">
+                <a href="{{ route('admin.evaluations.index') }}"
+                    class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Batal</a>
+                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Update</button>
             </div>
         </form>
     </div>

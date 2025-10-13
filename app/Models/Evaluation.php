@@ -10,6 +10,7 @@ class Evaluation extends Model
     use HasFactory;
 
     protected $fillable = [
+        'employee_nik',
         'nilai_kepemimpinan',
         'nilai_perilaku_budaya',
         'nilai_pengalaman_teknis',

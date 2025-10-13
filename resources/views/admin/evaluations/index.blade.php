@@ -10,7 +10,7 @@
                     <p class="text-gray-500 mt-1">Kelola data penilaian karyawan</p>
                 </div>
                 <a href="{{ route('admin.evaluations.create') }}"
-                    class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition ease-in-out duration-200 flex items-center">
+                    class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition ease-in-out duration-200 flex items-center">
                     <i class="fas fa-plus mr-2"></i> Tambah Penilaian
                 </a>
             </div>

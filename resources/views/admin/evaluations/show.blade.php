@@ -16,7 +16,7 @@
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <label class="text-sm font-medium text-gray-600 block mb-1">NIK</label>
-                            <p class="text-gray-900 font-semibold">{{ $evaluation->employee_nik  }}</p>
+                            <p class="text-gray-900 font-semibold">{{ $evaluation->employee_nik }}</p>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <label class="text-sm font-medium text-gray-600 block mb-1">Bidang Tugas</label>
@@ -126,21 +126,21 @@
                                     {{ $evaluation->expired_asesmen ? \Carbon\Carbon::parse($evaluation->expired_asesmen)->format('d-m-Y') : '-' }}
                                 </p>
                             </div>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="text-sm font-medium text-gray-600 block mb-1">Keterangan</label>
-                            <p class="text-gray-900 bg-gray-50 px-3 py-2 rounded-md min-h-[60px]">
-                                {{ $evaluation->keterangan_asesmen ?? '-' }}</p>
+                            <div>
+                                <label class="text-sm font-medium text-gray-600 block mb-1">Keterangan</label>
+                                <p class="text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                                    {{ $evaluation->keterangan_asesmen ?? '-' }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
             <!-- Back Button -->
             <div class="mt-8 flex justify-center sm:justify-start">
-                <a href="{{ route('admin.employees.index') }}"
-                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-medium rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                    <i class="fas fa-arrow-left w-5 h-5 mr-2"></i>
-                    Kembali ke Daftar
+                <a href="{{ route('admin.evaluations.index') }}"
+                    class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                    <i class="fas fa-arrow-left mr-2"></i> Kembali
                 </a>
             </div>
         </div>

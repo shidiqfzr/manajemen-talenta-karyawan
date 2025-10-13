@@ -8,14 +8,34 @@
             @csrf
 
             {{-- Pilih Karyawan --}}
+            @if (isset($employee))
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Karyawan</label>
+                    <input type="text" value="{{ $employee->nik }} - {{ $employee->nama }}"
+                        class="w-full border p-2 rounded bg-gray-100" readonly>
+                    <input type="hidden" name="employee_nik" value="{{ $employee->nik }}">
+                </div>
+            @else
+                <div>
+                    <label for="employee_nik" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
+                    <select name="employee_nik" id="employee_nik" class="tom-input">
+                        <option value=""></option>
+                        @foreach ($employees as $emp)
+                            <option value="{{ $emp->nik }}">{{ $emp->nik }} - {{ $emp->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
+            {{-- Bidang Tugas --}}
             <div>
-                <label for="employee_nik" class="block text-sm font-semibold text-gray-700 mb-2">Pilih Karyawan</label>
-                <select name="employee_nik" id="employee_nik" class="tom-input">
-                    <option value=""></option>
-                    @foreach ($employees as $emp)
-                        <option value="{{ $emp->nik }}">{{ $emp->nik }} - {{ $emp->nama }}</option>
-                    @endforeach
-                </select>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="bidang_tugas" class="block text-sm font-semibold text-gray-700 mb-1">Bidang
+                            Tugas</label>
+                        <input type="text" name="bidang_tugas" id="bidang_tugas" class="w-full border p-2 rounded">
+                    </div>
+                </div>
             </div>
 
             {{-- Nilai Per Kriteria --}}
@@ -24,31 +44,31 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="nilai_kepemimpinan" class="block text-sm font-semibold">Nilai Kepemimpinan</label>
-                        <input type="number" name="nilai_kepemimpinan" id="nilai_kepemimpinan"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="nilai_kepemimpinan" id="nilai_kepemimpinan" min="0"
+                            max="10" step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="nilai_perilaku_budaya" class="block text-sm font-semibold">Nilai Perilaku Budaya</label>
-                        <input type="number" name="nilai_perilaku_budaya" id="nilai_perilaku_budaya"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="nilai_perilaku_budaya" id="nilai_perilaku_budaya" min="0"
+                            max="10" step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="nilai_pengalaman_teknis" class="block text-sm font-semibold">Nilai Pengalaman
                             Teknis</label>
-                        <input type="number" name="nilai_pengalaman_teknis" id="nilai_pengalaman_teknis"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="nilai_pengalaman_teknis" id="nilai_pengalaman_teknis" min="0"
+                            max="10" step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="nilai_kematangan_pribadi" class="block text-sm font-semibold text-gray-700 mb-1">Nilai
                             Kematangan Pribadi</label>
-                        <input type="number" name="nilai_kematangan_pribadi" id="nilai_kematangan_pribadi"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="nilai_kematangan_pribadi" id="nilai_kematangan_pribadi" min="0"
+                            max="10" step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="nilai_tertimbang" class="block text-sm font-semibold text-gray-700 mb-1">Nilai
                             Tertimbang</label>
-                        <input type="number" name="nilai_tertimbang" id="nilai_tertimbang"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="nilai_tertimbang" id="nilai_tertimbang" min="0" max="10"
+                            step="0.01" class="w-full border p-2 rounded">
                     </div>
                 </div>
             </div>
@@ -60,11 +80,13 @@
                     <div>
                         <label for="skor_smkbk_9box" class="block text-sm font-semibold text-gray-700 mb-1">Skor
                             SMK-BK</label>
-                        <input type="number" name="skor_smkbk_9box" id="skor_smkbk_9box" class="w-full border p-2 rounded">
+                        <input type="number" name="skor_smkbk_9box" id="skor_smkbk_9box" min="0" max="100"
+                            step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="skor_cli_9box" class="block text-sm font-semibold text-gray-700 mb-1">Skor CLI</label>
-                        <input type="number" name="skor_cli_9box" id="skor_cli_9box" class="w-full border p-2 rounded">
+                        <input type="number" name="skor_cli_9box" id="skor_cli_9box" min="0" max="100"
+                            step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="kategori_9box" class="block text-sm font-semibold text-gray-700 mb-1">Kategori</label>
@@ -80,7 +102,8 @@
                     <div>
                         <label for="lembaga_asesmen" class="block text-sm font-semibold text-gray-700 mb-1">Lembaga
                             Asesmen</label>
-                        <input type="text" name="lembaga_asesmen" id="lembaga_asesmen" class="w-full border p-2 rounded">
+                        <input type="text" name="lembaga_asesmen" id="lembaga_asesmen"
+                            class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="tanggal_pelaksanaan_asesmen"
@@ -91,8 +114,8 @@
                     <div>
                         <label for="hasil_skor_asesmen" class="block text-sm font-semibold text-gray-700 mb-1">Hasil
                             Skor</label>
-                        <input type="number" name="hasil_skor_asesmen" id="hasil_skor_asesmen"
-                            class="w-full border p-2 rounded">
+                        <input type="number" name="hasil_skor_asesmen" id="hasil_skor_asesmen" min="0"
+                            max="10" step="0.01" class="w-full border p-2 rounded">
                     </div>
                     <div>
                         <label for="kategori_asesmen" class="block text-sm font-semibold text-gray-700 mb-1">Kategori
@@ -109,20 +132,19 @@
                     <div>
                         <label for="expired_asesmen" class="block text-sm font-semibold text-gray-700 mb-1">Expired
                             Asesmen</label>
-                        <input type="date" name="expired_asesmen" id="expired_asesmen" class="w-full border p-2 rounded">
+                        <input type="date" name="expired_asesmen" id="expired_asesmen"
+                            class="w-full border p-2 rounded">
                     </div>
                 </div>
             </div>
 
-            {{-- Tombol --}}
-            <div class="flex justify-end pt-6">
-                <button type="submit"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow">
-                    Simpan
-                </button>
+            <!-- Actions -->
+            <div class="flex justify-end space-x-3">
+                <a href="{{ route('admin.evaluations.index') }}"
+                    class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Batal</a>
+                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Simpan</button>
             </div>
         </form>
-    </div>
     </div>
 @endsection
 

@@ -109,7 +109,7 @@ Route::prefix('admin')
         // Evaluations
         Route::prefix('evaluations')->name('evaluations.')->group(function () {
             Route::get('/', [AdminEvaluationController::class, 'index'])->name('index');
-            Route::get('/create/{nik?}', [AdminEvaluationController::class, 'create'])->name('create');
+            Route::get('/create/{employee_nik?}', [AdminEvaluationController::class, 'create'])->name('create');
             Route::post('/store', [AdminEvaluationController::class, 'store'])->name('store');
             Route::get('/{evaluation}/detail', [AdminEvaluationController::class, 'show'])->name('show');
             Route::get('/{evaluation}/edit', [AdminEvaluationController::class, 'edit'])->name('edit');
