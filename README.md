@@ -1,66 +1,68 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistem Manajemen Talenta & Formasi Pegawai
+## PT Perkebunan Nusantara IV Regional V (Kalimantan)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi Human Resources Information System (HRIS) dan perencanaan formasi talenta (*Man Power Planning*) berbasis web yang dirancang khusus untuk mengelola data kepegawaian, formasi jabatan pimpinan (RM Band), riwayat mutasi, evaluasi kinerja 9-box, serta monitoring pensiun di lingkungan PT Perkebunan Nusantara IV Regional V.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 📚 Dokumen Acuan Tunggal (4 Pilar SSOT)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Proyek ini dipandu oleh empat pilar dokumentasi arsitektur utama:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. **[DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md)** — **Business Domain & Enterprise Rules**
+   - Kamus data dan spesifikasi entitas (`Employee`, `JobHistory`, `Evaluation`, `Training`, `JobVacancy`).
+   - Struktur 43 unit kerja (Regional Office, Kalbar, Kalselteng, Kaltim).
+   - Regulasi SDM BUMN: Strata Karpim & Karpel, RM Band (`RM-1`, `RM-2`, `RM-3`), 4 Bidang Fungsional (`KEU`, `TAN`, `TEK`, `UMU`).
+   - Rumus otomatis Pensiun (56 tahun) & Masa Bebas Tugas (MBT 55 tahun).
+   - Aturan transaksi mutasi (straight vs swap transfer, auto-chain vacancy).
+   - Service layer: `ManPowerPlanningService`, `MutasiService`, `JobVacancyService`.
 
-## Learning Laravel
+2. **[DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md)** — **Design System & UI/UX Guidelines**
+   - Panduan UI/UX berbasis TALL Stack (Tailwind CSS, Alpine.js, Laravel, Livewire).
+   - Design tokens: Palet warna "Perkebunan Modern" (hijau `#2F8250`, earth tones, semantic badges).
+   - Komponen antarmuka enterprise, dialog konfirmasi modal, dan live impact analysis panel.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+3. **[ENGINEERING.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/ENGINEERING.md)** — **Engineering Standards, SDLC & Testing Strategy**
+   - Alur Agile Feature-Driven SDLC 5 tahap.
+   - Pola Service Layer, transaksi atomik database (`DB::transaction()`), dan standar Livewire components.
+   - Strategi pengujian otomatis: PHPUnit 11 (Unit Tests formula HR & Feature Tests alur mutasi) dan linter Laravel Pint.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+4. **[SECURITY.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/SECURITY.md)** — **Security Policy & Data Governance**
+   - Standar kepatuhan privasi data pegawai (UU No. 27/2022 UU PDP).
+   - Mitigasi risiko keamanan OWASP Top 10 (SQL Injection, CSRF, XSS, proteksi unggah Excel/sertifikat).
+   - Kontrol akses berbasis peran (RBAC) dan prosedur pelaporan kerentanan keamanan siber.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+> **Catatan Pengembang & AI**: Selalu rujuk **[AGENTS.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/AGENTS.md)** sebagai panduan kontekstual saat melakukan vibe coding.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🚀 Tech Stack
 
-### Premium Partners
+- **Framework**: Laravel 11.x (PHP 8.2+)
+- **Frontend / Styling**: Tailwind CSS, Alpine.js, Blade Components
+- **Interactivity**: Laravel Livewire
+- **Database**: MySQL / MariaDB
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+---
 
-## Contributing
+## 🛠️ Menjalankan Aplikasi Secara Lokal
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. Salin file konfigurasi environment:
+   ```bash
+   cp .env.example .env
+   ```
+2. Pasang dependensi PHP dan Node:
+   ```bash
+   composer install
+   npm install
+   ```
+3. Generate application key & migrasi database:
+   ```bash
+   php artisan key:generate
+   php artisan migrate --seed
+   ```
+4. Jalankan server pengembangan:
+   ```bash
+   npm run dev
+   php artisan serve
+   ```
