@@ -15,26 +15,33 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'username' => ['required', 'alpha_dash'],
+        $request->validate([
+            'username' => ['required', 'string'],
             'password' => ['required'],
         ]);
+
+        $loginField = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $credentials = [
+            $loginField => $request->username,
+            'password' => $request->password,
+        ];
 
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
 
             // Redirect by role
-            $user = Auth::user(); 
+            $user = Auth::user();
 
             return match ($user->role) {
                 'admin' => redirect()->route('admin.employees.index'),
-                'user'  => redirect()->route('user.employees.index'),
+                'user' => redirect()->route('user.employees.index'),
                 default => redirect('/'),
             };
         }
 
         return back()->withErrors([
-            'username' => 'Username atau password salah.',
+            'username' => 'Username/Email atau password salah.',
         ])->onlyInput('username');
     }
 

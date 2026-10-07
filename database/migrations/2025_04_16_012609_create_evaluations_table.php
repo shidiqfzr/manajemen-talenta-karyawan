@@ -12,8 +12,8 @@ return new class extends Migration
     public function up()
     {
         Schema::create('evaluations', function (Blueprint $table) {
-            $table->id(); //PK
-            $table->string('employee_nik'); 
+            $table->id(); // PK
+            $table->string('employee_nik');
             $table->foreign('employee_nik')->references('nik')->on('employees')->onDelete('cascade');
 
             // Nilai per kriteria
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('nilai_perilaku_budaya', 5, 2)->nullable(); // 30%
             $table->decimal('nilai_pengalaman_teknis', 5, 2)->nullable(); // 20%
             $table->decimal('nilai_kematangan_pribadi', 5, 2)->nullable(); // 10%
-            
+
             $table->decimal('nilai_tertimbang', 5, 2)->nullable();
 
             // 9 Box

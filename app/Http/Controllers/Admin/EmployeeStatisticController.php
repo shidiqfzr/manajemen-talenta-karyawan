@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\EmployeeStatistic;
+use Illuminate\Http\Request;
 
 class EmployeeStatisticController extends Controller
 {
@@ -14,6 +14,7 @@ class EmployeeStatisticController extends Controller
     public function index()
     {
         $statistics = EmployeeStatistic::latest()->get();
+
         return view('admin.employees.statistics.index', compact('statistics'));
     }
 
@@ -57,6 +58,7 @@ class EmployeeStatisticController extends Controller
     public function edit(string $id)
     {
         $statistic = EmployeeStatistic::findOrFail($id);
+
         return view('admin.employees.statistics.edit-statistic', compact('statistic'));
     }
 

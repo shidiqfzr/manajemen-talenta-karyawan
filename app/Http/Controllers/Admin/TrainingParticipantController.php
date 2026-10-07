@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Training;
 use App\Models\Employee;
+use App\Models\Training;
 use App\Services\TrainingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +24,7 @@ class TrainingParticipantController extends Controller
     public function create(Training $training)
     {
         $employees = Employee::all();
+
         return view('admin.trainings.add-participant', compact('training', 'employees'));
     }
 

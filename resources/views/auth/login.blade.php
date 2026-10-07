@@ -254,20 +254,13 @@
 
             // Form submission with loading state
             form.addEventListener('submit', function(e) {
-
                 // Show loading state
                 btnText.textContent = 'Memproses...';
                 btnSpinner.classList.remove('hidden');
-                submitBtn.disabled = true;
-                submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
-            });
-
-            // Keyboard shortcuts
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && (document.activeElement === document.getElementById('username') ||
-                        document.activeElement === document.getElementById('password'))) {
-                    form.dispatchEvent(new Event('submit'));
-                }
+                setTimeout(function() {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+                }, 10);
             });
 
             // Auto-focus username on page load

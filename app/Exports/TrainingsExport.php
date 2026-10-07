@@ -3,14 +3,13 @@
 namespace App\Exports;
 
 use App\Models\Training;
-use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Events\AfterSheet;
 
-class TrainingsExport implements FromCollection, WithHeadings, WithMapping, WithEvents
+class TrainingsExport implements FromCollection, WithEvents, WithHeadings, WithMapping
 {
     protected $filters;
 
@@ -38,13 +37,13 @@ class TrainingsExport implements FromCollection, WithHeadings, WithMapping, With
 
     public function collection()
     {
-        $query = Training::withCount('employees'); 
+        $query = Training::withCount('employees');
 
-        if (!empty($this->filters['start_date'])) {
+        if (! empty($this->filters['start_date'])) {
             $query->whereDate('tanggal_mulai', '>=', $this->filters['start_date']);
         }
 
-        if (!empty($this->filters['end_date'])) {
+        if (! empty($this->filters['end_date'])) {
             $query->whereDate('tanggal_mulai', '<=', $this->filters['end_date']);
         }
 
@@ -68,7 +67,7 @@ class TrainingsExport implements FromCollection, WithHeadings, WithMapping, With
             $training->bidang_pelatihan,
             $training->jam_belajar_per_hari,
             $training->jumlah_man_hours,
-            $training->employees_count, 
+            $training->employees_count,
         ];
     }
 
@@ -89,7 +88,7 @@ class TrainingsExport implements FromCollection, WithHeadings, WithMapping, With
             'BIDANG PELATIHAN',
             'JAM BELAJAR PER HARI',
             'JUMLAH MAN HOURS',
-            'JUMLAH PESERTA', 
+            'JUMLAH PESERTA',
         ];
     }
 

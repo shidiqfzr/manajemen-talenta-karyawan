@@ -2,11 +2,8 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
 
 class JobHistory extends Model
 {
@@ -23,14 +20,14 @@ class JobHistory extends Model
     ];
 
     protected $fillable = [
-        'employee_nik',      
+        'employee_nik',
         'jabatan',
         'unit_kerja',
         'level',
         'golongan',
         'tmt_awal',
         'tmt_akhir',
-        'jenis_mutasi',      
+        'jenis_mutasi',
         'nomor_sk',
         'tanggal_sk',
         'catatan',
@@ -49,16 +46,18 @@ class JobHistory extends Model
 
     public function getJenisMutasiLabelAttribute(): string
     {
-        if (!$this->jenis_mutasi) return '—';
+        if (! $this->jenis_mutasi) {
+            return '—';
+        }
 
         return match ($this->jenis_mutasi) {
-            'PROMOSI'     => 'Promosi',
-            'ROTASI'      => 'Rotasi',
-            'DEMOSI'      => 'Demosi',
-            'ALIH_TUGAS'  => 'Alih Tugas',
+            'PROMOSI' => 'Promosi',
+            'ROTASI' => 'Rotasi',
+            'DEMOSI' => 'Demosi',
+            'ALIH_TUGAS' => 'Alih Tugas',
             'MUTASI_UNIT' => 'Mutasi Unit',
-            'PENUGASAN'   => 'Penugasan',
-            default       => 'Lainnya',
+            'PENUGASAN' => 'Penugasan',
+            default => 'Lainnya',
         };
     }
 }

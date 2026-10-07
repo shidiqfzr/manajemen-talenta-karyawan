@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\EmployeeStatistic;
-use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -20,7 +18,8 @@ class DatabaseSeeder extends Seeder
             TrainingSeeder::class,
             EmployeeTrainingSeeder::class,
             EvaluationSeeder::class,
-            EmployeeStatisticSeeder::class
+            EmployeeStatisticSeeder::class,
+            RealisticMutationSeeder::class,
         ]);
     }
 }

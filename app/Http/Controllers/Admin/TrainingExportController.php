@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\TrainingsExport;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Training;
 use App\Services\TrainingExportService;
-use App\Exports\TrainingsExport;
+use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
 class TrainingExportController extends Controller
@@ -32,6 +32,7 @@ class TrainingExportController extends Controller
     public function exportExcel(Request $request)
     {
         $filters = $request->only(['start_date', 'end_date']);
+
         return Excel::download(new TrainingsExport($filters), 'data_pelatihan.xlsx');
     }
 }

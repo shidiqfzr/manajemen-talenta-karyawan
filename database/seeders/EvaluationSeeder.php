@@ -2,16 +2,16 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Evaluation;
 use App\Models\Employee;
+use App\Models\Evaluation;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 class EvaluationSeeder extends Seeder
 {
     public function run(): void
     {
-        $employees = Employee::take(10)->get(); 
+        $employees = Employee::take(10)->get();
 
         foreach ($employees as $employee) {
             $nilai_kepemimpinan = rand(60, 100);
@@ -36,7 +36,7 @@ class EvaluationSeeder extends Seeder
                 'skor_smkbk_9box' => rand(1, 9),
                 'skor_cli_9box' => rand(1, 9),
                 'kategori_9box' => collect(['High Potential', 'Promotable', 'Sleeping Tiger', 'Solid Contributor', 'Unfit'])->random(),
-                'bidang_tugas' => 'Bidang ' . rand(1, 3),
+                'bidang_tugas' => 'Bidang '.rand(1, 3),
                 'lembaga_asesmen' => collect(['Lembaga A', 'Lembaga B', 'Lembaga C'])->random(),
                 'tanggal_pelaksanaan_asesmen' => now()->subMonths(rand(1, 24)),
                 'hasil_skor_asesmen' => rand(60, 100),

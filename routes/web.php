@@ -1,21 +1,20 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
+use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
+use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
+use App\Http\Controllers\Admin\JobVacancyController;
+use App\Http\Controllers\Admin\Master\PositionController;
+use App\Http\Controllers\Admin\Master\UnitController;
+use App\Http\Controllers\Admin\MutasiController;
+use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
+use App\Http\Controllers\Admin\TrainingExportController as AdminTrainingExportController;
+use App\Http\Controllers\Admin\TrainingParticipantController as AdminTrainingParticipantController;
 use App\Http\Controllers\Auth\LoginController;
-
+use App\Http\Controllers\DataController;
 use App\Http\Controllers\User\EmployeeController as UserEmployeeController;
 use App\Http\Controllers\User\TrainingController as UserTrainingController;
-
-use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
-use App\Http\Controllers\Admin\EmployeeStatisticController as AdminEmployeeStatisticController;
-use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
-use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
-use App\Http\Controllers\Admin\TrainingParticipantController as AdminTrainingParticipantController;
-use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
-use App\Http\Controllers\Admin\TrainingExportController as AdminTrainingExportController;
-
-use App\Http\Controllers\DataController;
+use Illuminate\Support\Facades\Route;
 
 // Redirect default to login
 Route::get('/', function () {
@@ -62,14 +61,11 @@ Route::prefix('admin')
             Route::put('/{employee}', [AdminEmployeeController::class, 'update'])->name('update');
             Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy'])->name('destroy');
 
-            // Employee Statistics
+            // Employee Statistics (Legacy redirect to unified Employee Directory)
             Route::prefix('statistics')->name('statistics.')->group(function () {
-                Route::get('/', [AdminEmployeeStatisticController::class, 'index'])->name('index');
-                Route::get('/create', [AdminEmployeeStatisticController::class, 'create'])->name('create');
-                Route::post('/', [AdminEmployeeStatisticController::class, 'store'])->name('store');
-                Route::get('/{statistic}/edit', [AdminEmployeeStatisticController::class, 'edit'])->name('edit');
-                Route::put('/{statistic}', [AdminEmployeeStatisticController::class, 'update'])->name('update');
-                Route::delete('/{statistic}', [AdminEmployeeStatisticController::class, 'destroy'])->name('destroy');
+                Route::get('/', function () {
+                    return redirect()->route('admin.employees.index');
+                })->name('index');
             });
 
             // Employee Job History
@@ -116,6 +112,44 @@ Route::prefix('admin')
             Route::put('/{evaluation}', [AdminEvaluationController::class, 'update'])->name('update');
             Route::delete('/{evaluation}', [AdminEvaluationController::class, 'destroy'])->name('destroy');
         });
+
+        // Vacancies — read-only monitoring dashboard
+        Route::prefix('vacancies')->name('vacancies.')->group(function () {
+            Route::get('/', [JobVacancyController::class, 'index'])->name('index');
+        });
+
+        // Mutasi & Penempatan — unified transfer module
+        Route::prefix('mutasi')->name('mutasi.')->group(function () {
+            Route::get('/', [MutasiController::class, 'index'])->name('index');
+            Route::get('/create', [MutasiController::class, 'create'])->name('create');
+            Route::get('/history', [MutasiController::class, 'history'])->name('history');
+        });
+
+        // Master Data Management
+        Route::prefix('master')->name('master.')->group(function () {
+            // Units
+            Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
+            Route::resource('units', UnitController::class)->except(['show']);
+
+            // Positions
+            Route::post('positions/{position}/toggle', [PositionController::class, 'toggleStatus'])->name('positions.toggle');
+            Route::resource('positions', PositionController::class)->except(['show']);
+        });
+
+        // API for Smart Classification (SSOT via Service)
+        Route::get('/api/classify-position', function (\Illuminate\Http\Request $request, \App\Services\ManPowerPlanningService $service) {
+            $emp = new \App\Models\Employee();
+            $emp->jabatan = $request->query('jabatan', '');
+            $emp->unit_kerja = $request->query('unit_kerja', '');
+            $emp->level = $request->query('level', 'Karpim');
+            $emp->golongan = $request->query('golongan', '');
+            $emp->job_grade = $request->query('job_grade', '');
+            
+            return response()->json([
+                'bidang' => $service->determineBidang($emp),
+                'rm_band' => $service->determineRmLevel($emp)
+            ]);
+        })->name('api.classify-position');
     });
 
 // Data Routes

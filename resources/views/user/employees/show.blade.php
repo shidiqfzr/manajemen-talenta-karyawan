@@ -39,7 +39,7 @@
                                 'Level' => $employee->level,
                                 'Unit Kerja' => $employee->unit_kerja,
                                 'Golongan' => $employee->golongan,
-                                'Job Grader' => $employee->job_grader,
+                                'Job Grader' => $employee->job_grade,
                                 'Person Grade' => $employee->person_grade,
                                 'Tanggal Dalam Jabatan' => $employee->tanggal_dalam_jabatan,
                                 'Tanggal MBT' => $employee->tanggal_mbt,

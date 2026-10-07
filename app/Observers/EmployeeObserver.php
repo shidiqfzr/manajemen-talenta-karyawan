@@ -20,7 +20,7 @@ class EmployeeObserver
      */
     public function created(Employee $employee): void
     {
-        if (!$this->hasCoreJob($employee)) {
+        if (! $this->hasCoreJob($employee)) {
             return; // skip if no meaningful job info yet
         }
 
@@ -33,13 +33,16 @@ class EmployeeObserver
 
         JobHistory::create([
             'employee_nik' => $employee->nik,
-            'jabatan'      => $employee->jabatan,
-            'unit_kerja'   => $employee->unit_kerja,
-            'level'        => $employee->level,
-            'golongan'     => $employee->golongan,
-            'tmt_awal'     => $start->toDateString(),
-            'tmt_akhir'    => null,
-            'jenis_mutasi' => null,
+            'jabatan' => $employee->jabatan,
+            'unit_kerja' => $employee->unit_kerja,
+            'level' => $employee->level,
+            'golongan' => $employee->golongan,
+            'tmt_awal' => $start->toDateString(),
+            'tmt_akhir' => null,
+            'jenis_mutasi' => 'PENUGASAN',
+            'nomor_sk' => 'SK.DIR/REG5/REK-AWAL/'.date('Y'),
+            'tanggal_sk' => $start->toDateString(),
+            'catatan' => 'Pengangkatan / Penugasan awal pegawai',
         ]);
     }
 
@@ -49,7 +52,7 @@ class EmployeeObserver
      */
     public function updated(Employee $employee): void
     {
-        if (!$this->hasCoreJob($employee)) {
+        if (! $this->hasCoreJob($employee)) {
             return;
         }
 
@@ -58,16 +61,16 @@ class EmployeeObserver
         $coreChanged = collect(self::CORE_FIELDS)
             ->some(fn ($f) => array_key_exists($f, $dirty));
 
-        $dateChangedOnly = !$coreChanged && collect(self::DATE_FIELDS)
+        $dateChangedOnly = ! $coreChanged && collect(self::DATE_FIELDS)
             ->some(fn ($f) => array_key_exists($f, $dirty));
 
-        if (!$coreChanged && !$dateChangedOnly) {
+        if (! $coreChanged && ! $dateChangedOnly) {
             return; // nothing relevant changed
         }
 
         $newStart = $this->resolveStartDate($employee);
 
-        DB::transaction(function () use ($employee, $coreChanged, $dateChangedOnly, $newStart) {
+        DB::transaction(function () use ($employee, $dateChangedOnly, $newStart) {
             $active = $employee->jobHistories()
                 ->whereNull('tmt_akhir')
                 ->latest('tmt_awal')
@@ -79,6 +82,7 @@ class EmployeeObserver
                     $active->tmt_awal = $newStart->toDateString();
                     $active->save();
                 }
+
                 return;
             }
 
@@ -95,12 +99,12 @@ class EmployeeObserver
 
             JobHistory::create([
                 'employee_nik' => $employee->nik,
-                'jabatan'      => $employee->jabatan,
-                'unit_kerja'   => $employee->unit_kerja,
-                'level'        => $employee->level,
-                'golongan'     => $employee->golongan,
-                'tmt_awal'     => $newStart->toDateString(),
-                'tmt_akhir'    => null,
+                'jabatan' => $employee->jabatan,
+                'unit_kerja' => $employee->unit_kerja,
+                'level' => $employee->level,
+                'golongan' => $employee->golongan,
+                'tmt_awal' => $newStart->toDateString(),
+                'tmt_akhir' => null,
                 'jenis_mutasi' => null,
             ]);
         });
@@ -123,8 +127,12 @@ class EmployeeObserver
         ];
 
         foreach ($candidates as $value) {
-            if ($value instanceof Carbon) return $value->copy()->startOfDay();
-            if (!empty($value))       return Carbon::parse($value)->startOfDay();
+            if ($value instanceof Carbon) {
+                return $value->copy()->startOfDay();
+            }
+            if (! empty($value)) {
+                return Carbon::parse($value)->startOfDay();
+            }
         }
 
         return now()->startOfDay();

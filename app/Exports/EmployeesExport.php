@@ -4,11 +4,11 @@ namespace App\Exports;
 
 use App\Models\Employee;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Events\AfterSheet;
 
-class EmployeesExport implements FromCollection, WithHeadings, WithEvents
+class EmployeesExport implements FromCollection, WithEvents, WithHeadings
 {
     protected $filters;
 
@@ -23,16 +23,17 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
         'tmt_unit_kerja',
         'tempat_lahir',
         'tanggal_lahir',
+        'jenis_kelamin',
         'tmt_bekerja',
         'tanggal_diangkat_staf',
         'susunan_keluarga',
-        'job_grader',
+        'job_grade',
         'person_grade',
         'tanggal_mbt',
         'tanggal_pensiun',
         'agama',
         'pendidikan_terakhir',
-        'sekolah'
+        'sekolah',
     ];
 
     public function __construct($filters = [])
@@ -44,27 +45,35 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
     {
         $query = Employee::query();
 
-        if (!empty($this->filters['search'])) {
+        if (! empty($this->filters['search'])) {
             $query->where(function ($q) {
-                $q->where('nik', 'like', '%' . $this->filters['search'] . '%')
-                    ->orWhere('nama', 'like', '%' . $this->filters['search'] . '%');
+                $q->where('nik', 'like', '%'.$this->filters['search'].'%')
+                    ->orWhere('nama', 'like', '%'.$this->filters['search'].'%');
             });
         }
 
-        if (!empty($this->filters['jabatan'])) {
+        if (! empty($this->filters['jabatan'])) {
             $query->where('jabatan', $this->filters['jabatan']);
         }
 
-        if (!empty($this->filters['level'])) {
+        if (! empty($this->filters['level'])) {
             $query->where('level', $this->filters['level']);
         }
 
-        if (!empty($this->filters['unit_kerja'])) {
+        if (! empty($this->filters['unit_kerja'])) {
             $query->where('unit_kerja', $this->filters['unit_kerja']);
         }
 
-        if (!empty($this->filters['golongan'])) {
+        if (! empty($this->filters['golongan'])) {
             $query->where('golongan', $this->filters['golongan']);
+        }
+
+        if (! empty($this->filters['tahun_masuk'])) {
+            $query->whereYear('tmt_bekerja', $this->filters['tahun_masuk']);
+        }
+
+        if (! empty($this->filters['bulan_masuk'])) {
+            $query->whereMonth('tmt_bekerja', $this->filters['bulan_masuk']);
         }
 
         return $query->select($this->columns)->get();
@@ -83,6 +92,7 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
             'TMT UNIT KERJA',
             'TEMPAT LAHIR',
             'TANGGAL LAHIR',
+            'JENIS KELAMIN',
             'TMT BEKERJA',
             'TANGGAL DIANGKAT STAF',
             'SUSUNAN KELUARGA',
@@ -102,13 +112,13 @@ class EmployeesExport implements FromCollection, WithHeadings, WithEvents
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
 
-                $sheet->getStyle('A1:T1')->applyFromArray([
+                $sheet->getStyle('A1:U1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                     ],
                 ]);
 
-                foreach (range('A', 'T') as $col) {
+                foreach (range('A', 'U') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
             },

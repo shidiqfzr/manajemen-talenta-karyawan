@@ -42,21 +42,27 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `nik` | `string(8)` | **Primary Key**. Nomor Induk Karyawan unik 8 digit numerik. Regex: `/^[0-9]{8}$/`. | `13004521`, `13004837` |
 | `nama` | `string` | Nama resmi sesuai SK Pengangkatan/KTP. Disimpan dalam format UPPERCASE. | `DONNY USMAN`, `HERRY WAHYUDI` |
 | `level` | `string` | Kategori strata pegawai: Karyawan Pimpinan atau Pelaksana. | `Karpim`, `Karpel` |
-| `rm_level` | `string/enum` | Eselon kepemimpinan manajerial: RM-1, RM-2, RM-3 (atau non-RM untuk pelaksana). | `RM-1`, `RM-2`, `RM-3` |
+| `rm_level` | `string/enum` | Eselon manajemen dan formasi: RM-1, RM-2, RM-3 (Karpim), dan RM-4 (Karpel). | `RM-1`, `RM-2`, `RM-3`, `RM-4` |
 | `bidang` | `string` | Bidang fungsional operasional pegawai. | `KEU`, `TAN`, `TEK`, `UMU` |
 | `jabatan` | `string` | Nomenklatur jabatan dinas yang sedang diemban saat ini. | `Manajer Kebun`, `Askep Tanaman`, `Asisten Afdeling` |
 | `unit_kerja` | `string` | Nama unit kerja definitif dari 43 unit resmi perusahaan. | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
 | `golongan` | `string` | Tingkat golongan kepangkatan beserta berkala genap (`[Gol]/[Berkala]`). | `IIIA/00`, `IIID/05`, `IVA/05` |
-| `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel: 1-10; Karpim: 11-16 |
-| `person_grade` | `integer` | Tingkat kompetensi individual pegawai (1 s.d. 16). | Karpel: 1-10; Karpim: 11-16 |
+| `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
+| `person_grade` | `integer` | Tingkat kompetensi individual pegawai (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
+| `jalur_masuk` | `string?` | Jalur rekrutmen/pengadaan pegawai yang berpengaruh ke supply pipa MPP. | `CKP`, `Talent Scouting`, `RBB`, `Reguler` |
 | `tanggal_lahir` | `date` | Tanggal lahir pegawai (dasar perhitungan pensiun & MBT). | `1980-08-15` |
+| `tempat_lahir` | `string(100)?` | Tempat/kota kelahiran sesuai KTP. | `Medan`, `Pontianak` |
+| `jenis_kelamin` | `string(10)?` | Jenis kelamin pegawai (Laki-laki / Perempuan). | `L`, `P` |
+| `agama` | `string(50)?` | Agama resmi yang diakui pemerintah. | `Islam`, `Kristen Protestan`, `Katolik`, `Hindu`, `Buddha`, `Khonghucu` |
 | `tmt_bekerja` | `date` | Terhitung Mulai Tanggal pertama kali diangkat di PTPN. | `2005-01-01` |
 | `tanggal_diangkat_staf`| `date` | Tanggal resmi diangkat menjadi staf pimpinan (Karpim). Kosong jika Karpel. | `2012-06-01` |
 | `tmt_unit_kerja` | `date` | Tanggal mulai bertugas di unit kerja saat ini (dasar rotasi dinas). | `2022-03-01` |
 | `tanggal_dalam_jabatan` | `date` | Tanggal SK pengangkatan posisi jabatan saat ini. | `2023-01-01` |
 | `tanggal_pensiun` | `date` | Tanggal jatuh tempo pensiun (tepat 56 tahun). | Ditentukan otomatis oleh sistem |
 | `tanggal_mbt` | `date` | Tanggal Masa Bebas Tugas (tepat 1 tahun sebelum pensiun / 55 tahun). | Ditentukan otomatis oleh sistem |
-| `susunan_keluarga` | `string` | Status tanggungan perkawinan & anak. | `L`, `TK`, `K/0`, `K/1`, `K/2`, `K/3` |
+| `susunan_keluarga` | `string` | Status tanggungan perkawinan & anak (PTKP). | `L`, `TK`, `K/0`, `K/1`, `K/2`, `K/3` |
+| `pendidikan_terakhir`| `string(100)?` | Jenjang pendidikan formal tertinggi yang ditamatkan. | `SD`, `SMP`, `SMA / SMK`, `D1 / D2`, `D3`, `D4 / S1`, `S2`, `S3` |
+| `sekolah` | `string?` | Nama institusi pendidikan formal / universitas. | `Universitas Gadjah Mada`, `INSTIPER` |
 
 ### 2.2 Entitas Riwayat Jabatan & Mutasi (`JobHistory` / `job_histories`)
 
@@ -164,36 +170,46 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 42. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
 43. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN/TEK)*
 
+### 3.5 Tata Kelola Master Data Dinamis (Hybrid Architecture)
+1. **Pemisahan Kategori Statis vs Dinamis**:
+   - Kategori regulasi negara & pajak (`jenis_kelamin`, `agama`, `susunan_keluarga`, `pendidikan_terakhir`, `level`) bersifat statis dan didefinisikan terpusat sebagai *Constants* pada model `Employee`.
+   - Unit Kerja (`Unit` / `units`) dan Jabatan Formasi (`Position` / `positions`) dikelola secara dinamis melalui antarmuka Master Data di Admin Panel (`/admin/master/units` dan `/admin/master/positions`).
+2. **Prinsip Proteksi Integritas (Anti-Broken Reference)**:
+   - Penghapusan unit kerja atau jabatan yang telah memiliki riwayat pegawai aktif ditolak oleh sistem (*integrity validation guard*).
+   - Penyesuaian restrukturisasi organisasi dilakukan melalui status `is_active` (*soft inactivation*). Entitas nonaktif tidak akan muncul pada pilihan penempatan pegawai baru, namun data historis pada `employees` dan `job_histories` tetap utuh.
+3. **Penyelarasan Nomenklatur Otomatis**:
+   - Jika nama unit atau jabatan diperbarui di Master Data, sistem secara transaksional menyelaraskan data terkait di tabel `employees` guna mencegah inkonsistensi pelaporan dan audit kepegawaian.
+
 ---
 
 ## 4. Strata Pegawai, RM Band, & 4 Bidang Fungsional
 
 ### 4.1 Strata Pegawai
 1. **Karyawan Pimpinan (Karpim)**:
-   - Staf pimpinan/manajerial pemegang keputusan strategis & operasional.
+   - Staf pimpinan/manajerial pemegang keputusan strategis & operasional (terbagi dalam eselon **RM-1**, **RM-2**, dan **RM-3**).
    - Golongan: **Golongan III** (`IIIA`, `IIIB`, `IIIC`, `IIID`) & **Golongan IV** (`IVA`, `IVB`, `IVC`, `IVD`).
    - Grade: **Job Grade 11 s.d. 16**, **Person Grade 11 s.d. 16**.
 2. **Karyawan Pelaksana (Karpel)**:
-   - Tenaga operasional non-staf lini depan.
+   - Tenaga operasional non-staf lini depan (diklasifikasikan ke dalam **RM-4**).
    - Golongan: **Golongan I** (`IA` - `ID`) & **Golongan II** (`IIA` - `IID`).
    - Grade: **Job Grade 1 s.d. 10**, **Person Grade 1 s.d. 10**.
 
 ### 4.2 Resource Management (RM) Band
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        4 BIDANG FUNGSIONAL                             │
-│   [KEU] Keuangan    [TAN] Tanaman    [TEK] Teknik    [UMU] Umum & SDM  │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │
-          ┌──────────────────────────┼──────────────────────────┐
-          ▼                          ▼                          ▼
-   ┌─────────────┐            ┌─────────────┐            ┌─────────────┐
-   │    RM-1     │            │    RM-2     │            │    RM-3     │
-   │  PIMPINAN   │            │    MADYA    │            │   PRATAMA   │
-   │ Job Gr: 15-16            │ Job Gr: 13-14            │ Job Gr: 11-12
-   │ Gol: IV                  │ Gol: IIIC - IIID         │ Gol: IIIA - IIIB
-   └─────────────┘            └─────────────┘            └─────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                  4 BIDANG FUNGSIONAL                                   │
+│       [KEU] Keuangan      [TAN] Tanaman      [TEK] Teknik      [UMU] Umum & SDM        │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            │
+          ┌──────────────────────────┬──────┴───────────────────┬────────────────────────┐
+          ▼                          ▼                          ▼                        ▼
+   ┌─────────────┐            ┌─────────────┐            ┌─────────────┐          ┌─────────────┐
+   │    RM-1     │            │    RM-2     │            │    RM-3     │          │    RM-4     │
+   │  PIMPINAN   │            │    MADYA    │            │   PRATAMA   │          │  PELAKSANA  │
+   │ Job Gr: 15-16            │ Job Gr: 13-14            │ Job Gr: 11-12          │ Job Gr: 1-10│
+   │ Gol: IV                  │ Gol: IIIC - IIID         │ Gol: IIIA - IIIB       │ Gol: I - II │
+   └─────────────┘            └─────────────┘            └─────────────┘          └─────────────┘
 ```
 
 1. **RM-1 (Senior Leadership / Pimpinan Puncak Unit)**:
@@ -208,6 +224,10 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
    - Standar Golongan: `IIIA` s.d. `IIIB` (dan `IIIC`)
    - Standar Job Grade: `11` – `12`
    - Posisi Kunci: Asisten Afdeling/Kebun, Asisten Pengolahan, Asisten Bengkel/Maintenance, Asisten QC/Laboratorium, Asisten Tata Usaha (KTU), Asisten SDM/Humas.
+4. **RM-4 (Operational Staff / Karyawan Pelaksana Lini Depan)**:
+   - Standar Golongan: `IA` s.d. `IID`
+   - Standar Job Grade: `1` – `10`
+   - Posisi Kunci: Mandor Panen/Pemeliharaan, Operator PKS, Krani Afdeling/Kantor, Mekanik Bengkel, Satpam/Keamanan Kebun. Disiapkan sebagai talenta internal untuk suksesi ke RM-3 via jalur **CKP**.
 
 ### 4.3 4 Bidang Fungsional
 Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService@determineBidang`:
@@ -306,13 +326,20 @@ Modul Pelatihan (`Trainings`) berfungsi memantau investasi kompetensi talenta:
 
 Service `ManPowerPlanningService` memuat data acuan baseline perusahaan:
 1. **Formasi Standar vs Realisasi**:
-   - Menghitung rasio pemenuhan formasi per RM Band (RM-1, RM-2, RM-3) pada setiap bidang (KEU, TAN, TEK, UMU).
-2. **Pipa Talenta Suksesi**:
-   - **CKP (Calon Karyawan Pimpinan)**: Karpel berprestasi yang dipersiapkan promosi staf RM-3.
-   - **Talent Scouting**: Penjaringan talenta muda unggul afdeling & pabrik.
-   - **RBB (Rencana Bisnis & Penambahan Formasi)**: Kebutuhan formasi baru akibat perluasan areal kebun atau revitalisasi pabrik.
+   - Menghitung rasio pemenuhan formasi per RM Band (`RM-1`, `RM-2`, `RM-3`, `RM-4`) pada setiap bidang (KEU, TAN, TEK, UMU).
+2. **Pipa Pasokan Talenta Rekrutmen (Recruitment Supply Channels)**:
+   - **CKP (Calon Karyawan Pimpinan) Internal**: Pasokan karir internal dari Karyawan Pelaksana (`RM-4`) berprestasi yang lulus seleksi asesmen untuk dipromosikan menjadi staf pimpinan (`RM-3`).
+   - **Talent Scouting (Eksternal)**: Pasokan rekrutmen kemitraan institusi pendidikan (MoU universitas / sekolah vokasi perkebunan) untuk percepatan pemenuhan formasi staf pratama (`RM-3`).
+   - **RBB (Rekrutmen Bersama BUMN)**: Pasokan rekrutmen terbuka nasional terpusat Kementerian BUMN & Holding Perkebunan untuk formasi staf (`RM-3`).
+   - **Reguler / Mandiri**: Pasokan rekrutmen langsung/lokal untuk pemenuhan formasi tenaga pelaksana operasional (`RM-4`).
 3. **Proyeksi Pensiun Multitahun**:
    - Sistem memproyeksikan data pensiun berjalan ($T$) dan tahun depan ($T+1$) untuk mengantisipasi regenerasi jabatan strategis tanpa jeda operasional.
+4. **Jabatan Fungsional (Advisor) / Overflow Penampungan**:
+   - Merupakan "jabatan penampungan" (overflow/parking position) fungsional yang diberikan kepada karyawan apabila kuota/formasi jabatan struktural untuk level mereka (berdasarkan RM-band/Golongan) di seluruh unit sudah terpenuhi secara penuh (tidak ada *vacancy*).
+   - Di dalam Matriks MPP, kolom ini digunakan untuk menampung agregat kelebihan/surplus pejabat definitif di luar kuota plafon formasi standar.
+5. **Jabatan Fungsional Pembantu (Diperban) / Sanksi Indisipliner**:
+   - Merupakan "jabatan penalti" (*non-job*/demosi) yang secara spesifik diposisikan untuk menampung karyawan yang sedang menjalani masa hukuman atau terbukti melakukan pelanggaran indisipliner (sanksi HR).
+   - Secara fungsional, karyawan yang berada di jabatan ini telah dicabut kewenangan strukturalnya.
 
 ---
 
@@ -321,7 +348,7 @@ Service `ManPowerPlanningService` memuat data acuan baseline perusahaan:
 AI dan pengembang harus memanfaatkan Service Layer yang ada:
 
 ### 9.1 `ManPowerPlanningService`
-- `determineRmLevel(Employee $emp): string` $\rightarrow$ `'RM-1'`, `'RM-2'`, `'RM-3'`
+- `determineRmLevel(Employee $emp): string` $\rightarrow$ `'RM-1'`, `'RM-2'`, `'RM-3'`, `'RM-4'`
 - `determineBidang(Employee $emp): string` $\rightarrow$ `'KEU'`, `'TAN'`, `'TEK'`, `'UMU'`
 - `getBaselineData(): array` $\rightarrow$ Data standar formasi BUMN perkebunan.
 
@@ -347,8 +374,9 @@ Tampilan UI wajib mencerminkan warna semantik domain yang telah disepakati di [D
 | **RM-1** | Pimpinan Puncak | `bg-orange-100 text-orange-800 border-orange-200` |
 | **RM-2** | Pimpinan Madya | `bg-sky-100 text-sky-800 border-sky-200` |
 | **RM-3** | Pimpinan Pratama | `bg-purple-100 text-purple-800 border-purple-200` |
+| **RM-4** | Pelaksana Lapangan | `bg-slate-100 text-slate-700 border-slate-200` |
 | **Karpim** | Staf Pimpinan | `bg-primary/10 text-primary border-primary/20` |
-| **Karpel** | Pelaksana Lapangan | `bg-slate-100 text-slate-700 border-slate-200` |
+| **Karpel** | Pelaksana Lapangan (RM-4) | `bg-slate-100 text-slate-700 border-slate-200` |
 
 ---
 

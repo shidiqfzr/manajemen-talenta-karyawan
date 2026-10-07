@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Training;
 use App\Models\Employee;
+use App\Models\Training;
 use App\Services\TrainingService;
+use Illuminate\Database\Seeder;
 
 class EmployeeTrainingSeeder extends Seeder
 {

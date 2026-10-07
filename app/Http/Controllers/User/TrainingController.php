@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers\User;
 
-use Illuminate\Http\Request;
-use App\Models\Training;
 use App\Http\Controllers\Controller;
+use App\Models\Training;
 
 class TrainingController extends Controller
 {
@@ -20,6 +19,7 @@ class TrainingController extends Controller
     public function show($id)
     {
         $training = Training::with('employees')->findOrFail($id);
+
         return view('user.trainings.show', compact('training'));
     }
 }

@@ -6,14 +6,14 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "barryvdh/laravel-dompdf": "^3.1",
-        "laravel/framework": "^11.31",
-        "laravel/tinker": "^2.9",
-        "livewire/livewire": "^3.6",
-        "maatwebsite/excel": "3.1.55",
+        "laravel/framework": "^13.0",
+        "laravel/tinker": "^3.0",
+        "livewire/livewire": "^4.0",
+        "maatwebsite/excel": "^3.1",
         "phpoffice/phpword": "^1.4",
-        "rappasoft/laravel-livewire-tables": "^3.7"
+        "predis/predis": "^2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

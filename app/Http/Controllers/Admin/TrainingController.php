@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Training;
-use App\Models\Employee;
 use App\Models\EmployeeStatistic;
+use App\Models\Training;
 use App\Services\TrainingService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class TrainingController extends Controller
 {
@@ -27,10 +25,10 @@ class TrainingController extends Controller
         $end = $request->end_date;
 
         $trainings = Training::withCount('employees')
-            ->when($start && $end, fn($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))
+            ->when($start && $end, fn ($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))
             ->paginate(20);
 
-        $summary = Training::when($start && $end, fn($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))->get();
+        $summary = Training::when($start && $end, fn ($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))->get();
 
         $totalManHours = $summary->sum('jumlah_man_hours');
         $totalTiketPeserta = $summary->sum('biaya_tiket_peserta');

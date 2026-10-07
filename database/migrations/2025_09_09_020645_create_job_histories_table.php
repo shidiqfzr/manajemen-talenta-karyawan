@@ -15,13 +15,13 @@ return new class extends Migration
             $table->id();
             $table->string('employee_nik');
             $table->foreign('employee_nik')->references('nik')->on('employees')->onDelete('cascade');
-            $table->string('jabatan');                
-            $table->string('unit_kerja');            
+            $table->string('jabatan');
+            $table->string('unit_kerja');
             $table->string('level')->nullable();
             $table->string('golongan')->nullable();
-            $table->date('tmt_awal');                 
-            $table->date('tmt_akhir')->nullable();    
-            $table->string('jenis_mutasi')->nullable();  
+            $table->date('tmt_awal');
+            $table->date('tmt_akhir')->nullable();
+            $table->string('jenis_mutasi')->nullable();
             $table->string('nomor_sk')->nullable();
             $table->date('tanggal_sk')->nullable();
             $table->text('catatan')->nullable();

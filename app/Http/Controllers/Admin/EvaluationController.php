@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Evaluation;
 use App\Models\Employee;
+use App\Models\Evaluation;
 use Illuminate\Http\Request;
 
 class EvaluationController extends Controller
@@ -27,10 +27,12 @@ class EvaluationController extends Controller
     {
         if ($employee_nik) {
             $employee = Employee::where('nik', $employee_nik)->firstOrFail();
+
             return view('admin.evaluations.add-evaluation', compact('employee'));
         }
 
         $employees = Employee::all();
+
         return view('admin.evaluations.add-evaluation', compact('employees'));
     }
 

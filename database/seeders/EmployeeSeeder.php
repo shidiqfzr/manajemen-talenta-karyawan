@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Employee;
+use Illuminate\Database\Seeder;
 
 class EmployeeSeeder extends Seeder
 {
@@ -27,14 +27,14 @@ class EmployeeSeeder extends Seeder
                 'tmt_bekerja' => '2010-01-01',
                 'tanggal_diangkat_staf' => '2010-01-01',
                 'susunan_keluarga' => 'L',
-                'job_grader' => 11,
+                'job_grade' => 11,
                 'person_grade' => 12,
                 'tanggal_mbt' => '2040-02-01',
                 'tanggal_pensiun' => '2025-10-01',
                 'agama' => 'Islam',
                 'pendidikan_terakhir' => 'S1 Ekonomi',
                 'sekolah' => 'Univ. Tanjungpura Pontianak',
-                'foto' => 'photos/default.png'
+                'foto' => 'photos/default.png',
             ],
             [
                 'nik' => '13004837',
@@ -50,14 +50,14 @@ class EmployeeSeeder extends Seeder
                 'tmt_bekerja' => '2012-06-01',
                 'tanggal_diangkat_staf' => '2012-06-01',
                 'susunan_keluarga' => 'K/2',
-                'job_grader' => 15,
+                'job_grade' => 15,
                 'person_grade' => 12,
                 'tanggal_mbt' => '2038-11-01',
                 'tanggal_pensiun' => '2052-03-01',
                 'agama' => 'Islam',
                 'pendidikan_terakhir' => '-',
                 'sekolah' => 'Univ. Tanjungpura Pontianak',
-                'foto' => 'photos/default.png'
+                'foto' => 'photos/default.png',
             ],
             [
                 'nik' => '13002797',
@@ -73,14 +73,14 @@ class EmployeeSeeder extends Seeder
                 'tmt_bekerja' => '1999-09-01',
                 'tanggal_diangkat_staf' => '1999-09-01',
                 'susunan_keluarga' => 'K/1',
-                'job_grader' => 13,
+                'job_grade' => 13,
                 'person_grade' => 14,
                 'tanggal_mbt' => '2029-10-01',
                 'tanggal_pensiun' => '2041-05-01',
                 'agama' => 'Katolik',
                 'pendidikan_terakhir' => 'S1 Ekonomi',
                 'sekolah' => 'Univ. Atma Jaya Yogyakarta',
-                'foto' => 'photos/default.png'
+                'foto' => 'photos/default.png',
             ],
             [
                 'nik' => '13004857',
@@ -96,21 +96,21 @@ class EmployeeSeeder extends Seeder
                 'tmt_bekerja' => '2012-06-01',
                 'tanggal_diangkat_staf' => '2012-06-01',
                 'susunan_keluarga' => 'L',
-                'job_grader' => 11,
+                'job_grade' => 11,
                 'person_grade' => 11,
                 'tanggal_mbt' => '2040-11-01',
                 'tanggal_pensiun' => '2041-10-01',
                 'agama' => 'Islam',
                 'pendidikan_terakhir' => 'S1 Manajemen',
                 'sekolah' => 'Sekolah Tinggi Ilmu Ekonomi Pancasetia Banjarmasin',
-                'foto' => 'photos/default.png'
+                'foto' => 'photos/default.png',
             ],
         ];
 
         foreach ($employees as $employee) {
             // Check if employee already exists before inserting
             Employee::firstOrCreate(
-                ['nik' => $employee['nik']], 
+                ['nik' => $employee['nik']],
                 $employee
             );
         }

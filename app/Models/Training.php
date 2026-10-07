@@ -24,8 +24,8 @@ class Training extends Model
     ];
 
     protected $casts = [
-        'tanggal_mulai'  => 'date',   
-        'tanggal_akhir'  => 'date',
+        'tanggal_mulai' => 'date',
+        'tanggal_akhir' => 'date',
     ];
 
     public function employees()

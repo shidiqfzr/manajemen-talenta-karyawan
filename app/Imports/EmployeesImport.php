@@ -3,19 +3,22 @@
 namespace App\Imports;
 
 use App\Models\Employee;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class EmployeesImport implements ToCollection, WithHeadingRow
 {
     public int $created = 0;
+
     public int $updated = 0;
+
     public int $skipped = 0;
+
     public array $errors = [];
 
     private const DATE_FIELDS = [
@@ -33,16 +36,18 @@ class EmployeesImport implements ToCollection, WithHeadingRow
         'nama' => 'required|string|max:255',
         'jabatan' => 'required|string|max:255',
         'level' => 'required|string|max:255',
+        'rm_level' => 'nullable|string|max:50',
         'unit_kerja' => 'required|string|max:255',
         'golongan' => 'nullable|string|max:255',
         'tanggal_dalam_jabatan' => 'nullable|date',
         'tmt_unit_kerja' => 'nullable|date',
         'tempat_lahir' => 'nullable|string|max:255',
+        'jenis_kelamin' => 'nullable|string|max:50',
         'tanggal_lahir' => 'nullable|date',
         'tmt_bekerja' => 'nullable|date',
         'tanggal_diangkat_staf' => 'nullable|date',
         'susunan_keluarga' => 'nullable|string',
-        'job_grader' => 'nullable|integer|max:255',
+        'job_grade' => 'nullable|integer|max:255',
         'person_grade' => 'nullable|integer|max:255',
         'tanggal_mbt' => 'nullable|date',
         'tanggal_pensiun' => 'nullable|date',
@@ -61,7 +66,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             try {
                 $data = $this->prepareRowData($this->normalizeKeys($row->toArray()));
 
-                if (!$this->validateRowData($data, $rowNumber)) {
+                if (! $this->validateRowData($data, $rowNumber)) {
                     continue;
                 }
 
@@ -82,6 +87,32 @@ class EmployeesImport implements ToCollection, WithHeadingRow
         // Normalize date fields
         foreach (self::DATE_FIELDS as $field) {
             $data[$field] = $this->normalizeDate($data[$field] ?? null);
+        }
+
+        // Auto-calculate Pensiun (56 thn) & MBT (55 thn) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
+        if (! empty($data['tanggal_lahir'])) {
+            if (empty($data['tanggal_pensiun'])) {
+                $data['tanggal_pensiun'] = Employee::calculateTanggalPensiun($data['tanggal_lahir']);
+            }
+            if (empty($data['tanggal_mbt']) && ! empty($data['tanggal_pensiun'])) {
+                $data['tanggal_mbt'] = Employee::calculateTanggalMbt($data['tanggal_pensiun']);
+            }
+        }
+
+        // Standardize string fields
+        if (isset($data['nama'])) {
+            $data['nama'] = strtoupper(trim((string) $data['nama']));
+        }
+        if (isset($data['unit_kerja'])) {
+            $data['unit_kerja'] = trim((string) $data['unit_kerja']);
+        }
+        if (isset($data['jenis_kelamin'])) {
+            $jk = strtoupper(trim((string) $data['jenis_kelamin']));
+            if (in_array($jk, ['L', 'LAKI-LAKI', 'PRIA', 'M', 'MALE'])) {
+                $data['jenis_kelamin'] = 'L';
+            } elseif (in_array($jk, ['P', 'PEREMPUAN', 'WANITA', 'F', 'FEMALE'])) {
+                $data['jenis_kelamin'] = 'P';
+            }
         }
 
         return $data;
@@ -105,6 +136,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
 
         if ($validator->fails()) {
             $this->recordValidationError($rowNumber, $validator->errors()->all());
+
             return false;
         }
 
@@ -135,7 +167,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             'errors' => $errors,
         ];
 
-        Log::warning("Row {$rowNumber} skipped: " . implode(', ', $errors));
+        Log::warning("Row {$rowNumber} skipped: ".implode(', ', $errors));
     }
 
     private function handleProcessingError(int $rowNumber, string $nik, \Exception $e): void
@@ -144,10 +176,10 @@ class EmployeesImport implements ToCollection, WithHeadingRow
         $this->errors[] = [
             'row' => $rowNumber,
             'nik' => $nik,
-            'errors' => ['Database error: ' . $e->getMessage()],
+            'errors' => ['Database error: '.$e->getMessage()],
         ];
 
-        Log::error("Failed to save NIK {$nik}: " . $e->getMessage());
+        Log::error("Failed to save NIK {$nik}: ".$e->getMessage());
     }
 
     private function normalizeDate(?string $value): ?string
@@ -176,6 +208,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             return ExcelDate::excelToDateTimeObject($value)->format('Y-m-d');
         } catch (\Exception $e) {
             Log::debug("Failed to parse Excel date: {$value}");
+
             return null;
         }
     }
@@ -186,6 +219,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             return Carbon::createFromFormat($format, $value)->format('Y-m-d');
         } catch (\Exception $e) {
             Log::debug("Failed to parse date with format {$format}: {$value}");
+
             return null;
         }
     }
@@ -196,6 +230,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             return Carbon::parse($value)->format('Y-m-d');
         } catch (\Exception $e) {
             Log::debug("Failed to parse date generically: {$value}");
+
             return null;
         }
     }
@@ -207,7 +242,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             'updated' => $this->updated,
             'skipped' => $this->skipped,
             'total_processed' => $this->created + $this->updated + $this->skipped,
-            'has_errors' => !empty($this->errors),
+            'has_errors' => ! empty($this->errors),
             'errors' => $this->errors,
         ];
     }

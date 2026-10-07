@@ -1,3 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@source "../views";
+@source "../../app";
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views";
+
+@theme {
+  --color-primary-50: #F3FAF6;
+  --color-primary-100: #E7F5EC;
+  --color-primary-200: #C9E8D5;
+  --color-primary-300: #9BD1B0;
+  --color-primary-400: #66B586;
+  --color-primary-500: #3E9A63;
+  --color-primary-600: #2F8250;
+  --color-primary-700: #256B3E;
+  --color-primary-800: #1B5330;
+  --color-primary-900: #123A22;
+  --color-primary-950: #0B2416;
+
+  --color-earth-100: #F2ECDD;
+  --color-earth-300: #D8C9A8;
+  --color-earth-500: #A8916A;
+  --color-earth-600: #8A7550;
+  --color-earth-700: #6B5B3A;
+
+  --color-surface-50: #F8F9F6;
+  --color-surface-100: #F1F3EE;
+  --color-surface-200: #DEE3D8;
+  --color-surface-300: #C3C9BE;
+  --color-surface-500: #737A70;
+  --color-surface-700: #40473F;
+  --color-surface-900: #1B1F1D;
+
+  --color-danger: #C0392B;
+  --color-warning: #B8860B;
+  --color-info: #2E6E9E;
+
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}

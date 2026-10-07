@@ -3,98 +3,46 @@
 namespace App\Livewire\Tables;
 
 use App\Models\JobHistory;
-use Illuminate\Database\Eloquent\Builder;
-use Rappasoft\LaravelLivewireTables\DataTableComponent;
-use Rappasoft\LaravelLivewireTables\Views\Column;
+use Livewire\Component;
+use Livewire\WithPagination;
 
-class JobHistoryTable extends DataTableComponent
+class JobHistoryTable extends Component
 {
+    use WithPagination;
+
     public string $employeeId;
+
+    public string $search = '';
+
+    public string $sortField = 'tmt_awal';
+
+    public string $sortDirection = 'desc';
+
+    public int $perPage = 5;
 
     public function mount(string $employeeId): void
     {
         $this->employeeId = $employeeId;
     }
 
-    public function configure(): void
+    public function updatingSearch(): void
     {
-        $this->setPerPageAccepted([5, 10, 25]);
-        $this->setPerPage(5);
-
-        $this->setPrimaryKey('id');
-
-        $this->setColumnSelectStatus(true);
-
-        $this->setTrAttributes(fn($row) => [
-            'class' => 'hover:bg-gray-50',
-        ]);
+        $this->resetPage();
     }
 
-    public function builder(): Builder
+    public function updatingPerPage(): void
     {
-        return JobHistory::query()
-            ->select('job_histories.*')
-            ->where('employee_nik', $this->employeeId)
-            ->orderByDesc('tmt_awal');
+        $this->resetPage();
     }
 
-    public function columns(): array
+    public function sortBy(string $field): void
     {
-        return [
-            Column::make('Periode', 'tmt_awal')
-                ->format(fn($value, $row) => $this->formatPeriode($row))
-                ->html(),
-
-            Column::make('Jabatan', 'jabatan')
-                ->sortable()
-                ->searchable(),
-
-            Column::make('Unit', 'unit_kerja')
-                ->sortable()
-                ->searchable(),
-
-            Column::make('Mutasi', 'jenis_mutasi')
-                ->format(fn($value, $row) => $row->jenis_mutasi_label ?? '–')
-                ->deselected(),
-
-            Column::make('Level', 'level')
-                ->sortable()
-                ->searchable()
-                ->deselected(),
-
-            Column::make('Golongan', 'golongan')
-                ->sortable()
-                ->searchable()
-                ->deselected(),
-
-            Column::make('SK', 'nomor_sk')
-                ->format(fn($value, $row) => $this->formatSk($row))
-                ->html()
-                ->deselected(),
-
-            Column::make('Aksi', 'id')
-                ->format(fn($value, $row) => view('admin.employees.partials.job-history-actions')->with('row', $row)->render())
-                ->html()
-                ->excludeFromColumnSelect(),
-        ];
-    }
-
-    protected function formatPeriode(JobHistory $row): string
-    {
-        $start = $row->tmt_awal?->format('d M Y') ?? '-';
-        $end = $row->tmt_akhir?->format('d M Y') ?? 'Sekarang';
-        return "{$start} &ndash; {$end}";
-    }
-
-    protected function formatSk(JobHistory $row): string
-    {
-        if ($row->nomor_sk || $row->tanggal_sk) {
-            $nomor = $row->nomor_sk ?? '–';
-            $tgl = $row->tanggal_sk?->format('d M Y') ?? '–';
-            return "{$nomor} / {$tgl}";
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
         }
-
-        return '–';
     }
 
     public function deleteRow(int $id): void
@@ -102,6 +50,26 @@ class JobHistoryTable extends DataTableComponent
         $record = JobHistory::where('employee_nik', $this->employeeId)->findOrFail($id);
         $record->delete();
 
-        session()->flash('message', 'Riwayat jabatan dihapus.');
+        session()->flash('message', 'Riwayat jabatan berhasil dihapus.');
+    }
+
+    public function render()
+    {
+        $histories = JobHistory::query()
+            ->where('employee_nik', $this->employeeId)
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('jabatan', 'like', '%'.$this->search.'%')
+                        ->orWhere('unit_kerja', 'like', '%'.$this->search.'%')
+                        ->orWhere('jenis_mutasi', 'like', '%'.$this->search.'%')
+                        ->orWhere('nomor_sk', 'like', '%'.$this->search.'%');
+                });
+            })
+            ->orderBy($this->sortField, $this->sortDirection)
+            ->paginate($this->perPage);
+
+        return view('livewire.tables.job-history-table', [
+            'histories' => $histories,
+        ]);
     }
 }

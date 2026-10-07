@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use App\Models\Training;
-use PhpOffice\PhpWord\TemplateProcessor;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
+use PhpOffice\PhpWord\TemplateProcessor;
 
 class TrainingExportService
 {
@@ -32,14 +32,15 @@ class TrainingExportService
             $this->fillParticipants($templateProcessor, $participants);
 
             // Save & return
-            $fileName = 'Surat_Tugas_' . Str::slug($training->judul) . '.docx';
+            $fileName = 'Surat_Tugas_'.Str::slug($training->judul).'.docx';
             $savePath = storage_path("app/public/exports/{$fileName}");
 
             $templateProcessor->saveAs($savePath);
+
             return response()->download($savePath)->deleteFileAfterSend();
 
         } catch (\Throwable $e) {
-            Log::error('Export Surat Tugas Word Error: ' . $e->getMessage());
+            Log::error('Export Surat Tugas Word Error: '.$e->getMessage());
             abort(500, 'Gagal mengekspor Surat Tugas. Silakan hubungi administrator.');
         }
     }
@@ -47,7 +48,7 @@ class TrainingExportService
     /**
      * Escape XML special characters
      */
-    protected function escape(string|null $value): string
+    protected function escape(?string $value): string
     {
         return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
     }
@@ -55,7 +56,7 @@ class TrainingExportService
     /**
      * Format date to Indonesian format
      */
-    protected function formatDate(string|null $date): string
+    protected function formatDate(?string $date): string
     {
         return $date ? Carbon::parse($date)->translatedFormat('d F Y') : '-';
     }
