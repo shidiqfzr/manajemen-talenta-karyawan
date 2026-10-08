@@ -108,10 +108,45 @@
             };
             
             this.$watch('jabatan', debouncedFetch);
-            this.$watch('level', debouncedFetch);
+            this.$watch('level', () => {
+                debouncedFetch();
+                this.fetchUnitPositions();
+            });
             this.$watch('golongan', debouncedFetch);
             this.$watch('jobGrade', debouncedFetch);
-            this.$watch('unitKerja', debouncedFetch);
+            this.$watch('unitKerja', () => {
+                debouncedFetch();
+                this.fetchUnitPositions();
+            });
+            
+            // Initial fetch for unit positions if unit is already selected
+            if (this.unitKerja) {
+                this.fetchUnitPositions();
+            }
+        },
+        
+        activePositionsList: [],
+        
+        async fetchUnitPositions() {
+            if (!this.unitKerja) {
+                this.activePositionsList = [];
+                return;
+            }
+            try {
+                // Fetch positions linked to the selected unit, filtered by level
+                const res = await fetch(`/admin/api/unit-positions?unit_name=${encodeURIComponent(this.unitKerja)}&level=${encodeURIComponent(this.level)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (!res.ok) throw new Error('API Error');
+                const data = await res.json();
+                this.activePositionsList = data.positions || [];
+            } catch (e) {
+                console.error('Gagal mengambil daftar jabatan unit', e);
+                this.activePositionsList = [];
+            }
         },
 
         get computedRmBand() {
@@ -342,8 +377,7 @@
                                placeholder="Contoh: 13009988"
                                class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm font-mono font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition">
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-1">Format baku: 8 digit numerik unik.</p>
-                    @error('nik') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('nik') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <!-- Nama Lengkap (Spans 2 cols on lg) -->
@@ -358,10 +392,9 @@
                                x-model="nama" 
                                value="{{ old('nama') }}" 
                                required 
-                               placeholder="Nama lengkap sesuai KTP / SK pengangkatan"
+                               placeholder="Nama lengkap sesuai KTP"
                                class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition">
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-1">Otomatis diformat UPPERCASE saat disimpan.</p>
                     @error('nama') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
@@ -473,7 +506,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <!-- Level Pegawai (Radio Cards) -->
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-2">Level Strata Pegawai <span class="text-red-500">*</span></label>
+                        <div class="flex items-center justify-between min-h-[22px] mb-1.5">
+                            <label class="block text-xs font-bold text-slate-700">Level Strata Pegawai <span class="text-red-500">*</span></label>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             @foreach($levels as $lvlKey => $lvlName)
                                 <label class="relative flex items-center px-3 py-1.5 rounded-xl border cursor-pointer transition"
@@ -487,7 +522,7 @@
                                            @change="onLevelChange()"
                                            class="sr-only">
                                     <div class="flex items-center gap-3 min-w-0">
-                                        <div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0"
+                                        <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] shrink-0"
                                              :class="level === '{{ $lvlKey }}' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-600'">
                                             <i class="fas {{ $lvlKey === 'Karpim' ? 'fa-user-tie' : 'fa-people-carry-box' }}"></i>
                                         </div>
@@ -503,9 +538,8 @@
 
                     <!-- Jalur Masuk / Rekrutmen Pegawai (DOMAIN.md Bab 2.1) -->
                     <div>
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between min-h-[22px] mb-1.5">
                             <label class="block text-xs font-bold text-slate-700">Jalur Masuk / Rekrutmen <span class="text-red-500">*</span></label>
-
                         </div>
                         <div class="relative">
                             <span class="absolute left-3.5 inset-y-0 flex items-center text-slate-400 text-xs">
@@ -529,41 +563,7 @@
 
                 <!-- Jabatan & Unit Kerja Form Inputs -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <!-- Jabatan Input with Datalist & Quick Add -->
-                    <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-xs font-bold text-slate-700">Jabatan Formasi <span class="text-red-500">*</span></label>
-                            <button type="button" @click="$dispatch('open-quick-add-position')"
-                                class="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                                title="Tambah Jabatan Baru ke Master Data">
-                                <i class="fas fa-plus text-[9px]"></i>
-                                <span>Jabatan Baru</span>
-                            </button>
-                        </div>
-                        <div class="relative">
-                            <span class="absolute left-3.5 inset-y-0 flex items-center text-slate-400 text-xs">
-                                <i class="fas fa-briefcase"></i>
-                            </span>
-                            <input type="text" 
-                                   name="jabatan" 
-                                   id="jabatanInput" 
-                                   list="positionOptions" 
-                                   x-model="jabatan"
-                                   value="{{ $prefilledJabatan }}" 
-                                   required 
-                                   placeholder="Ketik atau pilih nama jabatan formasi..."
-                                   class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition">
-                        </div>
-                        <datalist id="positionOptions">
-                            @foreach($activePositions ?? [] as $posName)
-                                <option value="{{ $posName }}"></option>
-                            @endforeach
-                        </datalist>
-                        <!-- Inline Bidang Indicator removed -->
-                        @error('jabatan') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <!-- Unit Kerja Combobox (Enhanced with Region Pills) -->
+                    <!-- Unit Kerja Combobox (Enhanced with Region Pills) - Dipindahkan ke kiri -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <label class="block text-xs font-bold text-slate-700">Unit Kerja Penempatan <span class="text-red-500">*</span></label>
@@ -579,7 +579,102 @@
                             :selected="old('unit_kerja', $prefilledUnit)" 
                             id="unitKerjaInput"
                             name="unit_kerja" />
+                        <p class="text-[11px] text-slate-400 mt-1">Pilih Unit Kerja terlebih dahulu untuk memunculkan formasi Jabatan.</p>
                         @error('unit_kerja') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Jabatan Dropdown (Strict Select) - Dipindahkan ke kanan -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-bold text-slate-700">Jabatan Formasi <span class="text-red-500">*</span></label>
+                            <button type="button" @click="if(unitKerja) $dispatch('open-quick-add-position', { unitKerja: unitKerja })"
+                                :disabled="!unitKerja"
+                                :class="!unitKerja ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60' : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 cursor-pointer'"
+                                class="text-[10px] font-bold px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1 shadow-xs"
+                                title="Pilih Unit Kerja terlebih dahulu untuk menambah formasi">
+                                <i class="fas fa-plus text-[9px]"></i>
+                                <span>Jabatan Baru</span>
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs transition-colors duration-300" :class="unitKerja ? 'text-emerald-600' : 'text-slate-400'">
+                                <i class="fas fa-briefcase"></i>
+                            </span>
+                            <select name="jabatan" 
+                                    id="jabatanInput" 
+                                    x-model="jabatan"
+                                    :disabled="!unitKerja || activePositionsList.length === 0"
+                                    required 
+                                    class="w-full pl-9 pr-8 py-2.5 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 transition-all duration-300 appearance-none"
+                                    :class="!unitKerja ? 'bg-slate-100/70 border border-slate-200/60 text-slate-400 cursor-not-allowed' : 'bg-slate-50/70 border border-slate-200 text-slate-800 focus:bg-white focus:ring-emerald-500/30 focus:border-emerald-500'">
+                                <option value="" disabled selected x-text="!unitKerja ? '-- Pilih Unit Kerja Terlebih Dahulu --' : (activePositionsList.length === 0 ? '-- Formasi Kosong / Memuat --' : '-- Pilih Formasi Jabatan --')"></option>
+                                <template x-for="pos in activePositionsList" :key="pos">
+                                    <option :value="pos" x-text="pos" :selected="jabatan === pos"></option>
+                                </template>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                                <i class="fas fa-chevron-down text-[10px]"></i>
+                            </div>
+                        </div>
+                        @error('jabatan') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
+                <!-- Status Penugasan, Karyawan & Kontrak (Dynamic Grid) -->
+                <div x-data="{ statusKaryawan: '{{ old('status_karyawan', 'Tetap (PKWTT)') }}' }" 
+                     :class="statusKaryawan !== 'Tetap (PKWTT)' ? 'md:grid-cols-3' : 'md:grid-cols-2'" 
+                     class="grid grid-cols-1 gap-5 mt-5 transition-all duration-300">
+                    
+                    <!-- Status Penugasan -->
+                    <div>
+                        <div class="flex items-center justify-between min-h-[22px] mb-1.5">
+                            <label class="block text-xs font-bold text-slate-700">Status Penugasan <span class="text-red-500">*</span></label>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-slate-400">
+                                <i class="fas fa-tag"></i>
+                            </span>
+                            <input type="text" disabled value="Definitif"
+                                    class="w-full pl-9 pr-8 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-500 cursor-not-allowed">
+                            <input type="hidden" name="status_penugasan" value="Definitif">
+                        </div>
+
+                    </div>
+
+                    <!-- Status Karyawan -->
+                    <div>
+                        <div class="flex items-center min-h-[22px] mb-1.5">
+                            <label class="block text-xs font-bold text-slate-700">Status Kepegawaian <span class="text-red-500">*</span></label>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-slate-400">
+                                <i class="fas fa-id-badge"></i>
+                            </span>
+                            <select name="status_karyawan" x-model="statusKaryawan" required class="w-full pl-9 pr-8 py-2.5 bg-slate-50/70 border border-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all duration-300 appearance-none">
+                                @foreach(\App\Models\Employee::EMPLOYMENT_STATUSES as $val => $label)
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                                <i class="fas fa-chevron-down text-[10px]"></i>
+                            </div>
+                        </div>
+                        @error('status_karyawan') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Tanggal Berakhir Kontrak (Hanya tampil jika PKWT / Calon) -->
+                    <div x-show="statusKaryawan !== 'Tetap (PKWTT)'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0" style="display: none;">
+                        <div class="flex items-center min-h-[22px] mb-1.5">
+                            <label class="block text-xs font-bold text-slate-700">Batas Berakhir Kontrak <span class="text-red-500">*</span></label>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-slate-400">
+                                <i class="fas fa-calendar-times"></i>
+                            </span>
+                            <input type="date" name="tanggal_berakhir_kontrak" value="{{ old('tanggal_berakhir_kontrak') }}"
+                                class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all duration-300">
+                        </div>
+                        @error('tanggal_berakhir_kontrak') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
 

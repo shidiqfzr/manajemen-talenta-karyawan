@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\Position;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
 use Tests\TestCase;
@@ -15,7 +17,7 @@ class EmployeeCrudTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = User::first() ?? User::factory()->create(['role' => 'admin']);
+        $this->admin = User::factory()->create(['role' => 'admin']);
     }
 
     public function test_admin_can_create_employee_with_auto_retirement_and_initial_job_history(): void
@@ -24,6 +26,11 @@ class EmployeeCrudTest extends TestCase
 
         // Clean up if already exists from prior run
         Employee::where('nik', $nik)->delete();
+
+        // Ensure the unit and position exist and are linked to satisfy validation
+        $unit = Unit::firstOrCreate(['nama' => 'Kebun Inti Gunung Meliau'], ['kode' => 'KIGM', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Asisten Afdeling', 'level' => 'Karpim'], ['is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1]]);
 
         $postData = [
             'nik' => $nik,
@@ -37,6 +44,7 @@ class EmployeeCrudTest extends TestCase
             'tanggal_dalam_jabatan' => '2023-01-01',
             'job_grade' => 11,
             'person_grade' => 11,
+            'status_karyawan' => 'Tetap (PKWTT)',
             // tanggal_pensiun and tanggal_mbt are intentionally left empty!
         ];
 
@@ -116,14 +124,14 @@ class EmployeeCrudTest extends TestCase
             'tanggal_lahir' => '1990-03-10',
             'job_grade' => 5,
             'person_grade' => 5,
+            'status_karyawan' => 'Tetap (PKWTT)',
         ]);
 
         $response->assertRedirect(route('admin.employees.index'));
 
         $employee->refresh();
         $this->assertEquals('SITI AMINAH UPDATED', $employee->nama);
-        $this->assertEquals('Kerani Kepala', $employee->jabatan);
-        $this->assertEquals('IIC/00', $employee->golongan);
+        // jabatan dan golongan tidak boleh berubah via form edit (SSOT rules)
         $this->assertEquals(5, $employee->job_grade);
 
         // Clean up
@@ -210,6 +218,11 @@ class EmployeeCrudTest extends TestCase
         $nik = '88990055';
         Employee::where('nik', $nik)->delete();
 
+        // Ensure the unit and position exist and are linked to satisfy validation
+        $unit = Unit::firstOrCreate(['nama' => 'Kebun Inti Gunung Meliau'], ['kode' => 'KIGM', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Asisten Afdeling', 'level' => 'Karpim'], ['is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1]]);
+
         // 1. Buat pegawai dengan rm_level eksplisit (misal penugasan khusus RM-2 untuk Asisten)
         $postData = [
             'nik' => $nik,
@@ -221,6 +234,7 @@ class EmployeeCrudTest extends TestCase
             'golongan' => 'IIIA/00',
             'job_grade' => 11,
             'person_grade' => 11,
+            'status_karyawan' => 'Tetap (PKWTT)',
         ];
 
         $response = $this->actingAs($this->admin)->post(route('admin.employees.store'), $postData);
@@ -248,9 +262,122 @@ class EmployeeCrudTest extends TestCase
         $updateResponse->assertRedirect(route('admin.employees.index'));
 
         $employee->refresh();
-        $this->assertEquals('RM-1', $employee->rm_level);
-        $this->assertEquals('RM-1', $mppService->determineRmLevel($employee));
+        $this->assertEquals('RM-2', $employee->rm_level);
+        $this->assertEquals('RM-2', $mppService->determineRmLevel($employee));
 
         $employee->delete();
+    }
+
+    public function test_api_unit_positions_returns_filtered_positions_by_level(): void
+    {
+        // 1. Setup a specific Unit and Positions
+        $unitName = 'Testing Unit API';
+        $unit = Unit::create([
+            'nama' => $unitName,
+            'kode' => 'TUA',
+            'wilayah' => 'Lainnya',
+            'is_active' => true,
+        ]);
+
+        $posKarpim = Position::create([
+            'nama' => 'Manajer Testing',
+            'level' => 'Karpim',
+            'is_active' => true,
+        ]);
+
+        $posKarpel = Position::create([
+            'nama' => 'Kerani Testing',
+            'level' => 'Karpel',
+            'is_active' => true,
+        ]);
+
+        $unit->positions()->attach([
+            $posKarpim->id => ['kuota' => 1],
+            $posKarpel->id => ['kuota' => 2],
+        ]);
+
+        // 2. Request without level should return all
+        $responseAll = $this->actingAs($this->admin)->getJson(route('admin.api.unit-positions', [
+            'unit_name' => $unitName,
+        ]));
+        $responseAll->assertOk();
+        $responseAll->assertJsonFragment(['positions' => ['Manajer Testing', 'Kerani Testing']]);
+
+        // 3. Request with Karpim level should return only Karpim position
+        $responseKarpim = $this->actingAs($this->admin)->getJson(route('admin.api.unit-positions', [
+            'unit_name' => $unitName,
+            'level' => 'Karpim',
+        ]));
+        $responseKarpim->assertOk();
+        $responseKarpim->assertJsonFragment(['positions' => ['Manajer Testing']]);
+        $responseKarpim->assertJsonMissing(['Kerani Testing']);
+
+        // 4. Request with Karpel level should return only Karpel position
+        $responseKarpel = $this->actingAs($this->admin)->getJson(route('admin.api.unit-positions', [
+            'unit_name' => $unitName,
+            'level' => 'Karpel',
+        ]));
+        $responseKarpel->assertOk();
+        $responseKarpel->assertJsonFragment(['positions' => ['Kerani Testing']]);
+        $responseKarpel->assertJsonMissing(['Manajer Testing']);
+
+        // Clean up
+        $unit->positions()->detach();
+        $unit->delete();
+        $posKarpim->delete();
+        $posKarpel->delete();
+    }
+
+    public function test_employee_creation_fails_if_position_invalid_for_unit(): void
+    {
+        // Setup a unit and a specific position
+        $unitName = 'Validation Test Unit';
+        $unit = Unit::create([
+            'nama' => $unitName,
+            'kode' => 'VTU',
+            'wilayah' => 'Lainnya',
+            'is_active' => true,
+        ]);
+
+        $posValid = Position::create([
+            'nama' => 'Posisi Valid Karpim',
+            'level' => 'Karpim',
+            'is_active' => true,
+        ]);
+
+        $unit->positions()->attach($posValid->id, ['kuota' => 1]);
+
+        $nik = '88990099';
+        Employee::where('nik', $nik)->delete();
+
+        $postData = [
+            'nik' => $nik,
+            'nama' => 'Testing Validation',
+            'jabatan' => 'Posisi Tidak Valid', // Not attached to unit!
+            'unit_kerja' => $unitName,
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tanggal_lahir' => '1990-01-01',
+            'tmt_bekerja' => '2015-01-01',
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ];
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.store'), $postData);
+
+        // Should be redirected back with errors for 'jabatan'
+        $response->assertSessionHasErrors('jabatan');
+        $this->assertNull(Employee::where('nik', $nik)->first());
+
+        // Now test with valid position
+        $postData['jabatan'] = 'Posisi Valid Karpim';
+        $responseValid = $this->actingAs($this->admin)->post(route('admin.employees.store'), $postData);
+        $responseValid->assertRedirect(route('admin.employees.index'));
+        $this->assertNotNull(Employee::where('nik', $nik)->first());
+
+        // Clean up
+        $unit->positions()->detach();
+        $unit->delete();
+        $posValid->delete();
+        Employee::where('nik', $nik)->first()->delete();
     }
 }

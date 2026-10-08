@@ -168,6 +168,9 @@ class EmployeeController extends Controller
             'level' => 'required|string|max:255',
             'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
             'unit_kerja' => 'required|string|max:255',
+            'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
+            'status_karyawan' => 'required|string|max:50',
+            'tanggal_berakhir_kontrak' => 'nullable|date',
             'golongan' => 'nullable|string|max:50',
             'tanggal_dalam_jabatan' => 'nullable|date',
             'tmt_unit_kerja' => 'nullable|date',
@@ -201,6 +204,23 @@ class EmployeeController extends Controller
         $validated['nama'] = strtoupper(trim($validated['nama']));
         $validated['unit_kerja'] = trim($validated['unit_kerja']);
         $validated['jalur_masuk'] = $validated['jalur_masuk'] ?? 'Reguler';
+        $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
+
+        // Validasi ketersediaan formasi (Jabatan harus ada di Unit Kerja dengan Level yang sesuai)
+        $unit = Unit::where('nama', $validated['unit_kerja'])->first();
+        if ($unit) {
+            $validPositions = $unit->positions()
+                ->where('positions.is_active', true)
+                ->where('positions.level', $validated['level'])
+                ->pluck('positions.nama')
+                ->toArray();
+
+            // Allow if position list is empty (fallback to master data skip if mapping incomplete)
+            // or if the position is explicitly valid
+            if (count($validPositions) > 0 && ! in_array($validated['jabatan'], $validPositions)) {
+                return back()->withErrors(['jabatan' => 'Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Pegawai yang dipilih.'])->withInput();
+            }
+        }
 
         // Auto-calculate Pensiun (56 tahun) & MBT (55 tahun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
         if (! empty($validated['tanggal_lahir'])) {
@@ -326,10 +346,9 @@ class EmployeeController extends Controller
 
         $validated = $request->validate([
             'nama' => 'required|string|max:255',
-            'jabatan' => 'required|string|max:255',
-            'level' => 'required|string|max:255',
-            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
-            'unit_kerja' => 'required|string|max:255',
+            'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
+            'status_karyawan' => 'required|string|max:50',
+            'tanggal_berakhir_kontrak' => 'nullable|date',
             'golongan' => 'nullable|string|max:50',
             'tanggal_dalam_jabatan' => 'nullable|date',
             'tmt_unit_kerja' => 'nullable|date',
@@ -366,7 +385,7 @@ class EmployeeController extends Controller
 
         // Standardize data (Uppercase nama & trim unit_kerja)
         $validated['nama'] = strtoupper(trim($validated['nama']));
-        $validated['unit_kerja'] = trim($validated['unit_kerja']);
+        $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
 
         // Auto-calculate Pensiun & MBT if tanggal_lahir is provided and pensiun/mbt are empty
         if (! empty($validated['tanggal_lahir'])) {

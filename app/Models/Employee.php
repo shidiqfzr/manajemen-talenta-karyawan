@@ -194,6 +194,15 @@ class Employee extends Model
     ];
 
     /**
+     * Status Kepegawaian.
+     */
+    public const EMPLOYMENT_STATUSES = [
+        'Tetap (PKWTT)' => 'Karyawan Tetap (PKWTT)',
+        'Kontrak (PKWT)' => 'Karyawan Kontrak (PKWT)',
+        'Calon Pegawai' => 'Calon Pegawai / Masa Percobaan',
+    ];
+
+    /**
      * Hitung Batas Usia Pensiun (56 tahun, awal bulan kelahiran).
      */
     public static function calculateTanggalPensiun(?string $tanggalLahir): ?string
@@ -232,6 +241,9 @@ class Employee extends Model
         'level',
         'rm_level',
         'unit_kerja',
+        'status_penugasan',
+        'status_karyawan',
+        'tanggal_berakhir_kontrak',
         'golongan',
         'tanggal_dalam_jabatan',
         'tmt_unit_kerja',

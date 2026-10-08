@@ -380,6 +380,10 @@
                     </div>
                 @endif
 
+                <!-- Komponen Penugasan Sementara (Plt/Pjs) -->
+                @livewire('admin.employees.penugasan-sementara-manager', ['employee' => $employee], key('penugasan-sementara-' . $employee->nik))
+
+
                 @livewire('tables.job-history-table', ['employeeId' => $employee->nik], key('riwayat-jabatan-' . $employee->nik))
             </div>
         </div>

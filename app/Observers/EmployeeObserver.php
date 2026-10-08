@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 class EmployeeObserver
 {
     /** Fields considered core “job identity” */
-    private const CORE_FIELDS = ['jabatan', 'unit_kerja', 'level', 'golongan'];
+    private const CORE_FIELDS = ['jabatan', 'unit_kerja', 'level', 'golongan', 'status_penugasan'];
 
     /** Fields considered start-date sources */
     private const DATE_FIELDS = ['tanggal_dalam_jabatan', 'tmt_unit_kerja'];
@@ -35,6 +35,7 @@ class EmployeeObserver
             'employee_nik' => $employee->nik,
             'jabatan' => $employee->jabatan,
             'unit_kerja' => $employee->unit_kerja,
+            'status_penugasan' => $employee->status_penugasan ?? 'Definitif',
             'level' => $employee->level,
             'golongan' => $employee->golongan,
             'tmt_awal' => $start->toDateString(),
@@ -101,6 +102,7 @@ class EmployeeObserver
                 'employee_nik' => $employee->nik,
                 'jabatan' => $employee->jabatan,
                 'unit_kerja' => $employee->unit_kerja,
+                'status_penugasan' => $employee->status_penugasan ?? 'Definitif',
                 'level' => $employee->level,
                 'golongan' => $employee->golongan,
                 'tmt_awal' => $newStart->toDateString(),
