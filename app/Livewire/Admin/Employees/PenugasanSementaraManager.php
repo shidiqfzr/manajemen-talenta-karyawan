@@ -70,10 +70,21 @@ class PenugasanSementaraManager extends Component
         if ($value) {
             $unit = Unit::where('nama', $value)->first();
             if ($unit) {
-                $this->positions = Position::where('unit_id', $unit->id)
-                    ->where('is_active', true)
-                    ->orderBy('nama')
+                $unitPositions = $unit->positions()
+                    ->where('positions.is_active', true)
                     ->get();
+
+                $poolPositions = Position::where('is_active', true)
+                    ->where(function ($q) {
+                        $q->where('is_overflow', true)
+                            ->orWhere('is_diperban', true);
+                    })
+                    ->get();
+
+                $this->positions = $unitPositions->concat($poolPositions)
+                    ->unique('id')
+                    ->sortBy('nama')
+                    ->values();
             } else {
                 $this->positions = [];
             }

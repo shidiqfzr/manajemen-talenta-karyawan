@@ -6,14 +6,16 @@
             nama: '',
             level: 'Karpim',
             bidang: 'TAN',
-            rm_level: 'RM-3'
+            rm_level: 'RM-3',
+            unit_nama: ''
         },
         resetForm() {
             this.formData = {
                 nama: '',
                 level: 'Karpim',
                 bidang: 'TAN',
-                rm_level: 'RM-3'
+                rm_level: 'RM-3',
+                unit_nama: ''
             };
             this.errorMessage = '';
             this.loading = false;
@@ -64,6 +66,9 @@
         errorMessage = ''; 
         if ($event.detail && $event.detail.nama) { 
             formData.nama = $event.detail.nama; 
+        }
+        if ($event.detail && $event.detail.unitKerja) {
+            formData.unit_nama = $event.detail.unitKerja;
         }
     "
     @keydown.escape.window="if (show && !loading) show = false;"

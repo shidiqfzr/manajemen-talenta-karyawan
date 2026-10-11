@@ -3,8 +3,10 @@
 namespace App\Imports;
 
 use App\Models\Employee;
+use App\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -32,23 +34,26 @@ class EmployeesImport implements ToCollection, WithHeadingRow
     ];
 
     private const VALIDATION_RULES = [
-        'nik' => 'required|string',
+        'nik' => ['required', 'string', 'regex:/^[0-9]{8}$/'],
         'nama' => 'required|string|max:255',
         'jabatan' => 'required|string|max:255',
         'level' => 'required|string|max:255',
-        'rm_level' => 'nullable|string|max:50',
+        'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
         'unit_kerja' => 'required|string|max:255',
+        'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
+        'status_karyawan' => 'required|string|max:50',
         'golongan' => 'nullable|string|max:255',
         'tanggal_dalam_jabatan' => 'nullable|date',
         'tmt_unit_kerja' => 'nullable|date',
         'tempat_lahir' => 'nullable|string|max:255',
-        'jenis_kelamin' => 'nullable|string|max:50',
+        'jenis_kelamin' => 'nullable|string|in:L,P,Laki-laki,Perempuan',
         'tanggal_lahir' => 'nullable|date',
         'tmt_bekerja' => 'nullable|date',
         'tanggal_diangkat_staf' => 'nullable|date',
         'susunan_keluarga' => 'nullable|string',
-        'job_grade' => 'nullable|integer|max:255',
-        'person_grade' => 'nullable|integer|max:255',
+        'job_grade' => 'nullable|integer|between:1,16',
+        'person_grade' => 'nullable|integer|between:1,16',
+        'jalur_masuk' => 'nullable|string|in:CKP,Talent Scouting,RBB,Reguler',
         'tanggal_mbt' => 'nullable|date',
         'tanggal_pensiun' => 'nullable|date',
         'agama' => 'nullable|string|max:255',
@@ -114,6 +119,8 @@ class EmployeesImport implements ToCollection, WithHeadingRow
                 $data['jenis_kelamin'] = 'P';
             }
         }
+        $data['jalur_masuk'] = $data['jalur_masuk'] ?? 'Reguler';
+        $data['status_penugasan'] = $data['status_penugasan'] ?? 'Definitif';
 
         return $data;
     }
@@ -123,7 +130,9 @@ class EmployeesImport implements ToCollection, WithHeadingRow
         $normalized = [];
 
         foreach ($row as $key => $value) {
-            $snakeKey = strtolower(preg_replace('/\s+/', '_', trim($key)));
+            // Remove asterisk used for required fields indication
+            $cleanKey = str_replace('*', '', (string) $key);
+            $snakeKey = strtolower(preg_replace('/\s+/', '_', trim($cleanKey)));
             $normalized[$snakeKey] = $value;
         }
 
@@ -132,7 +141,11 @@ class EmployeesImport implements ToCollection, WithHeadingRow
 
     private function validateRowData(array $data, int $rowNumber): bool
     {
-        $validator = Validator::make($data, self::VALIDATION_RULES);
+        $validator = Validator::make($data, self::VALIDATION_RULES, [
+            'nik.regex' => 'Format NIK harus berupa 8 digit angka numerik.',
+            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
+            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
+        ]);
 
         if ($validator->fails()) {
             $this->recordValidationError($rowNumber, $validator->errors()->all());
@@ -140,23 +153,55 @@ class EmployeesImport implements ToCollection, WithHeadingRow
             return false;
         }
 
+        // Business Logic Validations
+        $existingEmployee = Employee::where('nik', $data['nik'])->first();
+
+        if ($existingEmployee) {
+            // Jika ada perubahan jabatan/unit/level, tolak karena harus via MutasiService
+            if ($existingEmployee->jabatan !== $data['jabatan'] ||
+                $existingEmployee->unit_kerja !== $data['unit_kerja'] ||
+                $existingEmployee->level !== $data['level']) {
+                $this->recordValidationError($rowNumber, ['Perubahan Jabatan/Unit Kerja/Level tidak diizinkan melalui import (Gunakan Mutasi Karyawan).']);
+
+                return false;
+            }
+        } else {
+            // Pegawai Baru: Validasi Formasi (Jabatan harus ada di Unit Kerja dengan Level yang sesuai)
+            $unit = Unit::where('nama', $data['unit_kerja'])->first();
+            if ($unit) {
+                $validPositions = $unit->positions()
+                    ->where('positions.is_active', true)
+                    ->where('positions.level', $data['level'])
+                    ->pluck('positions.nama')
+                    ->toArray();
+
+                if (count($validPositions) > 0 && ! in_array($data['jabatan'], $validPositions)) {
+                    $this->recordValidationError($rowNumber, ['Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Pegawai yang dipilih.']);
+
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 
     private function saveEmployee(array $data): void
     {
-        $employee = Employee::updateOrCreate(
-            ['nik' => $data['nik']],
-            $data
-        );
+        DB::transaction(function () use ($data) {
+            $employee = Employee::updateOrCreate(
+                ['nik' => $data['nik']],
+                $data
+            );
 
-        if ($employee->wasRecentlyCreated) {
-            $this->created++;
-            Log::info("Created new employee: NIK {$data['nik']}");
-        } else {
-            $this->updated++;
-            Log::info("Updated employee: NIK {$data['nik']}");
-        }
+            if ($employee->wasRecentlyCreated) {
+                $this->created++;
+                Log::info("Created new employee: NIK {$data['nik']}");
+            } else {
+                $this->updated++;
+                Log::info("Updated employee: NIK {$data['nik']}");
+            }
+        });
     }
 
     private function recordValidationError(int $rowNumber, array $errors): void

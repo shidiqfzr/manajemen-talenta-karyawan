@@ -5,10 +5,18 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Evaluation;
+use App\Services\EvaluationService;
 use Illuminate\Http\Request;
 
 class EvaluationController extends Controller
 {
+    protected EvaluationService $evaluationService;
+
+    public function __construct(EvaluationService $evaluationService)
+    {
+        $this->evaluationService = $evaluationService;
+    }
+
     /**
      * Display a paginated listing of evaluations.
      */
@@ -60,15 +68,7 @@ class EvaluationController extends Controller
             'keterangan' => 'nullable|string',
         ]);
 
-        // Ensure numeric values are floats and default to 0 when null
-        $nk = (float) ($data['nilai_kepemimpinan'] ?? 0.0);
-        $npb = (float) ($data['nilai_perilaku_budaya'] ?? 0.0);
-        $npt = (float) ($data['nilai_pengalaman_teknis'] ?? 0.0);
-        $nkp = (float) ($data['nilai_kematangan_pribadi'] ?? 0.0);
-
-        $data['nilai_tertimbang'] = ($nk * 0.4) + ($npb * 0.3) + ($npt * 0.2) + ($nkp * 0.1);
-
-        Evaluation::create($data);
+        $this->evaluationService->processStore($data);
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil disimpan.');
     }
@@ -120,14 +120,7 @@ class EvaluationController extends Controller
             'keterangan' => 'nullable|string',
         ]);
 
-        $nk = (float) ($data['nilai_kepemimpinan'] ?? 0.0);
-        $npb = (float) ($data['nilai_perilaku_budaya'] ?? 0.0);
-        $npt = (float) ($data['nilai_pengalaman_teknis'] ?? 0.0);
-        $nkp = (float) ($data['nilai_kematangan_pribadi'] ?? 0.0);
-
-        $data['nilai_tertimbang'] = ($nk * 0.4) + ($npb * 0.3) + ($npt * 0.2) + ($nkp * 0.1);
-
-        $evaluation->update($data);
+        $this->evaluationService->processUpdate($evaluation, $data);
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil diperbarui.');
     }

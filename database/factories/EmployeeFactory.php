@@ -11,8 +11,8 @@ class EmployeeFactory extends Factory
         return [
             'nik' => $this->faker->unique()->numerify('########'),
             'nama' => $this->faker->name(),
-            'jabatan' => 'Asisten ' . $this->faker->word(),
-            'unit_kerja' => 'Kebun ' . $this->faker->word(),
+            'jabatan' => 'Asisten '.$this->faker->word(),
+            'unit_kerja' => 'Kebun '.$this->faker->word(),
             'level' => 'Karpim',
             'golongan' => 'IIIB/01',
             'pendidikan_terakhir' => 'S1',

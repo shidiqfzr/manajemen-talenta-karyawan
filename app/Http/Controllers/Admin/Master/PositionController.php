@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Position;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 
 class PositionController extends Controller
@@ -93,6 +94,7 @@ class PositionController extends Controller
             'level' => 'required|string|in:Karpim,Karpel',
             'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3',
             'is_active' => 'nullable|boolean',
+            'unit_nama' => 'nullable|string|exists:units,nama',
         ], [
             'nama.unique' => 'Nama jabatan formasi ini sudah terdaftar dalam sistem.',
         ]);
@@ -104,7 +106,19 @@ class PositionController extends Controller
             $validated['rm_level'] = null;
         }
 
+        $unitNama = $validated['unit_nama'] ?? null;
+        unset($validated['unit_nama']);
+
         $position = Position::create($validated);
+
+        if ($unitNama) {
+            $unit = Unit::where('nama', $unitNama)->first();
+            if ($unit) {
+                $unit->positions()->syncWithoutDetaching([
+                    $position->id => ['kuota' => 1],
+                ]);
+            }
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([

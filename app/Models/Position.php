@@ -32,6 +32,18 @@ class Position extends Model
         });
     }
 
+    /**
+     * Ambil nama-nama posisi overflow (non-diperban) dari cache.
+     */
+    public static function getOverflowPositionNames(): array
+    {
+        return static::getAllCached()
+            ->where('is_overflow', true)
+            ->where('is_diperban', false)
+            ->pluck('nama')
+            ->toArray();
+    }
+
     protected $table = 'positions';
 
     protected $fillable = [

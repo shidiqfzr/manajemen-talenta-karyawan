@@ -20,27 +20,38 @@ class EmployeeTemplateExport implements FromArray, WithColumnFormatting, WithEve
     public function headings(): array
     {
         return [
-            'NIK',
-            'NAMA',
-            'JABATAN',
-            'LEVEL',
-            'UNIT KERJA',
-            'GOLONGAN 2024',
-            'TANGGAL DALAM JABATAN',
-            'TMT UNIT KERJA',
+            // Identitas Utama
+            'NIK*',
+            'NAMA*',
+            'JENIS KELAMIN',
             'TEMPAT LAHIR',
             'TANGGAL LAHIR',
-            'JENIS KELAMIN',
+            'AGAMA',
+            'SUSUNAN KELUARGA',
+
+            // Info Jabatan & Formasi
+            'STATUS KARYAWAN*',
+            'JABATAN*',
+            'LEVEL*',
+            'UNIT KERJA*',
+            'GOLONGAN',
+            'RM LEVEL',
+            'STATUS PENUGASAN',
+
+            // Masa Kerja & Karir
             'TMT BEKERJA',
             'TANGGAL DIANGKAT STAF',
-            'SUSUNAN KELUARGA',
-            'JOB GRADER',
+            'TANGGAL DALAM JABATAN',
+            'TMT UNIT KERJA',
+            'JALUR MASUK',
+            'JOB GRADE',
             'PERSON GRADE',
-            'TANGGAL MBT',
-            'TANGGAL PENSIUN',
-            'AGAMA',
+
+            // Lain-lain
             'PENDIDIKAN TERAKHIR',
             'SEKOLAH',
+            'TANGGAL MBT',
+            'TANGGAL PENSIUN',
         ];
     }
 
@@ -48,27 +59,38 @@ class EmployeeTemplateExport implements FromArray, WithColumnFormatting, WithEve
     {
         return [
             [
+                // Identitas Utama
                 '13009988',
                 'BUDI SANTOSO',
+                'L',
+                'Pontianak',
+                '05/05/1990',
+                'Islam',
+                'K/1',
+
+                // Info Jabatan & Formasi
+                'PKWTT',
                 'Asisten Afdeling',
                 'Karpim',
                 'Kebun Inti Gunung Meliau',
                 'IIIA/00',
-                '01/01/2022',
-                '05/01/2022',
-                'Pontianak',
-                '05/05/1990',
-                'L',
+                '',
+                'Definitif',
+
+                // Masa Kerja & Karir
                 '01/01/2018',
                 '01/06/2020',
-                'K/1',
+                '01/01/2022',
+                '05/01/2022',
+                'Reguler',
                 '11',
                 '11',
-                '01/05/2045',
-                '01/05/2046',
-                'Islam',
+
+                // Lain-lain
                 'D4 / S1',
                 'INSTIPER Yogyakarta',
+                '01/05/2045',
+                '01/05/2046',
             ],
         ];
     }
@@ -76,13 +98,13 @@ class EmployeeTemplateExport implements FromArray, WithColumnFormatting, WithEve
     public function columnFormats(): array
     {
         return [
-            'G' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_dalam_jabatan
-            'H' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tmt_unit_kerja
-            'J' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_lahir
-            'L' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tmt_bekerja
-            'M' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_diangkat_staf
-            'Q' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_mbt
-            'R' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_pensiun
+            'E' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_lahir
+            'O' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tmt_bekerja
+            'P' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_diangkat_staf
+            'Q' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_dalam_jabatan
+            'R' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tmt_unit_kerja
+            'X' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_mbt
+            'Y' => NumberFormat::FORMAT_DATE_DDMMYYYY, // tanggal_pensiun
         ];
     }
 
@@ -94,25 +116,26 @@ class EmployeeTemplateExport implements FromArray, WithColumnFormatting, WithEve
 
                 // Add helpful comments for date fields & options
                 $comments = [
-                    'G1' => 'Format: dd/mm/yyyy. Contoh: 01/01/2022',
-                    'H1' => 'Format: dd/mm/yyyy. Contoh: 01/01/2022',
-                    'J1' => 'Format: dd/mm/yyyy. Contoh: 01/01/1990',
-                    'K1' => 'Pilihan: L (Laki-laki) atau P (Perempuan)',
-                    'L1' => 'Format: dd/mm/yyyy. Contoh: 01/01/2018',
-                    'M1' => 'Format: dd/mm/yyyy. Kosongkan jika Karpel',
-                    'Q1' => 'Format: dd/mm/yyyy. Contoh: 01/05/2045',
-                    'R1' => 'Format: dd/mm/yyyy. Contoh: 01/05/2046',
+                    'A1' => 'Format 8 digit angka. Contoh: 13009988',
+                    'C1' => 'Pilihan: L (Laki-laki) atau P (Perempuan)',
+                    'E1' => 'Format: dd/mm/yyyy. Contoh: 01/01/1990',
+                    'O1' => 'Format: dd/mm/yyyy. Contoh: 01/01/2018',
+                    'P1' => 'Format: dd/mm/yyyy. Kosongkan jika Karpel',
+                    'Q1' => 'Format: dd/mm/yyyy. Contoh: 01/01/2022',
+                    'R1' => 'Format: dd/mm/yyyy. Contoh: 05/01/2022',
+                    'X1' => 'Format: dd/mm/yyyy. Contoh: 01/05/2045',
+                    'Y1' => 'Format: dd/mm/yyyy. Contoh: 01/05/2046',
                 ];
 
                 foreach ($comments as $cell => $text) {
                     $sheet->getComment($cell)->getText()->createTextRun($text);
                 }
 
-                foreach (range('A', 'U') as $col) {
+                foreach (range('A', 'Y') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 
-                $sheet->getStyle('A1:U1')->applyFromArray([
+                $sheet->getStyle('A1:Y1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                     ],

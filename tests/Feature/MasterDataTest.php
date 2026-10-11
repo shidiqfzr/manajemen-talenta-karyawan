@@ -6,16 +6,19 @@ use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MasterDataTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $admin;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = User::first() ?? User::factory()->create(['role' => 'admin']);
+        $this->admin = User::factory()->create(['role' => 'admin']);
     }
 
     public function test_admin_can_access_master_units_index(): void

@@ -17,6 +17,7 @@ class EmployeesExport implements FromCollection, WithEvents, WithHeadings
         'nama',
         'jabatan',
         'level',
+        'rm_level',
         'unit_kerja',
         'golongan',
         'tanggal_dalam_jabatan',
@@ -46,10 +47,7 @@ class EmployeesExport implements FromCollection, WithEvents, WithHeadings
         $query = Employee::query();
 
         if (! empty($this->filters['search'])) {
-            $query->where(function ($q) {
-                $q->where('nik', 'like', '%'.$this->filters['search'].'%')
-                    ->orWhere('nama', 'like', '%'.$this->filters['search'].'%');
-            });
+            $query->search($this->filters['search']);
         }
 
         if (! empty($this->filters['jabatan'])) {
@@ -60,12 +58,40 @@ class EmployeesExport implements FromCollection, WithEvents, WithHeadings
             $query->where('level', $this->filters['level']);
         }
 
+        if (! empty($this->filters['rm_level'])) {
+            $query->where('rm_level', $this->filters['rm_level']);
+        }
+
         if (! empty($this->filters['unit_kerja'])) {
             $query->where('unit_kerja', $this->filters['unit_kerja']);
         }
 
         if (! empty($this->filters['golongan'])) {
             $query->where('golongan', $this->filters['golongan']);
+        }
+
+        if (! empty($this->filters['status_penugasan'])) {
+            $status = $this->filters['status_penugasan'];
+            if ($status === 'sementara') {
+                $query->whereHas('concurrentJobs');
+            } elseif ($status === 'definitif') {
+                $query->whereDoesntHave('concurrentJobs');
+            } else {
+                $query->whereHas('concurrentJobs', function ($q) use ($status) {
+                    $q->where('status_penugasan', $status);
+                });
+            }
+        }
+
+        if (! empty($this->filters['status_khusus'])) {
+            $khusus = $this->filters['status_khusus'];
+            if ($khusus === 'sanksi') {
+                $query->sanctionAll();
+            } elseif ($khusus === 'overflow') {
+                $query->overflow();
+            } elseif ($khusus === 'rangkap') {
+                $query->whereHas('concurrentJobs');
+            }
         }
 
         if (! empty($this->filters['tahun_masuk'])) {
@@ -86,6 +112,7 @@ class EmployeesExport implements FromCollection, WithEvents, WithHeadings
             'NAMA',
             'JABATAN',
             'LEVEL',
+            'ESELON / RM BAND',
             'UNIT KERJA',
             'GOLONGAN 2024',
             'TANGGAL DALAM JABATAN',

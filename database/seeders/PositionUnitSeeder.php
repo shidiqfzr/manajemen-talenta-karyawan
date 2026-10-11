@@ -52,7 +52,7 @@ class PositionUnitSeeder extends Seeder
                 foreach ($unitData['positions'] as $posData) {
                     $isOverflow = str_contains($posData['nama'], 'Advisor') || str_contains($posData['nama'], 'Diperbantukan');
                     $isDiperban = str_contains($posData['nama'], 'Diperbantukan');
-                    
+
                     $position = Position::firstOrCreate(
                         ['nama' => $posData['nama']],
                         [
@@ -116,6 +116,27 @@ class PositionUnitSeeder extends Seeder
                     'bidang' => 'UMU',
                     'level' => 'Karpim',
                     'rm_level' => $rm,
+                    'is_active' => true,
+                    'is_overflow' => true,
+                    'is_diperban' => true,
+                ]
+            );
+        }
+
+        // Jabatan Diperbantukan Spesifik Kantor (RM-1 s/d RM-3)
+        $officeDiperban = [
+            ['nama' => 'Kepala Bagian Diperbantukan', 'rm_level' => 'RM-1'],
+            ['nama' => 'Kepala Sub Bagian Diperbantukan', 'rm_level' => 'RM-2'],
+            ['nama' => 'Staf Pimpinan Diperbantukan', 'rm_level' => 'RM-3'],
+        ];
+
+        foreach ($officeDiperban as $pos) {
+            Position::firstOrCreate(
+                ['nama' => $pos['nama']],
+                [
+                    'bidang' => 'UMU',
+                    'level' => 'Karpim',
+                    'rm_level' => $pos['rm_level'],
                     'is_active' => true,
                     'is_overflow' => true,
                     'is_diperban' => true,

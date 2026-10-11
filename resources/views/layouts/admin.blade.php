@@ -446,6 +446,7 @@
             <main class="flex-1 p-4 lg:p-6">
                 <div class="max-w-7xl mx-auto">
                     @yield('content')
+                    {{ $slot ?? '' }}
                 </div>
             </main>
         </div>

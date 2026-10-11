@@ -9,7 +9,7 @@ class PositionFactory extends Factory
     public function definition(): array
     {
         return [
-            'nama' => 'Asisten ' . $this->faker->word(),
+            'nama' => 'Asisten '.$this->faker->word(),
             'rm_level' => 'RM-3',
             'bidang' => 'TAN',
             'is_active' => true,

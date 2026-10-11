@@ -14,6 +14,10 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\User\EmployeeController as UserEmployeeController;
 use App\Http\Controllers\User\TrainingController as UserTrainingController;
+use App\Models\Employee;
+use App\Models\Unit;
+use App\Services\ManPowerPlanningService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Redirect default to login
@@ -137,19 +141,42 @@ Route::prefix('admin')
         });
 
         // API for Smart Classification (SSOT via Service)
-        Route::get('/api/classify-position', function (\Illuminate\Http\Request $request, \App\Services\ManPowerPlanningService $service) {
-            $emp = new \App\Models\Employee();
+        Route::get('/api/classify-position', function (Request $request, ManPowerPlanningService $service) {
+            $emp = new Employee;
             $emp->jabatan = $request->query('jabatan', '');
             $emp->unit_kerja = $request->query('unit_kerja', '');
             $emp->level = $request->query('level', 'Karpim');
             $emp->golongan = $request->query('golongan', '');
             $emp->job_grade = $request->query('job_grade', '');
-            
+
             return response()->json([
                 'bidang' => $service->determineBidang($emp),
-                'rm_band' => $service->determineRmLevel($emp)
+                'rm_band' => $service->determineRmLevel($emp),
             ]);
         })->name('api.classify-position');
+        // API for Dynamic Cascading Position List
+        Route::get('/api/unit-positions', function (Request $request) {
+            $unitName = $request->query('unit_name');
+            $level = $request->query('level');
+
+            if (! $unitName) {
+                return response()->json(['positions' => []]);
+            }
+
+            $unit = Unit::where('nama', $unitName)->first();
+            if (! $unit) {
+                return response()->json(['positions' => []]);
+            }
+
+            $query = $unit->positions()->where('positions.is_active', true);
+            if ($level) {
+                $query->where('positions.level', $level);
+            }
+
+            $positions = $query->pluck('positions.nama')->toArray();
+
+            return response()->json(['positions' => $positions]);
+        })->name('api.unit-positions');
     });
 
 // Data Routes

@@ -5,7 +5,7 @@
     importModalOpen: false,
     deleteModalOpen: false,
     showColumnSpecs: false,
-    showAdvancedFilters: {{ request()->hasAny(['unit_kerja', 'jabatan', 'golongan', 'tahun_masuk', 'bulan_masuk']) ? 'true' : 'false' }},
+    showAdvancedFilters: {{ request()->hasAny(['unit_kerja', 'jabatan', 'rm_level', 'tahun_masuk']) ? 'true' : 'false' }},
     deleteNik: '',
     deleteNama: '',
     deleteAction: '',
@@ -114,101 +114,159 @@
         </div>
     @endif
 
-    @php
-        $isFiltered = request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan', 'tahun_masuk', 'bulan_masuk']);
-        $activePeriodText = null;
-        if (request('tahun_masuk')) {
-            $monthLabel = request('bulan_masuk') ? ($months[request('bulan_masuk')] ?? '') : '';
-            $activePeriodText = $monthLabel ? ($monthLabel . ' ' . request('tahun_masuk')) : ('Tahun ' . request('tahun_masuk'));
-        }
-    @endphp
+    @if(isset($expiredSanksiEmployees) && $expiredSanksiEmployees->isNotEmpty())
+        <div class="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm animate-fade-in relative overflow-hidden">
+            <!-- Decorative background pattern -->
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-red-100 rounded-full opacity-50 pointer-events-none"></div>
 
-    <!-- Summary KPI Metrics Cards (Reactive to Period & Filters) -->
-    <div class="space-y-2">
-        @if($isFiltered)
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-primary-100 text-primary-800">
-                        <i class="fas fa-filter text-[10px]"></i>
-                        <span>Metrik Terfilter</span>
-                    </span>
-                    @if($activePeriodText)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                            <i class="fas fa-calendar-check text-[10px]"></i>
-                            <span>Periode: {{ $activePeriodText }}</span>
-                        </span>
-                    @endif
+            <div class="relative flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg shrink-0 border border-red-200 shadow-inner">
+                    <i class="fas fa-exclamation-circle animate-pulse"></i>
                 </div>
-                <span class="text-xs text-surface-500">
-                    Total Keseluruhan: <strong class="text-surface-800 font-mono">{{ number_format($globalTotalEmployees) }} Pegawai</strong>
-                </span>
-            </div>
-        @endif
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Total Karyawan -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between hover:border-slate-300 transition">
-                <div class="space-y-1">
-                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pegawai</p>
-                    <p class="text-2xl lg:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">{{ number_format($totalEmployees) }}</p>
-                    <p class="text-xs text-slate-400">
-                        {{ $isFiltered ? 'Sesuai filter aktif' : 'Pegawai aktif terdaftar' }}
+                <div class="space-y-1.5 flex-1">
+                    <h4 class="text-sm font-bold text-red-900 uppercase tracking-wide flex items-center gap-2">
+                        Peringatan: Masa Sanksi Kedaluwarsa
+                        <span class="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{{ $expiredSanksiEmployees->count() }}</span>
+                    </h4>
+                    <p class="text-xs text-red-800 leading-relaxed max-w-4xl">
+                        Terdapat <strong class="text-red-900 font-extrabold">{{ $expiredSanksiEmployees->count() }} karyawan</strong> yang masa sanksi (Diperban)-nya telah berakhir hari ini atau sebelumnya. Mohon segera evaluasi dan terbitkan Mutasi Pencabutan Sanksi untuk memulihkan status mereka.
                     </p>
-                </div>
-                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl shrink-0 border border-emerald-100/80">
-                    <i class="fas fa-users"></i>
-                </div>
-            </div>
 
-            <!-- Karyawan Pimpinan -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between hover:border-slate-300 transition">
-                <div class="space-y-1">
-                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Karyawan Pimpinan</p>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl lg:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">{{ number_format($karpimCount) }}</span>
-                        @if($totalEmployees > 0)
-                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
-                                {{ round(($karpimCount / $totalEmployees) * 100) }}%
-                            </span>
-                        @endif
+                    <!-- Expandable List -->
+                    <div x-data="{ showList: false }" class="mt-3">
+                        <button type="button" @click="showList = !showList"
+                            class="text-xs font-semibold text-red-700 hover:text-red-900 hover:underline inline-flex items-center gap-1.5 transition-colors">
+                            <span x-text="showList ? 'Sembunyikan Daftar Karyawan' : 'Lihat Daftar Karyawan'"></span>
+                            <i class="fas fa-chevron-down text-[10px] transition-transform duration-200" :class="{ 'rotate-180': showList }"></i>
+                        </button>
+
+                        <div x-show="showList" x-collapse x-cloak class="mt-3 bg-white/60 border border-red-200 rounded-lg p-3 backdrop-blur-sm shadow-inner">
+                            <div class="max-h-56 overflow-y-auto space-y-2 pr-2" style="scrollbar-width: thin; scrollbar-color: #fca5a5 transparent;">
+                                @foreach($expiredSanksiEmployees as $emp)
+                                    <div class="flex items-center justify-between gap-4 py-2 border-b border-red-100 last:border-0 hover:bg-red-50/50 transition-colors px-2 rounded-md">
+                                        <div>
+                                            <a href="{{ route('admin.employees.show', $emp->nik) }}" class="text-xs font-bold text-red-900 hover:underline hover:text-red-700">
+                                                {{ $emp->nama }}
+                                            </a>
+                                            <p class="text-[10px] text-red-700 mt-0.5 font-medium"><i class="fas fa-id-badge mr-1"></i>{{ $emp->nik }} <span class="mx-1 text-red-300">|</span> <i class="fas fa-briefcase mr-1"></i>{{ $emp->jabatan }}</p>
+                                        </div>
+                                        <div class="text-right shrink-0">
+                                            <span class="text-[10px] font-bold text-red-900 bg-red-100/80 px-2 py-1 rounded border border-red-200 shadow-sm flex items-center gap-1.5">
+                                                <i class="fas fa-calendar-times text-red-600"></i>
+                                                Tgl. Berakhir: {{ \Carbon\Carbon::parse($emp->tanggal_berakhir_sanksi)->format('d M Y') }}
+                                            </span>
+                                            <a href="{{ route('admin.mutasi.create', ['nik' => $emp->nik]) }}" class="inline-flex mt-1 text-[10px] font-semibold text-red-600 hover:text-red-800 hover:underline">
+                                                Cabut Sanksi (Mutasi) &rarr;
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-xs text-sky-700 font-medium">Level Pimpinan &amp; Manajerial</p>
-                </div>
-                <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center text-xl shrink-0 border border-sky-100/80">
-                    <i class="fas fa-user-tie"></i>
                 </div>
             </div>
+        </div>
+    @endif
 
-            <!-- Karyawan Pelaksana -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between hover:border-slate-300 transition">
-                <div class="space-y-1">
-                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Karyawan Pelaksana</p>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl lg:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">{{ number_format($pelaksanaCount) }}</span>
-                        @if($totalEmployees > 0)
-                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                                {{ round(($pelaksanaCount / $totalEmployees) * 100) }}%
-                            </span>
-                        @endif
-                    </div>
-                    <p class="text-xs text-amber-700 font-medium">Staf &amp; Pelaksana Lapangan</p>
-                </div>
-                <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl shrink-0 border border-amber-100/80">
-                    <i class="fas fa-id-badge"></i>
-                </div>
-            </div>
+    <!-- Summary KPI Metrics Cards (Primary Interactive Navigation & Executive Headcount Overview) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <!-- 1. Total Pegawai (Filter Reset to All) -->
+        <x-admin.kpi-card
+            title="Total Pegawai"
+            :value="$totalEmployees"
+            subtitle="Pegawai aktif terdaftar"
+            icon="fas fa-users"
+            theme="primary"
+            :active="!request('level') && !request('status_khusus') && !request('status_penugasan')"
+            :href="route('admin.employees.index')" />
 
-            <!-- Unit Kerja -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between hover:border-slate-300 transition">
-                <div class="space-y-1">
-                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unit Kerja</p>
-                    <p class="text-2xl lg:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">{{ number_format($totalUnits) }}</p>
-                    <p class="text-xs text-teal-700 font-medium">Entitas &amp; Wilayah Terdistribusi</p>
-                </div>
-                <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center text-xl shrink-0 border border-teal-100/80">
-                    <i class="fas fa-building"></i>
-                </div>
-            </div>
+        <!-- 2. Karyawan Pimpinan -->
+        <x-admin.kpi-card
+            title="Karyawan Pimpinan"
+            :value="$karpimCount"
+            :badge="$totalEmployees > 0 ? round(($karpimCount / $totalEmployees) * 100) . '%' : null"
+            subtitle="Pimpinan & Manajerial"
+            icon="fas fa-user-tie"
+            theme="sky"
+            :active="request('level') === 'Karpim'"
+            :href="request()->fullUrlWithQuery(['level' => request('level') === 'Karpim' ? null : 'Karpim'])" />
+
+        <!-- 3. Karyawan Pelaksana -->
+        <x-admin.kpi-card
+            title="Karyawan Pelaksana"
+            :value="$pelaksanaCount"
+            :badge="$totalEmployees > 0 ? round(($pelaksanaCount / $totalEmployees) * 100) . '%' : null"
+            subtitle="Staf & Lapangan"
+            icon="fas fa-id-badge"
+            theme="earth"
+            :active="request('level') === 'Pelaksana'"
+            :href="request()->fullUrlWithQuery(['level' => request('level') === 'Pelaksana' ? null : 'Pelaksana'])" />
+
+        <!-- 4. Unit Kerja -->
+        <x-admin.kpi-card
+            title="Unit Kerja"
+            :value="$totalUnits"
+            subtitle="Entitas Terdistribusi"
+            icon="fas fa-building"
+            theme="teal" />
+    </div>
+
+    <!-- Executive Governance & Special Status Quick Strip -->
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs shadow-2xs">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-slate-700 flex items-center gap-1.5 mr-1">
+                <i class="fas fa-shield-alt text-emerald-600"></i> Tata Kelola & Kasus Khusus:
+            </span>
+
+            <!-- Chip 1: Tugas Rangkap -->
+            <a href="{{ request()->fullUrlWithQuery(['status_khusus' => request('status_khusus') === 'rangkap' ? null : 'rangkap']) }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer {{ request('status_khusus') === 'rangkap' ? 'bg-purple-600 text-white border-purple-600 shadow-xs' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50' }}">
+                <i class="fas fa-briefcase text-[11px]"></i>
+                <span>Tugas Rangkap</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold {{ request('status_khusus') === 'rangkap' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800' }}">
+                    {{ $penugasanSementaraCount }}
+                </span>
+            </a>
+
+            <!-- Chip 2: Masa Sanksi (Diperban) -->
+            <a href="{{ request()->fullUrlWithQuery(['status_khusus' => request('status_khusus') === 'sanksi' ? null : 'sanksi']) }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer {{ request('status_khusus') === 'sanksi' ? 'bg-red-600 text-white border-red-600 shadow-xs' : 'bg-white text-red-700 border-red-200 hover:bg-red-50' }}">
+                <i class="fas fa-gavel text-[11px]"></i>
+                <span>Masa Sanksi (Diperban)</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold {{ request('status_khusus') === 'sanksi' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800' }}">
+                    {{ $sanksiAktifCount }}
+                </span>
+                @if($expiredSanksiEmployees->isNotEmpty())
+                    <span class="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-500 text-white shadow-2xs animate-pulse"
+                          title="{{ $expiredSanksiEmployees->count() }} pegawai masa sanksinya telah habis/kedaluwarsa">
+                        {{ $expiredSanksiEmployees->count() }} kedaluwarsa
+                    </span>
+                @endif
+            </a>
+
+            <!-- Chip 3: Jabatan Overflow (Advisor) -->
+            <a href="{{ request()->fullUrlWithQuery(['status_khusus' => request('status_khusus') === 'overflow' ? null : 'overflow']) }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer {{ request('status_khusus') === 'overflow' ? 'bg-slate-700 text-white border-slate-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100' }}">
+                <i class="fas fa-layer-group text-[11px]"></i>
+                <span>Jabatan Overflow (Advisor)</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold {{ request('status_khusus') === 'overflow' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800' }}">
+                    {{ $overflowCount }}
+                </span>
+            </a>
+        </div>
+
+        <div class="flex items-center gap-3">
+            @if(request('status_khusus'))
+                <a href="{{ request()->fullUrlWithQuery(['status_khusus' => null]) }}"
+                   class="text-[11px] text-slate-500 hover:text-red-600 font-medium inline-flex items-center gap-1">
+                    <i class="fas fa-times text-[9px]"></i> Reset Status Khusus
+                </a>
+            @endif
+            <a href="{{ route('admin.mutasi.index') }}" class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 hover:underline inline-flex items-center gap-1">
+                <span>Kelola di Modul Mutasi</span>
+                <i class="fas fa-arrow-right text-[10px]"></i>
+            </a>
         </div>
     </div>
 
@@ -217,184 +275,175 @@
         
         <!-- Filter Toolbar -->
         <div class="p-5 border-b border-slate-200/80 bg-slate-50/50 space-y-4">
-            <!-- Row 1: Quick Filter Tabs (Level) -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="inline-flex items-center p-1 bg-slate-200/60 rounded-xl text-xs font-semibold">
-                    <a href="{{ request()->fullUrlWithQuery(['level' => null]) }}"
-                        class="px-3.5 py-1.5 rounded-lg transition {{ !request('level') ? 'bg-white text-emerald-800 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900' }}">
-                        Semua Pegawai
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['level' => 'Karpim']) }}"
-                        class="px-3.5 py-1.5 rounded-lg transition {{ request('level') === 'Karpim' ? 'bg-white text-emerald-800 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900' }}">
-                        Karyawan Pimpinan
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['level' => 'Pelaksana']) }}"
-                        class="px-3.5 py-1.5 rounded-lg transition {{ request('level') === 'Pelaksana' ? 'bg-white text-emerald-800 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900' }}">
-                        Karyawan Pelaksana
-                    </a>
-                </div>
-
-                <!-- Toggle Button for Advanced Dropdown Filters -->
-                <button type="button" @click="showAdvancedFilters = !showAdvancedFilters"
-                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs self-start sm:self-auto cursor-pointer">
-                    <i class="fas fa-sliders text-emerald-600 text-[11px]"></i>
-                    <span>Filter Lanjutan</span>
-                    @php
-                        $advCount = count(array_filter([request('unit_kerja'), request('jabatan'), request('golongan'), request('tahun_masuk'), request('bulan_masuk')]));
-                    @endphp
-                    @if($advCount > 0)
-                        <span class="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
-                            {{ $advCount }}
-                        </span>
-                    @endif
-                    <i class="fas text-[10px] text-slate-400" :class="showAdvancedFilters ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                </button>
-            </div>
-
             <form method="GET" action="{{ route('admin.employees.index') }}" id="filterForm" class="space-y-4">
-                <!-- Keep level hidden if already selected from tabs -->
+                <!-- Keep level, status_penugasan & status_khusus hidden if already selected from KPI cards / quick strip -->
                 @if(request('level'))
                     <input type="hidden" name="level" value="{{ request('level') }}">
                 @endif
+                @if(request('status_penugasan') && !request()->has('status_penugasan_select'))
+                    <input type="hidden" name="status_penugasan" value="{{ request('status_penugasan') }}">
+                @endif
+                @if(request('status_khusus'))
+                    <input type="hidden" name="status_khusus" value="{{ request('status_khusus') }}">
+                @endif
 
-                <!-- Row 2: Search Input & Apply Action -->
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <!-- Search Input -->
-                    <div class="relative flex-1">
-                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                            <i class="fas fa-search text-xs"></i>
+                <!-- Unified 1-Row Toolbar: Search Input + Advanced Filter Toggle + Reset Filter -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    <!-- Search Input (Reusable Enterprise Component: NIK, Nama, Jabatan, Unit Kerja with '/' shortcut) -->
+                    <x-admin.search-input
+                        name="search"
+                        id="employeeSearchInput"
+                        placeholder="Cari NIK, Nama, Jabatan, atau Unit Kerja..." />
+
+                    <!-- Toggle Button for Advanced Dropdown Filters -->
+                    <button type="button" @click="showAdvancedFilters = !showAdvancedFilters"
+                        class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs shrink-0 cursor-pointer">
+                        <i class="fas fa-sliders text-emerald-600 text-xs"></i>
+                        <span>Filter Lanjutan</span>
+                        @php
+                            $advCount = count(array_filter([
+                                request('unit_kerja'),
+                                request('jabatan'),
+                                request('rm_level'),
+                                request('tahun_masuk'),
+                            ]));
+                        @endphp
+                        @if($advCount > 0)
+                            <span class="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                                {{ $advCount }}
+                            </span>
+                        @endif
+                        <i class="fas text-[10px] text-slate-400" :class="showAdvancedFilters ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                    </button>
+
+                    <!-- Reset Filter Button (Shown when filters active) -->
+                    @if(request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'rm_level', 'golongan', 'tahun_masuk', 'status_penugasan']))
+                        <a href="{{ route('admin.employees.index') }}"
+                            class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 text-slate-600 hover:text-danger hover:border-red-200 hover:bg-red-50/50 rounded-xl text-xs font-semibold transition shadow-2xs shrink-0 cursor-pointer"
+                            title="Reset semua filter">
+                            <i class="fas fa-rotate-left text-xs"></i>
+                            <span class="hidden sm:inline">Reset Filter</span>
+                        </a>
+                    @endif
+                </div>
+
+                <!-- Collapsible Advanced Filters Panel (4 Core Essential Filters in 1 Symmetrical Row) -->
+                <div x-show="showAdvancedFilters" x-cloak
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-y-2"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    class="pt-4 mt-1 border-t border-slate-200/80 space-y-3.5">
+
+                    <!-- Symmetrical 4-Column Grid for High-Frequency Core Filters -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <!-- 1. Unit Kerja -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">
+                                <i class="fas fa-building text-slate-400 text-[10px] mr-1"></i> Unit Kerja
+                            </label>
+                            <x-admin.searchable-select
+                                name="unit_kerja"
+                                id="filterUnitKerja"
+                                :options="$units"
+                                :selected="request('unit_kerja')"
+                                placeholder="Semua Unit Kerja"
+                                searchPlaceholder="Cari unit kerja..."
+                                icon="fas fa-building"
+                                :hasAllOption="true"
+                                allOptionText="Semua Unit Kerja"
+                                emptyText="Unit kerja tidak ditemukan" />
                         </div>
-                        <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Cari berdasarkan NIK atau Nama Pegawai..."
-                            class="w-full pl-10 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition">
-                        @if(request('search'))
-                            <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}"
-                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                                title="Hapus pencarian">
-                                <i class="fas fa-times-circle text-xs"></i>
-                            </a>
-                        @endif
+
+                        <!-- 2. Jabatan -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">
+                                <i class="fas fa-briefcase text-slate-400 text-[10px] mr-1"></i> Jabatan
+                            </label>
+                            <x-admin.searchable-select
+                                name="jabatan"
+                                id="filterJabatan"
+                                :options="$jabatans"
+                                :selected="request('jabatan')"
+                                placeholder="Semua Jabatan"
+                                searchPlaceholder="Cari nama jabatan..."
+                                icon="fas fa-briefcase"
+                                :hasAllOption="true"
+                                allOptionText="Semua Jabatan"
+                                emptyText="Jabatan tidak ditemukan" />
+                        </div>
+
+                        <!-- 3. Eselon / RM Band -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">
+                                <i class="fas fa-layer-group text-slate-400 text-[10px] mr-1"></i> Eselon / RM Band
+                            </label>
+                            <x-admin.searchable-select
+                                name="rm_level"
+                                id="filterRmLevel"
+                                :options="$rmLevels"
+                                :selected="request('rm_level')"
+                                placeholder="Semua Eselon / RM Band"
+                                searchPlaceholder="Cari eselon atau level..."
+                                icon="fas fa-layer-group"
+                                :hasAllOption="true"
+                                allOptionText="Semua Eselon / RM Band"
+                                emptyText="Eselon tidak ditemukan" />
+                        </div>
+
+                        <!-- 4. Tahun Masuk (TMT) -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">
+                                <i class="fas fa-calendar-alt text-slate-400 text-[10px] mr-1"></i> Tahun Masuk (TMT)
+                            </label>
+                            @php
+                                $yearOptions = collect($availableYears)->map(function ($year) {
+                                    return ['value' => (string) $year, 'label' => 'Tahun ' . $year];
+                                })->values()->toArray();
+                            @endphp
+                            <x-admin.searchable-select
+                                name="tahun_masuk"
+                                id="filterTahunMasuk"
+                                :options="$yearOptions"
+                                :selected="request('tahun_masuk')"
+                                placeholder="Semua Angkatan"
+                                searchPlaceholder="Cari tahun angkatan..."
+                                icon="fas fa-calendar-alt"
+                                :hasAllOption="true"
+                                allOptionText="Semua Angkatan"
+                                emptyText="Tahun angkatan tidak ditemukan" />
+                        </div>
                     </div>
 
-                    <!-- Filter & Reset Buttons -->
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button type="submit"
-                            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer">
-                            <i class="fas fa-filter text-[11px]"></i>
-                            <span>Terapkan</span>
-                        </button>
-                        @if(request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan', 'tahun_masuk', 'bulan_masuk']))
-                            <a href="{{ route('admin.employees.index') }}"
-                                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-medium transition shadow-2xs"
-                                title="Reset semua filter">
-                                <i class="fas fa-rotate-left text-xs"></i>
-                                <span>Reset</span>
-                            </a>
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Row 3: Collapsible Advanced Dropdown Filters -->
-                <div x-show="showAdvancedFilters" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-2 border-t border-slate-200/70">
-                    <!-- Filter 1: Periode Tahun Masuk (TMT) -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">
-                            <i class="fas fa-calendar-alt text-emerald-600 text-[10px] mr-1"></i> Tahun Masuk (TMT)
-                        </label>
-                        <select name="tahun_masuk" onchange="this.form.submit()"
-                            class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition truncate cursor-pointer">
-                            <option value="">Semua Angkatan</option>
-                            @foreach ($availableYears as $year)
-                                <option value="{{ $year }}" {{ request('tahun_masuk') == $year ? 'selected' : '' }}>
-                                    Tahun {{ $year }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Filter 2: Bulan Masuk -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">
-                            <i class="fas fa-calendar-day text-slate-400 text-[10px] mr-1"></i> Bulan Masuk
-                        </label>
-                        <select name="bulan_masuk" onchange="this.form.submit()"
-                            class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition truncate cursor-pointer">
-                            <option value="">Semua Bulan</option>
-                            @foreach ($months as $num => $monthName)
-                                <option value="{{ $num }}" {{ request('bulan_masuk') == $num ? 'selected' : '' }}>
-                                    {{ $monthName }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Filter 3: Unit Kerja -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Unit Kerja</label>
-                        <select name="unit_kerja" onchange="this.form.submit()"
-                            class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition truncate cursor-pointer">
-                            <option value="">Semua Unit Kerja</option>
-                            @foreach ($units as $unit)
-                                <option value="{{ $unit }}" {{ request('unit_kerja') == $unit ? 'selected' : '' }}>
-                                    {{ $unit }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Filter 4: Jabatan -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Jabatan</label>
-                        <select name="jabatan" onchange="this.form.submit()"
-                            class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition truncate cursor-pointer">
-                            <option value="">Semua Jabatan</option>
-                            @foreach ($jabatans as $jabatan)
-                                <option value="{{ $jabatan }}" {{ request('jabatan') == $jabatan ? 'selected' : '' }}>
-                                    {{ $jabatan }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Filter 5: Golongan -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Golongan</label>
-                        <select name="golongan" onchange="this.form.submit()"
-                            class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition cursor-pointer">
-                            <option value="">Semua Golongan</option>
-                            @foreach ($golongans as $golongan)
-                                <option value="{{ $golongan }}" {{ request('golongan') == $golongan ? 'selected' : '' }}>
-                                    {{ $golongan }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <!-- Panel Action Bar (Apply & Reset) -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-200/80">
+                        <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                            <i class="fas fa-info-circle text-emerald-600"></i>
+                            <span>Pilih kriteria yang diinginkan, lalu klik <strong>Terapkan Filter</strong>.</span>
+                        </p>
+                        <div class="flex items-center justify-end gap-2 shrink-0">
+                            @if(request()->hasAny(['unit_kerja', 'jabatan', 'rm_level', 'tahun_masuk']))
+                                <a href="{{ request()->fullUrlWithQuery(['unit_kerja' => null, 'jabatan' => null, 'rm_level' => null, 'tahun_masuk' => null]) }}"
+                                    class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-danger hover:border-red-200 hover:bg-red-50 text-xs font-semibold transition cursor-pointer shadow-2xs">
+                                    Bersihkan Kriteria
+                                </a>
+                            @endif
+                            <button type="submit"
+                                class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold shadow-xs hover:shadow transition active:scale-95 cursor-pointer">
+                                <i class="fas fa-check text-[10px]"></i>
+                                <span>Terapkan Filter</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Active Filter Tags Display -->
-                @if (request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan', 'tahun_masuk', 'bulan_masuk']))
+                <!-- Active Filter Tags Display (Excludes Level Tab which is visually active above) -->
+                @php
+                    $hasAdvancedActiveFilters = request()->hasAny(['search', 'unit_kerja', 'jabatan', 'rm_level', 'tahun_masuk', 'status_khusus']);
+                @endphp
+                @if ($hasAdvancedActiveFilters)
                     <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-surface-200">
                         <span class="text-xs font-medium text-surface-500">Filter Aktif:</span>
                         
-                        @if (request('tahun_masuk'))
-                            <a href="{{ request()->fullUrlWithQuery(['tahun_masuk' => null]) }}"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition">
-                                <i class="fas fa-calendar-alt text-[10px] text-emerald-600"></i>
-                                <span>Tahun: <strong>{{ request('tahun_masuk') }}</strong></span>
-                                <i class="fas fa-times text-[10px]"></i>
-                            </a>
-                        @endif
-
-                        @if (request('bulan_masuk'))
-                            <a href="{{ request()->fullUrlWithQuery(['bulan_masuk' => null]) }}"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition">
-                                <i class="fas fa-calendar-day text-[10px] text-emerald-600"></i>
-                                <span>Bulan: <strong>{{ $months[request('bulan_masuk')] ?? request('bulan_masuk') }}</strong></span>
-                                <i class="fas fa-times text-[10px]"></i>
-                            </a>
-                        @endif
-
                         @if (request('search'))
                             <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}"
                                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary-50 text-primary-800 border border-primary-200 hover:bg-primary-100 transition">
@@ -419,25 +468,44 @@
                             </a>
                         @endif
 
-                        @if (request('level'))
-                            <a href="{{ request()->fullUrlWithQuery(['level' => null]) }}"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-earth-100 text-earth-800 border border-earth-300 hover:bg-earth-200 transition">
-                                <span>Level: <strong>{{ request('level') }}</strong></span>
+                        @if (request('rm_level'))
+                            <a href="{{ request()->fullUrlWithQuery(['rm_level' => null]) }}"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition">
+                                <i class="fas fa-layer-group text-[10px] text-purple-600"></i>
+                                <span>Eselon: <strong>{{ request('rm_level') }}</strong></span>
                                 <i class="fas fa-times text-[10px]"></i>
                             </a>
                         @endif
 
-                        @if (request('golongan'))
-                            <a href="{{ request()->fullUrlWithQuery(['golongan' => null]) }}"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-surface-100 text-surface-800 border border-surface-300 hover:bg-surface-200 transition">
-                                <span>Golongan: <strong>{{ request('golongan') }}</strong></span>
+                        @if (request('tahun_masuk'))
+                            <a href="{{ request()->fullUrlWithQuery(['tahun_masuk' => null]) }}"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition">
+                                <i class="fas fa-calendar-alt text-[10px] text-emerald-600"></i>
+                                <span>Tahun: <strong>{{ request('tahun_masuk') }}</strong></span>
                                 <i class="fas fa-times text-[10px]"></i>
                             </a>
                         @endif
 
-                        <a href="{{ route('admin.employees.index') }}"
+                        @if (request('status_khusus'))
+                            @php
+                                $statusKhususLabels = [
+                                    'rangkap' => 'Tugas Rangkap',
+                                    'sanksi' => 'Masa Sanksi (Diperban)',
+                                    'overflow' => 'Jabatan Overflow (Advisor)',
+                                ];
+                                $labelKhusus = $statusKhususLabels[request('status_khusus')] ?? request('status_khusus');
+                            @endphp
+                            <a href="{{ request()->fullUrlWithQuery(['status_khusus' => null]) }}"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-red-50 text-red-800 border border-red-200 hover:bg-red-100 transition">
+                                <i class="fas fa-shield-alt text-[10px] text-red-600"></i>
+                                <span>Tata Kelola: <strong>{{ $labelKhusus }}</strong></span>
+                                <i class="fas fa-times text-[10px]"></i>
+                            </a>
+                        @endif
+
+                        <a href="{{ route('admin.employees.index', array_filter(['level' => request('level')])) }}"
                             class="text-xs text-danger hover:underline ml-1 font-medium">
-                            Hapus Semua
+                            Hapus Filter Tambahan
                         </a>
                     </div>
                 @endif
@@ -488,15 +556,16 @@
                 <thead>
                     <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-700 uppercase tracking-wider">
                         <th scope="col" class="py-3.5 px-5">Pegawai</th>
-                        <th scope="col" class="py-3.5 px-5">Jabatan & Unit Kerja</th>
-                        <th scope="col" class="py-3.5 px-5">Level</th>
+                        <th scope="col" class="py-3.5 px-5">Jabatan &amp; Unit Kerja</th>
+                        <th scope="col" class="py-3.5 px-5">Eselon &amp; Level</th>
                         <th scope="col" class="py-3.5 px-5">Golongan</th>
                         <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-surface-200 text-sm">
                     @forelse ($employees as $employee)
-                        <tr class="hover:bg-surface-50/75 transition duration-150 group">
+                        <tr @click="window.location.href = '{{ route('admin.employees.show', $employee->nik) }}'"
+                            class="cursor-pointer hover:bg-slate-50/80 transition duration-150 group {{ $employee->concurrentJobs->isNotEmpty() ? 'border-l-4 border-l-purple-500 bg-purple-50/15' : '' }}">
                             <!-- Pegawai (Avatar + Name + NIK) -->
                             <td class="py-3.5 px-5 whitespace-nowrap">
                                 <div class="flex items-center gap-3">
@@ -519,13 +588,13 @@
                                         <a href="{{ route('admin.employees.show', $employee->nik) }}"
                                             class="font-semibold text-surface-900 group-hover:text-primary-700 transition block truncate max-w-[200px] sm:max-w-xs"
                                             title="{{ $employee->nama }}">
-                                            {{ $employee->nama }}
+                                            <x-highlight :text="$employee->nama" />
                                         </a>
                                         <div class="flex items-center gap-1.5 mt-0.5">
                                             <span class="font-mono text-xs text-surface-500 tabular-nums">
-                                                {{ $employee->nik }}
+                                                <x-highlight :text="$employee->nik" />
                                             </span>
-                                            <button type="button" @click="copyNik('{{ $employee->nik }}')"
+                                            <button type="button" @click.stop="copyNik('{{ $employee->nik }}')"
                                                 class="text-surface-400 hover:text-surface-700 text-[11px] transition"
                                                 title="Salin NIK">
                                                 <i :class="copiedNik === '{{ $employee->nik }}' ? 'fas fa-check text-primary-600' : 'far fa-copy'"></i>
@@ -537,27 +606,87 @@
 
                             <!-- Jabatan & Unit Kerja -->
                             <td class="py-3.5 px-5">
-                                <div class="font-medium text-surface-900 text-sm">
-                                    {{ $employee->jabatan }}
+                                <div class="font-medium text-surface-900 text-sm flex items-center gap-2 flex-wrap">
+                                    <span><x-highlight :text="$employee->jabatan" /></span>
+
+                                    {{-- Badge Kasus Spesial 1: Sanksi Indisipliner Aktif / Kedaluwarsa --}}
+                                    @if($employee->isSanctionActive())
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 shadow-2xs"
+                                            title="Pegawai dalam masa sanksi indisipliner (Diperban) hingga {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}">
+                                            <i class="fas fa-gavel text-[9px]"></i>
+                                            Masa Sanksi s/d {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}
+                                        </span>
+                                    @elseif($employee->isSanctionExpired())
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs animate-pulse"
+                                            title="Masa sanksi kedaluwarsa sejak {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }} - Harap terbitkan Mutasi Pencabutan Sanksi">
+                                            <i class="fas fa-exclamation-triangle text-[9px] text-amber-600"></i>
+                                            Sanksi Kedaluwarsa
+                                        </span>
+                                    @endif
+
+                                    {{-- Badge Kasus Spesial 2: Jabatan Overflow / Pool Penampungan (Advisor) --}}
+                                    @if($employee->isOverflow())
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
+                                            title="Formasi penampungan fungsional non-struktural (Advisor/Overflow Pool)">
+                                            <i class="fas fa-layer-group text-[9px] text-slate-500"></i>
+                                            Fungsional Pool
+                                        </span>
+                                    @endif
                                 </div>
+                                @if($employee->concurrentJobs->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                        @foreach($employee->concurrentJobs as $cj)
+                                            @php
+                                                $badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
+                                                if ($cj->status_penugasan === 'Plt') {
+                                                    $badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
+                                                } elseif ($cj->status_penugasan === 'Diperbantukan') {
+                                                    $badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+                                                }
+                                            @endphp
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $badgeStyle }}"
+                                                title="Tugas Tambahan Aktif: {{ $cj->jabatan }} di {{ $cj->unit_kerja }} (sejak {{ $cj->tmt_awal?->format('d M Y') }})">
+                                                <i class="fas fa-briefcase text-[9px]"></i>
+                                                {{ $cj->status_penugasan }}: {{ $cj->jabatan }} ({{ $cj->unit_kerja }})
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                                 <div class="text-xs text-surface-500 flex items-center gap-1.5 mt-0.5">
                                     <i class="fas fa-building text-[10px] text-surface-400"></i>
-                                    <span class="truncate max-w-[280px]">{{ $employee->unit_kerja }}</span>
+                                    <span class="truncate max-w-[280px]"><x-highlight :text="$employee->unit_kerja" /></span>
                                 </div>
                             </td>
 
-                            <!-- Level -->
+                            <!-- Eselon & Level -->
                             <td class="py-3.5 px-5 whitespace-nowrap">
-                                @php
-                                    $isKarpim = str_contains(strtolower($employee->level ?? ''), 'karpim') || str_contains(strtolower($employee->level ?? ''), 'pimpinan');
-                                @endphp
-                                @if($employee->level)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium {{ $isKarpim ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-surface-100 text-surface-700 border border-surface-200' }}">
-                                        {{ $employee->level }}
-                                    </span>
-                                @else
-                                    <span class="text-surface-400 text-xs">-</span>
-                                @endif
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    @if($employee->rm_level)
+                                        @php
+                                            $rmTheme = match($employee->rm_level) {
+                                                'RM-1' => 'bg-purple-50 text-purple-700 border-purple-200 font-bold',
+                                                'RM-2' => 'bg-sky-50 text-sky-700 border-sky-200 font-bold',
+                                                'RM-3' => 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
+                                                default => 'bg-slate-100 text-slate-700 border-slate-200 font-medium',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] border {{ $rmTheme }}"
+                                            title="{{ \App\Models\Employee::RM_LEVELS[$employee->rm_level] ?? $employee->rm_level }}">
+                                            {{ $employee->rm_level }}
+                                        </span>
+                                    @endif
+
+                                    @php
+                                        $isKarpim = str_contains(strtolower($employee->level ?? ''), 'karpim') || str_contains(strtolower($employee->level ?? ''), 'pimpinan');
+                                    @endphp
+                                    @if($employee->level)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium {{ $isKarpim ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-surface-100 text-surface-700 border border-surface-200' }}">
+                                            {{ $employee->level }}
+                                        </span>
+                                    @else
+                                        <span class="text-surface-400 text-xs">-</span>
+                                    @endif
+                                </div>
                             </td>
 
                             <!-- Golongan -->
@@ -573,27 +702,27 @@
 
                             <!-- Aksi -->
                             <td class="py-3.5 px-5 whitespace-nowrap text-right">
-                                <div class="inline-flex items-center gap-1">
+                                <div class="inline-flex items-center rounded-xl border border-slate-200 bg-white shadow-2xs divide-x divide-slate-100 overflow-hidden" @click.stop>
                                     <!-- Detail -->
                                     <a href="{{ route('admin.employees.show', $employee->nik) }}"
-                                        class="p-2 text-surface-500 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition"
+                                        class="p-2 text-slate-500 hover:text-primary-700 hover:bg-slate-50 transition"
                                         title="Lihat Detail Profil">
-                                        <i class="fas fa-eye text-sm"></i>
+                                        <i class="fas fa-eye text-xs"></i>
                                     </a>
 
                                     <!-- Edit -->
                                     <a href="{{ route('admin.employees.edit', $employee->nik) }}"
-                                        class="p-2 text-surface-500 hover:text-earth-700 hover:bg-earth-100 rounded-lg transition"
+                                        class="p-2 text-slate-500 hover:text-earth-700 hover:bg-slate-50 transition"
                                         title="Ubah Data Pegawai">
-                                        <i class="fas fa-pencil-alt text-sm"></i>
+                                        <i class="fas fa-pencil-alt text-xs"></i>
                                     </a>
 
                                     <!-- Delete Modal Trigger -->
                                     <button type="button"
                                         @click="confirmDelete('{{ $employee->nik }}', '{{ addslashes($employee->nama) }}', '{{ route('admin.employees.destroy', $employee->nik) }}')"
-                                        class="p-2 text-surface-500 hover:text-danger hover:bg-red-50 rounded-lg transition"
+                                        class="p-2 text-slate-500 hover:text-danger hover:bg-red-50 transition"
                                         title="Hapus Pegawai">
-                                        <i class="fas fa-trash-alt text-sm"></i>
+                                        <i class="fas fa-trash-alt text-xs"></i>
                                     </button>
                                 </div>
                             </td>
@@ -606,18 +735,33 @@
                                         <i class="fas fa-users-slash"></i>
                                     </div>
                                     <h3 class="text-base font-semibold text-surface-900 mb-1">Tidak ada data karyawan ditemukan</h3>
+                                    @php
+                                        $hasActiveFilters = request()->hasAny([
+                                            'search', 'unit_kerja', 'jabatan', 'level', 'rm_level',
+                                            'golongan', 'tahun_masuk', 'bulan_masuk', 'status_penugasan'
+                                        ]);
+                                    @endphp
                                     <p class="text-xs text-surface-500 mb-4 leading-relaxed">
-                                        @if(request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan']))
-                                            Tidak ditemukan data yang sesuai dengan kriteria filter atau pencarian Anda. Coba sesuaikan kata kunci atau reset filter.
+                                        @if($hasActiveFilters)
+                                            Tidak ditemukan data yang sesuai dengan kriteria 
+                                            @if(request('search'))
+                                                pencarian "<strong>{{ request('search') }}</strong>"
+                                            @endif
+                                            @if(request()->hasAny(['unit_kerja', 'jabatan', 'rm_level', 'tahun_masuk']))
+                                                {{ request('search') ? 'dan' : '' }} filter aktif Anda.
+                                            @else
+                                                Anda.
+                                            @endif
+                                            Coba sesuaikan kata kunci atau reset filter untuk menampilkan data lainnya.
                                         @else
                                             Belum ada data karyawan terdaftar di sistem. Anda dapat menambah karyawan baru atau mengimpor dari file Excel.
                                         @endif
                                     </p>
-                                    @if(request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan']))
+                                    @if($hasActiveFilters)
                                         <a href="{{ route('admin.employees.index') }}"
-                                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold border border-surface-300 transition">
+                                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300 transition shadow-2xs">
                                             <i class="fas fa-rotate-left text-xs"></i>
-                                            <span>Reset Semua Filter</span>
+                                            <span>Reset Pencarian &amp; Filter</span>
                                         </a>
                                     @else
                                         <a href="{{ route('admin.employees.create') }}"

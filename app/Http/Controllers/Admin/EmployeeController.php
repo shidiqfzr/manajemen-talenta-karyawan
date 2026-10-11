@@ -20,14 +20,11 @@ class EmployeeController extends Controller
     // Display all employees
     public function index(Request $request)
     {
-        $query = Employee::query();
+        $query = Employee::with(['concurrentJobs']);
 
-        // Text search
+        // Text search (Omnisearch: NIK, Nama, Jabatan, Unit Kerja via Eloquent Scope)
         if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('nik', 'like', '%'.$request->search.'%')
-                    ->orWhere('nama', 'like', '%'.$request->search.'%');
-            });
+            $query->search($request->search);
         }
 
         // Dropdown filters
@@ -43,8 +40,38 @@ class EmployeeController extends Controller
             $query->where('unit_kerja', $request->unit_kerja);
         }
 
+        if ($request->filled('rm_level')) {
+            $query->where('rm_level', $request->rm_level);
+        }
+
         if ($request->filled('golongan')) {
             $query->where('golongan', $request->golongan);
+        }
+
+        // Filter: Status Penugasan (Definitif vs Plt/Pjs/Diperbantukan)
+        if ($request->filled('status_penugasan')) {
+            $status = $request->status_penugasan;
+            if ($status === 'sementara') {
+                $query->whereHas('concurrentJobs');
+            } elseif ($status === 'definitif') {
+                $query->whereDoesntHave('concurrentJobs');
+            } else {
+                $query->whereHas('concurrentJobs', function ($q) use ($status) {
+                    $q->where('status_penugasan', $status);
+                });
+            }
+        }
+
+        // Filter: Status Khusus / Tata Kelola (Sanksi, Overflow, Rangkap)
+        if ($request->filled('status_khusus')) {
+            $khusus = $request->status_khusus;
+            if ($khusus === 'sanksi') {
+                $query->sanctionAll();
+            } elseif ($khusus === 'overflow') {
+                $query->overflow();
+            } elseif ($khusus === 'rangkap') {
+                $query->whereHas('concurrentJobs');
+            }
         }
 
         // Period filter: Tahun Masuk (TMT Bekerja)
@@ -57,18 +84,23 @@ class EmployeeController extends Controller
             $query->whereMonth('tmt_bekerja', $request->bulan_masuk);
         }
 
-        // Reactive Summary KPI Metrics based on active filters
-        $filteredQuery = clone $query;
-        $totalEmployees = $filteredQuery->count();
-        $totalUnits = (clone $query)->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
-        $karpimCount = (clone $query)->where(function ($q) {
+        // Fixed Global Headcount KPI Metrics (Executive Overview)
+        $totalEmployees = Employee::count();
+        $totalUnits = Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
+        $karpimCount = Employee::where(function ($q) {
             $q->where('level', 'like', '%Karpim%')
                 ->orWhere('level', 'like', '%Pimpinan%');
         })->count();
         $pelaksanaCount = max(0, $totalEmployees - $karpimCount);
 
-        // Global count for overall reference
-        $globalTotalEmployees = Employee::count();
+        // Global reference
+        $globalTotalEmployees = $totalEmployees;
+        $penugasanSementaraCount = Employee::whereHas('concurrentJobs')->count();
+
+        // Special governance metrics
+        $sanksiAktifCount = Employee::sanctionActive()->count();
+        $sanksiTotalCount = Employee::sanctionAll()->count();
+        $overflowCount = Employee::overflow()->count();
 
         $employees = $query->orderBy('nama', 'asc')->paginate(20)->withQueryString();
 
@@ -77,6 +109,7 @@ class EmployeeController extends Controller
         $levels = Employee::select('level')->whereNotNull('level')->where('level', '!=', '')->distinct()->orderBy('level')->pluck('level');
         $units = Employee::select('unit_kerja')->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->orderBy('unit_kerja')->pluck('unit_kerja');
         $golongans = Employee::select('golongan')->whereNotNull('golongan')->where('golongan', '!=', '')->distinct()->orderBy('golongan')->pluck('golongan');
+        $rmLevels = Employee::RM_LEVELS;
 
         // Dynamic hire years from database
         $availableYears = Employee::whereNotNull('tmt_bekerja')
@@ -100,19 +133,30 @@ class EmployeeController extends Controller
             '10' => 'Oktober', '11' => 'November', '12' => 'Desember',
         ];
 
+        // Fetch employees with expired sanctions (Diperban)
+        $expiredSanksiEmployees = Employee::sanctionExpired()
+            ->orderBy('tanggal_berakhir_sanksi', 'asc')
+            ->get();
+
         return view('admin.employees.index', compact(
             'employees',
             'jabatans',
             'levels',
             'units',
             'golongans',
+            'rmLevels',
             'availableYears',
             'months',
             'totalEmployees',
             'totalUnits',
             'karpimCount',
             'pelaksanaCount',
-            'globalTotalEmployees'
+            'globalTotalEmployees',
+            'expiredSanksiEmployees',
+            'penugasanSementaraCount',
+            'sanksiAktifCount',
+            'sanksiTotalCount',
+            'overflowCount'
         ));
     }
 
@@ -288,8 +332,11 @@ class EmployeeController extends Controller
             'search',
             'jabatan',
             'level',
+            'rm_level',
             'unit_kerja',
             'golongan',
+            'status_penugasan',
+            'status_khusus',
             'tahun_masuk',
             'bulan_masuk',
         ]);

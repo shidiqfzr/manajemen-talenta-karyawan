@@ -2,14 +2,24 @@
 
 namespace App\Models;
 
+use App\Models\Traits\Searchable;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Employee extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
+
+    /**
+     * Columns that are searchable via scopeSearch().
+     */
+    protected array $searchable = [
+        'nik',
+        'nama',
+        'jabatan',
+        'unit_kerja',
+    ];
 
     protected $primaryKey = 'nik';
 
@@ -248,6 +258,7 @@ class Employee extends Model
         'status_penugasan',
         'status_karyawan',
         'tanggal_berakhir_kontrak',
+        'tanggal_berakhir_sanksi',
         'golongan',
         'tanggal_dalam_jabatan',
         'tmt_unit_kerja',
@@ -276,6 +287,7 @@ class Employee extends Model
         'tanggal_diangkat_staf' => 'date',
         'tanggal_mbt' => 'date',
         'tanggal_pensiun' => 'date',
+        'tanggal_berakhir_sanksi' => 'date',
     ];
 
     public function trainings()
@@ -315,12 +327,87 @@ class Employee extends Model
     {
         return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
             ->whereNull('tmt_akhir')
-            ->whereIn('status_penugasan', ['Pj', 'Plt'])
+            ->where('status_penugasan', '!=', 'Definitif')
             ->orderByDesc('tmt_awal');
     }
 
     public function hasConcurrentJobs(): bool
     {
         return $this->concurrentJobs()->exists();
+    }
+
+    /**
+     * Cek apakah karyawan sedang menjalani masa sanksi indisipliner aktif.
+     */
+    public function isSanctionActive(): bool
+    {
+        return ! empty($this->tanggal_berakhir_sanksi) && $this->tanggal_berakhir_sanksi->gte(Carbon::today());
+    }
+
+    /**
+     * Cek apakah masa sanksi karyawan telah kedaluwarsa dan perlu dicabut/dimutasi.
+     */
+    public function isSanctionExpired(): bool
+    {
+        return ! empty($this->tanggal_berakhir_sanksi) && $this->tanggal_berakhir_sanksi->lt(Carbon::today());
+    }
+
+    /**
+     * Cek apakah jabatan definitif karyawan adalah formasi penampungan fungsional (Advisor/Overflow).
+     */
+    public function isOverflow(): bool
+    {
+        if (empty($this->jabatan)) {
+            return false;
+        }
+
+        if (str_contains($this->jabatan, 'Advisor')) {
+            return true;
+        }
+
+        $position = Position::getAllCached()->get($this->jabatan);
+
+        return $position ? ($position->is_overflow && ! $position->is_diperban) : false;
+    }
+
+    /**
+     * Scope query untuk pegawai dalam masa sanksi indisipliner aktif.
+     */
+    public function scopeSanctionActive($query)
+    {
+        return $query->whereNotNull('tanggal_berakhir_sanksi')
+            ->where('tanggal_berakhir_sanksi', '>=', Carbon::today()->toDateString());
+    }
+
+    /**
+     * Scope query untuk pegawai dengan masa sanksi kedaluwarsa.
+     */
+    public function scopeSanctionExpired($query)
+    {
+        return $query->whereNotNull('tanggal_berakhir_sanksi')
+            ->where('tanggal_berakhir_sanksi', '<', Carbon::today()->toDateString());
+    }
+
+    /**
+     * Scope query untuk semua pegawai yang memiliki riwayat/status sanksi.
+     */
+    public function scopeSanctionAll($query)
+    {
+        return $query->whereNotNull('tanggal_berakhir_sanksi');
+    }
+
+    /**
+     * Scope query untuk pegawai pada posisi overflow fungsional (Advisor / Pool).
+     */
+    public function scopeOverflow($query)
+    {
+        $overflowNames = Position::getOverflowPositionNames();
+
+        return $query->where(function ($q) use ($overflowNames) {
+            if (! empty($overflowNames)) {
+                $q->whereIn('jabatan', $overflowNames);
+            }
+            $q->orWhere('jabatan', 'like', '%Advisor%');
+        });
     }
 }

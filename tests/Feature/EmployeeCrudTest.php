@@ -8,10 +8,13 @@ use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class EmployeeCrudTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $admin;
 
     protected function setUp(): void
