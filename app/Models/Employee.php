@@ -5,8 +5,12 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class Employee extends Model
 {
+    use HasFactory;
+
     protected $primaryKey = 'nik';
 
     public $incrementing = false;
@@ -296,6 +300,27 @@ class Employee extends Model
     {
         return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
             ->whereNull('tmt_akhir')
+            ->where('status_penugasan', 'Definitif')
             ->latestOfMany('tmt_awal');
+    }
+
+    public function activeJobs()
+    {
+        return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->whereNull('tmt_akhir')
+            ->orderByDesc('tmt_awal');
+    }
+
+    public function concurrentJobs()
+    {
+        return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->whereNull('tmt_akhir')
+            ->whereIn('status_penugasan', ['Pj', 'Plt'])
+            ->orderByDesc('tmt_awal');
+    }
+
+    public function hasConcurrentJobs(): bool
+    {
+        return $this->concurrentJobs()->exists();
     }
 }

@@ -32,3 +32,4 @@ Repositori ini berpedoman pada **4 Pilar Single Source of Truth (SSOT)** yang **
 2. **Integritas Kode**: Pertahankan dokumentasi, docblock, dan komentar struktural yang ada.
 3. **Database & Migrations**: Pastikan integritas tipe data (misal NIK sebagai `string(8)` bukan integer).
 4. **Kerapihan & Validasi**: Jalankan formatting Laravel Pint dan pastikan pengujian passing jika menambahkan fitur baru.
+5. **SUT Testing Principle**: Patuhi prinsip *One Test Class per System Under Test (SUT)*. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan kuat. Semua skenario uji untuk satu fitur wajib disatukan dalam satu file uji utama miliknya.

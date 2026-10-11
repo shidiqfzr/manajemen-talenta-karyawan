@@ -208,8 +208,8 @@
                 </span>
             </div>
 
-            <!-- Region Filter Buttons (Horizontal Scrollable Pills) -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <!-- Region Filter Buttons (Wrapped Pills for Desktop friendliness) -->
+            <div class="flex flex-wrap items-center gap-1.5 pb-1 text-xs">
                 <button type="button"
                         @click="activeWilayah = 'all'"
                         class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition shrink-0 flex items-center gap-1 cursor-pointer"

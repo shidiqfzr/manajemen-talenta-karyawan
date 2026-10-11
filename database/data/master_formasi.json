@@ -1,0 +1,2775 @@
+[
+    {
+        "nama": "Bagian Sekretariat dan Hukum",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 1,
+        "positions": [
+            {
+                "nama": "Kepala Sub Bagian Kesekretariatan dan Humas",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian TJSL",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kesekretariatan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Humas & Protokoler",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 3
+            },
+            {
+                "nama": "Asisten TJSL",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pendanaan UMK",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Perizinan & Kepatuhan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Litigasi & Non Litigasi",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Pertanahan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Keamanan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Pengamanan Perusahaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Bagian Sumber Daya Manusia dan Sistem Manajemen",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 2,
+        "positions": [
+            {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Kesejahteraan & HI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Pengembangan SDM & Talenta",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Sistem Manajemen dan Sustainability",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Personalia & Manajemen Kinerja",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Manajemen Kinerja SDM",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Jaminan Sosial & Admi Pensiun",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Hubungan Industrial",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Penggajian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Assessment & Rekrutment",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Sistem Manajemen & Sertifikasi",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten ESG dan Sustainability",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Manajemen Risiko",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Bagian Tanaman",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 3,
+        "positions": [
+            {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Produksi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Pemupukan dan Proteksi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Investasi dan Pemetaan Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian QC dan Administrasi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Perencanaan Produksi Tanaman Sawit",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Pemupukan Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Proteksi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pemeliharaan Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Investasi Tanaman Kelapa Sawit",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Investasi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pemetaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Administrasi Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten QC Tanaman Kelapa Sawit",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Bagian Teknik dan Pengolahan",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 4,
+        "positions": [
+            {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Manajer Diperbantukan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Teknik dan Infrastruktur",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten QC Pengolahan Kelapa Sawit",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Proses Pengolahan Kelapa Sawit",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Proses & Evaluasi Pengolahan Karet",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Mesin & Instalasi Pabrik",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Sipil dan Infrastruktur Pabrik",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Sipil dan Infrastruktur Kebun",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Traksi dan Alat Berat Kebun",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Bagian Akuntansi dan Keuangan",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 5,
+        "positions": [
+            {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Pajak & Asuransi",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Keuangan & HPS",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Akuntansi",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Anggaran & Verifikasi",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pajak",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kas & Bank",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten HPS & Informasi Harga",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 3
+            },
+            {
+                "nama": "Asisten Anggaran",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Verifikasi & Aset",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Laporan & Analisa Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Akuntansi",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Tim Penguatan ERP SAP",
+        "kode": "Tim",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 6,
+        "positions": [
+            {
+                "nama": "Lead Of ERP SAP",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Key User Modul MM",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 2
+            },
+            {
+                "nama": "Key User Modul HCM",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Key User Modul SD",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Key User Modul PP, QM & Jembatan Timbang",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Key User Modul FI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Bagian Pengadaan dan Teknologi Informasi",
+        "kode": "Bagian",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 7,
+        "positions": [
+            {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Ketua Tim Pengadaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian TI Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Sub Bagian Logistik",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengadaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Admi & Monitoring Pengadaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Admi Logistik",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Operasional Logistik",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten TI Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Administrasi & Help Desk ERP",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Divisi Sistem Manajemen & Sustainability",
+        "kode": "Divisi",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 8,
+        "positions": [
+            {
+                "nama": "Management Representative Lead",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Project Management Office (PMO)",
+        "kode": "Project",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 9,
+        "positions": [
+            {
+                "nama": "Head of PMO Batu Bara dan Bisnis Lainnya",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Lead Batu Bara & Bisnis Lainnya",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Coordinator Bisnis Batu Bara",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Coordinator Pengembangan Bisnis Lainnya",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Satuan Pengawasan Internal (SPI)",
+        "kode": "Satuan",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 10,
+        "positions": [
+            {
+                "nama": "Ketua Tim Audit VA",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Ketua Tim Audit VB)",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Ketua Tim Audit VC",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Auditor VA",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Auditor VB",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Auditor VC",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "Distrik Petani Mitra",
+        "kode": "Distrik",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 11,
+        "positions": [
+            {
+                "nama": "Group Manager",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Tanaman Plasma\/KKPA",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Operasional Pembelian Bahan Baku",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Kemitraan & Kelembagaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Kemitraan & Kelembagaan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Administrasi Plasma\/KKPA & Pembelian Bahan Baku",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Operasional & Pembelian Bahan Baku",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Operasional Pembelian Bahan Baku",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Parindu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Rimba Belian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Gunung Emas",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Ngabang",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Kembayan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Kemitraan Area Kalbar",
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 12,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Parindu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Rimba Belian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Gunung Emas",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Ngabang",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Kembayan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Kemitraan Area Kaltim-Sel",
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Pontianak)",
+        "is_active": true,
+        "urutan": 13,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Kemitraan Area Kalsel",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Longkali",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Tabara",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Tajati",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Pelaihari",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kemitraan Pamukan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Unit Group Kalimantan Barat",
+        "kode": "Unit",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 14,
+        "positions": [
+            {
+                "nama": "Group Manager",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Advisor",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Bidang Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Bidang Teknik & Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Diperbantukan",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Staf Inspektorat Bidang Keuangan, Pengadaan, Umum, Humas dan Perijinan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Inti Gunung Meliau",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 15,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Inti Rayon Selatan",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Rayon Utara",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VIII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling",
+                "bidang": null,
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Gunung Meliau",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 16,
+        "positions": [
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Gunung Emas",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 17,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII & VIII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Inti Sungai Dekan",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 18,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Rayon Timur",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Rayon Barat",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Rimba Belian",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 19,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Rayon Barat",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman Rayon Timur",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Rimba Belian",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 20,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "Kebun PKR Sintang",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 21,
+        "positions": [
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Ngabang",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 22,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Ngabang",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 23,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Parindu",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 24,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Parindu",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 25,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Kembayan",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 26,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Kembayan",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Barat",
+        "is_active": true,
+        "urutan": 27,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "Unit Group Kalimantan Selatan\/Tengah",
+        "kode": "Unit",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 28,
+        "positions": [
+            {
+                "nama": "Group Manager",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Diperbantukan",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Advisor",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Tanaman & Plasma",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Teknik & Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Danau Salak",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 29,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I & II",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VIII",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IX",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling X",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling XI",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti XII",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling XIII",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Pamukan",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 30,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Pamukan",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 31,
+        "positions": [
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Batulicin",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 32,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Inti II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Pelaihari",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 33,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Pelaihari",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 34,
+        "positions": [
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "Proyek Batubara Danau Salak & Buntok",
+        "kode": "Proyek",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 35,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Staf Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Raren Batuah",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Selatan & Tengah",
+        "is_active": true,
+        "urutan": 36,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Unit Group Wilayah Kalimantan Timur",
+        "kode": "Unit",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 37,
+        "positions": [
+            {
+                "nama": "Group Manager",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Kepala Bidang Operasional",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-4",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Bidang Teknik & Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas & Perijinan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Tabara",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 38,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman (Rayon Utara)",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman (Rayon Selatan)",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia dan Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VI",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling VIII",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IX",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Tajati",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 39,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala (Rayon A)",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Penugasan sebagai Asisten Kepala (Rayon B)",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia & Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling Inti III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Inti Pandawa",
+        "kode": "Kebun",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 40,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Kepala Tanaman",
+                "bidang": "TAN",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Personalia dan Teknik Kebun",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling I",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling II",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling III",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling IV",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Afdeling V",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "PKS Longpinang",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 41,
+        "positions": [
+            {
+                "nama": "Manajer",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Masinis Kepala",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha & Keuangan",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengendalian Mutu",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            }
+        ]
+    },
+    {
+        "nama": "PKS Samuntai",
+        "kode": "PKS",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 42,
+        "positions": [
+            {
+                "nama": "Asisten Pengolahan",
+                "bidang": "TEK",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            }
+        ]
+    },
+    {
+        "nama": "Kebun-PKS Longkali",
+        "kode": "Kebun-PKS",
+        "wilayah": "Kalimantan Timur",
+        "is_active": true,
+        "urutan": 43,
+        "positions": []
+    }
+]

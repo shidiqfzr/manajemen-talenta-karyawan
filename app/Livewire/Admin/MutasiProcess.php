@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\Position;
+use App\Models\Unit;
 use App\Services\ManPowerPlanningService;
 use App\Services\MutasiService;
 use Livewire\Component;
@@ -13,17 +14,29 @@ class MutasiProcess extends Component
 {
     // ── Mutation Type & Legal ──────────────────────────────────────────────
     public string $jenisMutasi = 'PROMOSI';
+
+    public string $statusJabatan = 'Definitif';
+
     public string $tmtAwal = '';
+
     public string $nomorSk = '';
+
     public string $tanggalSk = '';
+
     public string $catatan = '';
+
+    public string $tmtAkhirEstimasi = '';
 
     // ── Employee (source) ──────────────────────────────────────────────────
     public string $employeeNik = '';
+
+    public string $sourceUnitFilter = '';
+
     public ?array $employeeDetails = null;
 
     // ── Target position ────────────────────────────────────────────────────
     public string $targetJabatan = '';
+
     public string $targetUnitKerja = '';
 
     // ── Live impact analysis ───────────────────────────────────────────────
@@ -33,11 +46,22 @@ class MutasiProcess extends Component
     /** Explicit confirmation required when target is occupied (swap) */
     public bool $swapConfirmed = false;
 
+    // ── Diperban (Sanksi) ──────────────────────────────────────────────────
+    public bool $isTargetDiperban = false;
 
-    public function mount(?string $jabatan = null, ?string $unit = null): void
+    public bool $isTargetOverflow = false;
+
+    public string $tanggalBerakhirSanksi = '';
+
+    public function mount(?string $jabatan = null, ?string $unit = null, ?string $nik = null): void
     {
         $this->tmtAwal = now()->toDateString();
         $this->tanggalSk = now()->toDateString();
+
+        if ($nik) {
+            $this->employeeNik = $nik;
+            $this->updatedEmployeeNik($nik); // Trigger the employee info load
+        }
 
         // Deep-link pre-fill from vacancy monitoring page
         if ($jabatan) {
@@ -56,12 +80,23 @@ class MutasiProcess extends Component
 
     public function updatedJenisMutasi(): void
     {
+        if (in_array($this->jenisMutasi, ['SANKSI_INDISIPLINER', 'PENUGASAN_KHUSUS'])) {
+            $this->statusJabatan = 'Definitif';
+            $this->tmtAkhirEstimasi = '';
+        }
         $this->resetTarget();
     }
 
     public function updatedEmployeeNik(string $value): void
     {
         $this->employeeDetails = $this->resolveEmployee($value);
+        $this->resetTarget();
+    }
+
+    public function updatedSourceUnitFilter(): void
+    {
+        $this->employeeNik = '';
+        $this->employeeDetails = null;
         $this->resetTarget();
     }
 
@@ -73,16 +108,20 @@ class MutasiProcess extends Component
 
     public function updatedTargetUnitKerja(): void
     {
-        $this->swapConfirmed = false;
-        $this->runAnalysis();
+        $this->resetTarget(resetUnit: false);
     }
 
-    private function resetTarget(): void
+    private function resetTarget(bool $resetUnit = true): void
     {
         $this->targetJabatan = '';
-        $this->targetUnitKerja = '';
+        if ($resetUnit) {
+            $this->targetUnitKerja = '';
+        }
         $this->targetAnalysis = null;
         $this->swapConfirmed = false;
+        $this->isTargetDiperban = false;
+        $this->isTargetOverflow = false;
+        $this->tanggalBerakhirSanksi = '';
     }
 
     // ── Submit ─────────────────────────────────────────────────────────────
@@ -91,18 +130,26 @@ class MutasiProcess extends Component
     {
         $this->validate([
             'jenisMutasi' => 'required|string',
+            'statusJabatan' => 'required|in:Definitif,Pj,Plt',
             'employeeNik' => 'required|exists:employees,nik',
             'targetJabatan' => 'required|string',
             'targetUnitKerja' => 'required|string',
             'tmtAwal' => 'required|date',
-            'nomorSk' => 'nullable|string|max:100',
-            'tanggalSk' => 'nullable|date',
-            'catatan' => 'nullable|string|max:500',
+            'nomorSk' => 'required|string|max:100',
+            'tanggalSk' => 'required|date',
+            'catatan' => 'required|string|max:500',
+            'tmtAkhirEstimasi' => 'nullable|date|after_or_equal:tmtAwal',
+            'tanggalBerakhirSanksi' => 'exclude_unless:isTargetDiperban,true|required|date|after_or_equal:tmtAwal',
         ], [
             'employeeNik.required' => 'Pilih karyawan yang akan dimutasi.',
             'targetJabatan.required' => 'Jabatan tujuan wajib diisi.',
             'targetUnitKerja.required' => 'Unit kerja tujuan wajib diisi.',
             'tmtAwal.required' => 'Tanggal TMT Awal wajib diisi.',
+            'nomorSk.required' => 'Nomor SK wajib diisi untuk Audit Trail.',
+            'tanggalSk.required' => 'Tanggal Penerbitan SK wajib diisi.',
+            'catatan.required' => 'Catatan dasar pertimbangan wajib diisi.',
+            'tanggalBerakhirSanksi.required' => 'Tanggal kedaluwarsa sanksi wajib diisi untuk jabatan Diperban.',
+            'tanggalBerakhirSanksi.after_or_equal' => 'Tanggal kedaluwarsa sanksi tidak boleh sebelum TMT awal.',
         ]);
 
         // If target is occupied, require explicit swap confirmation
@@ -126,6 +173,9 @@ class MutasiProcess extends Component
                 nomorSk: $this->nomorSk ?: null,
                 tanggalSk: $this->tanggalSk ?: null,
                 catatan: $this->catatan ?: null,
+                tanggalBerakhirSanksi: $this->isTargetDiperban ? $this->tanggalBerakhirSanksi : null,
+                statusJabatan: $this->statusJabatan,
+                tmtAkhirEstimasi: in_array($this->statusJabatan, ['Pj', 'Plt']) && ! empty($this->tmtAkhirEstimasi) ? $this->tmtAkhirEstimasi : null,
             );
         } catch (\InvalidArgumentException|\RuntimeException $e) {
             $this->addError('employeeNik', $e->getMessage());
@@ -147,14 +197,27 @@ class MutasiProcess extends Component
 
     public function render(MutasiService $service)
     {
-        $employees = Employee::orderBy('nama')->get(['nik', 'nama', 'jabatan', 'unit_kerja']);
-        
+        $empQuery = Employee::orderBy('nama');
+        if (! empty($this->sourceUnitFilter)) {
+            $empQuery->where('unit_kerja', $this->sourceUnitFilter);
+        }
+        $employees = $empQuery->get(['nik', 'nama', 'jabatan', 'unit_kerja']);
+
         $jabatanList = $this->getFilteredJabatanList($service);
         $unitList = $service->getKnownUnits();
         $mutasiTypes = JobHistory::MUTASI_TYPES;
 
+        $activeUnits = Unit::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get();
+        if ($activeUnits->isNotEmpty()) {
+            $groupedUnits = $activeUnits->groupBy('wilayah')
+                ->map(fn ($units) => $units->pluck('nama')->toArray())
+                ->toArray();
+        } else {
+            $groupedUnits = Employee::GROUPED_UNITS;
+        }
+
         return view('livewire.admin.mutasi-process', compact(
-            'employees', 'jabatanList', 'unitList', 'mutasiTypes'
+            'employees', 'jabatanList', 'unitList', 'groupedUnits', 'mutasiTypes'
         ));
     }
 
@@ -162,54 +225,19 @@ class MutasiProcess extends Component
 
     private function getFilteredJabatanList(MutasiService $service)
     {
-        $allJabatan = $service->getKnownJabatan();
-        
-        if (!$this->employeeNik || !$this->jenisMutasi) {
-            return collect(); // Return empty if no employee selected
+        if (! $this->employeeNik || ! $this->jenisMutasi || ! $this->targetUnitKerja) {
+            return collect(); // Return empty if no employee or unit selected
         }
 
         $emp = Employee::where('nik', $this->employeeNik)->first();
-        if (!$emp) return collect();
-
-        $empRmLevel = app(ManPowerPlanningService::class)->determineRmLevel($emp);
-        $empRmNumber = (int) str_replace('RM-', '', $empRmLevel); // 1, 2, 3, or 4
-
-        $filtered = collect();
-        $positions = Position::all()->keyBy('nama'); // To look up rm_level
-
-        foreach ($allJabatan as $j) {
-            $jRmNumber = null;
-            if (isset($positions[$j]) && $positions[$j]->rm_level) {
-                $jRmNumber = (int) str_replace('RM-', '', $positions[$j]->rm_level);
-            } else {
-                // Determine by string matching (logic from ManPowerPlanningService)
-                $jabatanLower = strtolower($j);
-                if (str_contains($jabatanLower, 'manajer') || str_contains($jabatanLower, 'general manager') || str_contains($jabatanLower, 'kepala bagian') || str_contains($jabatanLower, 'kabag') || str_contains($jabatanLower, 'koordinator spi') || str_contains($jabatanLower, 'senior manager') || str_contains($jabatanLower, 'pimpinan')) {
-                    $jRmNumber = 1;
-                } elseif (str_contains($jabatanLower, 'askep') || str_contains($jabatanLower, 'asisten kepala') || str_contains($jabatanLower, 'kasubag') || str_contains($jabatanLower, 'kepala sub') || str_contains($jabatanLower, 'masinis kepala')) {
-                    $jRmNumber = 2;
-                } elseif (str_contains($jabatanLower, 'asisten')) {
-                    $jRmNumber = 3;
-                } else {
-                    $jRmNumber = 4;
-                }
-            }
-
-            // Note: RM-1 is highest rank (numerically lower).
-            if ($this->jenisMutasi === 'PROMOSI') {
-                if ($jRmNumber < $empRmNumber) $filtered->push($j);
-            } elseif ($this->jenisMutasi === 'DEMOSI') {
-                if ($jRmNumber > $empRmNumber) $filtered->push($j);
-            } elseif (in_array($this->jenisMutasi, ['ROTASI', 'MUTASI_UNIT', 'ALIH_TUGAS'])) {
-                // Same level
-                if ($jRmNumber === $empRmNumber) $filtered->push($j);
-            } else {
-                // LAINNYA / PENUGASAN -> no filter
-                $filtered->push($j);
-            }
+        if (! $emp) {
+            return collect();
         }
 
-        return $filtered->sort()->values();
+        $positionsArray = app(MutasiService::class)
+            ->getAvailableTargetPositions($emp, $this->targetUnitKerja, $this->jenisMutasi);
+
+        return collect($positionsArray);
     }
 
     private function resolveEmployee(string $nik): ?array
@@ -263,7 +291,7 @@ class MutasiProcess extends Component
         );
 
         $this->targetAnalysis = [
-            'type' => $analysis['vacant'] ? 'vacant' : 'occupied',
+            'type' => $analysis['type'],
             'occupant' => $analysis['occupant'] ? [
                 'nik' => $analysis['occupant']->nik,
                 'nama' => $analysis['occupant']->nama,
@@ -272,5 +300,9 @@ class MutasiProcess extends Component
                 'golongan' => $analysis['occupant']->golongan,
             ] : null,
         ];
+
+        $targetPos = Position::getAllCached()->get($this->targetJabatan);
+        $this->isTargetDiperban = $targetPos ? (bool) $targetPos->is_diperban : false;
+        $this->isTargetOverflow = $targetPos ? (bool) $targetPos->is_overflow : false;
     }
 }

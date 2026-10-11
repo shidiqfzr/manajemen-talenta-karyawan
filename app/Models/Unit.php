@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends Model
@@ -47,5 +48,29 @@ class Unit extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'unit_kerja', 'nama');
+    }
+
+    /**
+     * Relasi ke Position (Jabatan) via pivot table position_unit.
+     */
+    public function positions(): BelongsToMany
+    {
+        return $this->belongsToMany(Position::class, 'position_unit')
+            ->withPivot('kuota')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if this unit is an operational unit (Kebun, PKS, Pabrik, Distrik, Group).
+     */
+    public function isOperationalUnit(): bool
+    {
+        $lower = strtolower($this->nama);
+
+        return str_contains($lower, 'kebun') ||
+               str_contains($lower, 'pks') ||
+               str_contains($lower, 'pabrik') ||
+               str_contains($lower, 'group') ||
+               str_contains($lower, 'distrik');
     }
 }

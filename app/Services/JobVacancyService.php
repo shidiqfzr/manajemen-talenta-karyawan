@@ -172,6 +172,7 @@ class JobVacancyService
                 'employee_nik' => $employee->nik,
                 'jabatan' => $targetJabatan,
                 'unit_kerja' => $targetUnitKerja,
+                'status_penugasan' => $employee->status_penugasan ?? 'Definitif',
                 'level' => $employee->level,
                 'golongan' => $employee->golongan,
                 'tmt_awal' => $tmtAwal,
@@ -223,12 +224,14 @@ class JobVacancyService
             $posA = [
                 'jabatan' => $employeeA->jabatan,
                 'unit_kerja' => $employeeA->unit_kerja,
+                'status_penugasan' => $employeeA->status_penugasan,
                 'level' => $employeeA->level,
                 'golongan' => $employeeA->golongan,
             ];
             $posB = [
                 'jabatan' => $employeeB->jabatan,
                 'unit_kerja' => $employeeB->unit_kerja,
+                'status_penugasan' => $employeeB->status_penugasan,
                 'level' => $employeeB->level,
                 'golongan' => $employeeB->golongan,
             ];
@@ -266,6 +269,7 @@ class JobVacancyService
                 'employee_nik' => $nikA,
                 'jabatan' => $posB['jabatan'],
                 'unit_kerja' => $posB['unit_kerja'],
+                'status_penugasan' => $posB['status_penugasan'] ?? 'Definitif',
                 'level' => $posB['level'],
                 'golongan' => $posB['golongan'],
                 'tmt_awal' => $tmtAwal,
@@ -279,6 +283,7 @@ class JobVacancyService
                 'employee_nik' => $nikB,
                 'jabatan' => $posA['jabatan'],
                 'unit_kerja' => $posA['unit_kerja'],
+                'status_penugasan' => $posA['status_penugasan'] ?? 'Definitif',
                 'level' => $posA['level'],
                 'golongan' => $posA['golongan'],
                 'tmt_awal' => $tmtAwal,

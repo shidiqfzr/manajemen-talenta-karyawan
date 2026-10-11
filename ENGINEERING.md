@@ -116,6 +116,11 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - Pagination dinamis (`WithPagination`) dengan URL query string persistence.
   - State reset saat filter berubah: `public function updatingSearch() { $this->resetPage(); }`.
 
+### 2.4 Prinsip DRY (Don't Repeat Yourself) & Reusability
+Prinsip DRY adalah fondasi utama arsitektur aplikasi ini. Dilarang keras melakukan penyalinan (copy-paste) kode secara masif baik di Backend maupun Frontend.
+- **Backend (Single Source of Truth):** Segala bentuk kalkulasi (Pensiun, MBT, RM Level) wajib dipusatkan di **Service Layer**. Tidak boleh ada kalkulasi duplikat di Controller, Command, atau Livewire.
+- **Frontend (UI Components):** Elemen visual yang digunakan lebih dari satu kali (seperti *Page Header*, *Card*, *Combobox*, *Modal*) **wajib** diabstraksi menjadi **Blade Components** (contoh: `<x-admin.page-header>`) di `resources/views/components/`. Hal ini menjamin keseragaman UI dan mempermudah perubahan tema secara terpusat sesuai `DESIGN.md`.
+
 ---
 
 ## 3. Strategi Pengujian (Testing & QA Standards)
@@ -179,6 +184,9 @@ Sebelum mengajukan pull request atau menggabungkan kode:
 # Cek dan perbaiki style kode otomatis sesuai standar PSR-12 & Laravel
 ./vendor/bin/pint
 ```
+
+### 3.5 SUT Testing Principle
+Patuhi prinsip **One Test Class per System Under Test (SUT)**. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan yang sangat kuat. Semua skenario uji (termasuk edge-cases dan integrasi) untuk satu fitur/komponen wajib disatukan dalam satu file uji utama miliknya (contoh: seluruh pengujian komponen `MutasiProcess` harus berada utuh di dalam `MutasiProcessTest.php`).
 
 ---
 

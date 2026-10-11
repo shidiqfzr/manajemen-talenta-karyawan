@@ -102,39 +102,52 @@ class ManPowerPlanningService
         }
 
         // RM-1: Pimpinan Puncak Unit / Senior Leadership (DOMAIN.md Bab 4.2.1)
-        // Posisi Kunci: Kepala Bagian Regional Office, Manajer Kebun, Manajer Pabrik (PKS), General Manager, Koordinator SPI
-        if (
-            str_contains($jabatan, 'manajer') ||
-            str_contains($jabatan, 'general manager') ||
-            str_contains($jabatan, 'kepala bagian') ||
-            str_contains($jabatan, 'kabag') ||
-            str_contains($jabatan, 'koordinator spi') ||
-            str_contains($jabatan, 'senior manager') ||
-            str_contains($jabatan, 'pimpinan') ||
-            ($jobGrade >= 15 && $jobGrade <= 16) ||
-            str_starts_with($gol, 'IV')
-        ) {
+        if (($jobGrade >= 15 && $jobGrade <= 16) || str_starts_with($gol, 'IV')) {
             return 'RM-1';
         }
 
         // RM-2: Middle Management / Madya (DOMAIN.md Bab 4.2.2)
-        // Posisi Kunci: Kepala Sub Bagian (Kasubag), Askep Tanaman, Askep Pengolahan/PKS (Masinis Kepala)
-        if (
-            str_contains($jabatan, 'askep') ||
-            str_contains($jabatan, 'asisten kepala') ||
-            str_contains($jabatan, 'kasubag') ||
-            str_contains($jabatan, 'kepala sub') ||
-            str_contains($jabatan, 'masinis kepala') ||
-            ($jobGrade >= 13 && $jobGrade <= 14) ||
-            str_starts_with($gol, 'IIID') ||
-            str_starts_with($gol, 'IIIC')
-        ) {
+        if (($jobGrade >= 13 && $jobGrade <= 14) || str_starts_with($gol, 'IIID') || str_starts_with($gol, 'IIIC')) {
             return 'RM-2';
         }
 
-        // RM-3: First-Line Management / Pratama (DOMAIN.md Bab 4.2.3)
-        // Posisi Kunci: Asisten Afdeling, Asisten Pengolahan, Asisten Bengkel, Asisten QC, Asisten Tata Usaha (KTU), Asisten SDM
-        return 'RM-3';
+        // Fallback to Job Title matching
+        $jRmNumber = $this->determineRmLevelByJobTitle($jabatan);
+
+        return 'RM-'.$jRmNumber;
+    }
+
+    /**
+     * Determine RM Level based solely on job title (Jabatan) string matching.
+     * Used when evaluating potential positions where we don't have a full Employee object.
+     */
+    public function determineRmLevelByJobTitle(string $jabatan): int
+    {
+        $jabatanLower = strtolower($jabatan);
+
+        if (
+            str_contains($jabatanLower, 'manajer') ||
+            str_contains($jabatanLower, 'general manager') ||
+            str_contains($jabatanLower, 'kepala bagian') ||
+            str_contains($jabatanLower, 'kabag') ||
+            str_contains($jabatanLower, 'koordinator spi') ||
+            str_contains($jabatanLower, 'senior manager') ||
+            str_contains($jabatanLower, 'pimpinan')
+        ) {
+            return 1;
+        } elseif (
+            str_contains($jabatanLower, 'askep') ||
+            str_contains($jabatanLower, 'asisten kepala') ||
+            str_contains($jabatanLower, 'kasubag') ||
+            str_contains($jabatanLower, 'kepala sub') ||
+            str_contains($jabatanLower, 'masinis kepala')
+        ) {
+            return 2;
+        } elseif (str_contains($jabatanLower, 'asisten')) {
+            return 3;
+        }
+
+        return 4;
     }
 
     /**
@@ -167,6 +180,7 @@ class ManPowerPlanningService
     public function getLiveDatabaseCounts(int $filterYear = 2026): array
     {
         $employees = Employee::all();
+        $overflowPositions = Position::where('is_overflow', true)->pluck('nama')->toArray();
 
         $realisasi = [
             'RM-1' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
@@ -181,6 +195,18 @@ class ManPowerPlanningService
         ];
 
         $pensiunT1 = [
+            'RM-1' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+            'RM-2' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+            'RM-3' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+        ];
+
+        $advisor = [
+            'RM-1' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+            'RM-2' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+            'RM-3' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
+        ];
+
+        $diperban = [
             'RM-1' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
             'RM-2' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
             'RM-3' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
@@ -211,10 +237,24 @@ class ManPowerPlanningService
             $rm = $this->determineRmLevel($emp);
             $bidang = $this->determineBidang($emp);
 
-            if (isset($realisasi[$rm][$bidang])) {
-                $realisasi[$rm][$bidang]++;
+            // Separate logic for Overflow (Advisor / Diperban) vs Realisasi Struktural
+            if (in_array($emp->jabatan, $overflowPositions)) {
+                if (str_contains(strtolower($emp->jabatan), 'advisor')) {
+                    if (isset($advisor[$rm][$bidang])) {
+                        $advisor[$rm][$bidang]++;
+                    }
+                } else {
+                    if (isset($diperban[$rm][$bidang])) {
+                        $diperban[$rm][$bidang]++;
+                    }
+                }
+            } else {
+                if (isset($realisasi[$rm][$bidang])) {
+                    $realisasi[$rm][$bidang]++;
+                }
             }
 
+            // Normal structural retirement logic still applies (they still retire)
             if ($pYear !== null) {
                 if ($pYear <= $targetYearT) {
                     $pensiunT[$rm][$bidang]++;
@@ -228,6 +268,8 @@ class ManPowerPlanningService
             'realisasi' => $realisasi,
             'pensiun_t' => $pensiunT,
             'pensiun_t1' => $pensiunT1,
+            'advisor' => $advisor,
+            'diperban' => $diperban,
         ];
     }
 
@@ -243,7 +285,7 @@ class ManPowerPlanningService
         $fields = ['KEU', 'TAN', 'TEK', 'UMU'];
         $levels = ['RM-1', 'RM-2', 'RM-3'];
 
-        // Row labels and targets are dynamically fixed to the current calendar year 
+        // Row labels and targets are dynamically fixed to the current calendar year
         // to future-proof the matrix as time passes.
         $yearT = Carbon::now()->year;
         $yearT1 = $yearT + 1;
@@ -254,9 +296,14 @@ class ManPowerPlanningService
             $realisasi = $live['realisasi'];
             $pensiunT = $live['pensiun_t'];
             $pensiunT1 = $live['pensiun_t1'];
+            $advisor = $live['advisor'];
+            $diperban = $live['diperban'];
             $rbb = $baseline['rbb_2026'];
         } else {
             $realisasi = $baseline['realisasi_baseline'];
+            $advisor = $baseline['fungsional_advisor'];
+            $diperban = $baseline['fungsional_diperban'];
+
             if ($planningYear === 2026) {
                 $pensiunT = $baseline['pensiun_2026_baseline'];
                 $pensiunT1 = $baseline['pensiun_2027_baseline'];
@@ -274,8 +321,6 @@ class ManPowerPlanningService
         $prioritas = $baseline['prioritas_diisi'];
         $ckp = $baseline['ckp_internal'];
         $talentScouting = $baseline['talent_scouting'];
-        $advisor = $baseline['fungsional_advisor'];
-        $diperban = $baseline['fungsional_diperban'];
 
         // Calculate Kebutuhan Year T & Year T+1:
         // Formula: (Standar Formasi - Realisasi + Pensiun) - Total Pasokan (CKP + Talent Scouting + RBB)

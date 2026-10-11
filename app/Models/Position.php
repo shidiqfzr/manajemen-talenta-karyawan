@@ -5,11 +5,32 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class Position extends Model
 {
     use HasFactory;
+
+    public const CACHE_KEY = 'master_positions_all';
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => Cache::forget(self::CACHE_KEY));
+        static::deleted(fn () => Cache::forget(self::CACHE_KEY));
+    }
+
+    /**
+     * Retrieve all positions keyed by nama with automatic caching.
+     */
+    public static function getAllCached(): Collection
+    {
+        return Cache::remember(self::CACHE_KEY, 86400, function () {
+            return static::all()->keyBy('nama');
+        });
+    }
 
     protected $table = 'positions';
 
@@ -19,10 +40,14 @@ class Position extends Model
         'level',
         'rm_level',
         'is_active',
+        'is_overflow',
+        'is_diperban',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_overflow' => 'boolean',
+        'is_diperban' => 'boolean',
     ];
 
     public const BIDANG_LIST = [
@@ -58,5 +83,37 @@ class Position extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'jabatan', 'nama');
+    }
+
+    /**
+     * Relasi ke Unit via pivot table position_unit.
+     */
+    public function units(): BelongsToMany
+    {
+        return $this->belongsToMany(Unit::class, 'position_unit')
+            ->withPivot('kuota')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if the position title is meant for operational units (Kebun/Pabrik).
+     */
+    public function isOperationalTitle(): bool
+    {
+        $lower = strtolower($this->nama);
+
+        return str_contains($lower, 'manajer') || str_contains($lower, 'asisten');
+    }
+
+    /**
+     * Check if the position title is meant for office units (Kandir/Bagian).
+     */
+    public function isKantorTitle(): bool
+    {
+        $lower = strtolower($this->nama);
+
+        return str_contains($lower, 'kepala bagian') ||
+               str_contains($lower, 'kepala sub bagian') ||
+               $lower === 'asisten diperbantukan';
     }
 }

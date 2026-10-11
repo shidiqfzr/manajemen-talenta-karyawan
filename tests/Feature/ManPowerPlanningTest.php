@@ -3,19 +3,25 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\ManPowerPlanning;
+use App\Models\Employee;
+use App\Models\Position;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 class ManPowerPlanningTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::first() ?? User::factory()->create();
+        $this->user = User::factory()->create(['role' => 'admin']);
     }
 
     public function test_authenticated_admin_can_access_mutasi_mpp_tab(): void
@@ -91,9 +97,48 @@ class ManPowerPlanningTest extends TestCase
         $this->assertCount(12, $baseline['matrix']); // 12 indicator rows
     }
 
+    public function test_mpp_service_excludes_overflow_positions_from_realisasi(): void
+    {
+        // Set up live database scenario
+        Position::create(['nama' => 'Manajer Regulatif', 'rm_level' => 'RM-1', 'is_overflow' => false, 'is_active' => true]);
+        Position::create(['nama' => 'Advisor', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
+
+        // Employee 1: Regular position
+        Employee::create([
+            'nik' => '99991111',
+            'nama' => 'Reguler',
+            'jabatan' => 'Manajer Regulatif',
+            'unit_kerja' => 'Kebun A',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tmt_bekerja' => '2010-01-01',
+            'status_penugasan' => 'Definitif',
+        ]);
+
+        // Employee 2: Overflow position
+        Employee::create([
+            'nik' => '99992222',
+            'nama' => 'Overflow',
+            'jabatan' => 'Advisor',
+            'unit_kerja' => 'Kantor Direksi',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tmt_bekerja' => '2010-01-01',
+            'status_penugasan' => 'Definitif',
+        ]);
+
+        $service = new ManPowerPlanningService;
+        $liveStats = $service->getLiveDatabaseCounts(2026);
+
+        // Assert that the overflow employee is NOT counted in realisasi but counted in their respective overflow bins
+        $this->assertEquals(1, array_sum($liveStats['realisasi']['RM-1']));
+        $this->assertEquals(1, array_sum($liveStats['advisor']['RM-1']));
+        $this->assertEquals(0, array_sum($liveStats['diperban']['RM-1']));
+    }
+
     public function test_mpp_component_can_change_planning_year(): void
     {
-        $yearT = \Carbon\Carbon::now()->year;
+        $yearT = Carbon::now()->year;
         $yearT1 = $yearT + 1;
 
         Livewire::actingAs($this->user)

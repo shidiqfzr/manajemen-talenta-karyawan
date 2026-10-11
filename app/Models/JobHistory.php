@@ -13,20 +13,28 @@ class JobHistory extends Model
         'PROMOSI',
         'ROTASI',
         'DEMOSI',
-        'ALIH_TUGAS',
         'MUTASI_UNIT',
         'PENUGASAN',
-        'LAINNYA',
+        'PENUGASAN_KHUSUS',
+        'SANKSI_INDISIPLINER',
+    ];
+
+    public const STATUS_JABATAN = [
+        'Definitif',
+        'Pj',
+        'Plt',
     ];
 
     protected $fillable = [
         'employee_nik',
         'jabatan',
         'unit_kerja',
+        'status_penugasan',
         'level',
         'golongan',
         'tmt_awal',
         'tmt_akhir',
+        'tmt_akhir_estimasi',
         'jenis_mutasi',
         'nomor_sk',
         'tanggal_sk',
@@ -36,6 +44,7 @@ class JobHistory extends Model
     protected $casts = [
         'tmt_awal' => 'date',
         'tmt_akhir' => 'date',
+        'tmt_akhir_estimasi' => 'date',
         'tanggal_sk' => 'date',
     ];
 
@@ -54,10 +63,10 @@ class JobHistory extends Model
             'PROMOSI' => 'Promosi',
             'ROTASI' => 'Rotasi',
             'DEMOSI' => 'Demosi',
-            'ALIH_TUGAS' => 'Alih Tugas',
             'MUTASI_UNIT' => 'Mutasi Unit',
             'PENUGASAN' => 'Penugasan',
-            default => 'Lainnya',
+            'PENUGASAN_KHUSUS' => 'Penugasan Khusus',
+            'SANKSI_INDISIPLINER' => 'Sanksi Indisipliner',
         };
     }
 }

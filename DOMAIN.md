@@ -280,6 +280,16 @@ Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService
 3. `tmt_bekerja` minimal 18 tahun setelah `tanggal_lahir`.
 4. Jika `level == 'Karpim'`, `job_grade` dan `person_grade` wajib $\ge 11$.
 
+### 5.4 Jenis-Jenis Mutasi & Penugasan
+Dalam siklus rotasi pegawai, Sistem HRIS mendefinisikan beberapa tipe mutasi formal yang masing-masing memiliki peruntukan tersendiri:
+1. **Promosi**: Kenaikan tingkat Eselon (RM Level) atau Job Grade.
+2. **Demosi**: Penurunan tingkat Eselon (RM Level) atau Job Grade akibat underperformance atau reorganisasi.
+3. **Rotasi & Alih Tugas**: Perpindahan jabatan secara fungsional yang terjadi **di dalam satu Unit Kerja yang sama** (tidak pindah lokasi/rumah). Contoh: Asisten Afdeling 1 berotasi menjadi Asisten Afdeling 2 di kebun yang sama.
+4. **Mutasi Unit**: Perpindahan fisik/geografis melintasi **Unit Kerja yang berbeda** (harus pindah lokasi dari Kebun/Pabrik A ke Kebun/Pabrik B), meskipun jabatannya mungkin sama persis.
+5. **Penugasan (Assignment)**: Penempatan sementara (Pj/Plt) atau penempatan pada struktur formasi definitif yang bersifat operasional tanpa merubah hierarki organik pegawai.
+6. **Penugasan Khusus (Special Assignment / Overflow)**: Penempatan pegawai ke posisi "Keranjang Logis" atau "Pool" (*is_overflow* = true) seperti formasi **Advisor**. Biasanya ini digunakan untuk mengisolasi atau "memarkir" pegawai senior sementara menunggu posisi struktural yang cocok, namun **bukan** sebagai sebuah hukuman. Pegawai di pool ini tetap mendapatkan hak sesuai RM Level-nya.
+7. **Sanksi Indisipliner**: Pemindahan paksa pegawai ke posisi hukuman/penampungan (*is_diperban* = true) seperti **Karyawan Diperbantukan**. Ini merupakan tindakan indisipliner di mana pegawai dilucuti dari posisi strukturalnya. Posisi hukuman wajib dievaluasi kembali setelah batas waktu sanksi kedaluwarsa.
+
 ---
 
 ## 6. Manajemen Kinerja & Matriks Talenta (9-Box Grid)
