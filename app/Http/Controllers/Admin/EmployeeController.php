@@ -270,7 +270,7 @@ class EmployeeController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'import_file' => 'required|file|mimes:xlsx,xls|max:2048',
+            'import_file' => 'required|file|mimes:xlsx,xls|max:10240',
         ]);
 
         $import = new EmployeesImport;
