@@ -626,11 +626,27 @@ Tepat di bawah Hero Banner, sediakan navigasi tab berbasis Alpine.js (`x-data="{
    - Filter cepat (Quick Tabs): Tab pill instan untuk beralih antara "Semua Pegawai", "Karyawan Pimpinan", dan "Karyawan Pelaksana".
    - Search input utama dengan ikon kaca pembesar dan shortcut `Ctrl + K`.
    - Tombol "Filter Lanjutan" (Toggle drawer/accordion) untuk menyembunyikan 5-6 dropdown filter agar antarmuka tidak sesak.
-3. **Tabel Data Karyawan**:
-   - Baris tabel berjarak rapi (`py-3.5`), hover efek `hover:bg-slate-50/80`.
-   - Kolom Nama & NIK dilengkapi avatar inisial/foto bergaris halus.
-   - Badge Level & Golongan memakai warna pastel modern (bukan warna mentah/neon).
-   - Tombol Aksi per baris (Detail, Edit, Hapus) dalam tombol ikon minimalis dengan tooltip.
+3. **Tabel Data Karyawan (Standar Enterprise Workday & Mekari Talenta)**:
+   - **Ultra-Clean Selection (Dedicated Clean Checkbox Column + Workday Standard)**: Kolom checkbox mandiri yang rapi di sisi kiri (`w-10 text-center`) selaras dengan checkbox header `[ ]`. Kotak centang berupa persegi putih bersih kosong murni `[ ]` tanpa bayangan ikon samar saat belum dipilih. Meniadakan lingkaran inisial nama generik (`AY`, `A`, `BH`) yang redundan; foto profil ditampilkan murni sebagai thumbnail bulat hanya jika berkas foto asli tersedia, kemudian langsung diikuti Nama Pegawai tebal dan NIK.
+   - **Modern Minimalist Hybrid Bulk Action (Stripe & Linear Enterprise Standard)**:
+     - *Google Drive & Gmail Keyboard Shortcuts (Range Select & Toggle)*:
+       - **Ctrl+Click / Cmd+Click**: Menekan Ctrl (atau Cmd pada Mac) dan mengklik di mana saja pada baris tabel akan langsung memilih/mencentang pegawai tersebut secara individual tanpa berpindah halaman.
+       - **Shift+Click (Range Selection)**: Mengklik pegawai pertama lalu menahan tombol Shift dan mengklik pegawai kedua akan otomatis memilih seluruh baris di antara keduanya (rentang kontigu A sampai B), persis seperti di Google Drive dan Gmail.
+       - **Active Selection Mode**: Saat $\ge 1$ pegawai sedang terpilih, mengklik di mana saja pada baris (selain teks nama/link) otomatis melakukan toggle centang tanpa mewajibkan pengguna membidik avatar kecil 40px. Teks nama pegawai tetap dapat diklik untuk membuka profil secara presisi.
+     - *Subtle Row Selection Highlight*: Meniadakan "green sea syndrome" (banjir warna hijau pekat saat banyak baris dipilih). Baris yang dicentang diberi latar netral yang sangat lembut (`bg-slate-50/70`) dengan aksen garis kiri hijau korporat (`border-l-4 border-l-primary-600`) dan avatar tercentang hijau solid (`bg-primary-600 text-white`). Hal ini memastikan seluruh badge data tetap memiliki kontras tinggi dan mudah dipindai (*high scannability*).
+     - *Slim Neutral Contextual Bar (Toolbar Atas Tabel)*: Bertransformasi secara elegan menjadi baris netral yang tenang (`bg-slate-50/90 border-slate-200`) dengan tipografi mikro yang rapi (`[X] Terpilih • Pilih Semua • Batalkan Pilihan • Shift + klik untuk rentang`) dan tombol sekunder *Export* serta *Hapus* bergaris halus.
+     - *Floating Action Dock (Bawah Layar)*: Mengambang di tengah bawah layar (`fixed bottom-6 left-1/2 -translate-x-1/2 z-50`) dengan gaya *Dark Slate Glassmorphism* (`bg-slate-900/95 text-white backdrop-blur-md shadow-2xl rounded-2xl border border-slate-700/80`). Berisi indikator counter, shortcut keyboard pembatalan `Esc`, tombol aksi utama *Export Excel*, dan tombol destruktif terproteksi *Hapus*.
+   - **Pemisahan Kolom Atomik & Tipografi Bersih (Anti-Badge Overload)**: Mempertahankan pemisahan kolom independen untuk *Pegawai*, *Jabatan & Unit Kerja*, *Strata*, *Eselon*, dan *Golongan* dengan tipografi korporat bersih:
+      - *Pegawai*: Nama tebal dengan NIK monospaced + copy action di sub-baris.
+      - *Jabatan & Unit Kerja*: Jabatan di baris atas, Unit Kerja di baris bawah disertai **micro-chip Bidang netral** (`bg-slate-100 text-slate-600 border border-slate-200`) tanpa warna pelangi yang bertabrakan.
+      - *Strata*: Ditampilkan sebagai **tipografi bersih (Clean Enterprise Typography)** tanpa border pill (`text-xs font-semibold text-slate-800` untuk Karpim dan `text-xs font-medium text-slate-500` untuk Karpel) guna mencegah banjir chip berulang di setiap baris.
+      - *Eselon*: Ditampilkan dengan chip warna semantik RM Band lembut (`RM-1` orange soft, `RM-2` sky soft, `RM-3` purple soft, `RM-4` slate netral) sebagai aksen tunggal yang teratur di kolom tengah tabel.
+      - *Golongan*: Ditampilkan sebagai teks monospaced tegas (`font-mono text-xs font-semibold text-slate-800 tabular-nums`) tanpa kontainer pill.
+    - **Exception-Driven Lifecycle Badges**: Menghindari kolom "Status: Aktif" generik yang redundan; sebagai gantinya, kolom *Jabatan & Unit Kerja* secara cerdas menampilkan badge khusus untuk anomali/siklus kritis:
+      - Sanksi Indisipliner Aktif (`bg-red-50 text-red-700`) & Sanksi Kedaluwarsa (`animate-pulse`).
+      - Tugas Rangkap / Penugasan Khusus (Plt/Pj/Diperbantukan) ditempatkan di bawah jabatan & unit definitif (Tier 3) dengan compact badge pill Title Case dan shadow mikro (tanpa border samping warna ungu agar ritme visual tabel tetap bersih & seragam).
+      - Masa Pensiun BUP 56 Tahun (`bg-red-100 text-red-800`), Masa Bebas Tugas MBT 55 Tahun (`bg-amber-100 text-amber-900`), dan Menjelang MBT $\le 12$ bulan (`bg-amber-50 text-amber-800`).
+    - **Aksi Baris Terproteksi (Single Kebab Menu ...)**: Tombol aksi disederhanakan menjadi tombol tunggal titik tiga (`...`) tanpa ikon mata terpisah. Seluruh opsi (Profil Lengkap, Ubah Data, Ajukan Mutasi, Hapus Pegawai) tersaji rapi di dalam dropdown menu untuk menjaga kerapian kolom aksi.
 
 ---
 
@@ -694,6 +710,39 @@ Untuk menjaga konsistensi operasional pada modul Monitoring Formasi Kosong:
    - **Dimensi & Lebar Identik**: Kedua tombol mengisi lebar penuh kontainer (`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold`).
    - **Mutasi Internal (Primary Talent Mobility Path)**: Berada di atas dengan gaya emerald solid (`bg-emerald-600 hover:bg-emerald-700 text-white`) dan ikon mutasi `fas fa-exchange-alt text-[10px]`.
    - **Rekrut Baru (Secondary Fulfillment Path)**: Berada di bawah dengan gaya outline bersih (`bg-white hover:bg-surface-50 text-surface-700 border border-surface-300`) dan ikon `fas fa-user-plus text-[10px] text-surface-400`.
+
+---
+
+## 34. Standar Ergonomi Kognitif & Anti-Badge Fatigue (Intentional Color System)
+
+### 34.1 Anatomi Masalah "Badge Fatigue" & Visual Clutter pada HRIS
+Pada sistem informasi enterprise, tabel data master (seperti Direktori Pegawai, Riwayat Mutasi, dan Formasi) memiliki densitas data yang tinggi. Ketika setiap atribut (Strata, Eselon, Bidang, Golongan, Status) dibungkus ke dalam *chip/pill* berwarna-warni yang berbeda, muncul fenomena anti-pattern:
+1. **The "Christmas Tree" / "Badge Soup" Effect**: Layar dipenuhi kotak-kotak warna pelangi (merah, hijau, ungu, biru, oranye, kuning) di setiap baris.
+2. **Hilangnya Kemampuan Deteksi Anomali (*Lost Signal-to-Noise Ratio*)**:
+   > *"When everything is highlighted, nothing is highlighted."*  
+   Ketika atribut statis normal (seperti Karpim atau TAN) diberi badge berwarna mencolok, mata admin HR gagal mendeteksi sinyal kritis yang membutuhkan tindakan cepat (seperti *Masa Sanksi Disiplin*, *Menjelang MBT*, atau *Tugas Rangkap*).
+3. **Kelelahan Visual & Kognitif (*Eye & Cognitive Fatigue*)**: Pengguna HR yang mengaudit puluhan hingga ratusan baris per hari mengalami keletihan mata karena otak dipaksa memecahkan kode warna (*color decoding*) pada setiap sel.
+
+### 34.2 Matriks 4-Tier "Color with Intent" (Color Budgeting)
+Untuk mencegah *badge fatigue*, seluruh tabel data padat di aplikasi wajib mengadopsi sistem anggaran warna 4 tingkat (*4-Tier Intentional Color Budgeting*):
+
+| Tingkat Hierarki | Definisi & Sifat Data | Perlakuan Desain UI/UX | Contoh Implementasi |
+|---|---|---|---|
+| **Tier 1: Critical Exception & Lifecycle Alerts** | Anomali tata kelola, hukuman disiplin, atau batas waktu legal yang menuntut tindakan/perhatian segera. | **Aksen Warna Jenuh Penuh (High-Contrast Saturated Pills)** dengan ikon semantik. Dialokasikan $\le 10\%$ dari total ruang visual. | • Masa Sanksi (`bg-red-50 text-red-700 border-red-200`)<br>• MBT/Pensiun (`bg-amber-100 text-amber-900 border-amber-300`)<br>• Tugas Rangkap (`bg-purple-50 text-purple-700 border-purple-200`) |
+| **Tier 2: Key Managerial Echelon (RM Band)** | Eselon formasi manajerial (RM-1 s/d RM-4) yang menjadi jangkar struktural organisasi. | **Single-Anchor Soft Semantic Chips**. Satu-satunya kolom klasifikasi yang diberi warna pastel lembut di tengah tabel agar menjadi pemisah ritme baca. | • RM-1: Orange pastel (`bg-orange-50 text-orange-800 border-orange-200`)<br>• RM-2: Sky pastel (`bg-sky-50 text-sky-800 border-sky-200`)<br>• RM-3: Purple pastel (`bg-purple-50 text-purple-800 border-purple-200`)<br>• RM-4: Slate netral (`bg-slate-100 text-slate-700 border-slate-200`) |
+| **Tier 3: Macro Categorical (Strata Pegawai)** | Pengelompokan makro (Karpim vs Karpel) di mana $\ge 90\%$ populasi baris bernilai seragam. | **Clean Enterprise Typography (Dilarang Memakai Chip)**. Meniadakan kotak chip berulang; gunakan kontras bobot teks. | • Karpim: `text-xs font-semibold text-slate-800`<br>• Karpel: `text-xs font-medium text-slate-500` |
+| **Tier 4: Operational Metadata (Bidang Fungsional)** | Informasi pendukung teknis operasional (KEU, TAN, TEK, UMU). | **Neutral Subtle Micro-Chip**. Kotak mikro abu-abu tanpa warna pelangi agar menyatu halus dengan Unit Kerja tanpa mencuri fokus. | • Micro-chip netral: `bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-semibold px-1.5 py-0.5 rounded` |
+
+### 34.3 Prinsip Kenyamanan Sesi Kerja Panjang (Ergonomi Tampilan HR)
+1. **Pola Scanning Horizontal Mengalir (Flow F-Pattern)**:
+   - Urutan kolom dari makro ke mikro: `Identitas Pegawai` $\rightarrow$ `Jabatan & Unit Kerja` $\rightarrow$ `Strata` $\rightarrow$ `Eselon` $\rightarrow$ `Golongan` $\rightarrow$ `Aksi`.
+   - Pola ini memastikan mata bergerak mulus dari kiri ke kanan tanpa "lompatan kognitif" yang melelahkan.
+2. **Pencegahan Horizontal Overflow (2-Tier Row Grouping)**:
+   - Data sekunder (NIK di bawah Nama, Unit Kerja + Micro-chip Bidang di bawah Jabatan) disematkan di tingkat sub-baris (*tier-2*), menjaga jumlah kolom tetap ramping ($\le 6$ kolom data) sehingga tabel tampil utuh 100% pada resolusi laptop dinas (1366×768) tanpa memicu horizontal scrollbar.
+3. **Monospaced Visual Rhythm untuk Kode & Angka**:
+   - NIK, Golongan, dan kode numerik wajib menggunakan `font-mono tabular-nums`. Karakter monospaced menciptakan garis lurus vertikal yang menstabilkan ritme baca saat memindai ke bawah secara cepat.
+4. **Dominasi Kanvas Terang & Kontras AA (Unified Light Shell)**:
+   - Latar tabel putih bersih (`bg-white`) di atas kanvas `bg-slate-50` dengan garis pemisah tipis `divide-surface-200` memberikan kontras WCAG AA yang menenangkan mata dan mencegah sakit kepala pada sesi kerja administratif intensif (6–8 jam/hari).
 
 ---
 

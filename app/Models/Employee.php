@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Traits\Searchable;
+use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -353,6 +354,103 @@ class Employee extends Model
     }
 
     /**
+     * Ambil tanggal pensiun efektif (menggunakan tanggal_pensiun atau dihitung dari tanggal_lahir + 56 thn).
+     */
+    public function getEffectiveTanggalPensiunAttribute(): ?Carbon
+    {
+        if ($this->tanggal_pensiun) {
+            return Carbon::parse($this->tanggal_pensiun);
+        }
+
+        if ($this->tanggal_lahir) {
+            return Carbon::parse($this->tanggal_lahir)->addYears(56)->startOfMonth();
+        }
+
+        return null;
+    }
+
+    /**
+     * Ambil tanggal MBT efektif (T-1 tahun sebelum tanggal pensiun / usia 55 thn).
+     */
+    public function getEffectiveTanggalMbtAttribute(): ?Carbon
+    {
+        if ($this->tanggal_mbt) {
+            return Carbon::parse($this->tanggal_mbt);
+        }
+
+        if ($pensiun = $this->effective_tanggal_pensiun) {
+            return (clone $pensiun)->subYear();
+        }
+
+        return null;
+    }
+
+    /**
+     * Cek apakah pegawai telah mencapai atau melewati Batas Usia Pensiun (BUP 56 thn).
+     */
+    public function isPensionReached(): bool
+    {
+        $pensiun = $this->effective_tanggal_pensiun;
+
+        return $pensiun ? Carbon::today()->gte($pensiun) : false;
+    }
+
+    /**
+     * Cek apakah pegawai sedang dalam Masa Bebas Tugas aktif (usia 55 s.d. 56 thn).
+     */
+    public function isMbtActive(): bool
+    {
+        $mbt = $this->effective_tanggal_mbt;
+        $pensiun = $this->effective_tanggal_pensiun;
+
+        if (! $mbt) {
+            return false;
+        }
+
+        $today = Carbon::today();
+
+        return $today->gte($mbt) && (! $pensiun || $today->lt($pensiun));
+    }
+
+    /**
+     * Cek apakah pegawai menjelang MBT (sisa waktu <= 12 bulan menuju tanggal_mbt).
+     */
+    public function isApproachingMbt(): bool
+    {
+        $mbt = $this->effective_tanggal_mbt;
+
+        if (! $mbt) {
+            return false;
+        }
+
+        $today = Carbon::today();
+
+        return $today->lt($mbt) && $today->diffInDays($mbt) <= 365;
+    }
+
+    /**
+     * Accessor untuk teks hitung mundur sisa bulan menuju MBT.
+     */
+    public function getMbtCountdownAttribute(): ?string
+    {
+        $mbt = $this->effective_tanggal_mbt;
+
+        if (! $mbt) {
+            return null;
+        }
+
+        $today = Carbon::today();
+        $diffDays = $today->diffInDays($mbt);
+        $diffMonths = (int) ceil($diffDays / 30);
+
+        if ($diffMonths <= 0) {
+            return '< 1 bln';
+        }
+
+        return $diffMonths.' bln';
+    }
+
+    /**
      * Cek apakah jabatan definitif karyawan adalah formasi penampungan fungsional (Advisor/Overflow).
      */
     public function isOverflow(): bool
@@ -409,5 +507,91 @@ class Employee extends Model
             }
             $q->orWhere('jabatan', 'like', '%Advisor%');
         });
+    }
+
+    /**
+     * Scope query untuk Karyawan Pimpinan (Karpim).
+     */
+    public function scopeKarpim($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('level', 'like', '%Karpim%')
+                ->orWhere('level', 'like', '%Pimpinan%');
+        });
+    }
+
+    /**
+     * Scope query untuk Karyawan Pelaksana (Karpel / Pelaksana).
+     */
+    public function scopePelaksana($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('level', 'like', '%Pelaksana%')
+                ->orWhere('level', 'like', '%Karpel%');
+        });
+    }
+
+    /**
+     * Accessor untuk mengecek apakah pegawai merupakan Karpim.
+     */
+    public function getIsKarpimAttribute(): bool
+    {
+        $lvl = strtolower((string) ($this->level ?? ''));
+
+        return str_contains($lvl, 'karpim') || str_contains($lvl, 'pimpinan');
+    }
+
+    /**
+     * Accessor untuk mengambil 2 huruf inisial nama pegawai.
+     */
+    public function getInitialsAttribute(): string
+    {
+        $initials = collect(explode(' ', (string) $this->nama))
+            ->filter()
+            ->take(2)
+            ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
+            ->implode('');
+
+        return $initials ?: 'HR';
+    }
+
+    /**
+     * Accessor untuk menentukan Bidang Fungsional via ManPowerPlanningService (DOMAIN.md Bab 4 & 9).
+     */
+    public function getBidangAttribute(): string
+    {
+        return app(ManPowerPlanningService::class)->determineBidang($this);
+    }
+
+    /**
+     * Accessor untuk token CSS styling Bidang Fungsional (Neutral Subtle Tag untuk mencegah visual clutter).
+     */
+    public function getBidangThemeAttribute(): string
+    {
+        return 'bg-slate-100 text-slate-600 border-slate-200';
+    }
+
+    /**
+     * Accessor untuk styling token CSS RM Band sesuai DOMAIN.md Bab 10 & DESIGN.md.
+     */
+    public function getRmThemeAttribute(): string
+    {
+        return match ($this->rm_level) {
+            'RM-1' => 'bg-orange-50 text-orange-800 border-orange-200',
+            'RM-2' => 'bg-sky-50 text-sky-800 border-sky-200',
+            'RM-3' => 'bg-purple-50 text-purple-800 border-purple-200',
+            'RM-4' => 'bg-slate-100 text-slate-700 border-slate-200',
+            default => 'bg-slate-100 text-slate-700 border-slate-200',
+        };
+    }
+
+    /**
+     * Accessor untuk token CSS styling Strata Pegawai (Level) sesuai DOMAIN.md Bab 10.
+     */
+    public function getLevelThemeAttribute(): string
+    {
+        return $this->is_karpim
+            ? 'bg-primary-50 text-primary-800 border-primary-200'
+            : 'bg-slate-100 text-slate-700 border-slate-200';
     }
 }

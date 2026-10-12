@@ -201,4 +201,51 @@ class EmployeePeriodFilterTest extends TestCase
         $response->assertDontSee('PEGAWAI SINGLE TEST');
         $response->assertSee('Tata Kelola: <strong>Tugas Rangkap</strong>', false);
     }
+
+    public function test_employee_table_renders_correct_columns_order_and_domain_badges(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama' => 'SURYA AGRO TEST',
+            'nik' => '13009988',
+            'jabatan' => 'Asisten Tanaman',
+            'unit_kerja' => 'Kebun Gunung Emas',
+            'level' => 'Karpim',
+            'rm_level' => 'RM-3',
+            'golongan' => 'IIIB/02',
+        ]);
+
+        $response = $this->actingAs($this->user)->get(route('admin.employees.index'));
+
+        $response->assertStatus(200);
+
+        // Verify table header sequence in HTML: Pegawai -> Jabatan & Unit Kerja -> Strata -> Eselon -> Golongan -> Aksi
+        $content = $response->getContent();
+        $pegawaiPos = strpos($content, 'sort=nama');
+        $jabatanPos = strpos($content, 'sort=jabatan');
+        $strataPos = strpos($content, 'sort=level');
+        $eselonPos = strpos($content, 'sort=rm_level');
+        $golonganPos = strpos($content, 'sort=golongan');
+        $aksiPos = strpos($content, '>Aksi</th>');
+
+        $this->assertNotFalse($pegawaiPos, 'Header Pegawai (sort=nama) harus ada');
+        $this->assertNotFalse($jabatanPos, 'Header Jabatan & Unit Kerja (sort=jabatan) harus ada');
+        $this->assertNotFalse($strataPos, 'Header Strata (sort=level) harus ada');
+        $this->assertNotFalse($eselonPos, 'Header Eselon (sort=rm_level) harus ada');
+        $this->assertNotFalse($golonganPos, 'Header Golongan (sort=golongan) harus ada');
+        $this->assertNotFalse($aksiPos, 'Header Aksi harus ada');
+
+        $this->assertTrue($pegawaiPos < $jabatanPos, 'Pegawai harus sebelum Jabatan & Unit Kerja');
+        $this->assertTrue($jabatanPos < $strataPos, 'Jabatan & Unit Kerja harus sebelum Strata');
+        $this->assertTrue($strataPos < $eselonPos, 'Strata harus sebelum Eselon');
+        $this->assertTrue($eselonPos < $golonganPos, 'Eselon harus sebelum Golongan');
+        $this->assertTrue($golonganPos < $aksiPos, 'Golongan harus sebelum Aksi');
+
+        // Verify row badges
+        $response->assertSee('SURYA AGRO TEST');
+        $response->assertSee('Kebun Gunung Emas');
+        $response->assertSee('TAN'); // Bidang micro-badge
+        $response->assertSee('Karpim'); // Strata
+        $response->assertSee('RM-3'); // Eselon
+        $response->assertSee('IIIB/02'); // Golongan
+    }
 }

@@ -4,12 +4,67 @@
 <div x-data="{
     importModalOpen: false,
     deleteModalOpen: false,
+    bulkDeleteModalOpen: false,
     showColumnSpecs: false,
     showAdvancedFilters: {{ request()->hasAny(['unit_kerja', 'jabatan', 'rm_level', 'tahun_masuk']) ? 'true' : 'false' }},
     deleteNik: '',
     deleteNama: '',
     deleteAction: '',
     copiedNik: null,
+    selectedNiks: [],
+    pageNiks: {{ json_encode($employees->pluck('nik')->toArray()) }},
+    lastSelectedNik: null,
+    get isAllSelected() {
+        return this.pageNiks.length > 0 && this.pageNiks.every(nik => this.selectedNiks.includes(nik));
+    },
+    toggleSelectAll(checked) {
+        if (checked) {
+            this.selectedNiks = Array.from(new Set([...this.selectedNiks, ...this.pageNiks]));
+        } else {
+            this.selectedNiks = this.selectedNiks.filter(nik => !this.pageNiks.includes(nik));
+        }
+        this.lastSelectedNik = null;
+    },
+    toggleSelect(nik, event = null) {
+        if (event && event.shiftKey && this.lastSelectedNik && this.pageNiks.includes(this.lastSelectedNik)) {
+            const startIdx = this.pageNiks.indexOf(this.lastSelectedNik);
+            const endIdx = this.pageNiks.indexOf(nik);
+            const minIdx = Math.min(startIdx, endIdx);
+            const maxIdx = Math.max(startIdx, endIdx);
+            const rangeNiks = this.pageNiks.slice(minIdx, maxIdx + 1);
+            this.selectedNiks = Array.from(new Set([...this.selectedNiks, ...rangeNiks]));
+            this.lastSelectedNik = nik;
+            return;
+        }
+
+        if (this.selectedNiks.includes(nik)) {
+            this.selectedNiks = this.selectedNiks.filter(n => n !== nik);
+        } else {
+            this.selectedNiks.push(nik);
+        }
+        this.lastSelectedNik = nik;
+    },
+    handleRowClick(nik, event, showUrl) {
+        // 1. Modifier keys (Ctrl/Cmd or Shift): toggle or range-select
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            event.preventDefault();
+            this.toggleSelect(nik, event);
+            return;
+        }
+
+        // 2. Selection mode is active (>= 1 items): click anywhere toggles this row
+        if (this.selectedNiks.length > 0) {
+            this.toggleSelect(nik, event);
+            return;
+        }
+
+        // 3. Normal mode: navigate to profile
+        window.location.href = showUrl;
+    },
+    deselectAll() {
+        this.selectedNiks = [];
+        this.lastSelectedNik = null;
+    },
     copyNik(nik) {
         navigator.clipboard.writeText(nik);
         this.copiedNik = nik;
@@ -512,224 +567,130 @@
             </form>
         </div>
 
-        <!-- Table Information & Smart Export Toolbar -->
-        <div class="px-5 py-3.5 bg-white border-b border-surface-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <!-- Left: Table Count Info -->
-            <div class="flex items-center gap-2.5">
-                <span class="text-sm font-bold text-surface-900">Daftar Karyawan</span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-700">
-                    {{ $employees->total() }} Pegawai
-                </span>
-                @if ($employees->isNotEmpty())
-                    <span class="text-xs text-surface-400 hidden md:inline">|</span>
-                    <span class="text-xs text-surface-500 tabular-nums hidden md:inline">
-                        Menampilkan <strong class="text-surface-800">{{ $employees->firstItem() }}</strong> – <strong class="text-surface-800">{{ $employees->lastItem() }}</strong> dari <strong class="text-surface-800">{{ $employees->total() }}</strong> data
+        <!-- Table Information & Smart Dual Toolbar (Normal vs Bulk Action State) -->
+        <div class="px-5 py-3 border-b transition-colors duration-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+             :class="selectedNiks.length > 0 ? 'bg-slate-50/90 border-slate-200' : 'bg-white border-surface-200'">
+            
+            <!-- STATE 1: Normal View (When 0 items selected) -->
+            <div x-show="selectedNiks.length === 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                <!-- Left: Table Count Info -->
+                <div class="flex items-center gap-2.5">
+                    <span class="text-sm font-bold text-surface-900">Daftar Karyawan</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-700">
+                        {{ $employees->total() }} Pegawai
                     </span>
-                @endif
-            </div>
-
-            <!-- Right: Smart 1-Click Export to Excel in Table Toolbar -->
-            <div>
-                <form action="{{ route('admin.employees.export') }}" method="GET" id="tableExportForm" class="inline">
-                    @foreach(request()->query() as $key => $value)
-                        @if($value !== null && $value !== '')
-                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                        @endif
-                    @endforeach
-
-                    <button type="submit" id="tableExportBtn"
-                        class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-semibold transition shadow-xs group cursor-pointer"
-                        title="{{ request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan', 'tahun_masuk', 'bulan_masuk']) ? 'Export data pegawai sesuai filter aktif' : 'Export seluruh data pegawai ke Excel' }}">
-                        <i class="fas fa-file-excel text-emerald-600 text-xs group-hover:scale-110 transition-transform"></i>
-                        <span id="tableExportBtnText">Export Data</span>
-                        <span class="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px]">
-                            {{ $employees->total() }}
+                    @if ($employees->isNotEmpty())
+                        <span class="text-xs text-surface-400 hidden md:inline">|</span>
+                        <span class="text-xs text-surface-500 tabular-nums hidden md:inline">
+                            Menampilkan <strong class="text-surface-800">{{ $employees->firstItem() }}</strong> – <strong class="text-surface-800">{{ $employees->lastItem() }}</strong> dari <strong class="text-surface-800">{{ $employees->total() }}</strong> data
                         </span>
-                    </button>
-                </form>
+                    @endif
+                </div>
+
+                <!-- Right: Action Buttons in Table Toolbar (Smart Export) -->
+                <div class="flex items-center gap-2">
+                    <form action="{{ route('admin.employees.export') }}" method="GET" id="tableExportForm" class="inline">
+                        @foreach(request()->query() as $key => $value)
+                            @if($value !== null && $value !== '')
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endif
+                        @endforeach
+
+                        <button type="submit" id="tableExportBtn"
+                            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-semibold transition shadow-xs group cursor-pointer"
+                            title="{{ request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'golongan', 'tahun_masuk', 'bulan_masuk']) ? 'Export data pegawai sesuai filter aktif' : 'Export seluruh data pegawai ke Excel' }}">
+                            <i class="fas fa-file-excel text-emerald-600 text-xs group-hover:scale-110 transition-transform"></i>
+                            <span id="tableExportBtnText">Export Data</span>
+                            <span class="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px]">
+                                {{ $employees->total() }}
+                            </span>
+                        </button>
+                    </form>
+                </div>
             </div>
+
+            <!-- STATE 2: Slim Neutral Contextual Strip (When >= 1 items selected) -->
+            <div x-show="selectedNiks.length > 0" x-cloak class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full animate-fade-in">
+                <!-- Left: Selected Count, Selection Utilities & Keyboard Hint -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-100 text-primary-800 font-bold text-xs shadow-2xs">
+                        <i class="fas fa-check text-[10px] text-primary-700"></i>
+                        <span><strong x-text="selectedNiks.length"></strong> Terpilih</span>
+                    </span>
+                    <span class="text-xs text-slate-300">•</span>
+                    <button type="button" @click="toggleSelectAll(true)"
+                        class="text-xs font-semibold text-slate-600 hover:text-primary-700 transition cursor-pointer">
+                        Pilih Semua ({{ $employees->count() }})
+                    </button>
+                    <span class="text-xs text-slate-300">•</span>
+                    <button type="button" @click="deselectAll()"
+                        class="text-xs font-medium text-slate-500 hover:text-slate-800 transition cursor-pointer">
+                        Batalkan Pilihan
+                    </button>
+                    <span class="text-xs text-slate-300 hidden xl:inline">•</span>
+                    <span class="text-[11px] text-slate-400 hidden xl:inline items-center gap-1">
+                        <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 font-mono text-[10px] shadow-2xs">Shift</kbd> + klik baris untuk rentang
+                    </span>
+                </div>
+
+                <!-- Right: Quick Export & Delete Trigger -->
+                <div class="flex items-center gap-2">
+                    <!-- Export Selected -->
+                    <form action="{{ route('admin.employees.export') }}" method="GET" class="inline">
+                        <template x-for="nik in selectedNiks" :key="'top-export-' + nik">
+                            <input type="hidden" name="niks[]" :value="nik">
+                        </template>
+                        <button type="submit"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-primary-800 text-xs font-semibold transition shadow-2xs cursor-pointer">
+                            <i class="fas fa-file-excel text-emerald-600 text-xs"></i>
+                            <span>Export (<span x-text="selectedNiks.length"></span>)</span>
+                        </button>
+                    </form>
+
+                    <!-- Bulk Delete Trigger (Clean Subdued Outline) -->
+                    <button type="button" @click="bulkDeleteModalOpen = true"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-white text-danger hover:bg-red-50 text-xs font-semibold transition shadow-2xs cursor-pointer">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                        <span>Hapus</span>
+                    </button>
+                </div>
+            </div>
+
         </div>
 
         <!-- Data Table -->
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-700 uppercase tracking-wider">
-                        <th scope="col" class="py-3.5 px-5">Pegawai</th>
-                        <th scope="col" class="py-3.5 px-5">Jabatan &amp; Unit Kerja</th>
-                        <th scope="col" class="py-3.5 px-5">Eselon &amp; Level</th>
-                        <th scope="col" class="py-3.5 px-5">Golongan</th>
-                        <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
+                <thead class="sticky top-0 z-10 bg-surface-50 border-b border-surface-200 shadow-2xs">
+                    <tr class="text-xs font-semibold text-surface-700 uppercase tracking-wider">
+                        <!-- Dedicated Clean Checkbox Column -->
+                        <th scope="col" class="py-3.5 pl-5 pr-2 w-10 text-center">
+                            <div class="w-4 h-4 rounded border flex items-center justify-center cursor-pointer transition mx-auto shrink-0"
+                                 :class="isAllSelected ? 'bg-primary-600 border-primary-600 text-white shadow-2xs' : (selectedNiks.length > 0 ? 'bg-primary-100 border-primary-500 text-primary-700' : 'bg-white border-slate-300 hover:border-primary-500 shadow-2xs')"
+                                 @click.stop="toggleSelectAll(!isAllSelected)"
+                                 title="Pilih Semua Pegawai di Halaman Ini (Tips: Tahan Ctrl+Klik atau Shift+Klik pada baris untuk rentang)">
+                                <template x-if="isAllSelected">
+                                    <i class="fas fa-check text-[10px] text-white"></i>
+                                </template>
+                                <template x-if="!isAllSelected && selectedNiks.length > 0">
+                                    <i class="fas fa-minus text-[8px] text-primary-700"></i>
+                                </template>
+                            </div>
+                        </th>
+                        <x-admin.table.sort-th column="nama" label="Pegawai" class="min-w-[200px]" />
+                        <x-admin.table.sort-th column="jabatan" label="Jabatan & Unit Kerja" class="min-w-[260px]" />
+                        <x-admin.table.sort-th column="level" label="Strata" align="center" class="w-28 whitespace-nowrap" />
+                        <x-admin.table.sort-th column="rm_level" label="Eselon" align="center" class="w-28 whitespace-nowrap" />
+                        <x-admin.table.sort-th column="golongan" label="Golongan" align="center" class="w-28 whitespace-nowrap" />
+                        <th scope="col" class="py-3.5 px-5 text-right w-16 whitespace-nowrap">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-surface-200 text-sm">
                     @forelse ($employees as $employee)
-                        <tr @click="window.location.href = '{{ route('admin.employees.show', $employee->nik) }}'"
-                            class="cursor-pointer hover:bg-slate-50/80 transition duration-150 group {{ $employee->concurrentJobs->isNotEmpty() ? 'border-l-4 border-l-purple-500 bg-purple-50/15' : '' }}">
-                            <!-- Pegawai (Avatar + Name + NIK) -->
-                            <td class="py-3.5 px-5 whitespace-nowrap">
-                                <div class="flex items-center gap-3">
-                                    <!-- Photo or Initials Avatar -->
-                                    <div class="w-10 h-10 rounded-full shrink-0 overflow-hidden bg-primary-100 text-primary-800 flex items-center justify-center font-bold text-xs border border-primary-200 shadow-xs">
-                                        @if ($employee->foto && Storage::disk('public')->exists($employee->foto))
-                                            <img src="{{ Storage::disk('public')->url($employee->foto) }}" alt="{{ $employee->nama }}"
-                                                class="w-full h-full object-cover">
-                                        @else
-                                            @php
-                                                $initials = collect(explode(' ', $employee->nama))
-                                                    ->take(2)
-                                                    ->map(fn($part) => strtoupper(substr($part, 0, 1)))
-                                                    ->implode('');
-                                            @endphp
-                                            <span>{{ $initials ?: 'HR' }}</span>
-                                        @endif
-                                    </div>
-                                    <div class="min-w-0">
-                                        <a href="{{ route('admin.employees.show', $employee->nik) }}"
-                                            class="font-semibold text-surface-900 group-hover:text-primary-700 transition block truncate max-w-[200px] sm:max-w-xs"
-                                            title="{{ $employee->nama }}">
-                                            <x-highlight :text="$employee->nama" />
-                                        </a>
-                                        <div class="flex items-center gap-1.5 mt-0.5">
-                                            <span class="font-mono text-xs text-surface-500 tabular-nums">
-                                                <x-highlight :text="$employee->nik" />
-                                            </span>
-                                            <button type="button" @click.stop="copyNik('{{ $employee->nik }}')"
-                                                class="text-surface-400 hover:text-surface-700 text-[11px] transition"
-                                                title="Salin NIK">
-                                                <i :class="copiedNik === '{{ $employee->nik }}' ? 'fas fa-check text-primary-600' : 'far fa-copy'"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <!-- Jabatan & Unit Kerja -->
-                            <td class="py-3.5 px-5">
-                                <div class="font-medium text-surface-900 text-sm flex items-center gap-2 flex-wrap">
-                                    <span><x-highlight :text="$employee->jabatan" /></span>
-
-                                    {{-- Badge Kasus Spesial 1: Sanksi Indisipliner Aktif / Kedaluwarsa --}}
-                                    @if($employee->isSanctionActive())
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 shadow-2xs"
-                                            title="Pegawai dalam masa sanksi indisipliner (Diperban) hingga {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}">
-                                            <i class="fas fa-gavel text-[9px]"></i>
-                                            Masa Sanksi s/d {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}
-                                        </span>
-                                    @elseif($employee->isSanctionExpired())
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs animate-pulse"
-                                            title="Masa sanksi kedaluwarsa sejak {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }} - Harap terbitkan Mutasi Pencabutan Sanksi">
-                                            <i class="fas fa-exclamation-triangle text-[9px] text-amber-600"></i>
-                                            Sanksi Kedaluwarsa
-                                        </span>
-                                    @endif
-
-                                    {{-- Badge Kasus Spesial 2: Jabatan Overflow / Pool Penampungan (Advisor) --}}
-                                    @if($employee->isOverflow())
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
-                                            title="Formasi penampungan fungsional non-struktural (Advisor/Overflow Pool)">
-                                            <i class="fas fa-layer-group text-[9px] text-slate-500"></i>
-                                            Fungsional Pool
-                                        </span>
-                                    @endif
-                                </div>
-                                @if($employee->concurrentJobs->isNotEmpty())
-                                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                                        @foreach($employee->concurrentJobs as $cj)
-                                            @php
-                                                $badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
-                                                if ($cj->status_penugasan === 'Plt') {
-                                                    $badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
-                                                } elseif ($cj->status_penugasan === 'Diperbantukan') {
-                                                    $badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
-                                                }
-                                            @endphp
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $badgeStyle }}"
-                                                title="Tugas Tambahan Aktif: {{ $cj->jabatan }} di {{ $cj->unit_kerja }} (sejak {{ $cj->tmt_awal?->format('d M Y') }})">
-                                                <i class="fas fa-briefcase text-[9px]"></i>
-                                                {{ $cj->status_penugasan }}: {{ $cj->jabatan }} ({{ $cj->unit_kerja }})
-                                            </span>
-                                        @endforeach
-                                    </div>
-                                @endif
-                                <div class="text-xs text-surface-500 flex items-center gap-1.5 mt-0.5">
-                                    <i class="fas fa-building text-[10px] text-surface-400"></i>
-                                    <span class="truncate max-w-[280px]"><x-highlight :text="$employee->unit_kerja" /></span>
-                                </div>
-                            </td>
-
-                            <!-- Eselon & Level -->
-                            <td class="py-3.5 px-5 whitespace-nowrap">
-                                <div class="flex items-center gap-1.5 flex-wrap">
-                                    @if($employee->rm_level)
-                                        @php
-                                            $rmTheme = match($employee->rm_level) {
-                                                'RM-1' => 'bg-purple-50 text-purple-700 border-purple-200 font-bold',
-                                                'RM-2' => 'bg-sky-50 text-sky-700 border-sky-200 font-bold',
-                                                'RM-3' => 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
-                                                default => 'bg-slate-100 text-slate-700 border-slate-200 font-medium',
-                                            };
-                                        @endphp
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] border {{ $rmTheme }}"
-                                            title="{{ \App\Models\Employee::RM_LEVELS[$employee->rm_level] ?? $employee->rm_level }}">
-                                            {{ $employee->rm_level }}
-                                        </span>
-                                    @endif
-
-                                    @php
-                                        $isKarpim = str_contains(strtolower($employee->level ?? ''), 'karpim') || str_contains(strtolower($employee->level ?? ''), 'pimpinan');
-                                    @endphp
-                                    @if($employee->level)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium {{ $isKarpim ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-surface-100 text-surface-700 border border-surface-200' }}">
-                                            {{ $employee->level }}
-                                        </span>
-                                    @else
-                                        <span class="text-surface-400 text-xs">-</span>
-                                    @endif
-                                </div>
-                            </td>
-
-                            <!-- Golongan -->
-                            <td class="py-3.5 px-5 whitespace-nowrap">
-                                @if($employee->golongan)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-earth-100 text-earth-800 border border-earth-300 tabular-nums">
-                                        {{ $employee->golongan }}
-                                    </span>
-                                @else
-                                    <span class="text-surface-400 text-xs">-</span>
-                                @endif
-                            </td>
-
-                            <!-- Aksi -->
-                            <td class="py-3.5 px-5 whitespace-nowrap text-right">
-                                <div class="inline-flex items-center rounded-xl border border-slate-200 bg-white shadow-2xs divide-x divide-slate-100 overflow-hidden" @click.stop>
-                                    <!-- Detail -->
-                                    <a href="{{ route('admin.employees.show', $employee->nik) }}"
-                                        class="p-2 text-slate-500 hover:text-primary-700 hover:bg-slate-50 transition"
-                                        title="Lihat Detail Profil">
-                                        <i class="fas fa-eye text-xs"></i>
-                                    </a>
-
-                                    <!-- Edit -->
-                                    <a href="{{ route('admin.employees.edit', $employee->nik) }}"
-                                        class="p-2 text-slate-500 hover:text-earth-700 hover:bg-slate-50 transition"
-                                        title="Ubah Data Pegawai">
-                                        <i class="fas fa-pencil-alt text-xs"></i>
-                                    </a>
-
-                                    <!-- Delete Modal Trigger -->
-                                    <button type="button"
-                                        @click="confirmDelete('{{ $employee->nik }}', '{{ addslashes($employee->nama) }}', '{{ route('admin.employees.destroy', $employee->nik) }}')"
-                                        class="p-2 text-slate-500 hover:text-danger hover:bg-red-50 transition"
-                                        title="Hapus Pegawai">
-                                        <i class="fas fa-trash-alt text-xs"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                        <x-admin.employee-table-row :employee="$employee" />
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-16 text-center">
+                            <td colspan="7" class="px-6 py-16 text-center">
                                 <div class="max-w-sm mx-auto flex flex-col items-center">
                                     <div class="w-16 h-16 rounded-full bg-surface-100 text-surface-400 flex items-center justify-center text-2xl mb-4 border border-surface-200">
                                         <i class="fas fa-users-slash"></i>
@@ -1016,6 +977,126 @@
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-danger hover:bg-red-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">
                             <i class="fas fa-trash-alt text-xs"></i>
                             <span>Ya, Hapus Data</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Bulk Action Bar (Linear / Stripe Standard - Dark Slate Glassmorphism) -->
+    <div x-show="selectedNiks.length > 0" x-cloak
+        x-transition:enter="transition cubic-bezier(0.16, 1, 0.3, 1) duration-300"
+        x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-y-8 scale-95"
+        @keydown.window.escape="if (selectedNiks.length > 0 && !bulkDeleteModalOpen) deselectAll()"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3.5 border border-slate-700/80 max-w-[95vw]">
+        
+        <!-- Counter Badge & Deselect -->
+        <div class="flex items-center gap-2.5 pr-2 border-r border-slate-700/80">
+            <span class="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-bold font-mono text-xs flex items-center justify-center shrink-0 shadow-xs"
+                x-text="selectedNiks.length"></span>
+            <span class="text-xs font-semibold text-slate-200 whitespace-nowrap"><span x-text="selectedNiks.length"></span> Dipilih</span>
+            <button type="button" @click="deselectAll()"
+                class="text-xs text-slate-400 hover:text-white transition px-1.5 py-0.5 rounded-md hover:bg-slate-800 cursor-pointer flex items-center gap-1"
+                title="Batalkan Pilihan (Esc)">
+                <i class="fas fa-times text-[11px]"></i>
+                <kbd class="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.2 rounded font-mono border border-slate-700 hidden sm:inline">Esc</kbd>
+            </button>
+        </div>
+
+        <!-- Action: Export Selected to Excel -->
+        <form action="{{ route('admin.employees.export') }}" method="GET" class="inline">
+            <template x-for="nik in selectedNiks" :key="'export-' + nik">
+                <input type="hidden" name="niks[]" :value="nik">
+            </template>
+            <button type="submit"
+                class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer">
+                <i class="fas fa-file-excel text-xs"></i>
+                <span>Export Excel</span>
+            </button>
+        </form>
+
+        <!-- Action: Bulk Delete Modal Trigger (Protected Dangerous State) -->
+        <button type="button" @click="bulkDeleteModalOpen = true"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-red-900/40 text-red-400 hover:text-red-300 border border-slate-700 hover:border-red-800/60 text-xs font-semibold transition active:scale-95 cursor-pointer">
+            <i class="fas fa-trash-alt text-xs"></i>
+            <span>Hapus</span>
+        </button>
+    </div>
+
+    <!-- Bulk Delete Confirmation Modal (Enterprise Destructive Safety) -->
+    <div x-show="bulkDeleteModalOpen" x-cloak
+        class="fixed inset-0 z-50 overflow-y-auto"
+        aria-labelledby="bulk-delete-dialog-title" role="dialog" aria-modal="true">
+        
+        <div x-show="bulkDeleteModalOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+            @click="bulkDeleteModalOpen = false"></div>
+
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div x-show="bulkDeleteModalOpen"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 overflow-hidden text-left"
+                @click.stop>
+                
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-50 text-danger border border-red-200 flex items-center justify-center text-xl shrink-0">
+                        <i class="fas fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <h3 class="text-lg font-bold text-slate-900" id="bulk-delete-dialog-title">
+                            Hapus Massal Pegawai Terpilih
+                        </h3>
+                        <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                            Anda akan menghapus <strong class="text-slate-900 font-semibold" x-text="selectedNiks.length"></strong> data pegawai yang dicentang. Seluruh berkas foto profil, data riwayat penempatan, evaluasi, dan pelatihan yang melekat akan ikut terhapus secara permanen.
+                        </p>
+                        
+                        <!-- Selected NIK list preview -->
+                        <div class="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 max-h-28 overflow-y-auto">
+                            <span class="text-[11px] font-semibold text-slate-500 block mb-1">NIK Terpilih:</span>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="nik in selectedNiks" :key="'badge-' + nik">
+                                    <span class="px-2 py-0.5 rounded-md bg-white border border-slate-200 font-mono text-[11px] text-slate-700 shadow-2xs"
+                                        x-text="nik"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-danger font-medium mt-2">
+                            <i class="fas fa-circle-exclamation mr-1"></i> Tindakan penghapusan massal ini tidak dapat dibatalkan (Irreversible).
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                    <button type="button" @click="bulkDeleteModalOpen = false"
+                        class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer shadow-2xs">
+                        Batal
+                    </button>
+                    <form action="{{ route('admin.employees.bulkDestroy') }}" method="POST" class="inline">
+                        @csrf
+                        <template x-for="nik in selectedNiks" :key="'delete-' + nik">
+                            <input type="hidden" name="niks[]" :value="nik">
+                        </template>
+                        <button type="submit"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-danger hover:bg-red-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer">
+                            <i class="fas fa-trash-alt text-xs"></i>
+                            <span>Ya, Hapus <span x-text="selectedNiks.length"></span> Pegawai</span>
                         </button>
                     </form>
                 </div>
