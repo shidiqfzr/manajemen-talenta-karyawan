@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Services\ManPowerPlanningService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +15,36 @@ class EmployeeObserver
 
     /** Fields considered start-date sources */
     private const DATE_FIELDS = ['tanggal_dalam_jabatan', 'tmt_unit_kerja'];
+
+    /**
+     * Auto-derive RM Level and calculate Retirement & MBT before saving.
+     */
+    public function saving(Employee $employee): void
+    {
+        // 1. Auto-derive RM Level if empty
+        if (empty($employee->rm_level) && filled($employee->jabatan)) {
+            $employee->rm_level = app(ManPowerPlanningService::class)->determineRmLevel($employee);
+        }
+
+        // 2. Auto-calculate Pensiun (56 tahun) & MBT (55 tahun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
+        if (! empty($employee->tanggal_lahir)) {
+            $tglLahirStr = $employee->tanggal_lahir instanceof Carbon
+                ? $employee->tanggal_lahir->toDateString()
+                : (string) $employee->tanggal_lahir;
+
+            if (empty($employee->tanggal_pensiun)) {
+                $employee->tanggal_pensiun = Employee::calculateTanggalPensiun($tglLahirStr);
+            }
+
+            if (empty($employee->tanggal_mbt) && ! empty($employee->tanggal_pensiun)) {
+                $tglPensiunStr = $employee->tanggal_pensiun instanceof Carbon
+                    ? $employee->tanggal_pensiun->toDateString()
+                    : (string) $employee->tanggal_pensiun;
+
+                $employee->tanggal_mbt = Employee::calculateTanggalMbt($tglPensiunStr);
+            }
+        }
+    }
 
     /**
      * On first create, seed 1 active history row (if job info is present).

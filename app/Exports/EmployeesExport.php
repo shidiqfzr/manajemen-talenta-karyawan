@@ -46,6 +46,11 @@ class EmployeesExport implements FromCollection, WithEvents, WithHeadings
     {
         $query = Employee::query();
 
+        if (! empty($this->filters['niks'])) {
+            $niks = is_array($this->filters['niks']) ? $this->filters['niks'] : explode(',', (string) $this->filters['niks']);
+            $query->whereIn('nik', $niks);
+        }
+
         if (! empty($this->filters['search'])) {
             $query->search($this->filters['search']);
         }

@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreEmployeeRequest;
+use App\Http\Requests\Admin\UpdateEmployeeRequest;
 use App\Imports\EmployeesImport;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -87,11 +88,8 @@ class EmployeeController extends Controller
         // Fixed Global Headcount KPI Metrics (Executive Overview)
         $totalEmployees = Employee::count();
         $totalUnits = Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
-        $karpimCount = Employee::where(function ($q) {
-            $q->where('level', 'like', '%Karpim%')
-                ->orWhere('level', 'like', '%Pimpinan%');
-        })->count();
-        $pelaksanaCount = max(0, $totalEmployees - $karpimCount);
+        $karpimCount = Employee::karpim()->count();
+        $pelaksanaCount = Employee::pelaksana()->count();
 
         // Global reference
         $globalTotalEmployees = $totalEmployees;
@@ -102,7 +100,18 @@ class EmployeeController extends Controller
         $sanksiTotalCount = Employee::sanctionAll()->count();
         $overflowCount = Employee::overflow()->count();
 
-        $employees = $query->orderBy('nama', 'asc')->paginate(20)->withQueryString();
+        // Column sorting (Enterprise HRIS standard: sortable table columns)
+        $sortColumn = $request->query('sort', 'nama');
+        $sortDirection = $request->query('direction', 'asc') === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['nama', 'jabatan', 'rm_level', 'level', 'golongan'];
+
+        if (in_array($sortColumn, $allowedSorts)) {
+            $query->orderBy($sortColumn, $sortDirection);
+        } else {
+            $query->orderBy('nama', 'asc');
+        }
+
+        $employees = $query->paginate(20)->withQueryString();
 
         // Get unique sorted values for filters
         $jabatans = Employee::select('jabatan')->whereNotNull('jabatan')->where('jabatan', '!=', '')->distinct()->orderBy('jabatan')->pluck('jabatan');
@@ -111,16 +120,10 @@ class EmployeeController extends Controller
         $golongans = Employee::select('golongan')->whereNotNull('golongan')->where('golongan', '!=', '')->distinct()->orderBy('golongan')->pluck('golongan');
         $rmLevels = Employee::RM_LEVELS;
 
-        // Dynamic hire years from database
+        // Dynamic hire years from database (Fast substring extraction)
         $availableYears = Employee::whereNotNull('tmt_bekerja')
             ->pluck('tmt_bekerja')
-            ->map(function ($date) {
-                try {
-                    return Carbon::parse($date)->year;
-                } catch (\Exception $e) {
-                    return null;
-                }
-            })
+            ->map(fn ($date) => $date ? substr((string) $date, 0, 4) : null)
             ->filter()
             ->unique()
             ->sortDesc()
@@ -203,42 +206,9 @@ class EmployeeController extends Controller
     }
 
     // Store new employee
-    public function store(Request $request)
+    public function store(StoreEmployeeRequest $request)
     {
-        $validated = $request->validate([
-            'nik' => ['required', 'string', 'regex:/^[0-9]{8}$/', 'unique:employees,nik'],
-            'nama' => 'required|string|max:255',
-            'jabatan' => 'required|string|max:255',
-            'level' => 'required|string|max:255',
-            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
-            'unit_kerja' => 'required|string|max:255',
-            'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
-            'status_karyawan' => 'required|string|max:50',
-            'tanggal_berakhir_kontrak' => 'nullable|date',
-            'golongan' => 'nullable|string|max:50',
-            'tanggal_dalam_jabatan' => 'nullable|date',
-            'tmt_unit_kerja' => 'nullable|date',
-            'tempat_lahir' => 'nullable|string|max:100',
-            'jenis_kelamin' => 'nullable|string|in:L,P,Laki-laki,Perempuan',
-            'tanggal_lahir' => 'nullable|date',
-            'tmt_bekerja' => 'nullable|date',
-            'tanggal_diangkat_staf' => 'nullable|date',
-            'susunan_keluarga' => 'nullable|string|max:255',
-            'job_grade' => 'nullable|integer|between:1,16',
-            'person_grade' => 'nullable|integer|between:1,16',
-            'jalur_masuk' => 'nullable|string|in:CKP,Talent Scouting,RBB,Reguler',
-            'tanggal_mbt' => 'nullable|date',
-            'tanggal_pensiun' => 'nullable|date',
-            'agama' => 'nullable|string|max:50',
-            'pendidikan_terakhir' => 'nullable|string|max:100',
-            'sekolah' => 'nullable|string|max:255',
-            'foto' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-        ], [
-            'nik.regex' => 'Format NIK harus berupa 8 digit angka numerik (contoh: 13004521).',
-            'nik.unique' => 'NIK ini sudah terdaftar dalam sistem.',
-            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
-            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
-        ]);
+        $validated = $request->validated();
 
         if ($request->hasFile('foto')) {
             $validated['foto'] = $request->file('foto')->store('photos', 'public');
@@ -263,16 +233,6 @@ class EmployeeController extends Controller
             // or if the position is explicitly valid
             if (count($validPositions) > 0 && ! in_array($validated['jabatan'], $validPositions)) {
                 return back()->withErrors(['jabatan' => 'Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Pegawai yang dipilih.'])->withInput();
-            }
-        }
-
-        // Auto-calculate Pensiun (56 tahun) & MBT (55 tahun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
-        if (! empty($validated['tanggal_lahir'])) {
-            if (empty($validated['tanggal_pensiun'])) {
-                $validated['tanggal_pensiun'] = Employee::calculateTanggalPensiun($validated['tanggal_lahir']);
-            }
-            if (empty($validated['tanggal_mbt']) && ! empty($validated['tanggal_pensiun'])) {
-                $validated['tanggal_mbt'] = Employee::calculateTanggalMbt($validated['tanggal_pensiun']);
             }
         }
 
@@ -339,6 +299,7 @@ class EmployeeController extends Controller
             'status_khusus',
             'tahun_masuk',
             'bulan_masuk',
+            'niks',
         ]);
 
         return Excel::download(new EmployeesExport($filters), 'data_karyawan.xlsx');
@@ -387,37 +348,11 @@ class EmployeeController extends Controller
     }
 
     // Update existing employee
-    public function update(Request $request, $nik)
+    public function update(UpdateEmployeeRequest $request, $nik)
     {
         $employee = Employee::findOrFail($nik);
 
-        $validated = $request->validate([
-            'nama' => 'required|string|max:255',
-            'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
-            'status_karyawan' => 'required|string|max:50',
-            'tanggal_berakhir_kontrak' => 'nullable|date',
-            'golongan' => 'nullable|string|max:50',
-            'tanggal_dalam_jabatan' => 'nullable|date',
-            'tmt_unit_kerja' => 'nullable|date',
-            'tempat_lahir' => 'nullable|string|max:100',
-            'jenis_kelamin' => 'nullable|string|in:L,P,Laki-laki,Perempuan',
-            'tanggal_lahir' => 'nullable|date',
-            'tmt_bekerja' => 'nullable|date',
-            'tanggal_diangkat_staf' => 'nullable|date',
-            'susunan_keluarga' => 'nullable|string|max:255',
-            'job_grade' => 'nullable|integer|between:1,16',
-            'person_grade' => 'nullable|integer|between:1,16',
-            'jalur_masuk' => 'nullable|string|in:CKP,Talent Scouting,RBB,Reguler',
-            'tanggal_mbt' => 'nullable|date',
-            'tanggal_pensiun' => 'nullable|date',
-            'agama' => 'nullable|string|max:50',
-            'pendidikan_terakhir' => 'nullable|string|max:100',
-            'sekolah' => 'nullable|string|max:255',
-            'foto' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-        ], [
-            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
-            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
-        ]);
+        $validated = $request->validated();
 
         if ($request->hasFile('foto')) {
             // Delete old foto if exists
@@ -433,16 +368,6 @@ class EmployeeController extends Controller
         // Standardize data (Uppercase nama & trim unit_kerja)
         $validated['nama'] = strtoupper(trim($validated['nama']));
         $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
-
-        // Auto-calculate Pensiun & MBT if tanggal_lahir is provided and pensiun/mbt are empty
-        if (! empty($validated['tanggal_lahir'])) {
-            if (empty($validated['tanggal_pensiun'])) {
-                $validated['tanggal_pensiun'] = Employee::calculateTanggalPensiun($validated['tanggal_lahir']);
-            }
-            if (empty($validated['tanggal_mbt']) && ! empty($validated['tanggal_pensiun'])) {
-                $validated['tanggal_mbt'] = Employee::calculateTanggalMbt($validated['tanggal_pensiun']);
-            }
-        }
 
         DB::transaction(function () use ($employee, $validated) {
             $employee->update($validated);
@@ -466,5 +391,30 @@ class EmployeeController extends Controller
         });
 
         return redirect()->route('admin.employees.index')->with('success', 'Data pegawai berhasil dihapus.');
+    }
+
+    /**
+     * Hapus massal data pegawai terpilih secara transaksional.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'niks' => 'required|array|min:1',
+            'niks.*' => 'required|string|size:8',
+        ]);
+
+        $count = count($validated['niks']);
+
+        DB::transaction(function () use ($validated) {
+            $employees = Employee::whereIn('nik', $validated['niks'])->get();
+            foreach ($employees as $employee) {
+                if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
+                    Storage::disk('public')->delete($employee->foto);
+                }
+                $employee->delete();
+            }
+        });
+
+        return redirect()->route('admin.employees.index')->with('success', "{$count} data pegawai terpilih berhasil dihapus.");
     }
 }

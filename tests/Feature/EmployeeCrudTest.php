@@ -8,6 +8,7 @@ use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -382,5 +383,66 @@ class EmployeeCrudTest extends TestCase
         $unit->delete();
         $posValid->delete();
         Employee::where('nik', $nik)->first()->delete();
+    }
+
+    public function test_admin_can_bulk_delete_employees(): void
+    {
+        Employee::whereIn('nik', ['77112233', '77112244'])->delete();
+
+        Employee::create([
+            'nik' => '77112233',
+            'nama' => 'PEGAWAI BULK SATU',
+            'jabatan' => 'Asisten Afdeling',
+            'unit_kerja' => 'Kebun Parindu',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tanggal_lahir' => '1990-01-01',
+            'tmt_bekerja' => '2015-01-01',
+        ]);
+
+        Employee::create([
+            'nik' => '77112244',
+            'nama' => 'PEGAWAI BULK DUA',
+            'jabatan' => 'Asisten Afdeling',
+            'unit_kerja' => 'Kebun Parindu',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tanggal_lahir' => '1992-01-01',
+            'tmt_bekerja' => '2016-01-01',
+        ]);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.bulkDestroy'), [
+            'niks' => ['77112233', '77112244'],
+        ]);
+
+        $response->assertRedirect(route('admin.employees.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('employees', ['nik' => '77112233']);
+        $this->assertDatabaseMissing('employees', ['nik' => '77112244']);
+    }
+
+    public function test_employee_mbt_and_pension_lifecycle_helpers(): void
+    {
+        // Approaching MBT (age 54.5)
+        $approachingDate = Carbon::today()->subYears(54)->subMonths(6)->toDateString();
+        $empApproaching = new Employee(['tanggal_lahir' => $approachingDate]);
+        $this->assertTrue($empApproaching->isApproachingMbt());
+        $this->assertFalse($empApproaching->isMbtActive());
+        $this->assertFalse($empApproaching->isPensionReached());
+        $this->assertNotNull($empApproaching->mbt_countdown);
+
+        // MBT Active (age 55.5)
+        $mbtDate = Carbon::today()->subYears(55)->subMonths(6)->toDateString();
+        $empMbt = new Employee(['tanggal_lahir' => $mbtDate]);
+        $this->assertFalse($empMbt->isApproachingMbt());
+        $this->assertTrue($empMbt->isMbtActive());
+        $this->assertFalse($empMbt->isPensionReached());
+
+        // Pension Reached (age 56.5)
+        $pensionDate = Carbon::today()->subYears(56)->subMonths(6)->toDateString();
+        $empPension = new Employee(['tanggal_lahir' => $pensionDate]);
+        $this->assertFalse($empPension->isMbtActive());
+        $this->assertTrue($empPension->isPensionReached());
     }
 }

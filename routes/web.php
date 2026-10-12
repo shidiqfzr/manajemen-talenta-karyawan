@@ -63,6 +63,7 @@ Route::prefix('admin')
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
             Route::get('/{employee}/edit', [AdminEmployeeController::class, 'edit'])->name('edit');
             Route::put('/{employee}', [AdminEmployeeController::class, 'update'])->name('update');
+            Route::post('/bulk-destroy', [AdminEmployeeController::class, 'bulkDestroy'])->name('bulkDestroy');
             Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy'])->name('destroy');
 
             // Employee Statistics (Legacy redirect to unified Employee Directory)
