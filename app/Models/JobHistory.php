@@ -64,9 +64,10 @@ class JobHistory extends Model
             'ROTASI' => 'Rotasi',
             'DEMOSI' => 'Demosi',
             'MUTASI_UNIT' => 'Mutasi Unit',
-            'PENUGASAN' => 'Penugasan',
+            'PENUGASAN', 'PENUGASAN_SEMENTARA' => 'Penugasan',
             'PENUGASAN_KHUSUS' => 'Penugasan Khusus',
             'SANKSI_INDISIPLINER' => 'Sanksi Indisipliner',
+            default => $this->jenis_mutasi,
         };
     }
 }

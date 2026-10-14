@@ -59,6 +59,9 @@ Route::prefix('admin')
             Route::post('/', [AdminEmployeeController::class, 'store'])->name('store');
             Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
             Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import');
+            Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview');
+            Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit');
+            Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
             Route::get('/{employee}/edit', [AdminEmployeeController::class, 'edit'])->name('edit');

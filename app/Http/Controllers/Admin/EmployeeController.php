@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
+use App\Exports\FailedEmployeesExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreEmployeeRequest;
 use App\Http\Requests\Admin\UpdateEmployeeRequest;
@@ -11,8 +12,10 @@ use App\Imports\EmployeesImport;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\EmployeeImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -278,12 +281,88 @@ class EmployeeController extends Controller
 
         $summary = $import->getImportSummary();
 
+        // Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN)
+        $user = auth()->user();
+        Log::info('HRIS Import Data Pegawai dieksekusi', [
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'System',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'file_name' => $request->file('import_file')->getClientOriginalName(),
+            'file_size' => $request->file('import_file')->getSize(),
+            'created_count' => $summary['created'],
+            'updated_count' => $summary['updated'],
+            'skipped_count' => $summary['skipped'],
+            'has_errors' => $summary['has_errors'],
+            'timestamp' => now()->toIso8601String(),
+        ]);
+
         return redirect()
             ->route('admin.employees.index')
             ->with([
                 'success' => "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, {$summary['skipped']} rows skipped.",
                 'import_summary' => $summary,
             ]);
+    }
+
+    public function previewImport(Request $request, EmployeeImportService $importService)
+    {
+        $request->validate([
+            'import_file' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        $previewData = $importService->preview($request->file('import_file'));
+
+        return response()->json([
+            'success' => true,
+            ...$previewData,
+        ]);
+    }
+
+    public function commitImport(Request $request, EmployeeImportService $importService)
+    {
+        $request->validate([
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $summary = $importService->commit(
+                $request->token,
+                auth()->user(),
+                $request->ip(),
+                $request->userAgent()
+            );
+
+            session()->flash('success', "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, {$summary['skipped']} rows skipped.");
+            session()->flash('import_summary', $summary);
+
+            return response()->json([
+                'success' => true,
+                'redirect_url' => route('admin.employees.index'),
+                'summary' => $summary,
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function downloadFailedRows(Request $request, EmployeeImportService $importService)
+    {
+        $request->validate([
+            'token' => 'required|string',
+        ]);
+
+        $failedRows = $importService->getFailedRows($request->token);
+        if (empty($failedRows)) {
+            return redirect()->back()->with('error', 'Tidak ada data baris gagal yang dapat diunduh atau sesi telah berakhir.');
+        }
+
+        $filename = 'baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(new FailedEmployeesExport($failedRows), $filename);
     }
 
     public function export(Request $request)
@@ -302,7 +381,24 @@ class EmployeeController extends Controller
             'niks',
         ]);
 
-        return Excel::download(new EmployeesExport($filters), 'data_karyawan.xlsx');
+        $export = new EmployeesExport($filters);
+
+        // Audit Trail Pencatatan Ekspor Data Pegawai (UU PDP No. 27/2022 & Tata Kelola BUMN)
+        $user = auth()->user();
+        $recordCount = $export->query()->count();
+        Log::info('HRIS Export Data Pegawai dieksekusi', [
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'System',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'filters' => array_filter($filters),
+            'record_count' => $recordCount,
+            'timestamp' => now()->toIso8601String(),
+        ]);
+
+        $filename = 'data_karyawan_ptpn4_reg5_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download($export, $filename);
     }
 
     public function downloadTemplate()
