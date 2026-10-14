@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Sheet;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Tests\TestCase;
@@ -375,5 +376,120 @@ class EmployeeExportTest extends TestCase
         $oddFooter = $activeSheet->getHeaderFooter()->getOddFooter();
         $this->assertStringContainsString('Dokumen Rahasia PT Perkebunan Nusantara IV Regional V - UU PDP No. 27/2022', $oddFooter);
         $this->assertStringContainsString($this->adminUser->name, $oddFooter);
+    }
+
+    public function test_export_handles_empty_dataset_gracefully_with_headings_only(): void
+    {
+        Excel::fake();
+        Excel::matchByRegex();
+
+        $response = $this->actingAs($this->adminUser)->get(route('admin.employees.export', [
+            'unit_kerja' => 'Unit Non Existent 9999',
+        ]));
+
+        $response->assertSuccessful();
+
+        Excel::assertDownloaded(
+            '/^data_karyawan_ptpn4_reg5_\d{8}_\d{6}\.xlsx$/',
+            function (EmployeesExport $export) {
+                return $export->query()->count() === 0
+                    && count($export->headings()) === 26;
+            }
+        );
+    }
+
+    public function test_export_maps_employee_with_all_nullable_fields_as_null_cleanly(): void
+    {
+        $employee = new Employee([
+            'nik' => '13999999',
+            'nama' => 'PEGAWAI NULL ATTRIBUTES',
+            'tempat_lahir' => null,
+            'jenis_kelamin' => null,
+            'agama' => null,
+            'susunan_keluarga' => null,
+            'status_karyawan' => null,
+            'status_penugasan' => null,
+            'tanggal_diangkat_staf' => null,
+            'tanggal_dalam_jabatan' => null,
+            'tmt_unit_kerja' => null,
+            'jalur_masuk' => null,
+            'job_grade' => null,
+            'person_grade' => null,
+            'pendidikan_terakhir' => null,
+            'sekolah' => null,
+        ]);
+
+        $export = new EmployeesExport;
+        $row = $export->map($employee);
+
+        $this->assertCount(26, $row);
+        $this->assertSame('13999999', $row[0]);
+        $this->assertSame('PEGAWAI NULL ATTRIBUTES', $row[1]);
+        $this->assertSame('', $row[2]); // jenis_kelamin default empty string
+        $this->assertSame('Tetap (PKWTT)', $row[7]); // status_karyawan fallback
+        $this->assertSame('Definitif', $row[13]); // status_penugasan fallback
+        $this->assertSame('', $row[14]); // tugas rangkap empty
+        $this->assertSame('Reguler', $row[19]); // jalur_masuk fallback
+        $this->assertSame('', $row[20]); // job_grade empty string
+        $this->assertSame('', $row[21]); // person_grade empty string
+    }
+
+    public function test_export_filters_by_comma_separated_niks_string(): void
+    {
+        Excel::fake();
+        Excel::matchByRegex();
+
+        Employee::factory()->create(['nik' => '13000010', 'nama' => 'NIK SEPULUH']);
+        Employee::factory()->create(['nik' => '13000020', 'nama' => 'NIK DUA PULUH']);
+        Employee::factory()->create(['nik' => '13000030', 'nama' => 'NIK TIGA PULUH']);
+
+        $response = $this->actingAs($this->adminUser)->get(route('admin.employees.export', [
+            'niks' => '13000010,13000030',
+        ]));
+
+        $response->assertSuccessful();
+
+        Excel::assertDownloaded(
+            '/^data_karyawan_ptpn4_reg5_\d{8}_\d{6}\.xlsx$/',
+            function (EmployeesExport $export) {
+                $results = $export->query()->get();
+
+                return $results->count() === 2
+                    && $results->pluck('nik')->sort()->values()->toArray() === ['13000010', '13000030'];
+            }
+        );
+    }
+
+    public function test_export_generates_real_binary_xlsx_file_without_mocking(): void
+    {
+        Employee::factory()->create([
+            'nik' => '13005555',
+            'nama' => 'TEST REAL BINARY EXCEL',
+            'unit_kerja' => 'Kebun Danau Salak',
+            'jabatan' => 'Asisten Afdeling',
+        ]);
+
+        $response = $this->actingAs($this->adminUser)->get(route('admin.employees.export', [
+            'niks' => ['13005555'],
+        ]));
+
+        $response->assertSuccessful();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $contentDisposition = $response->headers->get('content-disposition');
+        $this->assertStringContainsString('attachment; filename=data_karyawan_ptpn4_reg5_', $contentDisposition);
+        $this->assertStringContainsString('.xlsx', $contentDisposition);
+
+        $filePath = $response->getFile()->getPathname();
+        $this->assertFileExists($filePath);
+
+        $spreadsheet = IOFactory::load($filePath);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $this->assertSame('Data Karyawan', $sheet->getTitle());
+        $this->assertSame('NIK', $sheet->getCell('A1')->getValue());
+        $this->assertSame('NAMA', $sheet->getCell('B1')->getValue());
+        $this->assertSame('13005555', (string) $sheet->getCell('A2')->getValue());
+        $this->assertSame('TEST REAL BINARY EXCEL', $sheet->getCell('B2')->getValue());
     }
 }
