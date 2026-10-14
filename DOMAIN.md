@@ -369,6 +369,14 @@ AI dan pengembang harus memanfaatkan Service Layer yang ada:
 ### 9.3 `JobVacancyService`
 - Mendeteksi formasi kosong manajerial aktif berdasarkan standar formasi unit vs pejabat definitif yang bertugas.
 
+### 9.4 `EmployeeExportService`
+- `exportExcel(Request|array $requestOrFilters, ?User $user)` $\rightarrow$ Orkestrasi ekspor data kepegawaian 26 kolom SSOT ke Excel, penyematan metadata dokumen UU PDP No. 27/2022, dan pencatatan security audit trail.
+- `sanitizeFilters(Request|array $requestOrFilters): array` $\rightarrow$ Sanitasi filter query.
+
+### 9.5 `EmployeeImportService`
+- `preview(UploadedFile $file): array` $\rightarrow$ Dry-run parsing Excel, validasi integritas master data, dan deteksi anomali formasi sebelum disimpan permanen.
+- `commit(string $token): array` $\rightarrow$ Eksekusi penyimpanan baris valid ke database secara transaksional.
+
 ---
 
 ## 10. Sinkronisasi Domain ke UI ([DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md))

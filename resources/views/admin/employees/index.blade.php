@@ -971,22 +971,5 @@
 
 </div>
 
-<!-- Enhanced JS for Table Export -->
-<script>
-    // Table Smart Export Loading State
-    document.getElementById('tableExportForm')?.addEventListener('submit', function() {
-        const btn = document.getElementById('tableExportBtn');
-        const btnText = document.getElementById('tableExportBtnText');
-
-        btn.disabled = true;
-        btnText.textContent = 'Mengunduh...';
-
-        setTimeout(function() {
-            btn.disabled = false;
-            btnText.textContent = 'Export Excel ({{ $employees->total() }})';
-        }, 3000);
-    });
-</script>
-
 <x-toast />
 @endsection

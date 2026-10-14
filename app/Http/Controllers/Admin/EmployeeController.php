@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesExport;
 use App\Http\Controllers\Controller;
@@ -12,6 +11,7 @@ use App\Imports\EmployeesImport;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -365,40 +365,9 @@ class EmployeeController extends Controller
         return Excel::download(new FailedEmployeesExport($failedRows), $filename);
     }
 
-    public function export(Request $request)
+    public function export(Request $request, EmployeeExportService $exportService)
     {
-        $filters = $request->only([
-            'search',
-            'jabatan',
-            'level',
-            'rm_level',
-            'unit_kerja',
-            'golongan',
-            'status_penugasan',
-            'status_khusus',
-            'tahun_masuk',
-            'bulan_masuk',
-            'niks',
-        ]);
-
-        $export = new EmployeesExport($filters);
-
-        // Audit Trail Pencatatan Ekspor Data Pegawai (UU PDP No. 27/2022 & Tata Kelola BUMN)
-        $user = auth()->user();
-        $recordCount = $export->query()->count();
-        Log::info('HRIS Export Data Pegawai dieksekusi', [
-            'user_id' => $user?->id,
-            'user_name' => $user?->name ?? 'System',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'filters' => array_filter($filters),
-            'record_count' => $recordCount,
-            'timestamp' => now()->toIso8601String(),
-        ]);
-
-        $filename = 'data_karyawan_ptpn4_reg5_'.now()->format('Ymd_His').'.xlsx';
-
-        return Excel::download($export, $filename);
+        return $exportService->exportExcel($request, auth()->user());
     }
 
     public function downloadTemplate()

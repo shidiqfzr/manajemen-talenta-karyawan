@@ -6,6 +6,7 @@ use App\Exports\EmployeesExport;
 use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\User;
+use App\Services\EmployeeExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Events\AfterSheet;
@@ -303,5 +304,76 @@ class EmployeeExportTest extends TestCase
 
         // Verify AutoFilter is set on A1:Z1
         $this->assertSame('A1:Z1', $activeSheet->getAutoFilter()->getRange());
+    }
+
+    public function test_employee_export_service_handles_export_and_audit_logging(): void
+    {
+        Excel::fake();
+        Excel::matchByRegex();
+
+        Employee::factory()->count(2)->create(['level' => 'Karpim']);
+
+        Log::shouldReceive('info')
+            ->once()
+            ->with(
+                'HRIS Export Data Pegawai dieksekusi',
+                \Mockery::on(function ($context) {
+                    return isset($context['user_id'])
+                        && $context['user_id'] === $this->adminUser->id
+                        && isset($context['filters']['level'])
+                        && $context['filters']['level'] === 'Karpim'
+                        && isset($context['record_count']);
+                })
+            );
+
+        $service = new EmployeeExportService;
+        $response = $service->exportExcel(['level' => 'Karpim'], $this->adminUser);
+
+        $this->assertNotNull($response);
+
+        Excel::assertDownloaded(
+            '/^data_karyawan_ptpn4_reg5_\d{8}_\d{6}\.xlsx$/',
+            function (EmployeesExport $export) {
+                return $export->query()->count() >= 2;
+            }
+        );
+    }
+
+    public function test_export_contains_enterprise_document_properties_and_pdp_metadata(): void
+    {
+        $export = new EmployeesExport([], $this->adminUser);
+        $properties = $export->properties();
+
+        $this->assertArrayHasKey('creator', $properties);
+        $this->assertStringContainsString($this->adminUser->name, $properties['creator']);
+        $this->assertArrayHasKey('company', $properties);
+        $this->assertSame('PT Perkebunan Nusantara IV (Persero) Regional V', $properties['company']);
+        $this->assertArrayHasKey('category', $properties);
+        $this->assertSame('HR Confidential Document', $properties['category']);
+        $this->assertArrayHasKey('description', $properties);
+        $this->assertStringContainsString('UU PDP No. 27/2022', $properties['description']);
+    }
+
+    public function test_export_embeds_confidential_print_footer_in_sheet(): void
+    {
+        $export = new EmployeesExport([], $this->adminUser);
+        $sheet = new Spreadsheet;
+        $activeSheet = $sheet->getActiveSheet();
+
+        $activeSheet->fromArray($export->headings(), null, 'A1');
+
+        $events = $export->registerEvents();
+        $afterSheetCallback = $events[AfterSheet::class];
+
+        $eventMock = new AfterSheet(
+            new Sheet($activeSheet),
+            $export
+        );
+
+        $afterSheetCallback($eventMock);
+
+        $oddFooter = $activeSheet->getHeaderFooter()->getOddFooter();
+        $this->assertStringContainsString('Dokumen Rahasia PT Perkebunan Nusantara IV Regional V - UU PDP No. 27/2022', $oddFooter);
+        $this->assertStringContainsString($this->adminUser->name, $oddFooter);
     }
 }

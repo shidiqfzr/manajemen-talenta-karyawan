@@ -3,11 +3,13 @@
 namespace App\Exports;
 
 use App\Models\Employee;
+use App\Models\User;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithProperties;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -15,18 +17,43 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithTitle
+class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithProperties, WithTitle
 {
     protected array $filters;
 
-    public function __construct(array $filters = [])
+    protected ?User $user;
+
+    public function __construct(array $filters = [], ?User $user = null)
     {
         $this->filters = $filters;
+        $this->user = $user;
     }
 
     public function title(): string
     {
         return 'Data Karyawan';
+    }
+
+    /**
+     * Properti dokumen metadata Excel sesuai regulasi UU PDP No. 27/2022
+     * dan tata kelola keamanan informasi BUMN.
+     */
+    public function properties(): array
+    {
+        $userName = $this->user?->name ?? 'Administrator HRIS';
+        $userNik = $this->user?->nik ?? 'ADMIN';
+
+        return [
+            'creator' => "{$userName} ({$userNik})",
+            'lastModifiedBy' => 'PTPN IV Regional V HRIS System',
+            'title' => 'Master Data Karyawan PTPN IV Regional V',
+            'description' => 'Dokumen Rahasia Data Pegawai diekspor sesuai UU PDP No. 27/2022',
+            'subject' => 'Data Karyawan & Formasi',
+            'keywords' => 'ptpn4, hris, karyawan, formasi, confidential',
+            'category' => 'HR Confidential Document',
+            'manager' => 'Bagian SDM & TI PTPN IV Regional V',
+            'company' => 'PT Perkebunan Nusantara IV (Persero) Regional V',
+        ];
     }
 
     /**
@@ -274,6 +301,11 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
 
                 // 6. Wrap text aktif untuk kolom O (Tugas Rangkap) agar multi-tugas tampil bertingkat rapi
                 $sheet->getStyle('O')->getAlignment()->setWrapText(true);
+
+                // 7. Pengaturan Halaman Cetak & Print Footer Keamanan (UU PDP No. 27/2022)
+                $userName = $this->user?->name ?? 'Admin SDM';
+                $sheet->getHeaderFooter()
+                    ->setOddFooter('&L&8Dokumen Rahasia PT Perkebunan Nusantara IV Regional V - UU PDP No. 27/2022&R&8Diunduh oleh: '.$userName.' (&D &T) - Hal &P dari &N');
             },
         ];
     }

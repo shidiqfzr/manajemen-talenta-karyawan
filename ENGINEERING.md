@@ -79,6 +79,8 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - `App\Services\MutasiService`: Simulasi dampak mutasi (`analyzeTarget`), eksekusi straight/swap mutasi, dan pencatatan `job_histories`.
   - `App\Services\JobVacancyService`: Deteksi formasi kosong manajerial aktif.
   - `App\Services\TrainingExportService`: Ekspor laporan dan surat tugas.
+  - `App\Services\EmployeeExportService`: Orkestrasi ekspor data kepegawaian berstandar UU PDP No. 27/2022, sanitasi parameter filter, penyematan metadata/print footer rahasia, dan pencatatan audit trail.
+  - `App\Services\EmployeeImportService`: Validasi pra-impor, kalkulasi pensiun/MBT otomatis, dan preview dry-run.
 
 ### 2.2 Eloquent Models & Database Practices
 1. **Format NIK**:
