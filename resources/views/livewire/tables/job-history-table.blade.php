@@ -43,7 +43,14 @@
             </td>
             <td class="px-4 py-3 text-gray-600">
                 @if ($history->nomor_sk || $history->tanggal_sk)
-                    <div>{{ $history->nomor_sk ?? '&mdash;' }}</div>
+                    <div class="flex items-center gap-1.5">
+                        <span>{{ $history->nomor_sk ?? '&mdash;' }}</span>
+                        @if ($history->file_sk)
+                            <a href="{{ route('admin.mutasi.downloadSk', $history->id) }}" target="_blank" class="text-danger hover:text-red-700 transition" title="Unduh Berkas SK PDF (Aman)">
+                                <i class="fas fa-file-pdf text-xs"></i>
+                            </a>
+                        @endif
+                    </div>
                     <div class="text-[11px] text-gray-400">{{ $history->tanggal_sk?->format('d M Y') ?? '' }}</div>
                 @else
                     <span class="text-gray-400">&mdash;</span>

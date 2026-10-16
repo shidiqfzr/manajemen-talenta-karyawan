@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\User;
 use App\Services\MutasiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -148,5 +149,101 @@ class MutasiServiceTest extends TestCase
         Position::factory()->create(['nama' => 'Jabatan Beta', 'rm_level' => 'RM-3']);
         $newCached = Position::getAllCached();
         $this->assertTrue($newCached->has('Jabatan Beta'));
+    }
+
+    public function test_tenure_compliance_check(): void
+    {
+        $empCompliant = Employee::factory()->create([
+            'unit_kerja' => 'Unit A',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+        ]);
+
+        $empNonCompliant = Employee::factory()->create([
+            'unit_kerja' => 'Unit A',
+            'tmt_unit_kerja' => now()->subMonths(10)->toDateString(),
+        ]);
+
+        // Same unit -> not applicable (always compliant)
+        $sameUnit = $this->service->checkTenureCompliance($empNonCompliant, 'Unit A');
+        $this->assertFalse($sameUnit['is_applicable']);
+        $this->assertTrue($sameUnit['is_compliant']);
+
+        // Different unit, >= 2 years -> compliant
+        $compliantResult = $this->service->checkTenureCompliance($empCompliant, 'Unit B');
+        $this->assertTrue($compliantResult['is_applicable']);
+        $this->assertTrue($compliantResult['is_compliant']);
+
+        // Different unit, < 2 years -> non-compliant
+        $nonCompliantResult = $this->service->checkTenureCompliance($empNonCompliant, 'Unit B');
+        $this->assertTrue($nonCompliantResult['is_applicable']);
+        $this->assertFalse($nonCompliantResult['is_compliant']);
+        $this->assertEquals(10, $nonCompliantResult['months']);
+    }
+
+    public function test_promotion_eligibility_check(): void
+    {
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        // Emp with Gol IIIC (eligible for RM-2 promotion)
+        $empEligible = Employee::factory()->create([
+            'jabatan' => 'Asisten Tanaman',
+            'golongan' => 'IIIC',
+            'tanggal_dalam_jabatan' => now()->subYears(2)->toDateString(),
+        ]);
+
+        $resultEligible = $this->service->checkPromotionEligibility($empEligible, 'Askep Tanaman');
+        $this->assertTrue($resultEligible['is_applicable']);
+
+        // Emp with Gol IIIA and only 1 year tenure (not eligible for RM-2 without dispensation)
+        $empIneligible = Employee::factory()->create([
+            'jabatan' => 'Asisten Tanaman',
+            'golongan' => 'IIIA',
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+
+        $resultIneligible = $this->service->checkPromotionEligibility($empIneligible, 'Askep Tanaman');
+        $this->assertTrue($resultIneligible['is_applicable']);
+        $this->assertFalse($resultIneligible['is_eligible']);
+    }
+
+    public function test_process_mutasi_stores_enterprise_audit_and_dispensasi(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Tanaman',
+            'unit_kerja' => 'Kebun A',
+        ]);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Teknik', 'rm_level' => 'RM-3']);
+
+        $result = $this->service->processMutasi(
+            employeeNik: $emp->nik,
+            targetJabatan: 'Asisten Teknik',
+            targetUnitKerja: 'Kebun A',
+            tmtAwal: now()->toDateString(),
+            jenisMutasi: 'ROTASI',
+            nomorSk: 'SK/TEST/001',
+            tanggalSk: now()->toDateString(),
+            catatan: 'Rotasi rotasi',
+            tanggalBerakhirSanksi: null,
+            statusJabatan: 'Definitif',
+            tmtAkhirEstimasi: null,
+            fileSk: 'dokumen_sk/sk_dummy.pdf',
+            createdBy: $user->id,
+            isDispensasi: true,
+            alasanDispensasi: 'Dispensasi Khusus Direksi'
+        );
+
+        $this->assertEquals('transfer', $result['type']);
+
+        $job = JobHistory::where('employee_nik', $emp->nik)->where('jabatan', 'Asisten Teknik')->first();
+        $this->assertNotNull($job);
+        $this->assertEquals($user->id, $job->created_by);
+        $this->assertEquals('dokumen_sk/sk_dummy.pdf', $job->file_sk);
+        $this->assertTrue($job->is_dispensasi);
+        $this->assertEquals('Dispensasi Khusus Direksi', $job->alasan_dispensasi);
     }
 }

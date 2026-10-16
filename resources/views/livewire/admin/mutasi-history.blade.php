@@ -156,6 +156,11 @@
                                     <div class="font-medium text-surface-900 tabular-nums">
                                         {{ $record->tmt_awal ? \Carbon\Carbon::parse($record->tmt_awal)->translatedFormat('d M Y') : '—' }}
                                     </div>
+                                    @if ($record->tmt_awal && \Carbon\Carbon::parse($record->tmt_awal)->isFuture())
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 mt-1 tabular-nums">
+                                            <i class="fas fa-clock mr-1 text-[9px]"></i> TMT Mendatang
+                                        </span>
+                                    @endif
                                     <span class="text-[11px] text-surface-500 block mt-0.5 tabular-nums">
                                         Sampai: {{ $record->tmt_akhir ? \Carbon\Carbon::parse($record->tmt_akhir)->translatedFormat('d M Y') : 'Sekarang' }}
                                     </span>
@@ -173,21 +178,44 @@
                                             Selesai (Mutasi)
                                         </span>
                                     @endif
+
+                                    @if ($record->is_dispensasi)
+                                        <div class="mt-1">
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="{{ $record->alasan_dispensasi }}">
+                                                <i class="fas fa-exclamation-circle text-[9px]"></i> Dispensasi
+                                            </span>
+                                        </div>
+                                    @endif
                                 </td>
 
                                 <!-- SK & Catatan -->
-                                <td class="py-3.5 px-5 align-top text-xs">
-                                    @if ($record->nomor_sk)
-                                        <div class="font-mono text-[11px] font-semibold text-surface-800 bg-surface-100 px-2 py-0.5 rounded border border-surface-200 inline-block tabular-nums">
-                                            {{ $record->nomor_sk }}
-                                        </div>
-                                    @endif
+                                <td class="py-3.5 px-5 align-top text-xs space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        @if ($record->nomor_sk)
+                                            <div class="font-mono text-[11px] font-semibold text-surface-800 bg-surface-100 px-2 py-0.5 rounded border border-surface-200 inline-block tabular-nums">
+                                                {{ $record->nomor_sk }}
+                                            </div>
+                                        @endif
+                                        @if ($record->file_sk)
+                                            <a href="{{ route('admin.mutasi.downloadSk', $record->id) }}" target="_blank"
+                                                class="inline-flex items-center gap-1 text-[11px] font-semibold text-danger hover:text-red-700 transition"
+                                                title="Lihat Berkas SK Digital (Aman)">
+                                                <i class="fas fa-file-pdf"></i>
+                                                <span>Unduh SK</span>
+                                            </a>
+                                        @endif
+                                    </div>
                                     @if ($record->catatan)
-                                        <p class="text-[11px] text-surface-500 mt-1 line-clamp-2" title="{{ $record->catatan }}">
+                                        <p class="text-[11px] text-surface-500 line-clamp-2" title="{{ $record->catatan }}">
                                             {{ $record->catatan }}
                                         </p>
                                     @elseif (!$record->nomor_sk)
                                         <span class="text-surface-400 italic text-[11px]">—</span>
+                                    @endif
+                                    @if ($record->creator)
+                                        <span class="text-[10px] text-surface-400 block pt-0.5">
+                                            Oleh: {{ $record->creator->name }}
+                                        </span>
                                     @endif
                                 </td>
                             </tr>

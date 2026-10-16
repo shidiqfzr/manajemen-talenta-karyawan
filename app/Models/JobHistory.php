@@ -27,6 +27,7 @@ class JobHistory extends Model
 
     protected $fillable = [
         'employee_nik',
+        'created_by',
         'jabatan',
         'unit_kerja',
         'status_penugasan',
@@ -38,7 +39,10 @@ class JobHistory extends Model
         'jenis_mutasi',
         'nomor_sk',
         'tanggal_sk',
+        'file_sk',
         'catatan',
+        'is_dispensasi',
+        'alasan_dispensasi',
     ];
 
     protected $casts = [
@@ -46,7 +50,13 @@ class JobHistory extends Model
         'tmt_akhir' => 'date',
         'tmt_akhir_estimasi' => 'date',
         'tanggal_sk' => 'date',
+        'is_dispensasi' => 'boolean',
     ];
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
     public function employee()
     {

@@ -51,6 +51,183 @@ class MutasiService
     }
 
     /**
+     * Check tenure compliance in the current unit kerja based on DOMAIN.md §5.2.1
+     * (Pegawai minimal menjabat 2-3 tahun di unit kerja sebelum diperbolehkan rotasi unit).
+     */
+    public function checkTenureCompliance(Employee $emp, string $targetUnitKerja): array
+    {
+        $isDifferentUnit = $emp->unit_kerja !== $targetUnitKerja;
+        if (! $isDifferentUnit) {
+            return [
+                'is_applicable' => false,
+                'is_compliant' => true,
+                'months' => 0,
+                'years' => 0.0,
+                'tmt_unit_kerja' => $emp->tmt_unit_kerja?->toDateString(),
+                'message' => 'Rotasi internal dalam unit kerja yang sama (tidak pindah lokasi/unit).',
+            ];
+        }
+
+        $tmtDate = $emp->tmt_unit_kerja ?? $emp->tanggal_dalam_jabatan;
+        if (! $tmtDate) {
+            return [
+                'is_applicable' => true,
+                'is_compliant' => false,
+                'months' => 0,
+                'years' => 0.0,
+                'tmt_unit_kerja' => null,
+                'message' => 'Data TMT Unit Kerja belum tercatat. Standar minimal masa dinas adalah 2 tahun (24 bulan) sesuai DOMAIN.md §5.2.1.',
+            ];
+        }
+
+        $carbonTmt = Carbon::parse($tmtDate);
+        $months = (int) $carbonTmt->diffInMonths(now());
+        $years = round($months / 12, 1);
+        $isCompliant = $months >= 24;
+
+        return [
+            'is_applicable' => true,
+            'is_compliant' => $isCompliant,
+            'months' => $months,
+            'years' => $years,
+            'tmt_unit_kerja' => $carbonTmt->toDateString(),
+            'message' => $isCompliant
+                ? "Masa dinas di unit saat ini ({$years} tahun / {$months} bulan) telah memenuhi standar minimal 2 tahun."
+                : "Pegawai baru bertugas {$years} tahun ({$months} bulan) di {$emp->unit_kerja} (standar minimal 2-3 tahun sesuai DOMAIN.md §5.2.1). Memerlukan Dispensasi Khusus Direksi.",
+        ];
+    }
+
+    /**
+     * Check employee promotion readiness and eligibility based on DOMAIN.md §5.2.3 and §6.
+     */
+    public function checkPromotionEligibility(Employee $emp, string $targetJabatan): array
+    {
+        $currentRm = app(ManPowerPlanningService::class)->determineRmLevel($emp);
+        $currentRmNum = $this->parseRmNumber($currentRm);
+
+        $positions = Position::getAllCached();
+        $targetRm = isset($positions[$targetJabatan]) && $positions[$targetJabatan]->rm_level
+            ? $positions[$targetJabatan]->rm_level
+            : app(ManPowerPlanningService::class)->determineRmLevelByJobTitle($targetJabatan);
+        $targetRmNum = $this->parseRmNumber($targetRm);
+
+        // If not a promotion (or target rank not higher), return not applicable
+        if ($targetRmNum === null || $currentRmNum === null || $targetRmNum >= $currentRmNum) {
+            return [
+                'is_applicable' => false,
+                'is_eligible' => true,
+                'current_rm' => $currentRm,
+                'target_rm' => $targetRm,
+                'criteria' => [],
+                'summary' => 'Bukan kenaikan eselon (promosi struktural).',
+            ];
+        }
+
+        $criteria = [];
+        $isEligible = true;
+
+        // 1. Calculate job tenure (masa dinas jabatan saat ini)
+        $tmtJabatan = $emp->tanggal_dalam_jabatan ?? $emp->tmt_bekerja;
+        $jobTenureMonths = $tmtJabatan ? (int) Carbon::parse($tmtJabatan)->diffInMonths(now()) : 0;
+        $jobTenureYears = round($jobTenureMonths / 12, 1);
+
+        // 2. Fetch latest evaluation / assessment
+        $latestEvaluation = $emp->evaluations()->latest('id')->first();
+
+        // 3. Normalize employee golongan
+        $gol = strtoupper(trim(explode('/', $emp->golongan ?? '')[0])); // e.g. 'IIIC', 'IVA'
+
+        if ($currentRmNum === 3 && $targetRmNum === 2) {
+            // RM-3 -> RM-2: Syarat minimal Golongan IIIC atau masa dinas Asisten >= 4 tahun, dan evaluasi kinerja minimal "Baik"
+            $hasMinGol = in_array($gol, ['IIIC', 'IIID', 'IVA', 'IVB', 'IVC', 'IVD']);
+            $hasMinTenure = $jobTenureYears >= 4.0;
+            $golOrTenureMet = $hasMinGol || $hasMinTenure;
+
+            $criteria[] = [
+                'label' => 'Golongan Minimal IIIC atau Masa Dinas Asisten ≥ 4 Tahun',
+                'met' => $golOrTenureMet,
+                'value' => "Gol: {$emp->golongan} | Masa Dinas: {$jobTenureYears} thn",
+                'requirement' => 'Min. Gol IIIC atau Masa Dinas ≥ 4 tahun',
+            ];
+
+            // Kinerja check
+            $hasGoodEval = false;
+            $evalText = 'Belum ada data evaluasi SMKBK / 9-Box';
+            if ($latestEvaluation) {
+                $score = $latestEvaluation->skor_smkbk_9box ?? 0;
+                $box = $latestEvaluation->kategori_9box ?? '';
+                $hasGoodEval = $score >= 75 || str_contains($box, 'Box 5') || str_contains($box, 'Box 6') || str_contains($box, 'Box 8') || str_contains($box, 'Box 9');
+                $evalText = 'SMKBK: '.($score ?: '—').' ('.($box ?: 'Tercatat').')';
+            }
+
+            $criteria[] = [
+                'label' => 'Evaluasi Kinerja Minimal Kategori "Baik"',
+                'met' => $hasGoodEval,
+                'value' => $evalText,
+                'requirement' => 'Kategori Baik / Box 5, 6, 8, atau 9',
+            ];
+
+            $isEligible = $golOrTenureMet && $hasGoodEval;
+        } elseif ($currentRmNum === 2 && $targetRmNum === 1) {
+            // RM-2 -> RM-1: Syarat minimal Golongan IIID/IVA, menjabat Askep min 3 tahun, sertifikat asesmen kompetensi holding
+            $hasMinGol = in_array($gol, ['IIID', 'IVA', 'IVB', 'IVC', 'IVD']);
+            $criteria[] = [
+                'label' => 'Standar Golongan Minimal IIID / IVA',
+                'met' => $hasMinGol,
+                'value' => "Gol: {$emp->golongan}",
+                'requirement' => 'Golongan IIID s.d. IV',
+            ];
+
+            $hasAskepTenure = $jobTenureYears >= 3.0;
+            $criteria[] = [
+                'label' => 'Masa Dinas Jabatan Madya (Askep/Kasubag) ≥ 3 Tahun',
+                'met' => $hasAskepTenure,
+                'value' => "{$jobTenureYears} tahun ({$jobTenureMonths} bulan)",
+                'requirement' => 'Minimal 3 tahun menjabat',
+            ];
+
+            $hasValidAssessment = false;
+            $asesmenText = 'Belum memiliki sertifikasi asesmen holding';
+            if ($latestEvaluation && $latestEvaluation->expired_asesmen) {
+                $hasValidAssessment = Carbon::parse($latestEvaluation->expired_asesmen)->gte(Carbon::today());
+                $asesmenText = 'Kedaluwarsa: '.Carbon::parse($latestEvaluation->expired_asesmen)->format('d/m/Y');
+            } elseif ($latestEvaluation && $latestEvaluation->hasil_skor_asesmen) {
+                $hasValidAssessment = true;
+                $asesmenText = "Skor: {$latestEvaluation->hasil_skor_asesmen}";
+            }
+
+            $criteria[] = [
+                'label' => 'Sertifikat Asesmen Kompetensi Holding Aktif',
+                'met' => $hasValidAssessment,
+                'value' => $asesmenText,
+                'requirement' => 'Asesmen holding valid/aktif',
+            ];
+
+            $isEligible = $hasMinGol && $hasAskepTenure && $hasValidAssessment;
+        } elseif ($currentRmNum === 4 && $targetRmNum <= 3) {
+            // Pelaksana ke Staf via CKP
+            $criteria[] = [
+                'label' => 'Jalur Karir CKP (Calon Karyawan Pimpinan)',
+                'met' => true,
+                'value' => 'Promosi Karpel ke Karpim',
+                'requirement' => 'Lulus seleksi CKP internal',
+            ];
+            $isEligible = true;
+        }
+
+        return [
+            'is_applicable' => true,
+            'is_eligible' => $isEligible,
+            'current_rm' => $currentRm,
+            'target_rm' => $targetRm,
+            'criteria' => $criteria,
+            'summary' => $isEligible
+                ? "Seluruh kriteria formal promosi ke {$targetRm} telah terpenuhi."
+                : "Terdapat kriteria formal promosi ke {$targetRm} yang belum terpenuhi. Memerlukan dispensasi promosi khusus.",
+        ];
+    }
+
+    /**
      * Retrieve and filter available target positions for a specific employee and unit.
      */
     public function getAvailableTargetPositions(Employee $emp, string $targetUnitKerja, string $jenisMutasi): array
@@ -188,11 +365,18 @@ class MutasiService
         ?string $catatan = null,
         ?string $tanggalBerakhirSanksi = null,
         string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null
+        ?string $tmtAkhirEstimasi = null,
+        ?string $fileSk = null,
+        ?int $createdBy = null,
+        bool $isDispensasi = false,
+        ?string $alasanDispensasi = null,
+        ?string $newGolongan = null,
+        ?string $newJobGrade = null
     ): array {
         return DB::transaction(function () use (
             $employeeNik, $targetJabatan, $targetUnitKerja,
-            $tmtAwal, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi
+            $tmtAwal, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
+            $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
         ) {
             $employee = Employee::with('currentJob')
                 ->where('nik', $employeeNik)
@@ -215,7 +399,8 @@ class MutasiService
                 // ── Straight transfer ─────────────────────────────────────
                 $this->doTransfer(
                     $employee, $targetJabatan, $targetUnitKerja,
-                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi
+                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
+                    $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
                 );
 
                 return [
@@ -235,9 +420,20 @@ class MutasiService
                     );
                 }
 
+                // Guard: Lateral Swap Only (DOMAIN.md §5.2.2 & Enterprise Governance)
+                $empARm = $employee->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($employee);
+                $empBRm = $occupant->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($occupant);
+
+                if ($empARm !== $empBRm) {
+                    throw new \InvalidArgumentException(
+                        "Tukar jabatan (Swap) hanya diperbolehkan untuk tingkat eselon/RM yang setara (Lateral Swap). Pegawai {$employee->nama} ({$empARm}) tidak setara dengan {$occupant->nama} ({$empBRm}). Gunakan alur mutasi ke formasi kosong."
+                    );
+                }
+
                 $this->doSwap(
                     $employee, $occupant, $targetJabatan, $targetUnitKerja,
-                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi
+                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
+                    $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
                 );
 
                 return [
@@ -268,23 +464,58 @@ class MutasiService
         ?string $catatan,
         ?string $tanggalBerakhirSanksi = null,
         string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null
+        ?string $tmtAkhirEstimasi = null,
+        ?string $fileSk = null,
+        ?int $createdBy = null,
+        bool $isDispensasi = false,
+        ?string $alasanDispensasi = null,
+        ?string $newGolongan = null,
+        ?string $newJobGrade = null
     ): void {
         $isDefinitif = $statusJabatan === 'Definitif';
+
+        // Derive target RM Level
+        $positions = Position::getAllCached();
+        $targetRm = isset($positions[$targetJabatan]) && $positions[$targetJabatan]->rm_level
+            ? $positions[$targetJabatan]->rm_level
+            : app(ManPowerPlanningService::class)->determineRmLevelByJobTitle($targetJabatan);
+
+        // Derive Level (Karpim vs Karpel) according to DOMAIN.md §4.1
+        $newLevel = $employee->level;
+        if ($targetRm === 'RM-4') {
+            $newLevel = 'Karpel';
+        } elseif (in_array($targetRm, ['RM-1', 'RM-2', 'RM-3'])) {
+            $newLevel = 'Karpim';
+        }
+
+        $effectiveGolongan = $newGolongan ?: $employee->golongan;
+        $effectiveJobGrade = $newJobGrade ?: $employee->job_grade;
 
         if ($isDefinitif) {
             // 1. Close current definitive job history
             $employee->currentJob?->update(['tmt_akhir' => $tmtAkhir]);
 
             // 2. Update employee profile (bypass observer to avoid double history row)
-            Employee::withoutEvents(function () use ($employee, $targetJabatan, $targetUnitKerja, $tmtAwal, $tanggalBerakhirSanksi) {
-                $employee->update([
+            Employee::withoutEvents(function () use (
+                $employee, $targetJabatan, $targetUnitKerja, $tmtAwal,
+                $tanggalBerakhirSanksi, $targetRm, $newLevel, $statusJabatan,
+                $effectiveGolongan, $effectiveJobGrade
+            ) {
+                $payload = [
                     'jabatan' => $targetJabatan,
                     'unit_kerja' => $targetUnitKerja,
                     'tanggal_dalam_jabatan' => $tmtAwal,
                     'tmt_unit_kerja' => $tmtAwal,
                     'tanggal_berakhir_sanksi' => $tanggalBerakhirSanksi,
-                ]);
+                    'rm_level' => $targetRm,
+                    'level' => $newLevel,
+                    'status_penugasan' => $statusJabatan,
+                    'golongan' => $effectiveGolongan,
+                ];
+                if ($effectiveJobGrade) {
+                    $payload['job_grade'] = $effectiveJobGrade;
+                }
+                $employee->update($payload);
             });
         }
 
@@ -299,7 +530,13 @@ class MutasiService
             tanggalSk: $tanggalSk,
             catatan: $catatan ?? "Mutasi ke {$targetJabatan} di {$targetUnitKerja}",
             statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi
+            tmtAkhirEstimasi: $tmtAkhirEstimasi,
+            fileSk: $fileSk,
+            createdBy: $createdBy,
+            isDispensasi: $isDispensasi,
+            alasanDispensasi: $alasanDispensasi,
+            level: $newLevel,
+            golongan: $effectiveGolongan
         );
     }
 
@@ -320,23 +557,35 @@ class MutasiService
         ?string $catatan,
         ?string $tanggalBerakhirSanksi = null,
         string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null
+        ?string $tmtAkhirEstimasi = null,
+        ?string $fileSk = null,
+        ?int $createdBy = null,
+        bool $isDispensasi = false,
+        ?string $alasanDispensasi = null,
+        ?string $newGolongan = null,
+        ?string $newJobGrade = null
     ): void {
         // Snapshot both positions BEFORE touching anything
         $posA = [
             'jabatan' => $empA->jabatan,
             'unit_kerja' => $empA->unit_kerja,
             'level' => $empA->level,
+            'rm_level' => $empA->rm_level,
             'golongan' => $empA->golongan,
+            'job_grade' => $empA->job_grade,
         ];
         $posB = [
             'jabatan' => $empB->jabatan,
             'unit_kerja' => $empB->unit_kerja,
             'level' => $empB->level,
+            'rm_level' => $empB->rm_level,
             'golongan' => $empB->golongan,
+            'job_grade' => $empB->job_grade,
         ];
 
         $isDefinitif = $statusJabatan === 'Definitif';
+        $effectiveGolonganA = $newGolongan ?: $empA->golongan;
+        $effectiveJobGradeA = $newJobGrade ?: $empA->job_grade;
 
         // 1. Close active job histories (if Definitif, close empA's definitive job)
         if ($isDefinitif) {
@@ -345,21 +594,33 @@ class MutasiService
         $empB->currentJob?->update(['tmt_akhir' => $tmtAkhir]);
 
         // 2. Swap employee profiles atomically (bypass observer)
-        Employee::withoutEvents(function () use ($empA, $empB, $posA, $posB, $tmtAwal, $tanggalBerakhirSanksi, $isDefinitif) {
+        Employee::withoutEvents(function () use (
+            $empA, $empB, $posA, $posB, $tmtAwal, $tanggalBerakhirSanksi, $isDefinitif,
+            $effectiveGolonganA, $effectiveJobGradeA
+        ) {
             if ($isDefinitif) {
-                $empA->update([
+                $payloadA = [
                     'jabatan' => $posB['jabatan'],
                     'unit_kerja' => $posB['unit_kerja'],
                     'tanggal_dalam_jabatan' => $tmtAwal,
                     'tmt_unit_kerja' => $tmtAwal,
                     'tanggal_berakhir_sanksi' => $tanggalBerakhirSanksi,
-                ]);
+                    'rm_level' => $posB['rm_level'] ?? $empA->rm_level,
+                    'level' => $posB['level'] ?? $empA->level,
+                    'golongan' => $effectiveGolonganA,
+                ];
+                if ($effectiveJobGradeA) {
+                    $payloadA['job_grade'] = $effectiveJobGradeA;
+                }
+                $empA->update($payloadA);
             }
             $empB->update([
                 'jabatan' => $posA['jabatan'],
                 'unit_kerja' => $posA['unit_kerja'],
                 'tanggal_dalam_jabatan' => $tmtAwal,
                 'tmt_unit_kerja' => $tmtAwal,
+                'rm_level' => $posA['rm_level'] ?? $empB->rm_level,
+                'level' => $posA['level'] ?? $empB->level,
             ]);
         });
 
@@ -375,7 +636,13 @@ class MutasiService
             tanggalSk: $tanggalSk,
             catatan: "{$baseNote} — bertukar dengan {$empB->nama}",
             statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi
+            tmtAkhirEstimasi: $tmtAkhirEstimasi,
+            fileSk: $fileSk,
+            createdBy: $createdBy,
+            isDispensasi: $isDispensasi,
+            alasanDispensasi: $alasanDispensasi,
+            level: $posB['level'] ?? $empA->level,
+            golongan: $effectiveGolonganA
         );
         $this->recordJobHistory(
             employee: $empB,
@@ -387,7 +654,13 @@ class MutasiService
             tanggalSk: $tanggalSk,
             catatan: "{$baseNote} — bertukar dengan {$empA->nama}",
             statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi
+            tmtAkhirEstimasi: $tmtAkhirEstimasi,
+            fileSk: $fileSk,
+            createdBy: $createdBy,
+            isDispensasi: false,
+            alasanDispensasi: null,
+            level: $posA['level'] ?? $empB->level,
+            golongan: $posA['golongan'] ?? $empB->golongan
         );
     }
 
@@ -404,14 +677,21 @@ class MutasiService
         ?string $tanggalSk,
         string $catatan,
         string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null
+        ?string $tmtAkhirEstimasi = null,
+        ?string $fileSk = null,
+        ?int $createdBy = null,
+        bool $isDispensasi = false,
+        ?string $alasanDispensasi = null,
+        ?string $level = null,
+        ?string $golongan = null
     ): JobHistory {
         return JobHistory::create([
             'employee_nik' => $employee->nik,
+            'created_by' => $createdBy,
             'jabatan' => $jabatan,
             'unit_kerja' => $unitKerja,
-            'level' => $employee->level,
-            'golongan' => $employee->golongan,
+            'level' => $level ?? $employee->level,
+            'golongan' => $golongan ?? $employee->golongan,
             'tmt_awal' => $tmtAwal,
             'tmt_akhir' => null,
             'tmt_akhir_estimasi' => $tmtAkhirEstimasi,
@@ -419,7 +699,10 @@ class MutasiService
             'jenis_mutasi' => $jenisMutasi,
             'nomor_sk' => $nomorSk,
             'tanggal_sk' => $tanggalSk,
+            'file_sk' => $fileSk,
             'catatan' => $catatan,
+            'is_dispensasi' => $isDispensasi,
+            'alasan_dispensasi' => $alasanDispensasi,
         ]);
     }
 
@@ -448,7 +731,7 @@ class MutasiService
         ?string $jenisMutasi = null,
         int $perPage = 15,
     ): LengthAwarePaginator {
-        return JobHistory::with('employee')
+        return JobHistory::with(['employee', 'creator'])
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {
                     $q2->where('jabatan', 'like', "%{$search}%")

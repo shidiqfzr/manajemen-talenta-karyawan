@@ -19,7 +19,7 @@ class EmployeeFactory extends Factory
             'status_karyawan' => 'Tetap',
             'jenis_kelamin' => 'L',
             'agama' => 'Islam',
-            'tanggal_lahir' => $this->faker->date(),
+            'tanggal_lahir' => $this->faker->dateTimeBetween('-50 years', '-25 years')->format('Y-m-d'),
             'tmt_bekerja' => $this->faker->date(),
             'tanggal_dalam_jabatan' => $this->faker->date(),
             'tmt_unit_kerja' => $this->faker->date(),

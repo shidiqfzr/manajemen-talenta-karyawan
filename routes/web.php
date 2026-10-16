@@ -131,6 +131,7 @@ Route::prefix('admin')
             Route::get('/', [MutasiController::class, 'index'])->name('index');
             Route::get('/create', [MutasiController::class, 'create'])->name('create');
             Route::get('/history', [MutasiController::class, 'history'])->name('history');
+            Route::get('/job-history/{jobHistory}/download-sk', [MutasiController::class, 'downloadSk'])->name('downloadSk');
         });
 
         // Master Data Management

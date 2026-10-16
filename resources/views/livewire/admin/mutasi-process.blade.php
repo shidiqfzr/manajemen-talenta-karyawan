@@ -54,7 +54,7 @@
                                 Jenis Mutasi <span class="text-danger">*</span>
                             </label>
                             <div class="relative">
-                                <select wire:model.live="jenisMutasi"
+                                <select wire:model.live="form.jenisMutasi"
                                     class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition appearance-none cursor-pointer">
                                     @foreach ($mutasiTypes as $type)
                                         <option value="{{ $type }}">{{ ucwords(strtolower(str_replace('_', ' ', $type))) }}</option>
@@ -75,7 +75,7 @@
                                 $isStatusLocked = in_array($jenisMutasi, ['SANKSI_INDISIPLINER', 'PENUGASAN_KHUSUS']);
                             @endphp
                             <div class="relative">
-                                <select wire:model.live="statusJabatan"
+                                <select wire:model.live="form.statusJabatan"
                                     {{ $isStatusLocked ? 'disabled' : '' }}
                                     class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition appearance-none {{ $isStatusLocked ? 'bg-surface-100 cursor-not-allowed opacity-80' : 'cursor-pointer' }}">
                                     <option value="Definitif">Definitif (Posisi Utama)</option>
@@ -99,7 +99,7 @@
                                 <span class="text-[10px] text-surface-400 font-medium bg-surface-100 px-1.5 py-0.5 rounded">Opsional</span>
                             </div>
                             <x-admin.searchable-select 
-                                model="sourceUnitFilter" 
+                                model="form.sourceUnitFilter" 
                                 :options="$unitList" 
                                 placeholder="-- Semua Unit Kerja --"
                                 icon="fas fa-filter"
@@ -120,7 +120,7 @@
                                 })->values()->toArray();
                             @endphp
                             <x-admin.searchable-select 
-                                model="employeeNik" 
+                                model="form.employeeNik" 
                                 :options="$empOptions" 
                                 placeholder="-- Pilih Karyawan --"
                                 emptyText="Karyawan tidak ditemukan"
@@ -253,8 +253,19 @@
                                     </select>
                                 </div>
                                 <p class="text-[11px] text-surface-500 mt-1">Pilih karyawan terlebih dahulu.</p>
+                            @elseif($jenisMutasi === 'ROTASI')
+                                <div class="p-2.5 bg-surface-50 border border-surface-300 rounded-lg flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-lock text-surface-400 text-xs"></i>
+                                        <span class="text-xs sm:text-sm font-bold text-surface-800">{{ $targetUnitKerja ?: ($employeeDetails['unit_kerja'] ?? '') }}</span>
+                                    </div>
+                                    <span class="text-[10px] font-bold text-primary-700 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded">
+                                        Rotasi Internal Unit
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-surface-500 mt-1">Unit kerja terkunci otomatis karena jenis mutasi adalah Rotasi &amp; Alih Tugas dalam unit yang sama (DOMAIN.md §5.4.3).</p>
                             @else
-                                <div x-data="{ unit: @entangle('targetUnitKerja').live }"
+                                <div x-data="{ unit: @entangle('form.targetUnitKerja').live }"
                                      @unit-selected.window="if($event.detail.unit !== undefined) { unit = $event.detail.unit; }">
                                     <x-admin.unit-combobox 
                                         :grouped-units="$groupedUnits" 
@@ -266,6 +277,41 @@
                             @error('targetUnitKerja')
                                 <p class="text-danger text-xs mt-1">{{ $message }}</p>
                             @enderror
+
+                            {{-- Tenure Guard Warning (DOMAIN.md §5.2.1) --}}
+                            @if ($tenureAnalysis && ! $tenureAnalysis['is_compliant'])
+                                <div class="mt-2.5 p-3.5 bg-amber-50 border border-amber-300 rounded-lg space-y-2.5 shadow-2xs animate-fade-in">
+                                    <div class="flex items-start gap-2.5">
+                                        <div class="w-6 h-6 rounded-md bg-amber-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                                            <i class="fas fa-history"></i>
+                                        </div>
+                                        <div class="text-xs text-amber-950 leading-relaxed">
+                                            <span class="font-bold text-amber-900">Peringatan Masa Dinas Unit Kerja (DOMAIN.md §5.2.1)</span><br>
+                                            Pegawai baru bertugas <strong class="font-bold text-amber-950">{{ $tenureAnalysis['years'] }} tahun ({{ $tenureAnalysis['months'] }} bulan)</strong> di {{ $employeeDetails['unit_kerja'] ?? 'unit saat ini' }}. Standar regulasi rotasi unit minimal 2–3 tahun untuk kestabilan operasional.
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-t border-amber-200 space-y-2">
+                                        <label class="flex items-start gap-2 cursor-pointer">
+                                            <input type="checkbox" wire:model.live="form.dispensasiTenure" class="mt-0.5 w-4 h-4 rounded text-amber-600 border-amber-400 focus:ring-amber-500 cursor-pointer">
+                                            <span class="text-xs font-semibold text-amber-950">
+                                                Rotasi unit sebelum 2 tahun ini telah disetujui melalui Dispensasi Khusus Direksi. <span class="text-danger">*</span>
+                                            </span>
+                                        </label>
+                                        @error('dispensasiTenure')
+                                            <p class="text-danger text-xs font-semibold">{{ $message }}</p>
+                                        @enderror
+                                        @if ($dispensasiTenure)
+                                            <div>
+                                                <input type="text" wire:model="form.alasanDispensasiTenure" placeholder="Alasan pertimbangan / Nomor Nota Persetujuan Direksi..."
+                                                    class="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-md text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition">
+                                                @error('alasanDispensasiTenure')
+                                                    <p class="text-danger text-xs mt-1">{{ $message }}</p>
+                                                @enderror
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
                         </div>
 
                         <div>
@@ -276,7 +322,7 @@
                                 <span class="absolute left-3.5 inset-y-0 flex items-center text-xs transition-colors duration-300" :class="'{{ $targetUnitKerja }}' ? 'text-primary-600' : 'text-surface-400'">
                                     <i class="fas fa-briefcase"></i>
                                 </span>
-                                <select wire:model.live="targetJabatan"
+                                <select wire:model.live="form.targetJabatan"
                                     @if(!$targetUnitKerja) disabled @endif
                                     class="w-full pl-9 pr-8 py-2.5 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 transition-all duration-300 appearance-none @if(!$targetUnitKerja) bg-surface-100 border border-surface-300 text-surface-400 cursor-not-allowed @else bg-white border border-surface-300 text-surface-800 focus:border-primary-600 focus:ring-primary-300 @endif">
                                     
@@ -302,6 +348,60 @@
                             @error('targetJabatan')
                                 <p class="text-danger text-xs mt-1">{{ $message }}</p>
                             @enderror
+
+                            {{-- Promotion Readiness & Eligibility Card (DOMAIN.md §5.2.3 & §6) --}}
+                            @if ($promotionAnalysis && $promotionAnalysis['is_applicable'])
+                                <div class="mt-2.5 p-3.5 rounded-lg border {{ $promotionAnalysis['is_eligible'] ? 'bg-primary-50/60 border-primary-200' : 'bg-purple-50/70 border-purple-200' }} space-y-2.5 shadow-2xs animate-fade-in">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-md {{ $promotionAnalysis['is_eligible'] ? 'bg-primary-600' : 'bg-purple-600' }} text-white flex items-center justify-center text-xs shrink-0">
+                                                <i class="fas fa-chart-line"></i>
+                                            </div>
+                                            <h4 class="text-xs font-bold {{ $promotionAnalysis['is_eligible'] ? 'text-primary-900' : 'text-purple-900' }} uppercase tracking-wider">
+                                                Syarat Formal Promosi ({{ $promotionAnalysis['current_rm'] }} &rarr; {{ $promotionAnalysis['target_rm'] }})
+                                            </h4>
+                                        </div>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold {{ $promotionAnalysis['is_eligible'] ? 'bg-primary-100 text-primary-800 border border-primary-200' : 'bg-purple-100 text-purple-800 border border-purple-200' }}">
+                                            {{ $promotionAnalysis['is_eligible'] ? 'Memenuhi Syarat' : 'Perlu Dispensasi' }}
+                                        </span>
+                                    </div>
+
+                                    <div class="space-y-1.5 text-xs">
+                                        @foreach ($promotionAnalysis['criteria'] as $crit)
+                                            <div class="flex items-center justify-between p-2 rounded bg-white/90 border border-surface-200 text-xs">
+                                                <div class="flex items-center gap-2 min-w-0">
+                                                    <i class="fas {{ $crit['met'] ? 'fa-check-circle text-primary-600' : 'fa-times-circle text-danger' }} text-xs shrink-0"></i>
+                                                    <span class="font-medium text-surface-800 truncate">{{ $crit['label'] }}</span>
+                                                </div>
+                                                <span class="font-semibold text-surface-600 text-[11px] shrink-0 ml-2">{{ $crit['value'] }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    @if (! $promotionAnalysis['is_eligible'])
+                                        <div class="pt-2 border-t border-purple-200 space-y-2">
+                                            <label class="flex items-start gap-2 cursor-pointer">
+                                                <input type="checkbox" wire:model.live="form.dispensasiPromosi" class="mt-0.5 w-4 h-4 rounded text-purple-600 border-purple-400 focus:ring-purple-500 cursor-pointer">
+                                                <span class="text-xs font-semibold text-purple-950">
+                                                    Pengajuan promosi ini telah memperoleh persetujuan Dispensasi Promosi Dipercepat / Keputusan Khusus. <span class="text-danger">*</span>
+                                                </span>
+                                            </label>
+                                            @error('dispensasiPromosi')
+                                                <p class="text-danger text-xs font-semibold">{{ $message }}</p>
+                                            @enderror
+                                            @if ($dispensasiPromosi)
+                                                <div>
+                                                    <input type="text" wire:model="form.alasanDispensasiPromosi" placeholder="Alasan pertimbangan promosi / nomor rekomendasi asesmen..."
+                                                        class="w-full px-3 py-1.5 bg-white border border-purple-300 rounded-md text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-1 focus:ring-purple-500 transition">
+                                                    @error('alasanDispensasiPromosi')
+                                                        <p class="text-danger text-xs mt-1">{{ $message }}</p>
+                                                    @enderror
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
 
                         {{-- Diperban Warning --}}
@@ -353,33 +453,58 @@
                                     </div>
                                 </div>
                             @elseif ($targetAnalysis['type'] === 'occupied')
-                                <div class="p-3.5 bg-earth-100/70 border border-earth-300 rounded-lg space-y-3">
-                                    <div class="flex items-start gap-2.5">
-                                        <div class="w-6 h-6 rounded-md bg-earth-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
-                                            <i class="fas fa-user-check"></i>
+                                @if (!$isSwapAllowed)
+                                    <div class="p-3.5 bg-red-50 border border-red-200 rounded-lg space-y-2.5 shadow-2xs">
+                                        <div class="flex items-start gap-2.5">
+                                            <div class="w-6 h-6 rounded-md bg-danger text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                                                <i class="fas fa-ban"></i>
+                                            </div>
+                                            <div class="text-xs text-red-950 leading-relaxed">
+                                                <span class="font-bold text-danger uppercase tracking-wider">Tukar Jabatan (Swap) Ditolak</span><br>
+                                                {{ $swapIncompatibilityMessage }}
+                                            </div>
                                         </div>
-                                        <div class="text-xs text-surface-900 leading-relaxed">
-                                            <span class="font-bold text-earth-800">Posisi Sedang Ditempati:</span>
-                                            <div class="font-bold text-surface-900 text-sm mt-0.5">{{ $targetAnalysis['occupant']['nama'] }}</div>
-                                            <div class="text-[11px] text-surface-600 font-mono">NIK: {{ $targetAnalysis['occupant']['nik'] }} | Gol: {{ $targetAnalysis['occupant']['golongan'] ?? '—' }}</div>
-                                            <p class="mt-1 text-surface-700">
-                                                Sistem akan menjalankan <strong>Tukar Jabatan 2 Arah</strong> secara simultan. Tidak ada lowongan baru yang tertinggal.
-                                            </p>
+                                        <div class="p-2 bg-white/80 rounded border border-red-200 text-[11px] text-surface-700">
+                                            Pejabat saat ini: <strong>{{ $targetAnalysis['occupant']['nama'] }}</strong> ({{ $targetAnalysis['occupant']['rm_level'] ?? '—' }}) | Karyawan asal: <strong>{{ $employeeDetails['nama'] ?? '—' }}</strong> ({{ $employeeDetails['rm_level'] ?? '—' }})
                                         </div>
                                     </div>
+                                @else
+                                    <div class="p-3.5 bg-earth-100/70 border border-earth-300 rounded-lg space-y-3">
+                                        <div class="flex items-start gap-2.5">
+                                            <div class="w-6 h-6 rounded-md bg-earth-600 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
+                                                <i class="fas fa-user-check"></i>
+                                            </div>
+                                            <div class="text-xs text-surface-900 leading-relaxed">
+                                                <span class="font-bold text-earth-800">Posisi Sedang Ditempati:</span>
+                                                <div class="font-bold text-surface-900 text-sm mt-0.5">{{ $targetAnalysis['occupant']['nama'] }}</div>
+                                                <div class="text-[11px] text-surface-600 font-mono">NIK: {{ $targetAnalysis['occupant']['nik'] }} | Gol: {{ $targetAnalysis['occupant']['golongan'] ?? '—' }} | Eselon: {{ $targetAnalysis['occupant']['rm_level'] ?? '—' }}</div>
+                                                <p class="mt-1 text-surface-700">
+                                                    Sistem akan menjalankan <strong>Tukar Jabatan 2 Arah (Lateral Swap)</strong> secara simultan. Tidak ada lowongan baru yang tertinggal.
+                                                </p>
+                                            </div>
+                                        </div>
 
-                                    {{-- Swap Guard Checkbox --}}
-                                    <label class="flex items-start gap-2.5 cursor-pointer pt-2.5 border-t border-earth-300">
-                                        <input type="checkbox" wire:model.live="swapConfirmed"
-                                            class="mt-0.5 w-4 h-4 rounded text-earth-600 border-earth-400 focus:ring-earth-500 cursor-pointer">
-                                        <span class="text-xs font-semibold text-surface-900 leading-tight">
-                                            Saya mengonfirmasi bahwa pertukaran posisi kedua karyawan ini telah disetujui secara resmi.
-                                        </span>
-                                    </label>
-                                    @error('swapConfirmed')
-                                        <p class="text-danger text-xs font-semibold">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                        {{-- Occupant Tenure Evaluation --}}
+                                        @if ($occupantTenureAnalysis && ! $occupantTenureAnalysis['is_compliant'])
+                                            <div class="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900 flex items-start gap-2">
+                                                <i class="fas fa-exclamation-triangle text-amber-600 mt-0.5 shrink-0"></i>
+                                                <span><strong>Peringatan Masa Dinas Pejabat Tergeser:</strong> {{ $targetAnalysis['occupant']['nama'] }} baru bertugas {{ $occupantTenureAnalysis['years'] }} tahun di unit ini (kurang dari batas 2 tahun). Pastikan nota persetujuan direksi juga mencakup pergeseran pejabat ini.</span>
+                                            </div>
+                                        @endif
+
+                                        {{-- Swap Guard Checkbox --}}
+                                        <label class="flex items-start gap-2.5 cursor-pointer pt-2.5 border-t border-earth-300">
+                                            <input type="checkbox" wire:model.live="form.swapConfirmed"
+                                                class="mt-0.5 w-4 h-4 rounded text-earth-600 border-earth-400 focus:ring-earth-500 cursor-pointer">
+                                            <span class="text-xs font-semibold text-surface-900 leading-tight">
+                                                Saya mengonfirmasi bahwa pertukaran posisi kedua karyawan ini telah disetujui secara resmi.
+                                            </span>
+                                        </label>
+                                        @error('swapConfirmed')
+                                            <p class="text-danger text-xs font-semibold">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                @endif
                             @elseif ($targetAnalysis['type'] === 'same')
                                 <div class="p-3.5 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2.5">
                                     <i class="fas fa-ban text-danger text-sm shrink-0"></i>
@@ -442,7 +567,7 @@
                     <label class="block text-xs font-bold text-surface-700 mb-1.5">
                         Nomor SK / Surat Tugas <span class="text-danger">*</span>
                     </label>
-                    <input type="text" wire:model="nomorSk" placeholder="Contoh: SK.DIR/REG5/MUT-SDM/01/2026"
+                    <input type="text" wire:model="form.nomorSk" placeholder="Contoh: SK.DIR/REG5/MUT-SDM/01/2026"
                         class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                     @error('nomorSk')
                         <p class="text-danger text-xs mt-1">{{ $message }}</p>
@@ -453,7 +578,7 @@
                     <label class="block text-xs font-bold text-surface-700 mb-1.5">
                         Tanggal Penerbitan SK <span class="text-danger">*</span>
                     </label>
-                    <input type="date" wire:model="tanggalSk"
+                    <input type="date" wire:model="form.tanggalSk"
                         class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                     @error('tanggalSk')
                         <p class="text-danger text-xs mt-1">{{ $message }}</p>
@@ -466,7 +591,7 @@
                     <label class="block text-xs font-bold text-surface-700 mb-1.5">
                         TMT Berlaku (Efektif) <span class="text-danger">*</span>
                     </label>
-                    <input type="date" wire:model="tmtAwal"
+                    <input type="date" wire:model="form.tmtAwal"
                         class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                     @error('tmtAwal')
                         <p class="text-danger text-xs mt-1">{{ $message }}</p>
@@ -478,7 +603,7 @@
                     <label class="block text-xs font-bold text-surface-700 mb-1.5">
                         Tanggal Estimasi Selesai <span class="text-surface-400 font-normal">(Opsional)</span>
                     </label>
-                    <input type="date" wire:model="tmtAkhirEstimasi"
+                    <input type="date" wire:model="form.tmtAkhirEstimasi"
                         class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                     <p class="text-[10px] text-surface-500 mt-1">Sebagai pengingat masa berlaku Plt/Pj.</p>
                     @error('tmtAkhirEstimasi')
@@ -490,7 +615,7 @@
                     <label class="block text-xs font-bold text-surface-700 mb-1.5">
                         Tanggal Berakhir Sanksi <span class="text-danger">*</span>
                     </label>
-                    <input type="date" wire:model="tanggalBerakhirSanksi"
+                    <input type="date" wire:model="form.tanggalBerakhirSanksi"
                         class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                     <p class="text-[10px] text-surface-500 mt-1">Wajib diisi sesuai masa hukuman/demosi.</p>
                     @error('tanggalBerakhirSanksi')
@@ -502,11 +627,82 @@
                 @endif
             </div>
 
+            {{-- Digital Decree (SK) PDF Upload --}}
+            <div class="mt-4 pt-4 border-t border-surface-100">
+                <label class="block text-xs font-bold text-surface-700 mb-1.5">
+                    Unggah Berkas SK / Surat Tugas Digital (PDF) <span class="text-surface-400 font-normal">(Opsional, Dokumen Resmi Maks. 5MB)</span>
+                </label>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <label class="relative inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-surface-300 rounded-lg text-xs font-semibold text-surface-700 hover:bg-surface-50 hover:border-surface-400 transition cursor-pointer shadow-2xs">
+                        <i class="fas fa-file-pdf text-danger text-sm"></i>
+                        <span>Pilih Berkas PDF SK</span>
+                        <input type="file" wire:model="form.fileSk" accept="application/pdf" class="sr-only">
+                    </label>
+
+                    <div wire:loading wire:target="form.fileSk" class="text-xs text-primary-600 flex items-center gap-1.5 font-medium">
+                        <i class="fas fa-spinner fa-spin text-xs"></i> Mengunggah berkas...
+                    </div>
+
+                    @if ($fileSk)
+                        <div class="flex items-center gap-2 text-xs text-primary-800 font-semibold bg-primary-50 px-3 py-1.5 rounded-lg border border-primary-200">
+                            <i class="fas fa-check-circle text-xs text-primary-600"></i>
+                            <span class="truncate max-w-xs">{{ $fileSk->getClientOriginalName() }}</span>
+                            <button type="button" wire:click="$set('form.fileSk', null)" class="text-surface-400 hover:text-danger ml-1 p-0.5 cursor-pointer" title="Hapus berkas">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    @endif
+                </div>
+                @error('fileSk')
+                    <p class="text-danger text-xs mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+
+            {{-- Penyesuaian Golongan & Job Grade Baru (DOMAIN.md §4 & §5.2.3) --}}
+            @if (in_array($jenisMutasi, ['PROMOSI', 'DEMOSI']))
+                <div class="mt-4 pt-4 border-t border-surface-100 bg-surface-50 p-4 rounded-lg border border-surface-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-layer-group text-primary-600 text-xs"></i>
+                            <h4 class="text-xs font-bold text-surface-900 uppercase tracking-wide">
+                                Penyesuaian Golongan &amp; Job Grade Baru ({{ ucwords(strtolower($jenisMutasi)) }})
+                            </h4>
+                        </div>
+                        <span class="text-[10px] text-surface-500 font-medium bg-white px-2 py-0.5 rounded border border-surface-200">
+                            Opsional SK
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-surface-600 leading-relaxed">
+                        Jika SK penetapan promosi/demosi memuat penyesuaian golongan atau kenaikan Job Grade, Anda dapat memperbaruinya langsung di bawah ini. Jika tidak diubah, profil akan mempertahankan data saat ini.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-surface-700 mb-1">
+                                Golongan Baru
+                            </label>
+                            <input type="text" wire:model="form.newGolongan" placeholder="Contoh: IIIC/00 atau IVB/02"
+                                class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
+                            <span class="text-[10px] text-surface-400 mt-1 block">Golongan Saat Ini: {{ $employeeDetails['golongan'] ?? '—' }}</span>
+                            @error('newGolongan') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-surface-700 mb-1">
+                                Job Grade Baru
+                            </label>
+                            <input type="text" wire:model="form.newJobGrade" placeholder="Contoh: 11 s.d. 16"
+                                class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
+                            <span class="text-[10px] text-surface-400 mt-1 block">Job Grade Saat Ini: {{ $employeeDetails['job_grade'] ?? '—' }}</span>
+                            @error('newJobGrade') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="mt-4">
                 <label class="block text-xs font-bold text-surface-700 mb-1.5">
                     Catatan / Dasar Pertimbangan <span class="text-danger">*</span>
                 </label>
-                <input type="text" wire:model="catatan" placeholder="Keterangan rotasi unit, promosi, dsb..."
+                <input type="text" wire:model="form.catatan" placeholder="Keterangan rotasi unit, promosi, dsb..."
                     class="w-full px-3.5 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
                 @error('catatan')
                     <p class="text-danger text-xs mt-1">{{ $message }}</p>
@@ -520,17 +716,145 @@
                 Kembali ke Hub Mutasi
             </x-admin.button>
 
-            <x-admin.button type="submit" variant="primary"
+            <x-admin.button type="button" wire:click="openSummaryModal" variant="primary"
                 wire:loading.attr="disabled"
-                wire:target="submitMutasi">
-                <span wire:loading.remove wire:target="submitMutasi">
-                    <i class="fas fa-check-circle text-xs mr-1"></i> Simpan &amp; Sahkan Mutasi
+                wire:target="openSummaryModal">
+                <span wire:loading.remove wire:target="openSummaryModal">
+                    <i class="fas fa-check-double text-xs mr-1"></i> Tinjau &amp; Sahkan Mutasi
                 </span>
-                <span wire:loading wire:target="submitMutasi" class="flex items-center gap-2">
-                    <i class="fas fa-spinner fa-spin text-xs"></i> Menyimpan Perubahan...
+                <span wire:loading wire:target="openSummaryModal" class="flex items-center gap-2">
+                    <i class="fas fa-spinner fa-spin text-xs"></i> Memvalidasi Data...
                 </span>
             </x-admin.button>
         </div>
 
     </form>
+
+    {{-- ═══════════════════ REVIEW SUMMARY MODAL (DESIGN.md) ═══════════════════ --}}
+    @if ($showSummaryModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-surface-200 transition-all transform scale-100">
+                {{-- Modal Header --}}
+                <div class="bg-surface-50 px-6 py-4 border-b border-surface-200 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold shadow-inner">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-surface-900 leading-tight">Konfirmasi Pengesahan Mutasi</h3>
+                            <p class="text-xs text-surface-500 mt-0.5">Harap periksa kembali rincian SK &amp; dampak formasi sebelum commit ke database.</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeSummaryModal" class="text-surface-400 hover:text-surface-600 transition p-1.5 rounded-lg hover:bg-surface-200 cursor-pointer">
+                        <i class="fas fa-times text-sm"></i>
+                    </button>
+                </div>
+
+                {{-- Modal Body --}}
+                <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {{-- Movement Flow Summary --}}
+                    <div class="p-4 bg-primary-50/50 rounded-lg border border-primary-100 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-primary-800">
+                                Jenis Mutasi: {{ ucwords(strtolower(str_replace('_', ' ', $jenisMutasi))) }}
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-primary-100 text-primary-800 border border-primary-200">
+                                Status: {{ $statusJabatan }}
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div class="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                                <span class="text-[10px] font-bold text-surface-400 uppercase tracking-wider block">Posisi Asal</span>
+                                <div class="font-bold text-surface-900 text-sm">{{ $employeeDetails['nama'] ?? '—' }}</div>
+                                <div class="text-surface-600 font-medium">{{ $employeeDetails['jabatan'] ?? '—' }}</div>
+                                <div class="text-surface-500 text-[11px]">{{ $employeeDetails['unit_kerja'] ?? '—' }}</div>
+                                <div class="text-[10px] font-mono text-surface-400 mt-1">Gol: {{ $employeeDetails['golongan'] ?? '—' }} | {{ $employeeDetails['rm_level'] ?? '—' }}</div>
+                            </div>
+
+                            <div class="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                                <span class="text-[10px] font-bold text-primary-600 uppercase tracking-wider block">Posisi Tujuan</span>
+                                <div class="font-bold text-primary-900 text-sm">{{ $targetJabatan }}</div>
+                                <div class="text-primary-800 font-medium">{{ $targetUnitKerja }}</div>
+                                <div class="text-[10px] font-mono text-surface-600 mt-1">
+                                    Gol Baru: {{ $newGolongan ?: ($employeeDetails['golongan'] ?? '—') }} 
+                                    @if($newJobGrade) | Grade: {{ $newJobGrade }} @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Swap Details (if occupied) --}}
+                    @if ($targetAnalysis && $targetAnalysis['type'] === 'occupied')
+                        <div class="p-4 bg-earth-50 rounded-lg border border-earth-200 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-exchange-alt text-earth-700 text-xs"></i>
+                                <span class="text-xs font-bold text-earth-900 uppercase tracking-wider">Dampak Tukar Jabatan (Swap)</span>
+                            </div>
+                            <p class="text-xs text-earth-800 leading-relaxed">
+                                Pejabat <strong>{{ $targetAnalysis['occupant']['nama'] }}</strong> (NIK: {{ $targetAnalysis['occupant']['nik'] }}) secara otomatis akan dipindahkan menempati posisi <strong>{{ $employeeDetails['jabatan'] }}</strong> di <strong>{{ $employeeDetails['unit_kerja'] }}</strong>.
+                            </p>
+                        </div>
+                    @endif
+
+                    {{-- Legal Details --}}
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-surface-50 p-3.5 rounded-lg border border-surface-200">
+                        <div>
+                            <span class="text-[10px] text-surface-400 block font-medium">Nomor SK:</span>
+                            <span class="font-mono font-bold text-surface-800 text-[11px]">{{ $nomorSk }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-surface-400 block font-medium">Tanggal SK:</span>
+                            <span class="font-semibold text-surface-800">{{ \Carbon\Carbon::parse($tanggalSk)->format('d M Y') }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-surface-400 block font-medium">TMT Efektif:</span>
+                            <span class="font-semibold text-primary-700">{{ \Carbon\Carbon::parse($tmtAwal)->format('d M Y') }}</span>
+                        </div>
+                    </div>
+
+                    {{-- Dispensations Notice (if any) --}}
+                    @if ($dispensasiTenure || $dispensasiPromosi)
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-1 text-xs">
+                            <span class="font-bold text-amber-900 flex items-center gap-1.5">
+                                <i class="fas fa-shield-alt text-amber-600"></i> Dispensasi Direksi Terlampir:
+                            </span>
+                            @if ($dispensasiTenure)
+                                <p class="text-amber-800 text-[11px]">• Masa Dinas Unit: {{ $alasanDispensasiTenure }}</p>
+                            @endif
+                            @if ($dispensasiPromosi)
+                                <p class="text-amber-800 text-[11px]">• Kriteria Promosi: {{ $alasanDispensasiPromosi }}</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- File SK notice --}}
+                    @if ($fileSk)
+                        <div class="text-xs text-surface-600 flex items-center gap-2">
+                            <i class="fas fa-file-pdf text-danger"></i>
+                            <span>Dokumen SK Digital: <strong>{{ $fileSk->getClientOriginalName() }}</strong> (Disimpan di Storage Privat Terproteksi)</span>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Modal Footer --}}
+                <div class="bg-surface-50 px-6 py-3.5 border-t border-surface-200 flex items-center justify-between">
+                    <button type="button" wire:click="closeSummaryModal" class="px-4 py-2 bg-white border border-surface-300 rounded-lg text-xs font-semibold text-surface-700 hover:bg-surface-100 transition cursor-pointer">
+                        Kembali / Ubah Data
+                    </button>
+
+                    <button type="button" wire:click="confirmSubmitMutasi"
+                        wire:loading.attr="disabled"
+                        class="px-5 py-2 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-700 transition shadow-sm flex items-center gap-2 cursor-pointer">
+                        <span wire:loading.remove wire:target="confirmSubmitMutasi">
+                            <i class="fas fa-check-circle"></i> Sahkan &amp; Eksekusi Mutasi
+                        </span>
+                        <span wire:loading wire:target="confirmSubmitMutasi" class="flex items-center gap-1.5">
+                            <i class="fas fa-spinner fa-spin"></i> Menyimpan Perubahan...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
