@@ -100,12 +100,12 @@
 
         <!-- Clean Header Actions: Import Modal & Primary CTA -->
         <div class="flex items-center gap-2.5 shrink-0">
-            <!-- Import Modal Trigger Button -->
-            <button type="button" @click="$dispatch('open-import-modal')"
+            <!-- Import Page Navigation Button (Enterprise Workday / SAP Multi-Step Standard) -->
+            <a href="{{ route('admin.employees.import.page') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer">
                 <i class="fas fa-file-arrow-up text-emerald-600 text-xs"></i>
                 <span>Import Excel</span>
-            </button>
+            </a>
 
             <!-- Tambah Karyawan (Primary CTA) -->
             <a href="{{ route('admin.employees.create') }}"
@@ -778,8 +778,6 @@
             <x-pagination-ui :data="$employees" />
         </div>
     </div>
-
-    @include('admin.employees.partials.import-modal')
 
     <!-- MODAL: Delete Confirmation Modal (Destructive Action - DESIGN.md 6.5) -->
     <div x-show="deleteModalOpen"

@@ -66,7 +66,7 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
 
             $exportData[] = [
                 $rowNum,
-                $reasons,
+                self::sanitizeCellValue($reasons),
                 $this->findRawValue($raw, ['nik']),
                 $this->findRawValue($raw, ['nama']),
                 $this->findRawValue($raw, ['jenis_kelamin', 'jk']),
@@ -99,6 +99,24 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
         return $exportData;
     }
 
+    /**
+     * Mitigasi CWE-1236 (Formula / CSV Injection).
+     * Mencegah karakter formula (=, +, -, @, \t, \r) dieksekusi oleh aplikasi spreadsheet.
+     */
+    public static function sanitizeCellValue(mixed $val): string
+    {
+        $str = (string) ($val ?? '');
+        if ($str === '') {
+            return '';
+        }
+
+        if (in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$str;
+        }
+
+        return $str;
+    }
+
     protected function findRawValue(array $raw, array $possibleKeys): string
     {
         foreach ($raw as $k => $v) {
@@ -106,7 +124,7 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
             foreach ($possibleKeys as $pk) {
                 $cleanPk = strtolower(trim(str_replace('*', '', $pk)));
                 if ($cleanKey === $cleanPk || str_contains($cleanKey, $cleanPk)) {
-                    return (string) ($v ?? '');
+                    return self::sanitizeCellValue($v);
                 }
             }
         }

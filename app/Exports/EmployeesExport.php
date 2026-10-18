@@ -201,34 +201,43 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
         }
         $tugasRangkapText = ! empty($tugasRangkapList) ? implode("\n", $tugasRangkapList) : '';
 
-        return [
-            (string) $employee->nik,
-            (string) $employee->nama,
-            $employee->jenis_kelamin ?? '',
-            $employee->tempat_lahir ?? '',
-            $formatDate($employee->tanggal_lahir),
-            $employee->agama ?? '',
-            $employee->susunan_keluarga ?? '',
+        $clean = static function (mixed $val): string {
+            $str = (string) ($val ?? '');
+            if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                return "'".$str;
+            }
 
-            $employee->status_karyawan ?? 'Tetap (PKWTT)',
-            $employee->jabatan ?? '',
-            $employee->level ?? '',
-            $employee->unit_kerja ?? '',
-            $employee->golongan ?? '',
-            $employee->rm_level ?? '',
-            $employee->status_penugasan ?? 'Definitif',
-            $tugasRangkapText,
+            return $str;
+        };
+
+        return [
+            $clean($employee->nik),
+            $clean($employee->nama),
+            $clean($employee->jenis_kelamin),
+            $clean($employee->tempat_lahir),
+            $formatDate($employee->tanggal_lahir),
+            $clean($employee->agama),
+            $clean($employee->susunan_keluarga),
+
+            $clean($employee->status_karyawan ?? 'Tetap (PKWTT)'),
+            $clean($employee->jabatan),
+            $clean($employee->level),
+            $clean($employee->unit_kerja),
+            $clean($employee->golongan),
+            $clean($employee->rm_level),
+            $clean($employee->status_penugasan ?? 'Definitif'),
+            $clean($tugasRangkapText),
 
             $formatDate($employee->tmt_bekerja),
             $formatDate($employee->tanggal_diangkat_staf),
             $formatDate($employee->tanggal_dalam_jabatan),
             $formatDate($employee->tmt_unit_kerja),
-            $employee->jalur_masuk ?? 'Reguler',
+            $clean($employee->jalur_masuk ?? 'Reguler'),
             $employee->job_grade !== null ? (int) $employee->job_grade : '',
             $employee->person_grade !== null ? (int) $employee->person_grade : '',
 
-            $employee->pendidikan_terakhir ?? '',
-            $employee->sekolah ?? '',
+            $clean($employee->pendidikan_terakhir),
+            $clean($employee->sekolah),
             $formatDate($employee->tanggal_mbt),
             $formatDate($employee->tanggal_pensiun),
         ];

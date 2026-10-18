@@ -57,13 +57,16 @@ Route::prefix('admin')
             Route::get('/', [AdminEmployeeController::class, 'index'])->name('index');
             Route::get('/create', [AdminEmployeeController::class, 'create'])->name('create');
             Route::post('/', [AdminEmployeeController::class, 'store'])->name('store');
-            Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
+            Route::get('/import', [AdminEmployeeController::class, 'importPage'])->name('import.page');
             Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import');
             Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview');
             Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit');
+            Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
             Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
+            Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
+            Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
             Route::get('/{employee}/edit', [AdminEmployeeController::class, 'edit'])->name('edit');
             Route::put('/{employee}', [AdminEmployeeController::class, 'update'])->name('update');
             Route::post('/bulk-destroy', [AdminEmployeeController::class, 'bulkDestroy'])->name('bulkDestroy');

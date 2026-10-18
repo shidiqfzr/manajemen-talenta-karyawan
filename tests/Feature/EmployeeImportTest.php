@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesExport;
+use App\Exports\ImportSummaryExport;
 use App\Exports\Sheets\EmployeeTemplateDataSheet;
 use App\Exports\Sheets\EmployeeTemplateReferenceSheet;
 use App\Models\Employee;
@@ -12,9 +13,11 @@ use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Import\EmployeeImportDictionary;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Facades\Excel;
@@ -112,6 +115,30 @@ class EmployeeImportTest extends TestCase
     {
         $response = $this->post(route('admin.employees.import'), []);
         $response->assertRedirect(route('login'));
+
+        $pageResponse = $this->get(route('admin.employees.import.page'));
+        $pageResponse->assertRedirect(route('login'));
+    }
+
+    public function test_admin_can_access_import_wizard_page(): void
+    {
+        $response = $this->actingAs($this->admin)->get(route('admin.employees.import.page'));
+        $response->assertOk();
+        $response->assertViewIs('admin.employees.import');
+        $response->assertViewHas('dictionaryCategories');
+        $response->assertSee('Impor Data Pegawai');
+        $response->assertSee('Kamus Format Spreadsheet');
+        $response->assertSeeText('Unggah & Panduan Kolom');
+        $response->assertSee('Unduh Template Excel Resmi');
+        $response->assertSee('searchColumn');
+        $response->assertSee('6 wajib');
+
+        // Pastikan seluruh 26 kolom dari EmployeeImportDictionary ter-render
+        $columns = EmployeeImportDictionary::getColumns();
+        $this->assertCount(26, $columns);
+        foreach ($columns as $col) {
+            $response->assertSee($col['key']);
+        }
     }
 
     public function test_import_validation_rejects_non_excel_files_and_empty_requests(): void
@@ -711,7 +738,8 @@ class EmployeeImportTest extends TestCase
         $summary = session('import_summary');
 
         $this->assertEquals(0, $summary['created']);
-        $this->assertEquals(1, $summary['updated']);
+        $this->assertEquals(0, $summary['updated']);
+        $this->assertEquals(1, $summary['unchanged']);
         $this->assertEquals(0, $summary['skipped']);
         $this->assertFalse($summary['has_errors']);
     }
@@ -874,20 +902,48 @@ class EmployeeImportTest extends TestCase
         $token = $previewResponse->json('token');
 
         // 2. Download baris gagal
-        Excel::fake();
+        Carbon::setTestNow(now());
+        try {
+            Excel::fake();
 
-        $downloadResponse = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadFailed'), [
+            $downloadResponse = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadFailed'), [
+                'token' => $token,
+            ]);
+
+            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesExport $export) {
+                $array = $export->array();
+                $headings = $export->headings();
+
+                return count($array) === 1
+                    && in_array('NO. BARIS EXCEL', $headings)
+                    && in_array('ALASAN PENOLAKAN / KESALAHAN SISTEM', $headings);
+            });
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        // 3. Jalankan komit (Tahap 3)
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
             'token' => $token,
         ]);
+        $commitResponse->assertOk()->assertJsonPath('success', true);
 
-        Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesExport $export) {
-            $array = $export->array();
-            $headings = $export->headings();
+        // 4. Download baris gagal pada Tahap 3 (pasca-komit) harus tetap berhasil
+        Carbon::setTestNow(now());
+        try {
+            Excel::fake();
 
-            return count($array) === 1
-                && in_array('NO. BARIS EXCEL', $headings)
-                && in_array('ALASAN PENOLAKAN / KESALAHAN SISTEM', $headings);
-        });
+            $downloadPostCommit = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadFailed'), [
+                'token' => $token,
+            ]);
+
+            $downloadPostCommit->assertOk();
+            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesExport $export) {
+                return count($export->array()) === 1;
+            });
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     /**
@@ -1002,6 +1058,13 @@ class EmployeeImportTest extends TestCase
             'nik' => '13007788',
             'jabatan' => 'Asisten Tata Usaha & Keuangan',
         ]);
+
+        // Audit trail persisten harus tercatat di employee_import_logs
+        $this->assertDatabaseHas('employee_import_logs', [
+            'token' => $token,
+            'created_count' => 1,
+            'status' => 'completed',
+        ]);
     }
 
     /**
@@ -1079,5 +1142,647 @@ class EmployeeImportTest extends TestCase
         $this->assertNull($concurrentJob->tmt_akhir);
         $this->assertEquals('PENUGASAN', $concurrentJob->jenis_mutasi);
         $this->assertStringContainsString('Plt. Manajer PKS', $concurrentJob->catatan);
+    }
+
+    public function test_import_with_pmo_unit_alias_and_head_of_pmo_investasi_tanaman(): void
+    {
+        $pmoUnit = Unit::firstOrCreate(
+            ['nama' => 'Project Management Office (PMO)'],
+            ['kode' => 'Project', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true]
+        );
+
+        $pos = Position::firstOrCreate(
+            ['nama' => 'Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng'],
+            ['bidang' => 'TAN', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true]
+        );
+
+        $pmoUnit->positions()->syncWithoutDetaching([
+            $pos->id => ['kuota' => 1],
+        ]);
+
+        $rows = [
+            [
+                '13001428', 'JAN PURDY RAJAGUKGUK', 'L', 'Bakara', '1971-01-11',
+                'Kristen Protestan', 'K/3', 'Tetap (PKWTT)',
+                'Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng', 'Karpim',
+                'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG',
+                'IVB/05', 'RM-1', 'Definitif',
+                '1997-03-21', '1999-09-01', '2026-04-01', '2026-04-01',
+                'Reguler', 15, 15, 'S1', 'Universitas',
+                '2026-01-01', '2027-01-01',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $previewResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 1)
+            ->assertJsonPath('summary.failed_count', 0);
+
+        $token = $previewResponse->json('token');
+
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+
+        $commitResponse->assertOk()->assertJsonPath('success', true);
+
+        $employee = Employee::where('nik', '13001428')->firstOrFail();
+        $this->assertEquals('Project Management Office (PMO)', $employee->unit_kerja);
+        $this->assertEquals('Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng', $employee->jabatan);
+        $this->assertEquals('Karpim', $employee->level);
+        $this->assertEquals('RM-1', $employee->rm_level);
+    }
+
+    public function test_reimport_identical_employee_detected_as_unchanged_and_skips_database_update(): void
+    {
+        // 1. Buat pegawai definitif lengkap di database
+        $employee = Employee::create([
+            'nik' => '13008888',
+            'nama' => 'JOKO SUSILO',
+            'jenis_kelamin' => 'L',
+            'tempat_lahir' => 'Pontianak',
+            'tanggal_lahir' => '1985-05-15',
+            'agama' => 'Islam',
+            'susunan_keluarga' => 'K/2',
+            'status_karyawan' => 'Tetap (PKWTT)',
+            'jabatan' => 'Asisten Afdeling',
+            'level' => 'Karpim',
+            'unit_kerja' => 'Kebun Inti Gunung Meliau',
+            'golongan' => 'IIIA/00',
+            'rm_level' => 'RM-3',
+            'status_penugasan' => 'Definitif',
+            'tmt_bekerja' => '2010-01-01',
+            'tanggal_diangkat_staf' => '2012-01-01',
+            'tanggal_dalam_jabatan' => '2020-01-01',
+            'tmt_unit_kerja' => '2020-01-01',
+            'jalur_masuk' => 'Reguler',
+            'job_grade' => 11,
+            'person_grade' => 11,
+            'pendidikan_terakhir' => 'S1',
+            'sekolah' => 'Universitas Tanjungpura',
+            'tanggal_pensiun' => '2041-05-01',
+            'tanggal_mbt' => '2040-05-01',
+        ]);
+
+        $initialUpdatedAt = $employee->updated_at->toIso8601String();
+
+        // 2. Buat berkas Excel dengan data yang 100% identik persis
+        $rows = [
+            [
+                '13008888', 'JOKO SUSILO', 'L', 'Pontianak', '1985-05-15',
+                'Islam', 'K/2', 'Tetap (PKWTT)', 'Asisten Afdeling', 'Karpim',
+                'Kebun Inti Gunung Meliau', 'IIIA/00', 'RM-3', 'Definitif',
+                '2010-01-01', '2012-01-01', '2020-01-01', '2020-01-01',
+                'Reguler', 11, 11, 'S1', 'Universitas Tanjungpura',
+                '2040-05-01', '2041-05-01',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        // 3. Dry-Run Preview: Harus terdeteksi UNCHANGED / TETAP, bukan UPDATE
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $previewResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 0)
+            ->assertJsonPath('summary.updated', 0)
+            ->assertJsonPath('summary.unchanged', 1)
+            ->assertJsonPath('summary.failed_count', 0)
+            ->assertJsonPath('summary.sample_rows.0.action', 'UNCHANGED');
+
+        $token = $previewResponse->json('token');
+
+        // 4. Commit Import: Eksekusi lewati SQL update
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+
+        $commitResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 0)
+            ->assertJsonPath('summary.updated', 0)
+            ->assertJsonPath('summary.unchanged', 1);
+
+        // 5. Pastikan record di database tetap utuh dan timestamp updated_at tidak terganggu
+        $refreshedEmployee = Employee::where('nik', '13008888')->firstOrFail();
+        $this->assertEquals($initialUpdatedAt, $refreshedEmployee->updated_at->toIso8601String());
+    }
+
+    /**
+     * Uji Penguatan Keamanan: Sanitasi Formula Injection (CWE-1236 / OWASP) pada Ekspor Baris Gagal.
+     */
+    public function test_failed_employees_export_sanitizes_formula_injection_characters(): void
+    {
+        $this->assertEquals("'=SUM(A1:A10)", FailedEmployeesExport::sanitizeCellValue('=SUM(A1:A10)'));
+        $this->assertEquals("'+12345", FailedEmployeesExport::sanitizeCellValue('+12345'));
+        $this->assertEquals("'-100", FailedEmployeesExport::sanitizeCellValue('-100'));
+        $this->assertEquals("'@malicious", FailedEmployeesExport::sanitizeCellValue('@malicious'));
+        $this->assertEquals("'\tTabbed", FailedEmployeesExport::sanitizeCellValue("\tTabbed"));
+        $this->assertEquals('Normal Text', FailedEmployeesExport::sanitizeCellValue('Normal Text'));
+        $this->assertEquals('', FailedEmployeesExport::sanitizeCellValue(null));
+
+        $failedRows = [
+            [
+                'row' => 2,
+                'nik' => '=13009988',
+                'errors' => ['=HYPERLINK("http://evil.com")'],
+                'raw_data' => [
+                    'nik' => '=13009988',
+                    'nama' => '+DROP TABLE',
+                ],
+            ],
+        ];
+
+        $export = new FailedEmployeesExport($failedRows);
+        $data = $export->array();
+
+        $this->assertCount(1, $data);
+        $this->assertEquals("'=HYPERLINK(\"http://evil.com\")", $data[0][1]); // reasons
+        $this->assertEquals("'=13009988", $data[0][2]); // NIK
+        $this->assertEquals("'+DROP TABLE", $data[0][3]); // Nama
+    }
+
+    /**
+     * Uji Integritas Komit: Kebijakan komit parsial menyimpan baris valid dan mengisolasi baris gagal.
+     */
+    public function test_commit_import_persists_valid_rows_and_isolates_failed_rows(): void
+    {
+        // 1. Buat file Excel dengan 1 baris valid dan 1 baris invalid (Job Grade 5 untuk Karpim -> Ditolak)
+        $rows = [
+            [
+                '13007765',
+                'Valid Employee Mixed',
+                'L',
+                'Pontianak',
+                '1992-04-10',
+                'Islam',
+                'K/0',
+                'PKWTT',
+                'Asisten Afdeling',
+                'Karpim',
+                'Kebun Inti Gunung Meliau',
+                'IIIA/00',
+                'RM-3',
+                'Definitif',
+                '2015-01-01',
+                '2018-01-01',
+                '2021-01-01',
+                '2021-01-01',
+                'Reguler',
+                12,
+                12,
+                'D4 / S1',
+                'INSTIPER',
+                '',
+                '',
+            ],
+            [
+                '13007766',
+                'Invalid Grade Karpim',
+                'L',
+                'Pontianak',
+                '1992-04-10',
+                'Islam',
+                'K/0',
+                'PKWTT',
+                'Asisten Afdeling',
+                'Karpim',
+                'Kebun Inti Gunung Meliau',
+                'IIIA/00',
+                'RM-3',
+                'Definitif',
+                '2015-01-01',
+                '2018-01-01',
+                '2021-01-01',
+                '2021-01-01',
+                'Reguler',
+                5, // INVALID untuk Karpim (wajib 11-16)
+                5,
+                'D4 / S1',
+                'INSTIPER',
+                '',
+                '',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        // 2. Preview Dry-Run
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $previewResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 1)
+            ->assertJsonPath('summary.skipped', 1);
+
+        $token = $previewResponse->json('token');
+
+        // 3. Commit Tunggal (Simpan Parsial) -> Berhasil menyimpan 1 valid dan mengisolasi 1 gagal
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+
+        $commitResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 1)
+            ->assertJsonPath('summary.skipped', 1);
+
+        // Pastikan data valid tersimpan dan data tidak valid diisolasi
+        $this->assertDatabaseHas('employees', ['nik' => '13007765']);
+        $this->assertDatabaseMissing('employees', ['nik' => '13007766']);
+    }
+
+    /**
+     * Uji Integritas Komit: Berhasil menyimpan ketika seluruh baris 100% valid.
+     */
+    public function test_commit_import_succeeds_with_clean_dataset(): void
+    {
+        $rows = [
+            [
+                '13008899',
+                'Valid Employee Strict',
+                'L',
+                'Pontianak',
+                '1992-04-10',
+                'Islam',
+                'K/0',
+                'PKWTT',
+                'Asisten Afdeling',
+                'Karpim',
+                'Kebun Inti Gunung Meliau',
+                'IIIA/00',
+                'RM-3',
+                'Definitif',
+                '2015-01-01',
+                '2018-01-01',
+                '2021-01-01',
+                '2021-01-01',
+                'Reguler',
+                12,
+                12,
+                'D4 / S1',
+                'INSTIPER',
+                '',
+                '',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $previewResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.skipped', 0);
+
+        $token = $previewResponse->json('token');
+
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+
+        $commitResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 1);
+
+        $this->assertDatabaseHas('employees', ['nik' => '13008899']);
+    }
+
+    /**
+     * Uji Endpoint Polling Status Antrean Kerja Impor (Hybrid Execution).
+     */
+    public function test_import_status_endpoint_returns_job_progress(): void
+    {
+        $token = 'test-token-'.uniqid();
+
+        // 404 jika token belum terdaftar
+        $notFoundResponse = $this->actingAs($this->admin)->getJson(route('admin.employees.import.status', ['token' => $token]));
+        $notFoundResponse->assertStatus(404);
+
+        // Simulasi status job tersimpan di Cache
+        Cache::put("import_job_{$token}", [
+            'status' => 'processing',
+            'progress' => 60,
+            'message' => 'Sedang memproses baris data...',
+            'token' => $token,
+            'type' => 'preview',
+        ], now()->addMinutes(10));
+
+        $statusResponse = $this->actingAs($this->admin)->getJson(route('admin.employees.import.status', ['token' => $token]));
+        $statusResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('status', 'processing')
+            ->assertJsonPath('progress', 60);
+    }
+
+    /**
+     * Uji Fail-Safe Auto-Fallback ke Sinkron jika Worker Antrean tidak merespons (5-detik SLA).
+     */
+    public function test_import_status_endpoint_supports_fail_safe_auto_fallback_to_sync(): void
+    {
+        $rows = [
+            [
+                '13009911',
+                'Fallback Employee Test',
+                'L',
+                'Pontianak',
+                '1993-02-15',
+                'Islam',
+                'K/0',
+                'PKWTT',
+                'Asisten Afdeling',
+                'Karpim',
+                'Kebun Inti Gunung Meliau',
+                'IIIA/00',
+                'RM-3',
+                'Definitif',
+                '2016-01-01',
+                '2019-01-01',
+                '2022-01-01',
+                '2022-01-01',
+                'Reguler',
+                11,
+                11,
+                'D4 / S1',
+                'INSTIPER',
+                '',
+                '',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $token = $previewResponse->json('token');
+
+        // Simulasikan token sedang berada di antrean commit (processing)
+        Cache::put("import_commit_job_{$token}", [
+            'status' => 'processing',
+            'progress' => 15,
+            'message' => 'Menunggu worker antrean...',
+            'token' => $token,
+            'type' => 'commit',
+        ], now()->addMinutes(10));
+
+        // Panggil endpoint status dengan query fallback_sync=1
+        $fallbackResponse = $this->actingAs($this->admin)->getJson(route('admin.employees.import.status', [
+            'token' => $token,
+            'fallback_sync' => 1,
+        ]));
+
+        $fallbackResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('fallback_executed', true)
+            ->assertJsonPath('created', 1);
+
+        $this->assertDatabaseHas('employees', ['nik' => '13009911']);
+    }
+
+    /**
+     * Uji Artisan Console Command untuk Pembersihan Berkas Kedaluwarsa Terjadwal.
+     */
+    public function test_console_command_purges_expired_import_files(): void
+    {
+        $this->artisan('hris:purge-import-files', ['--hours' => 2])
+            ->expectsOutputToContain('Berhasil membersihkan')
+            ->assertExitCode(0);
+    }
+
+    /**
+     * Uji deteksi inspeksi diff atribut lama vs baru untuk data status UPDATE pada sesi pratinjau.
+     */
+    public function test_dry_run_preview_detects_attribute_diff_for_update_rows(): void
+    {
+        // Siapkan pegawai eksisting
+        Employee::factory()->create([
+            'nik' => '13008899',
+            'nama' => 'HENDRA WIJAYA',
+            'jabatan' => 'Asisten Afdeling',
+            'level' => 'Karpim',
+            'unit_kerja' => $this->validUnit->nama,
+            'golongan' => 'IIIA/00',
+            'rm_level' => 'RM-3',
+            'agama' => 'Islam',
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ]);
+
+        $rows = [
+            [
+                '13008899',
+                'HENDRA WIJAYA',
+                'L',
+                'Pontianak',
+                '1990-01-01',
+                'Islam',
+                'K/1',
+                'Tetap (PKWTT)',
+                'Asisten Afdeling',
+                'Karpim',
+                $this->validUnit->nama,
+                'IIIB/00', // Berubah dari IIIA/00 ke IIIB/00
+                'RM-2',    // Berubah dari RM-3 ke RM-2
+                'Definitif',
+                '',
+                '2015-01-01',
+                '2015-01-01',
+                '2020-01-01',
+                '2020-01-01',
+                'Reguler',
+                '12',
+                '12',
+                'D4 / S1',
+                'Universitas Tanjungpura',
+                '',
+                '',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.updated', 1)
+            ->assertJsonPath('summary.created', 0);
+
+        $sampleRows = $response->json('summary.sample_rows');
+        $this->assertNotEmpty($sampleRows);
+        $this->assertEquals('UPDATE', $sampleRows[0]['action']);
+        $this->assertNotEmpty($sampleRows[0]['diff']);
+
+        $diffFields = collect($sampleRows[0]['diff'])->pluck('field')->toArray();
+        $this->assertContains('golongan', $diffFields);
+        $this->assertContains('rm_level', $diffFields);
+
+        // Pastikan nilai old dan new akurat
+        $golDiff = collect($sampleRows[0]['diff'])->firstWhere('field', 'golongan');
+        $this->assertEquals('IIIA/00', $golDiff['old']);
+        $this->assertEquals('IIIB/00', $golDiff['new']);
+    }
+
+    /**
+     * Uji unduh rekapitulasi laporan impor pasca-komit (.xlsx).
+     */
+    public function test_admin_can_download_import_summary_report(): void
+    {
+        $rows = [
+            [
+                '13007788',
+                'RATNA SARI',
+                'P',
+                'Medan',
+                '1992-04-10',
+                'Islam',
+                'TK',
+                'Tetap (PKWTT)',
+                'Mandor Panen',
+                'Karpel',
+                $this->validUnit->nama,
+                'IIC/00',
+                'RM-4',
+                'Definitif',
+                '',
+                '2018-01-01',
+                '',
+                '2020-01-01',
+                '2020-01-01',
+                'Reguler',
+                '5',
+                '5',
+                'SMA/SMK',
+                'SMK Negeri 1',
+                '',
+                '',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows);
+
+        // 1. Jalankan preview
+        $previewRes = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+        $token = $previewRes->json('token');
+
+        // 2. Eksekusi commit
+        $commitRes = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+        $commitRes->assertOk()->assertJsonPath('success', true);
+
+        // 3. Unduh laporan rekapitulasi impor
+        $reportRes = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadReport'), [
+            'token' => $token,
+        ]);
+
+        $reportRes->assertOk();
+        $this->assertStringContainsString('spreadsheetml', $reportRes->headers->get('content-type'));
+        $this->assertStringContainsString('rekap_laporan_impor_karyawan_', $reportRes->headers->get('content-disposition'));
+
+        // 4. Unduh dengan token tidak valid harus ditolak
+        $invalidRes = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadReport'), [
+            'token' => 'invalid-token-xyz',
+        ]);
+        $invalidRes->assertRedirect();
+        $invalidRes->assertSessionHas('error');
+
+        // 5. Validasi struktur baris dan header sheet Ringkasan & Metadata
+        $export = new ImportSummaryExport([
+            'summary' => [
+                'total_processed' => 100,
+                'created' => 20,
+                'updated' => 30,
+                'unchanged' => 50,
+                'skipped' => 0,
+            ],
+        ]);
+        $sheets = $export->sheets();
+        $this->assertCount(2, $sheets);
+        $summarySheet = $sheets[0];
+        $this->assertEquals('Ringkasan & Metadata', $summarySheet->title());
+        $arrayData = $summarySheet->array();
+
+        // Baris 3 (index 2): Header Parameter Sistem
+        $this->assertEquals(['PARAMETER SISTEM', 'NILAI / KETERANGAN'], $arrayData[2]);
+        // Baris 11 (index 10): Baris kosong pemisah
+        $this->assertEquals([''], $arrayData[10]);
+        // Baris 12 (index 11): Header Ringkasan Metrik Hasil Impor
+        $this->assertEquals(['RINGKASAN METRIK HASIL IMPOR', 'JUMLAH BARIS', 'PERSENTASE'], $arrayData[11]);
+        // Baris 13 (index 12): Data Total Baris Diproses
+        $this->assertEquals(['Total Baris Diproses', 100, '100%'], $arrayData[12]);
+    }
+
+    /**
+     * Memastikan jika dalam berkas spreadsheet terdapat NIK ganda, baris duplikat berikutnya
+     * otomatis dikarantina dengan pesan informatif dan tidak menimpa data baris pertama.
+     */
+    public function test_import_quarantines_duplicate_niks_within_same_file(): void
+    {
+        $rows = [
+            // Baris 2: NIK 13008899 pertama (valid)
+            [
+                '13008899', 'BUDI SANTOSO', 'L', 'Pontianak', '1992-05-10',
+                'Islam', 'K/1', 'Tetap (PKWTT)', 'Asisten Afdeling', 'Karpim',
+                'Kebun Inti Gunung Meliau', 'IIIB/00', 'RM-3', 'Definitif', '',
+                '2015-01-01', '2018-01-01', '2020-01-01', '2020-01-01',
+                'Reguler', 12, 12, 'S1', 'Universitas Tanjungpura',
+                '2047-05-01', '2048-05-01',
+            ],
+            // Baris 3: NIK 13008899 kedua (duplikat dalam berkas yang sama)
+            [
+                '13008899', 'BUDI SANTOSO DUPLIKAT', 'L', 'Pontianak', '1992-05-10',
+                'Islam', 'K/1', 'Tetap (PKWTT)', 'Asisten Afdeling', 'Karpim',
+                'Kebun Inti Gunung Meliau', 'IIIB/00', 'RM-3', 'Definitif', '',
+                '2015-01-01', '2018-01-01', '2020-01-01', '2020-01-01',
+                'Reguler', 12, 12, 'S1', 'Universitas Tanjungpura',
+                '2047-05-01', '2048-05-01',
+            ],
+        ];
+
+        $file = $this->createExcelUploadFile($rows, 'duplicate_niks_test.xlsx');
+
+        $previewResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $file,
+        ]);
+
+        $previewResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.created', 1)
+            ->assertJsonPath('summary.skipped', 1);
+
+        $token = $previewResponse->json('token');
+
+        // Komit data
+        $commitResponse = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
+            'token' => $token,
+        ]);
+
+        $commitResponse->assertOk()
+            ->assertJsonPath('summary.created', 1)
+            ->assertJsonPath('summary.skipped', 1);
+
+        // Hanya baris pertama yang tersimpan
+        $employee = Employee::find('13008899');
+        $this->assertNotNull($employee);
+        $this->assertEquals('BUDI SANTOSO', $employee->nama);
     }
 }

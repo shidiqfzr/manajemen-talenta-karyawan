@@ -3,14 +3,12 @@
 namespace App\Imports;
 
 use App\Models\Employee;
-use App\Models\JobHistory;
-use App\Models\Position;
-use App\Models\Unit;
+use App\Services\Import\ConcurrentJobTextParser;
+use App\Services\Import\EmployeeImportRowValidator;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -22,6 +20,8 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
     public int $updated = 0;
 
+    public int $unchanged = 0;
+
     public int $skipped = 0;
 
     public array $errors = [];
@@ -32,7 +32,18 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
     public array $sampleRows = [];
 
-    public function __construct(public bool $dryRun = false) {}
+    public EmployeeImportRowValidator $validator;
+
+    public ConcurrentJobTextParser $jobParser;
+
+    public function __construct(
+        public bool $dryRun = false,
+        ?EmployeeImportRowValidator $validator = null,
+        ?ConcurrentJobTextParser $jobParser = null
+    ) {
+        $this->validator = $validator ?? new EmployeeImportRowValidator;
+        $this->jobParser = $jobParser ?? new ConcurrentJobTextParser;
+    }
 
     /**
      * Membatasi pembacaan impor hanya pada Sheet pertama ('Data Karyawan').
@@ -46,27 +57,14 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     }
 
     /**
-     * Cache in-memory lookup master unit & formasi aktif: [unit_name => ['exists' => bool, 'is_official' => bool, 'positions' => [level => [names]]]]
-     */
-    private array $unitPositionsCache = [];
-
-    /**
      * Cache in-memory lookup pegawai eksisting: [nik => ['nik' => ..., 'jabatan' => ..., 'unit_kerja' => ..., 'level' => ...]]
      */
     private array $existingEmployeesCache = [];
 
-    private ?array $allUnitNames = null;
-
-    private ?array $allPositionNames = null;
-
-    private const INDO_MONTHS = [
-        'januari' => 1, 'februari' => 2, 'maret' => 3, 'april' => 4,
-        'mei' => 5, 'juni' => 6, 'juli' => 7, 'agustus' => 8,
-        'september' => 9, 'oktober' => 10, 'november' => 11, 'desember' => 12,
-        'jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4,
-        'jun' => 6, 'jul' => 7, 'agu' => 8, 'agt' => 8,
-        'sep' => 9, 'okt' => 10, 'nov' => 11, 'des' => 12,
-    ];
+    /**
+     * Cache penampung NIK yang sudah diproses dalam batch berkas yang sama: [nik => rowNumber]
+     */
+    private array $seenNiksInFile = [];
 
     private const DATE_FIELDS = [
         'tanggal_dalam_jabatan',
@@ -78,33 +76,13 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         'tanggal_pensiun',
     ];
 
-    private const VALIDATION_RULES = [
-        'nik' => ['required', 'string', 'regex:/^[0-9]{8}$/'],
-        'nama' => 'required|string|max:255',
-        'jabatan' => 'required|string|max:255',
-        'level' => 'required|string|in:Karpim,Karpel',
-        'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
-        'unit_kerja' => 'required|string|max:255',
-        'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
-        'status_karyawan' => 'required|string|max:50',
-        'golongan' => ['nullable', 'string', 'regex:/^(I|II|III|IV)[A-D](\/[0-9]{2})?$/i'],
-        'tanggal_dalam_jabatan' => 'nullable|date',
-        'tmt_unit_kerja' => 'nullable|date',
-        'tempat_lahir' => 'nullable|string|max:255',
-        'jenis_kelamin' => 'nullable|string|in:L,P,Laki-laki,Perempuan',
-        'tanggal_lahir' => 'nullable|date',
-        'tmt_bekerja' => 'nullable|date',
-        'tanggal_diangkat_staf' => 'nullable|date',
-        'susunan_keluarga' => 'nullable|string',
-        'job_grade' => 'nullable|integer|between:1,16',
-        'person_grade' => 'nullable|integer|between:1,16',
-        'jalur_masuk' => 'nullable|string|in:CKP,Talent Scouting,RBB,Reguler',
-        'tanggal_mbt' => 'nullable|date',
-        'tanggal_pensiun' => 'nullable|date',
-        'agama' => 'nullable|string|max:255',
-        'pendidikan_terakhir' => 'nullable|string|max:255',
-        'sekolah' => 'nullable|string|max:255',
-        'tugas_rangkap_penugasan_sementara' => 'nullable|string',
+    public const UNIT_ALIASES = [
+        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
+        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'Project Management Office (PMO)',
+        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
+        'PROJECT MANAGEMENT OFFICE (PMO)' => 'Project Management Office (PMO)',
+        'PROJECT MANAGEMENT OFFICE' => 'Project Management Office (PMO)',
+        'PMO' => 'Project Management Office (PMO)',
     ];
 
     public function collection(Collection $rows): void
@@ -114,11 +92,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         foreach ($rows as $row) {
             foreach ($row as $k => $v) {
                 if (str_contains(strtolower((string) $k), 'nik') && ! empty($v)) {
-                    $rawNik = trim((string) $v);
-                    if (ctype_digit($rawNik) && strlen($rawNik) >= 5 && strlen($rawNik) < 8) {
-                        $rawNik = str_pad($rawNik, 8, '0', STR_PAD_LEFT);
-                    }
-                    $rawNiks[] = $rawNik;
+                    $rawNiks[] = $this->normalizeNik((string) $v);
                     break;
                 }
             }
@@ -126,19 +100,14 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
         if (! empty($rawNiks)) {
             $this->existingEmployeesCache = Employee::whereIn('nik', array_unique($rawNiks))
-                ->select(['nik', 'jabatan', 'unit_kerja', 'level'])
                 ->get()
                 ->keyBy('nik')
-                ->map(fn ($emp) => [
-                    'nik' => $emp->nik,
-                    'jabatan' => $emp->jabatan,
-                    'unit_kerja' => $emp->unit_kerja,
-                    'level' => $emp->level,
-                ])
-                ->toArray();
+                ->all();
         }
 
         $rowNumber = 1; // Header adalah baris 1
+
+        $this->seenNiksInFile = [];
 
         foreach ($rows as $row) {
             $rowNumber++;
@@ -151,6 +120,23 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
             try {
                 $rawRow = $row->toArray();
                 $data = $this->prepareRowData($this->normalizeKeys($rawRow));
+
+                // Deteksi NIK ganda di dalam berkas Excel yang sama
+                if (! empty($data['nik'])) {
+                    if (isset($this->seenNiksInFile[$data['nik']])) {
+                        $prevRow = $this->seenNiksInFile[$data['nik']];
+                        $this->recordValidationError(
+                            $rowNumber,
+                            ["NIK '{$data['nik']}' terdeteksi ganda (duplikat dari baris {$prevRow} pada berkas yang sama)."],
+                            $data['nik'],
+                            $rawRow,
+                            $data['nama'] ?? null
+                        );
+
+                        continue;
+                    }
+                    $this->seenNiksInFile[$data['nik']] = $rowNumber;
+                }
 
                 if (! $this->validateRowData($data, $rowNumber, $rawRow)) {
                     continue;
@@ -169,42 +155,72 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
     private function recordDryRunRow(array $data, array $rawRow): void
     {
-        $isExisting = isset($this->existingEmployeesCache[$data['nik']]);
-        if ($isExisting) {
-            $this->updated++;
+        $existingEmployee = $this->existingEmployeesCache[$data['nik']] ?? null;
+        $diff = [];
+
+        if ($existingEmployee) {
+            if ($existingEmployee instanceof Employee && $this->isEmployeeIdentical($existingEmployee, $data)) {
+                $action = 'UNCHANGED';
+                $this->unchanged++;
+            } else {
+                $action = 'UPDATE';
+                $this->updated++;
+                if ($existingEmployee instanceof Employee) {
+                    $diff = $this->getEmployeeDiff($existingEmployee, $data);
+                }
+            }
         } else {
+            $action = 'CREATE';
             $this->created++;
         }
 
-        $rowItem = [
-            'action' => $isExisting ? 'UPDATE' : 'CREATE',
+        $rowItem = $this->formatRowSummary($data, $action, $action, $diff);
+
+        $this->validRows[] = $rowItem;
+        $this->sampleRows[] = $rowItem;
+    }
+
+    /**
+     * Membentuk struktur standar rekapitulasi baris data pegawai (DRY pattern).
+     */
+    private function formatRowSummary(array $data, string $action, ?string $statusLabel = null, array $diff = []): array
+    {
+        return [
+            'action' => $action,
+            'status' => $statusLabel ?? $action,
             'nik' => $data['nik'],
             'nama' => $data['nama'],
             'jabatan' => $data['jabatan'],
             'unit_kerja' => $data['unit_kerja'],
             'level' => $data['level'],
             'golongan' => $data['golongan'] ?? '-',
+            'rm_level' => $data['rm_level'] ?? '-',
             'status_karyawan' => $data['status_karyawan'] ?? '-',
             'status_penugasan' => $data['status_penugasan'] ?? 'Definitif',
+            'tmt_bekerja' => $data['tmt_bekerja'] ?? '-',
             'tugas_rangkap' => $data['tugas_rangkap_penugasan_sementara'] ?? null,
+            'diff' => $diff,
         ];
+    }
 
-        $this->validRows[] = $rowItem;
-
-        if (count($this->sampleRows) < 15) {
-            $this->sampleRows[] = $rowItem;
+    /**
+     * Smart Auto-Healing untuk NIK: Excel sering menghilangkan leading-zero numerik.
+     */
+    public function normalizeNik(?string $nik): string
+    {
+        $rawNik = trim((string) $nik);
+        if (ctype_digit($rawNik) && strlen($rawNik) >= 5 && strlen($rawNik) < 8) {
+            return str_pad($rawNik, 8, '0', STR_PAD_LEFT);
         }
+
+        return $rawNik;
     }
 
     public function prepareRowData(array $data): array
     {
         // 1. Smart Auto-Healing untuk NIK: Excel sering menghilangkan leading-zero numerik
         if (isset($data['nik'])) {
-            $rawNik = trim((string) $data['nik']);
-            if (ctype_digit($rawNik) && strlen($rawNik) >= 5 && strlen($rawNik) < 8) {
-                $rawNik = str_pad($rawNik, 8, '0', STR_PAD_LEFT);
-            }
-            $data['nik'] = $rawNik;
+            $data['nik'] = $this->normalizeNik((string) $data['nik']);
         }
 
         // 2. Normalisasi format tanggal
@@ -227,7 +243,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
             $data['nama'] = strtoupper(trim((string) $data['nama']));
         }
         if (isset($data['unit_kerja'])) {
-            $data['unit_kerja'] = trim((string) $data['unit_kerja']);
+            $data['unit_kerja'] = $this->normalizeUnitKerja((string) $data['unit_kerja']);
         }
         if (isset($data['jabatan'])) {
             $data['jabatan'] = trim((string) $data['jabatan']);
@@ -275,103 +291,10 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
     private function validateRowData(array &$data, int $rowNumber, array $rawRow = []): bool
     {
-        $customMessages = [
-            'nik.required' => 'NIK wajib diisi.',
-            'nik.regex' => 'Format NIK harus berupa 8 digit angka numerik (contoh: 13009988).',
-            'nama.required' => 'Nama pegawai wajib diisi.',
-            'jabatan.required' => 'Jabatan pegawai wajib diisi.',
-            'level.required' => 'Level strata pegawai wajib diisi.',
-            'level.in' => 'Level strata pegawai harus Karpim atau Karpel.',
-            'unit_kerja.required' => 'Unit kerja wajib diisi.',
-            'status_karyawan.required' => 'Status karyawan wajib diisi.',
-            'golongan.regex' => 'Format Golongan tidak valid (Format baku: [Gol]/[Berkala], contoh: IIIA/00 atau IVA/02).',
-            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
-            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
-        ];
+        $errors = $this->validator->validateRow($data, $this->existingEmployeesCache);
 
-        $validator = Validator::make($data, self::VALIDATION_RULES, $customMessages);
-
-        if ($validator->fails()) {
-            $this->recordValidationError($rowNumber, $validator->errors()->all(), $data['nik'] ?? null, $rawRow);
-
-            return false;
-        }
-
-        $businessErrors = [];
-
-        // 1. Validasi Strata vs Job/Person Grade (DOMAIN.md Bab 4.1 & 5.3)
-        if ($data['level'] === 'Karpim') {
-            if (isset($data['job_grade']) && ($data['job_grade'] < 11 || $data['job_grade'] > 16)) {
-                $businessErrors[] = 'Untuk strata Karpim, Job Grade wajib berada dalam rentang 11 sampai 16.';
-            }
-            if (isset($data['person_grade']) && ($data['person_grade'] < 11 || $data['person_grade'] > 16)) {
-                $businessErrors[] = 'Untuk strata Karpim, Person Grade wajib berada dalam rentang 11 sampai 16.';
-            }
-        } elseif ($data['level'] === 'Karpel') {
-            if (isset($data['job_grade']) && ($data['job_grade'] < 1 || $data['job_grade'] > 10)) {
-                $businessErrors[] = 'Untuk strata Karpel, Job Grade wajib berada dalam rentang 1 sampai 10.';
-            }
-            if (isset($data['person_grade']) && ($data['person_grade'] < 1 || $data['person_grade'] > 10)) {
-                $businessErrors[] = 'Untuk strata Karpel, Person Grade wajib berada dalam rentang 1 sampai 10.';
-            }
-        }
-
-        // 2. Validasi Kronologis Tanggal (DOMAIN.md Bab 5.3)
-        if (! empty($data['tanggal_lahir']) && ! empty($data['tmt_bekerja'])) {
-            $tglLahir = Carbon::parse($data['tanggal_lahir']);
-            $tmtBekerja = Carbon::parse($data['tmt_bekerja']);
-            if ($tglLahir->copy()->addYears(18)->gt($tmtBekerja)) {
-                $businessErrors[] = 'TMT Bekerja minimal 18 tahun setelah Tanggal Lahir.';
-            }
-        }
-
-        if (! empty($data['tmt_bekerja']) && ! empty($data['tanggal_diangkat_staf'])) {
-            $tmtBekerja = Carbon::parse($data['tmt_bekerja']);
-            $tglStaf = Carbon::parse($data['tanggal_diangkat_staf']);
-            if ($tglStaf->lt($tmtBekerja)) {
-                $businessErrors[] = 'Tanggal Diangkat Staf tidak boleh lebih awal dari TMT Bekerja.';
-            }
-        }
-
-        if (! empty($data['tmt_bekerja']) && ! empty($data['tanggal_dalam_jabatan'])) {
-            $tmtBekerja = Carbon::parse($data['tmt_bekerja']);
-            $tglJabatan = Carbon::parse($data['tanggal_dalam_jabatan']);
-            if ($tglJabatan->lt($tmtBekerja)) {
-                $businessErrors[] = 'Tanggal Dalam Jabatan tidak boleh lebih awal dari TMT Bekerja.';
-            }
-        }
-
-        // 3. Cek Perlindungan Mutasi untuk Pegawai Eksisting (DOMAIN.md Bab 5.2)
-        $existingEmployee = $this->existingEmployeesCache[$data['nik']] ?? null;
-        if ($existingEmployee) {
-            $isSameJabatan = ($existingEmployee['jabatan'] === $data['jabatan']) ||
-                $this->matchPosition($data['jabatan'], [$existingEmployee['jabatan']]) !== null;
-
-            if (! $isSameJabatan ||
-                $existingEmployee['unit_kerja'] !== $data['unit_kerja'] ||
-                $existingEmployee['level'] !== $data['level']) {
-                $businessErrors[] = 'Perubahan Jabatan/Unit Kerja/Level tidak diizinkan melalui import (Gunakan Modul Mutasi Karyawan).';
-            } else {
-                $data['jabatan'] = $existingEmployee['jabatan'];
-            }
-        } else {
-            // Pegawai Baru: Validasi Master Unit Kerja & Formasi Jabatan via In-Memory Memoization (DOMAIN.md Bab 3 & Bab 3.5)
-            [$unitExists, $isOfficial, $validPositions] = $this->getUnitPositionData($data['unit_kerja'], $data['level']);
-
-            if (! $unitExists && ! $isOfficial) {
-                $businessErrors[] = "Unit Kerja '{$data['unit_kerja']}' tidak terdaftar di Master Unit Organisasi.";
-            } elseif ($unitExists && count($validPositions) > 0) {
-                $matchedPosition = $this->matchPosition($data['jabatan'], $validPositions);
-                if ($matchedPosition) {
-                    $data['jabatan'] = $matchedPosition;
-                } else {
-                    $businessErrors[] = "Jabatan '{$data['jabatan']}' tidak valid untuk Unit Kerja '{$data['unit_kerja']}' dan Level Strata '{$data['level']}'.";
-                }
-            }
-        }
-
-        if (! empty($businessErrors)) {
-            $this->recordValidationError($rowNumber, $businessErrors, $data['nik'], $rawRow);
+        if (! empty($errors)) {
+            $this->recordValidationError($rowNumber, $errors, $data['nik'] ?? null, $rawRow, $data['nama'] ?? null);
 
             return false;
         }
@@ -382,6 +305,16 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     private function saveEmployee(array $data): void
     {
         DB::transaction(function () use ($data) {
+            $existingEmployee = $this->existingEmployeesCache[$data['nik']] ?? null;
+
+            if ($existingEmployee instanceof Employee && $this->isEmployeeIdentical($existingEmployee, $data)) {
+                $this->unchanged++;
+                $this->validRows[] = $this->formatRowSummary($data, 'UNCHANGED', 'TETAP');
+                Log::info("Employee unchanged via Excel import: NIK {$data['nik']}");
+
+                return;
+            }
+
             $employee = Employee::updateOrCreate(
                 ['nik' => $data['nik']],
                 $data
@@ -389,16 +322,15 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
             // Jika terdapat data tugas rangkap / penugasan sementara (Kolom O), otomatis daftarkan ke job_histories
             if (! empty($data['tugas_rangkap_penugasan_sementara'])) {
-                $this->registerConcurrentJobFromText($employee, (string) $data['tugas_rangkap_penugasan_sementara']);
+                $this->jobParser->registerFromText($employee, (string) $data['tugas_rangkap_penugasan_sementara']);
             }
 
             // Sinkronkan cache in-memory untuk integritas batch
-            $this->existingEmployeesCache[$data['nik']] = [
-                'nik' => $data['nik'],
-                'jabatan' => $data['jabatan'],
-                'unit_kerja' => $data['unit_kerja'],
-                'level' => $data['level'],
-            ];
+            $this->existingEmployeesCache[$data['nik']] = $employee;
+
+            $action = $employee->wasRecentlyCreated ? 'CREATE' : 'UPDATE';
+            $status = $employee->wasRecentlyCreated ? 'BARU' : 'UPDATE';
+            $this->validRows[] = $this->formatRowSummary($data, $action, $status);
 
             if ($employee->wasRecentlyCreated) {
                 $this->created++;
@@ -411,241 +343,267 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     }
 
     /**
-     * Mengambil data unit dan jabatan aktif dengan In-Memory Memoization (O(1) lookup).
+     * Menghitung rincian atribut yang berubah (sebelum vs sesudah) untuk data status UPDATE.
      */
-    private function getUnitPositionData(string $unitName, string $level): array
+    public function getEmployeeDiff(Employee $existing, array $newData): array
     {
-        if (! isset($this->unitPositionsCache[$unitName])) {
-            $unit = Unit::with(['positions' => function ($query) {
-                $query->where('positions.is_active', true);
-            }])->where('nama', $unitName)->first();
+        $diff = [];
+        $labels = [
+            'nama' => 'Nama Lengkap',
+            'level' => 'Strata (Level)',
+            'golongan' => 'Golongan',
+            'rm_level' => 'RM Level',
+            'tempat_lahir' => 'Tempat Lahir',
+            'tanggal_lahir' => 'Tanggal Lahir',
+            'agama' => 'Agama',
+            'susunan_keluarga' => 'Susunan Keluarga / PTKP',
+            'status_karyawan' => 'Status Pegawai',
+            'status_penugasan' => 'Status Penugasan',
+            'pendidikan_terakhir' => 'Pendidikan Terakhir',
+            'sekolah' => 'Sekolah / Universitas',
+            'jenis_kelamin' => 'Jenis Kelamin',
+            'jalur_masuk' => 'Jalur Masuk',
+            'job_grade' => 'Job Grade',
+            'person_grade' => 'Person Grade',
+            'tmt_bekerja' => 'TMT Bekerja',
+            'tanggal_diangkat_staf' => 'Tanggal Diangkat Staf',
+            'tanggal_dalam_jabatan' => 'Tanggal Dalam Jabatan',
+            'tmt_unit_kerja' => 'TMT Unit Kerja',
+            'tanggal_mbt' => 'Tanggal MBT',
+            'tanggal_pensiun' => 'Tanggal Pensiun',
+            'tugas_rangkap_penugasan_sementara' => 'Tugas Rangkap',
+        ];
 
-            if (! $unit) {
-                $this->unitPositionsCache[$unitName] = [
-                    'exists' => false,
-                    'is_official' => in_array($unitName, Employee::OFFICIAL_UNITS, true),
-                    'positions' => [],
-                ];
-            } else {
-                $positionsByLevel = [];
-                foreach ($unit->positions as $pos) {
-                    $positionsByLevel[$pos->level][] = $pos->nama;
+        foreach ($labels as $field => $label) {
+            if (! array_key_exists($field, $newData)) {
+                continue;
+            }
+
+            $oldVal = trim((string) ($existing->{$field} ?? ''));
+            $newVal = trim((string) ($newData[$field] ?? ''));
+
+            if (in_array($field, self::DATE_FIELDS, true)) {
+                $oldVal = $oldVal ? Carbon::parse($oldVal)->toDateString() : '';
+                $newVal = $newVal ? Carbon::parse($newVal)->toDateString() : '';
+            }
+
+            if ($field === 'tugas_rangkap_penugasan_sementara') {
+                if (empty($newVal)) {
+                    continue;
                 }
-                $this->unitPositionsCache[$unitName] = [
-                    'exists' => true,
-                    'is_official' => true,
-                    'positions' => $positionsByLevel,
+                $parsed = $this->jobParser->parse($newVal, $existing->unit_kerja);
+                if ($parsed && $this->jobParser->isMatchingExisting($existing->nik, $parsed)) {
+                    // Penugasan sementara sudah tercatat identik di database
+                    continue;
+                }
+            }
+
+            if (strcasecmp($oldVal, $newVal) !== 0) {
+                $diff[] = [
+                    'field' => $field,
+                    'label' => $label,
+                    'old' => $oldVal ?: '-',
+                    'new' => $newVal ?: '-',
                 ];
             }
         }
 
-        $unitData = $this->unitPositionsCache[$unitName];
-        $validPositions = $unitData['positions'][$level] ?? [];
-
-        return [$unitData['exists'], $unitData['is_official'], $validPositions];
+        return $diff;
     }
 
     /**
-     * Resolves matching position name tolerating punctuation and spacing variations
-     * (e.g. '&' vs space, parentheses '()' vs none, case-insensitive).
+     * Memeriksa apakah data pegawai dari Excel sama persis (identik) dengan data di database.
      */
-    private function matchPosition(string $input, array $validPositions): ?string
+    private function isEmployeeIdentical(Employee $existing, array $newData): bool
     {
-        if (in_array($input, $validPositions, true)) {
-            return $input;
-        }
+        // 1. Perbandingan field teks & informasi dasar
+        $textFields = [
+            'nama',
+            'level',
+            'golongan',
+            'tempat_lahir',
+            'agama',
+            'susunan_keluarga',
+            'pendidikan_terakhir',
+            'sekolah',
+            'jenis_kelamin',
+            'jalur_masuk',
+            'status_penugasan',
+            'status_karyawan',
+        ];
 
-        foreach ($validPositions as $pos) {
-            if (strcasecmp($input, $pos) === 0) {
-                return $pos;
+        foreach ($textFields as $field) {
+            if (array_key_exists($field, $newData)) {
+                $existingVal = trim((string) ($existing->{$field} ?? ''));
+                $newVal = trim((string) ($newData[$field] ?? ''));
+                if (strcasecmp($existingVal, $newVal) !== 0) {
+                    return false;
+                }
             }
         }
 
-        $clean = function (string $str) {
-            $str = str_ireplace(['&', 'dan'], ' ', $str);
-            $str = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $str);
-            $str = preg_replace('/\s+/', ' ', trim($str));
-
-            return mb_strtolower($str);
-        };
-
-        $cleanedInput = $clean($input);
-        foreach ($validPositions as $pos) {
-            if ($clean($pos) === $cleanedInput) {
-                return $pos;
+        // 2. Unit Kerja & Jabatan
+        if (array_key_exists('unit_kerja', $newData)) {
+            $existingUnit = trim((string) $existing->unit_kerja);
+            $newUnit = trim((string) $newData['unit_kerja']);
+            if (strcasecmp($existingUnit, $newUnit) !== 0) {
+                return false;
             }
         }
 
-        return null;
+        if (array_key_exists('jabatan', $newData)) {
+            $existingJabatan = (string) $existing->jabatan;
+            $newJabatan = (string) $newData['jabatan'];
+            if (! $this->validator->isPositionEquivalent($existingJabatan, $newJabatan)) {
+                return false;
+            }
+        }
+
+        // 3. RM Level
+        if (array_key_exists('rm_level', $newData) && filled($newData['rm_level'])) {
+            $existingRm = trim((string) ($existing->rm_level ?? ''));
+            $newRm = trim((string) $newData['rm_level']);
+            if (strcasecmp($existingRm, $newRm) !== 0) {
+                return false;
+            }
+        }
+
+        // 4. Grades (Job Grade & Person Grade)
+        if (array_key_exists('job_grade', $newData) && filled($newData['job_grade'])) {
+            if ((int) $existing->job_grade !== (int) $newData['job_grade']) {
+                return false;
+            }
+        }
+        if (array_key_exists('person_grade', $newData) && filled($newData['person_grade'])) {
+            if ((int) $existing->person_grade !== (int) $newData['person_grade']) {
+                return false;
+            }
+        }
+
+        // 5. Tanggal (format Y-m-d)
+        $dateFields = [
+            'tanggal_dalam_jabatan',
+            'tmt_unit_kerja',
+            'tanggal_lahir',
+            'tmt_bekerja',
+            'tanggal_diangkat_staf',
+        ];
+
+        foreach ($dateFields as $df) {
+            if (array_key_exists($df, $newData) && filled($newData[$df])) {
+                $existingRaw = $existing->{$df};
+                $existingDate = $existingRaw ? Carbon::parse($existingRaw)->toDateString() : null;
+                $newDate = Carbon::parse($newData[$df])->toDateString();
+                if ($existingDate !== $newDate) {
+                    return false;
+                }
+            }
+        }
+
+        // 6. Tugas rangkap di Kolom O
+        if (! empty($newData['tugas_rangkap_penugasan_sementara'])) {
+            $parsed = $this->jobParser->parse((string) $newData['tugas_rangkap_penugasan_sementara'], $existing->unit_kerja);
+            if (! $parsed || ! $this->jobParser->isMatchingExisting($existing->nik, $parsed)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
-     * Otomatis mendaftarkan penugasan sementara / tugas rangkap (Plt/Pjs) ke job_histories.
+     * Memeriksa apakah dua nama jabatan setara (delegasi ke validator).
      */
-    private function registerConcurrentJobFromText(Employee $employee, string $rawText): void
+    public function isPositionEquivalent(?string $positionA, ?string $positionB): bool
     {
-        $parsed = $this->parseConcurrentJobText($rawText, $employee->unit_kerja);
-        if (! $parsed) {
-            return;
-        }
-
-        // Cek apakah riwayat penugasan aktif (tmt_akhir IS NULL) serupa sudah ada
-        $existingJob = JobHistory::where('employee_nik', $employee->nik)
-            ->whereNull('tmt_akhir')
-            ->where('jabatan', $parsed['jabatan'])
-            ->where('unit_kerja', $parsed['unit_kerja'])
-            ->first();
-
-        if ($existingJob) {
-            $existingJob->update([
-                'status_penugasan' => $parsed['status_penugasan'],
-                'tmt_awal' => $parsed['tmt_awal'],
-                'catatan' => 'Tugas Rangkap via Excel Import: '.$rawText,
-            ]);
-        } else {
-            JobHistory::create([
-                'employee_nik' => $employee->nik,
-                'jabatan' => $parsed['jabatan'],
-                'unit_kerja' => $parsed['unit_kerja'],
-                'level' => $employee->level,
-                'golongan' => $employee->golongan,
-                'status_penugasan' => $parsed['status_penugasan'],
-                'tmt_awal' => $parsed['tmt_awal'],
-                'tmt_akhir' => null,
-                'jenis_mutasi' => 'PENUGASAN',
-                'catatan' => 'Tugas Rangkap via Excel Import: '.$rawText,
-            ]);
-        }
+        return $this->validator->isPositionEquivalent($positionA, $positionB);
     }
 
     /**
-     * Mem-parsing teks tugas rangkap di Kolom O untuk mengekstrak status penugasan (Plt/Pjs),
-     * tanggal TMT, unit kerja penugasan, dan nama jabatan yang diemban.
+     * Menormalisasi nama Unit Kerja dari data import Excel ke 43 Unit Kerja resmi.
      */
-    private function parseConcurrentJobText(string $text, string $defaultUnit = ''): ?array
+    public function normalizeUnitKerja(?string $rawUnit): string
     {
-        $text = trim($text);
-        if (empty($text)) {
-            return null;
+        if (empty($rawUnit)) {
+            return '';
         }
 
-        // 1. Ekstrak Status Penugasan
-        $status = 'Plt';
-        if (preg_match('/pjs|pejabat\s+sementara/i', $text)) {
-            $status = 'Pejabat Sementara (Pjs)';
-        } elseif (preg_match('/diperbantukan/i', $text)) {
-            $status = 'Diperbantukan';
+        $trimmed = trim($rawUnit);
+
+        // 1. Direct match dengan unit resmi
+        if (in_array($trimmed, Employee::OFFICIAL_UNITS, true)) {
+            return $trimmed;
         }
 
-        // 2. Ekstrak Tanggal TMT
-        $tmt = null;
-        if (preg_match('/tmt\s*:?\s*(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/i', $text, $m)) {
-            $day = (int) $m[1];
-            $monthStr = strtolower($m[2]);
-            $year = (int) $m[3];
-            $month = self::INDO_MONTHS[$monthStr] ?? null;
-            if ($month) {
-                $tmt = sprintf('%04d-%02d-%02d', $year, $month, $day);
-            }
-        } elseif (preg_match('/tmt\s*:?\s*(\d{4}-\d{2}-\d{2})/i', $text, $m)) {
-            $tmt = $m[1];
-        }
-
-        // 3. Ekstrak Unit Kerja
-        if ($this->allUnitNames === null) {
-            $this->allUnitNames = Unit::orderByRaw('LENGTH(nama) DESC')->pluck('nama')->toArray();
-        }
-
-        $matchedUnit = null;
-        foreach ($this->allUnitNames as $unitName) {
-            if (stripos($text, $unitName) !== false) {
-                $matchedUnit = $unitName;
-                break;
+        // 2. Case-insensitive match dengan unit resmi
+        foreach (Employee::OFFICIAL_UNITS as $official) {
+            if (strcasecmp($trimmed, $official) === 0) {
+                return $official;
             }
         }
 
-        if (! $matchedUnit) {
-            $matchedUnit = $defaultUnit;
+        // 3. Match dari daftar alias
+        $upper = strtoupper($trimmed);
+        if (isset(self::UNIT_ALIASES[$upper])) {
+            return self::UNIT_ALIASES[$upper];
         }
 
-        // 4. Ekstrak Jabatan
-        $cleaned = $text;
-        if ($tmt) {
-            $cleaned = preg_replace('/tmt\s*:?.*$/i', '', $cleaned);
-        }
-        if ($matchedUnit && $matchedUnit !== $defaultUnit) {
-            $cleaned = str_ireplace($matchedUnit, '', $cleaned);
-        }
-        $cleaned = preg_replace('/^(merangkap\s+(sebagai|sbg)?\s*)/i', '', $cleaned);
-        $cleaned = preg_replace('/^(plt\.?|pjs\.?|pj\.?)\s*/i', '', trim($cleaned));
-        $cleaned = trim(preg_replace('/\s+/', ' ', $cleaned));
-
-        if ($this->allPositionNames === null) {
-            $this->allPositionNames = Position::orderByRaw('LENGTH(nama) DESC')->pluck('nama')->toArray();
+        // 4. Pattern regex untuk unit PMO (Project Management Office)
+        if (preg_match('/^(PROJECT\s+MANAGEMENT\s+OFFICE|PMO)\b/i', $trimmed)) {
+            return 'Project Management Office (PMO)';
         }
 
-        $matchedPos = null;
-        foreach ($this->allPositionNames as $posName) {
-            if (strcasecmp($cleaned, $posName) === 0) {
-                $matchedPos = $posName;
-                break;
-            }
-        }
-
-        if (! $matchedPos) {
-            $matchedPos = $this->matchPosition($cleaned, $this->allPositionNames);
-        }
-
-        if (! $matchedPos) {
-            $matchedPos = filled($cleaned) ? $cleaned : $text;
-        }
-
-        return [
-            'status_penugasan' => $status,
-            'jabatan' => $matchedPos,
-            'unit_kerja' => $matchedUnit,
-            'tmt_awal' => $tmt ?? now()->toDateString(),
-        ];
+        return $trimmed;
     }
 
-    private function recordValidationError(int $rowNumber, array $errors, ?string $nik = null, array $rawRow = []): void
+    private function recordValidationError(int $rowNumber, array $errors, ?string $nik = null, array $rawRow = [], ?string $nama = null): void
     {
-        $this->skipped++;
-        $errorRecord = [
-            'row' => $rowNumber,
-            'nik' => $nik ?? 'Unknown',
-            'errors' => $errors,
-        ];
-        $this->errors[] = $errorRecord;
-
-        $this->failedRows[] = [
-            'row' => $rowNumber,
-            'nik' => $nik ?? 'Unknown',
-            'errors' => $errors,
-            'raw_data' => $rawRow,
-        ];
-
-        Log::warning("Row {$rowNumber} [NIK: ".($nik ?? 'N/A').'] skipped during import: '.implode(', ', $errors));
+        $this->recordFailedRow($rowNumber, $errors, $nik, $rawRow, $nama, 'warning');
     }
 
     private function handleProcessingError(int $rowNumber, string $nik, \Exception $e, array $rawRow = []): void
     {
+        $this->recordFailedRow($rowNumber, ['Kendala data: '.$e->getMessage()], $nik, $rawRow, null, 'error');
+    }
+
+    /**
+     * Pencatatan baris gagal divalidasi atau diproses (DRY pattern).
+     */
+    private function recordFailedRow(
+        int $rowNumber,
+        array $errors,
+        ?string $nik = null,
+        array $rawRow = [],
+        ?string $nama = null,
+        string $logLevel = 'warning'
+    ): void {
         $this->skipped++;
+        $namaPegawai = $nama ?? $rawRow['nama'] ?? $rawRow['nama_pegawai'] ?? $rawRow['nama_lengkap'] ?? null;
+
         $errorRecord = [
             'row' => $rowNumber,
-            'nik' => $nik,
-            'errors' => ['Database error: '.$e->getMessage()],
+            'nik' => $nik ?? 'Unknown',
+            'nama' => $namaPegawai ?: '-',
+            'jabatan' => $rawRow['jabatan'] ?? $rawRow['posisi'] ?? '-',
+            'unit_kerja' => $rawRow['unit_kerja'] ?? $rawRow['unit'] ?? '-',
+            'errors' => $errors,
         ];
         $this->errors[] = $errorRecord;
 
         $this->failedRows[] = [
-            'row' => $rowNumber,
-            'nik' => $nik,
-            'errors' => ['Database error: '.$e->getMessage()],
+            ...$errorRecord,
             'raw_data' => $rawRow,
         ];
 
-        Log::error("Failed to save NIK {$nik} on row {$rowNumber}: ".$e->getMessage());
+        $logMsg = $logLevel === 'error'
+            ? "Failed to save NIK {$nik} on row {$rowNumber}: ".implode(', ', $errors)
+            : "Row {$rowNumber} [NIK: ".($nik ?? 'N/A').'] skipped during import: '.implode(', ', $errors);
+
+        if ($logLevel === 'error') {
+            Log::error($logMsg);
+        } else {
+            Log::warning($logMsg);
+        }
     }
 
     private function normalizeDate(?string $value): ?string
@@ -711,8 +669,10 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         return [
             'created' => $this->created,
             'updated' => $this->updated,
+            'unchanged' => $this->unchanged,
             'skipped' => $this->skipped,
-            'total_processed' => $this->created + $this->updated + $this->skipped,
+            'total_processed' => $this->created + $this->updated + $this->unchanged + $this->skipped,
+            'valid_count' => $this->created + $this->updated + $this->unchanged,
             'has_errors' => ! empty($this->errors),
             'errors' => $this->errors,
             'sample_rows' => $this->sampleRows,
