@@ -41,6 +41,16 @@
                         <p class="text-xs text-surface-500 mt-0.5">
                             Pemeriksaan kesesuaian masa dinas unit, kualifikasi jenjang eselon, dan ketersediaan formasi jabatan tujuan
                         </p>
+                        @if (count($this->outstandingIssues) >= 2)
+                            <div class="mt-2 text-xs text-surface-700">
+                                <p class="font-bold">{{ count($this->outstandingIssues) }} hal perlu diselesaikan</p>
+                                <ol class="list-decimal pl-4 mt-0.5 space-y-0.5">
+                                    @foreach ($this->outstandingIssues as $issue)
+                                        <li>{{ $issue }}</li>
+                                    @endforeach
+                                </ol>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
