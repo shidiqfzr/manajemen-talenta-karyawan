@@ -35,7 +35,7 @@
                     @if ($this->blockingReason)
                         <p class="text-xs text-rose-700 font-medium">{{ $this->blockingReason }}</p>
                     @else
-                        <p class="text-[11px] text-surface-500">Mutasi akan dieksekusi secara atomik dalam 1 transaksi database.</p>
+                        <p class="text-[11px] text-surface-500">Seluruh perubahan disimpan sekaligus; bila gagal, tidak ada data yang berubah.</p>
                     @endif
                 </div>
             </div>

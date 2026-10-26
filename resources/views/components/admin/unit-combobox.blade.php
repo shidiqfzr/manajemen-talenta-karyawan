@@ -119,11 +119,23 @@
             });
         },
 
+        init() {
+            this.$watch('selectedUnit', (val) => {
+                this.search = val || '';
+            });
+        },
+
         handleQuickAddPrompt() {
             $dispatch('open-quick-add-unit', { nama: this.search });
             this.isOpen = false;
         }
     }"
+    @unit-set.window="
+        if ($event.detail.id === '{{ $id }}' || !$event.detail.id) {
+            selectedUnit = $event.detail.unit || '';
+            search = $event.detail.unit || '';
+        }
+    "
     @unit-created.window="
         const newUnit = $event.detail;
         if (newUnit && newUnit.nama) {
@@ -160,6 +172,7 @@
             <input type="text"
                    x-ref="searchInput"
                    x-model="search"
+                   :title="search"
                    @focus="openDropdown()"
                    @click="openDropdown()"
                    @input="isOpen = true; $dispatch('unit-selected', { unit: search })"
