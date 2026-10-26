@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\MutasiProcess;
 use App\Models\Employee;
+use App\Models\Evaluation;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
@@ -619,9 +620,20 @@ class MutasiProcessTest extends TestCase
             ->assertSet('showSummaryModal', false);
     }
 
-    private function blockedPromotion()
+    private function blockedPromotion(array $candidate = [], bool $withGoodEvaluation = false)
     {
-        $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-3']);
+        $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-3'] + $candidate);
+        if ($withGoodEvaluation) {
+            Evaluation::create([
+                'employee_nik' => $empA->nik,
+                'kategori_9box' => 'Box 9: Star',
+                'skor_smkbk_9box' => 95.5,
+                'skor_cli_9box' => 90.0,
+                'lembaga_asesmen' => 'Holding Assessment Center',
+                'tanggal_pelaksanaan_asesmen' => now()->subMonths(6)->toDateString(),
+                'expired_asesmen' => now()->addYears(2)->toDateString(),
+            ]);
+        }
         Employee::factory()->create(['jabatan' => 'Kasubag B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
         Position::factory()->create(['nama' => 'Kasubag B', 'rm_level' => 'RM-2']);
         Position::factory()->create(['nama' => 'Kasubag Kosong', 'rm_level' => 'RM-2']);
@@ -863,6 +875,39 @@ class MutasiProcessTest extends TestCase
             '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
             $c->html()
         );
+    }
+
+    public function test_blocked_promotion_with_failed_criteria_lists_all_outstanding_issues()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $issues = $c->instance()->outstandingIssues;
+        $this->assertCount(2, $issues);
+        $this->assertSame($c->instance()->blockingReason, $issues[0]);
+        $c->assertSee('2 hal perlu diselesaikan');
+    }
+
+    public function test_single_issue_does_not_show_summary()
+    {
+        $c = $this->blockedPromotion([
+            'golongan' => 'IIIC',
+            'tmt_unit_kerja' => now()->subYears(5)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYears(5)->toDateString(),
+        ], withGoodEvaluation: true);
+
+        $this->assertCount(1, $c->instance()->outstandingIssues);
+        $c->assertDontSee('hal perlu diselesaikan');
+    }
+
+    public function test_promotion_block_message_is_short()
+    {
+        $c = $this->blockedPromotion();
+
+        $this->assertSame(
+            'Formasi target saat ini diduduki oleh '.Employee::where('jabatan', 'Kasubag B')->value('nama').' (RM-2). Pejabat petahana perlu dipindahkan lebih dulu melalui Mutasi Berantai.',
+            $c->instance()->swapIncompatibilityMessage
+        );
+        $c->assertDontSee('Swap Bilateral');
     }
 
     public function test_dispensation_unlocks_when_target_becomes_valid()

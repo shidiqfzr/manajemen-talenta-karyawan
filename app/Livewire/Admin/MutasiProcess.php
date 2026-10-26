@@ -215,6 +215,32 @@ class MutasiProcess extends Component
     }
 
     /**
+     * Everything still outstanding before this placement can be processed, blocker first.
+     * Applicability mirrors x-admin.mutasi.compliance-guard so the header summary and the cards agree.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function outstandingIssues(): array
+    {
+        $issues = [];
+
+        if ($reason = $this->blockingReason()) {
+            $issues[] = $reason;
+        }
+
+        if ($this->tenureAnalysis && ! ($this->tenureAnalysis['is_compliant'] ?? true) && ($this->tenureAnalysis['is_applicable'] ?? true)) {
+            $issues[] = 'Masa dinas unit kerja belum memenuhi, perlu dispensasi.';
+        }
+
+        if ($this->promotionAnalysis && ! ($this->promotionAnalysis['is_eligible'] ?? true) && ($this->promotionAnalysis['is_applicable'] ?? false)) {
+            $issues[] = 'Kualifikasi promosi belum memenuhi, perlu dispensasi.';
+        }
+
+        return $issues;
+    }
+
+    /**
      * True when the only obstacle is an occupied formasi that a chain mutation can resolve.
      * Mirrors the occupied arm of blockingReason(); retired employees cannot be chained.
      */
@@ -418,7 +444,7 @@ class MutasiProcess extends Component
             if ($empARm && $empBRm && $empARm !== $empBRm) {
                 $this->isSwapAllowed = false;
                 if ($this->form->jenisMutasi === 'PROMOSI') {
-                    $this->swapIncompatibilityMessage = "Formasi target saat ini diduduki oleh {$occupant->nama} ({$empBRm}). Penempatan Promosi pada formasi yang masih terisi tidak dapat diproses melalui Mutasi Tunggal (Swap Bilateral) karena memerlukan pergeseran pejabat petahana.";
+                    $this->swapIncompatibilityMessage = "Formasi target saat ini diduduki oleh {$occupant->nama} ({$empBRm}). Pejabat petahana perlu dipindahkan lebih dulu melalui Mutasi Berantai.";
                 } elseif ($this->form->jenisMutasi === 'DEMOSI') {
                     $this->swapIncompatibilityMessage = "Formasi target saat ini diduduki oleh {$occupant->nama} ({$empBRm}). Penempatan Demosi pada formasi yang masih terisi tidak dapat diproses melalui Mutasi Tunggal.";
                 } else {
