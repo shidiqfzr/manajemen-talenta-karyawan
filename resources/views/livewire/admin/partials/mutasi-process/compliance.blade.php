@@ -23,7 +23,8 @@
                             @if ($this->blockingReason)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300 shadow-2xs">
                                     <i class="fas fa-ban text-rose-600 text-[9px]"></i>
-                                    <span>Tidak Dapat Diproses Tunggal</span>
+                                    {{-- "Tunggal" only fits an occupied formasi that a chain mutation can free up --}}
+                                    <span>{{ $isSwapBlocked && ! ($employeeDetails['is_retired'] ?? false) ? 'Tidak Dapat Diproses Tunggal' : 'Tidak Dapat Diproses' }}</span>
                                 </span>
                             @elseif ($hasAnyWarning)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">

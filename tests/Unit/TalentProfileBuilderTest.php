@@ -13,4 +13,10 @@ class TalentProfileBuilderTest extends TestCase
         $this->assertSame('0 th 0 bln', TalentProfileBuilder::formatMonths(0));
         $this->assertSame('2 th 0 bln', TalentProfileBuilder::formatMonths(24));
     }
+
+    public function test_format_months_never_renders_a_negative_duration_for_future_dates(): void
+    {
+        $this->assertSame('0 th 0 bln', TalentProfileBuilder::formatMonths(-6));
+        $this->assertSame('0 th 0 bln', TalentProfileBuilder::formatMonths(-19));
+    }
 }

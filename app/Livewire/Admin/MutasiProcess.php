@@ -429,7 +429,8 @@ class MutasiProcess extends Component
         }
 
         $this->targetAnalysis = [
-            'type' => $analysis['type'],
+            // a formasi promised by a scheduled mutation is reserved even while its incumbent still sits in it
+            'type' => ($analysis['is_reserved'] ?? false) ? 'reserved' : $analysis['type'],
             'is_reserved' => $analysis['is_reserved'] ?? false,
             'reserved_occupant' => ! empty($analysis['reserved_occupant']) ? [
                 'nik' => $analysis['reserved_occupant']->nik,
