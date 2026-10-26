@@ -1060,4 +1060,47 @@ class MutasiProcessTest extends TestCase
             ->assertSee('Tidak Dapat Diproses')
             ->assertDontSee('Tidak Dapat Diproses Tunggal');
     }
+
+    public function test_occupied_block_card_is_announced()
+    {
+        $this->blockedPromotion()
+            ->assertSee('role="alert"', false)
+            ->assertSeeHtmlInOrder(['role="alert"', 'Formasi Masih Terisi Pejabat Definitif']);
+    }
+
+    public function test_disabled_review_button_references_its_reason()
+    {
+        $empA = Employee::factory()->create(['nama' => 'Ahmad R', 'jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+        $empB = Employee::factory()->create(['nama' => 'Bambang S', 'jabatan' => 'Asisten B', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+        Unit::where('nama', 'Kebun Sawit B')->first()?->positions()->syncWithoutDetaching(Position::where('nama', 'Asisten Afdeling 1')->pluck('id'));
+
+        JobHistory::create([
+            'employee_id' => $empB->id,
+            'employee_nik' => $empB->nik,
+            'jabatan' => 'Asisten Afdeling 1',
+            'unit_kerja' => 'Kebun Sawit B',
+            'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+            'sk_nomor' => 'SK/FUTURE/001',
+            'sk_tanggal' => now()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Afdeling 1')
+            ->assertSee('aria-describedby="blocking-reason"', false)
+            ->assertSee('id="blocking-reason"', false)
+            ->assertSeeHtml('min-h-11 px-5');
+    }
+
+    public function test_action_controls_meet_touch_target()
+    {
+        $html = $this->blockedPromotion()->html();
+
+        // Kartu formasi terisi (CTA), tautan bar, dan Batal: masing-masing min-h-11 (44px).
+        $this->assertGreaterThanOrEqual(3, substr_count($html, 'min-h-11'));
+    }
 }
