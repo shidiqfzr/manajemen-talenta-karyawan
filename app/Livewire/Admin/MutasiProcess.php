@@ -137,6 +137,7 @@ class MutasiProcess extends Component
 
     public function updatedTargetJabatan(): void
     {
+        $this->resetErrorBag(); // a new formasi invalidates errors raised for the previous one
         $this->form->swapConfirmed = false;
         $this->runAnalysis();
     }
@@ -149,6 +150,7 @@ class MutasiProcess extends Component
 
     private function resetTarget(bool $resetUnit = true): void
     {
+        $this->resetErrorBag();
         $this->form->resetTarget($resetUnit);
         if ($resetUnit) {
             $this->tenureAnalysis = null;
