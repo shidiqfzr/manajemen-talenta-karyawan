@@ -90,7 +90,7 @@
                         </div>
                     </div>
                 @else
-                    <div class="p-4 sm:p-5 bg-rose-50/80 border border-rose-200 rounded-2xl space-y-3.5 shadow-2xs">
+                    <div class="p-4 sm:p-5 bg-rose-50/80 border border-rose-200 rounded-2xl space-y-3.5 shadow-2xs" role="alert">
                         <!-- Header Warning -->
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex items-start gap-3">
@@ -164,7 +164,7 @@
                                 </p>
                             </div>
                             <a href="{{ route('admin.mutasi.chain') }}"
-                               class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-bold text-xs shadow-xs transition shrink-0 cursor-pointer">
+                               class="inline-flex items-center justify-center gap-2 min-h-11 px-3.5 py-2 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-bold text-xs shadow-xs transition shrink-0 cursor-pointer">
                                 <i class="fas fa-link text-xs"></i>
                                 <span>Selesaikan melalui Mutasi Berantai</span>
                             </a>
