@@ -845,14 +845,14 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('Tidak Dapat Diproses Tunggal');
     }
 
-    private function occupiedRm1Promotion()
+    private function occupiedRm1Promotion(array $incumbent = [])
     {
         $emp = Employee::factory()->create([
             'jabatan' => 'Kasubag Madya', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2',
             'golongan' => 'IIID',
             'tanggal_dalam_jabatan' => now()->subMonths(19)->toDateString(),
         ]);
-        Employee::factory()->create(['jabatan' => 'Kabag Penuh', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-1']);
+        Employee::factory()->create(['jabatan' => 'Kabag Penuh', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-1'] + $incumbent);
         Position::factory()->create(['nama' => 'Kabag Penuh', 'rm_level' => 'RM-1']);
         Position::factory()->create(['nama' => 'Kabag Kosong', 'rm_level' => 'RM-1']);
         Unit::where('nama', 'Bagian SDM')->first()->positions()
@@ -863,6 +863,33 @@ class MutasiProcessTest extends TestCase
             ->set('form.jenisMutasi', 'PROMOSI')
             ->set('form.targetUnitKerja', 'Bagian SDM')
             ->set('form.targetJabatan', 'Kabag Penuh');
+    }
+
+    public function test_promotion_dispensation_uses_warning_palette()
+    {
+        $c = $this->blockedPromotion();
+
+        $c->assertSee('Perlu Dispensasi')->assertDontSee('indigo-');
+    }
+
+    public function test_incumbent_pill_is_neutral()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $c->assertSee('Profil Pejabat Petahana Saat Ini')
+            ->assertDontSee('bg-rose-100 text-rose-900');
+        $this->assertMatchesRegularExpression('/incumbent-status-pill[^"]*bg-surface-100 text-surface-700 border border-surface-200/', $c->html());
+    }
+
+    public function test_candidate_and_incumbent_tenure_are_separate_values()
+    {
+        $c = $this->occupiedRm1Promotion(['tmt_unit_kerja' => now()->subYears(3)->toDateString()]);
+
+        $html = $c->html();
+        $this->assertMatchesRegularExpression('/Masa Dinas Jabatan Madya.*?1 th 7 bln/s', $html);
+        $this->assertMatchesRegularExpression('/Masa Dinas Unit:.*?3 th 0 bln/s', $html);
+        $this->assertDoesNotMatchRegularExpression('/Masa Dinas Unit:\s*<\/span>\s*<span[^>]*>\s*1 th 7 bln/s', $html);
+        $this->assertSame(0, substr_count($html, '3 th 0 bln') - 1);
     }
 
     public function test_dispensation_is_locked_while_formasi_is_occupied()

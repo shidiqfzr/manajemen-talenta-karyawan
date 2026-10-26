@@ -21,18 +21,18 @@
                         <div class="flex items-center gap-2">
                             <h3 class="text-sm sm:text-base font-bold text-surface-900">Uji Kelayakan Regulasi &amp; Kepatuhan Penugasan</h3>
                             @if ($this->blockingReason)
-                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300 shadow-2xs">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300 shadow-2xs">
                                     <i class="fas fa-ban text-rose-600 text-[9px]"></i>
                                     {{-- "Tunggal" only fits an occupied formasi that a chain mutation can free up --}}
                                     <span>{{ $isSwapBlocked && ! ($employeeDetails['is_retired'] ?? false) ? 'Tidak Dapat Diproses Tunggal' : 'Tidak Dapat Diproses' }}</span>
                                 </span>
                             @elseif ($hasAnyWarning)
-                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
                                     <i class="fas fa-triangle-exclamation text-amber-600 text-[9px]"></i>
                                     <span>Perlu Dispensasi</span>
                                 </span>
                             @else
-                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
                                     <i class="fas fa-circle-check text-emerald-600 text-[9px]"></i>
                                     <span>Memenuhi Standar Regulasi</span>
                                 </span>
@@ -64,7 +64,7 @@
                     <div class="text-xs text-sky-950 leading-relaxed flex-1">
                         <div class="flex items-center justify-between">
                             <span class="font-bold text-sky-900">Pengisian Formasi Lowong (Clean Transfer)</span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">Vacant</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-sky-100 text-sky-800 border border-sky-300">Vacant</span>
                         </div>
                         <p class="mt-1 text-sky-800">
                             Formasi ini saat ini sedang kosong definitif. Penempatan mutasi ini akan menutup formasi lowong secara otomatis.
@@ -80,7 +80,7 @@
                         <div class="text-xs text-surface-900 leading-relaxed flex-1">
                             <div class="flex items-center justify-between">
                                 <span class="font-bold text-earth-800">Target Terisi: Tukar Jabatan 2-Arah (Lateral Swap)</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-earth-100 text-earth-800 border border-earth-300">Occupied</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-bold bg-earth-100 text-earth-800 border border-earth-300">Occupied</span>
                             </div>
                             <p class="mt-1 text-surface-600 text-xs">
                                 Diduduki oleh <strong class="font-bold text-surface-900">{{ $targetAnalysis['occupant']['nama'] }}</strong> 
@@ -113,11 +113,11 @@
                             @php $occ = $targetAnalysis['occupant']; @endphp
                             <div class="p-3.5 sm:p-4 rounded-xl bg-white border border-rose-200 shadow-2xs space-y-3">
                                 <div class="flex items-center justify-between pb-2.5 border-b border-surface-100">
-                                    <span class="text-[11px] font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span class="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1.5">
                                         <i class="fas fa-id-card text-surface-400"></i>
                                         Profil Pejabat Petahana Saat Ini
                                     </span>
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300">
+                                    <span class="incumbent-status-pill px-2.5 py-0.5 rounded-full text-xs font-bold bg-surface-100 text-surface-700 border border-surface-200">
                                         {{ $occ['rm_level'] ?? 'RM' }} &bull; Definitif
                                     </span>
                                 </div>
@@ -136,22 +136,22 @@
                                     </div>
                                     @if (!empty($occ['tenure_text']))
                                         <div class="text-right shrink-0">
-                                            <span class="text-[10px] text-surface-400 block">Masa Dinas Unit:</span>
+                                            <span class="text-xs text-surface-400 block">Masa Dinas Unit:</span>
                                             <span class="text-xs font-semibold text-surface-700">{{ $occ['tenure_text'] }}</span>
                                         </div>
                                     @endif
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-surface-100 text-xs">
-                                    <div class="flex items-center justify-between text-surface-600 bg-surface-50 px-3 py-2 rounded-lg border border-surface-200/80 gap-2">
-                                        <span class="text-[11px] text-surface-400 shrink-0">Jabatan:</span>
-                                        <span class="font-semibold text-surface-800 text-right truncate" title="{{ $occ['jabatan'] }}">{{ $occ['jabatan'] }}</span>
+                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-surface-100">
+                                    <div class="min-w-0">
+                                        <dt class="text-xs text-surface-500">Jabatan</dt>
+                                        <dd class="text-sm font-semibold text-surface-800 truncate" title="{{ $occ['jabatan'] }}">{{ $occ['jabatan'] }}</dd>
                                     </div>
-                                    <div class="flex items-center justify-between text-surface-600 bg-surface-50 px-3 py-2 rounded-lg border border-surface-200/80 gap-2">
-                                        <span class="text-[11px] text-surface-400 shrink-0">Unit Kerja:</span>
-                                        <span class="font-semibold text-surface-800 text-right truncate" title="{{ $occ['unit_kerja'] }}">{{ $occ['unit_kerja'] }}</span>
+                                    <div class="min-w-0">
+                                        <dt class="text-xs text-surface-500">Unit Kerja</dt>
+                                        <dd class="text-sm font-semibold text-surface-800 truncate" title="{{ $occ['unit_kerja'] }}">{{ $occ['unit_kerja'] }}</dd>
                                     </div>
-                                </div>
+                                </dl>
                             </div>
                         @endif
 
@@ -159,13 +159,13 @@
                         <div class="p-3 bg-white/90 rounded-xl border border-rose-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-bold text-surface-800 block">Rekomendasi Prosedur Resmi:</span>
-                                <p class="text-[11px] text-surface-600 leading-relaxed">
+                                <p class="text-xs text-surface-600 leading-relaxed">
                                     Gunakan <strong>Mutasi Berantai</strong> untuk memindahkan pejabat petahana secara berantai (domino) ke formasi lain dalam satu SK kolektif.
                                 </p>
                             </div>
                             <a href="{{ route('admin.mutasi.chain') }}"
                                class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-bold text-xs shadow-xs transition shrink-0 cursor-pointer">
-                                <i class="fas fa-link text-[11px]"></i>
+                                <i class="fas fa-link text-xs"></i>
                                 <span>Selesaikan melalui Mutasi Berantai</span>
                             </a>
                         </div>
