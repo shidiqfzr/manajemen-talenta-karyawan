@@ -705,4 +705,35 @@ class MutasiProcessTest extends TestCase
 
         $this->assertStringContainsString('dipesan', $c->instance()->blockingReason);
     }
+
+    public function test_blocked_target_shows_single_blocking_status()
+    {
+        $this->blockedPromotion()
+            ->assertSee('Tidak Dapat Diproses Tunggal')
+            ->assertSee('Perlu Mutasi Berantai')
+            ->assertDontSee('Swap Ditolak')
+            ->assertDontSee('Konflik Okupansi')
+            ->assertDontSee('Memerlukan Perhatian / Dispensasi');
+    }
+
+    public function test_waivable_promotion_shows_dispensation_status_not_blocking()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertSee('Perlu Dispensasi')
+            ->assertDontSee('Memerlukan Perhatian / Dispensasi')
+            ->assertDontSee('Tidak Dapat Diproses Tunggal');
+    }
 }
