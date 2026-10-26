@@ -736,4 +736,25 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('Memerlukan Perhatian / Dispensasi')
             ->assertDontSee('Tidak Dapat Diproses Tunggal');
     }
+
+    public function test_same_unit_promotion_does_not_claim_unit_tenure_compliance()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertDontSee('Masa Dinas Unit Memenuhi Syarat')
+            ->assertSee('Masa Dinas: 1 th 0 bln')
+            ->assertDontSee('1.0 thn');
+    }
 }

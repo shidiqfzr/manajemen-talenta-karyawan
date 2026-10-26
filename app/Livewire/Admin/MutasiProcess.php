@@ -7,6 +7,7 @@ use App\Exceptions\MutasiRuleViolationException;
 use App\Livewire\Forms\MutasiForm;
 use App\Models\JobHistory;
 use App\Services\Data\MutasiRequest;
+use App\Services\Mutasi\TalentProfileBuilder;
 use App\Services\MutasiService;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
@@ -422,11 +423,7 @@ class MutasiProcess extends Component
 
         $occupantTenureText = null;
         if ($occupant?->tmt_unit_kerja) {
-            $tmt = Carbon::parse($occupant->tmt_unit_kerja);
-            $totalMonths = (int) $tmt->diffInMonths(now());
-            $years = (int) ($totalMonths / 12);
-            $months = $totalMonths % 12;
-            $occupantTenureText = "{$years} th {$months} bln";
+            $occupantTenureText = TalentProfileBuilder::formatMonths((int) Carbon::parse($occupant->tmt_unit_kerja)->diffInMonths(now()));
         }
 
         $this->targetAnalysis = [
