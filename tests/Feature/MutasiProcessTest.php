@@ -833,6 +833,69 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('Tidak Dapat Diproses Tunggal');
     }
 
+    private function occupiedRm1Promotion()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Kasubag Madya', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2',
+            'golongan' => 'IIID',
+            'tanggal_dalam_jabatan' => now()->subMonths(19)->toDateString(),
+        ]);
+        Employee::factory()->create(['jabatan' => 'Kabag Penuh', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-1']);
+        Position::factory()->create(['nama' => 'Kabag Penuh', 'rm_level' => 'RM-1']);
+        Position::factory()->create(['nama' => 'Kabag Kosong', 'rm_level' => 'RM-1']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()
+            ->attach(Position::whereIn('nama', ['Kabag Penuh', 'Kabag Kosong'])->pluck('id')->toArray());
+
+        return Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Kabag Penuh');
+    }
+
+    public function test_dispensation_is_locked_while_formasi_is_occupied()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $this->assertNotNull($c->instance()->blockingReason);
+        $c->assertSee('Berlaku setelah formasi tersedia');
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
+            $c->html()
+        );
+    }
+
+    public function test_dispensation_unlocks_when_target_becomes_valid()
+    {
+        $this->occupiedRm1Promotion()
+            ->set('form.targetJabatan', 'Kabag Kosong')
+            ->assertDontSee('Berlaku setelah formasi tersedia');
+    }
+
+    public function test_dispensation_stays_interactive_for_waivable_promotion()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertSee('Perlu Dispensasi')
+            ->assertDontSee('Berlaku setelah formasi tersedia');
+        $this->assertDoesNotMatchRegularExpression(
+            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
+            $c->html()
+        );
+    }
+
     public function test_same_unit_promotion_does_not_claim_unit_tenure_compliance()
     {
         $emp = Employee::factory()->create([
