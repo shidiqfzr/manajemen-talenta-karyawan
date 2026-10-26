@@ -85,7 +85,7 @@
                         </span>
                     </label>
                     @if ($locked)
-                        <p class="text-xs text-surface-500">Berlaku setelah formasi tersedia.</p>
+                        <p class="text-xs text-surface-500">Dapat diisi setelah kendala penempatan di atas diselesaikan.</p>
                     @endif
                     @if ($errors->has($errorTenureKey))
                         <p class="text-rose-600 text-xs font-semibold">{{ $errors->first($errorTenureKey) }}</p>
@@ -145,7 +145,7 @@
                         </span>
                     </label>
                     @if ($locked)
-                        <p class="text-xs text-surface-500">Berlaku setelah formasi tersedia.</p>
+                        <p class="text-xs text-surface-500">Dapat diisi setelah kendala penempatan di atas diselesaikan.</p>
                     @endif
                     @if ($errors->has($errorPromoKey))
                         <p class="text-rose-600 text-xs font-semibold">{{ $errors->first($errorPromoKey) }}</p>

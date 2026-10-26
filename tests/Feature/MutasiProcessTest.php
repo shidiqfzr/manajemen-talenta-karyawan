@@ -713,6 +713,7 @@ class MutasiProcessTest extends TestCase
         $c->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
             ->assertDontSee('Selesaikan melalui Mutasi Berantai')
             ->assertSeeHtml('data-blocked="true"');
+        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
     }
 
     public static function nonChainBlocks(): array
@@ -889,7 +890,7 @@ class MutasiProcessTest extends TestCase
         $this->assertMatchesRegularExpression('/Masa Dinas Jabatan Madya.*?1 th 7 bln/s', $html);
         $this->assertMatchesRegularExpression('/Masa Dinas Unit:.*?3 th 0 bln/s', $html);
         $this->assertDoesNotMatchRegularExpression('/Masa Dinas Unit:\s*<\/span>\s*<span[^>]*>\s*1 th 7 bln/s', $html);
-        $this->assertSame(0, substr_count($html, '3 th 0 bln') - 1);
+        $this->assertSame(1, substr_count($html, '3 th 0 bln'));
     }
 
     public function test_dispensation_is_locked_while_formasi_is_occupied()
@@ -897,7 +898,7 @@ class MutasiProcessTest extends TestCase
         $c = $this->occupiedRm1Promotion();
 
         $this->assertNotNull($c->instance()->blockingReason);
-        $c->assertSee('Berlaku setelah formasi tersedia');
+        $c->assertSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
         $this->assertMatchesRegularExpression(
             '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
             $c->html()
@@ -941,7 +942,7 @@ class MutasiProcessTest extends TestCase
     {
         $this->occupiedRm1Promotion()
             ->set('form.targetJabatan', 'Kabag Kosong')
-            ->assertDontSee('Berlaku setelah formasi tersedia');
+            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
     }
 
     public function test_dispensation_stays_interactive_for_waivable_promotion()
@@ -961,7 +962,7 @@ class MutasiProcessTest extends TestCase
             ->set('form.targetUnitKerja', 'Kebun Sawit A')
             ->set('form.targetJabatan', 'Askep Tanaman')
             ->assertSee('Perlu Dispensasi')
-            ->assertDontSee('Berlaku setelah formasi tersedia');
+            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
         $this->assertDoesNotMatchRegularExpression(
             '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
             $c->html()
