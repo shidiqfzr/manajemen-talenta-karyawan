@@ -757,4 +757,19 @@ class MutasiProcessTest extends TestCase
             ->assertSee('Masa Dinas: 1 th 0 bln')
             ->assertDontSee('1.0 thn');
     }
+
+    public function test_mutasi_form_has_no_decorative_tags_or_developer_copy()
+    {
+        $this->blockedPromotion()
+            ->assertDontSee('Asal Posisi')
+            ->assertDontSee('Tujuan Penempatan')
+            ->assertDontSee('SK Penugasan Individual')
+            ->assertDontSee('Klausul SK Direksi')
+            ->assertSee('Lihat 9-Box')
+            ->assertDontSee('9-Box Lengkap')
+            // unblocked state shows the action-bar subline, which must not use developer wording either
+            ->set('form.targetJabatan', 'Kasubag Kosong')
+            ->assertDontSee('atomik')
+            ->assertSee('disimpan sekaligus');
+    }
 }

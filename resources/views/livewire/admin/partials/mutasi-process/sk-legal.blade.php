@@ -10,10 +10,6 @@
                     <p class="text-xs text-surface-500">Nomor SK, tanggal penetapan, dan TMT efektif yang menjadi dasar hukum penugasan definitif</p>
                 </div>
             </div>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-800 border border-primary-200/60">
-                <i class="fas fa-shield-halved text-[10px]"></i>
-                <span>SK Penugasan Individual</span>
-            </span>
         </div>
 
         @if ($this->blockingReason)
@@ -36,9 +32,6 @@
                             <p class="text-[11px] text-surface-500">Klausul hukum penyesuaian kepangkatan/grade yang disahkan dalam SK Direksi ini</p>
                         </div>
                     </div>
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-primary-800 border border-primary-200 shrink-0">
-                        Klausul SK Direksi
-                    </span>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
                     <div>

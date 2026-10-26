@@ -8,9 +8,7 @@
                     <div class="flex items-center gap-2.5">
                         <span class="w-6 h-6 rounded-full bg-primary-100 text-primary-800 text-xs font-bold flex items-center justify-center">1</span>
                         <h3 class="text-sm font-bold text-surface-900">Karyawan yang Dimutasi</h3>
-                    </div>
-                    <span class="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Asal Posisi</span>
-                </div>
+                    </div>                </div>
 
                 <!-- Employee Searchable Combobox -->
                 <x-admin.employee-combobox 
@@ -115,9 +113,7 @@
                     <div class="flex items-center gap-2.5">
                         <span class="w-6 h-6 rounded-full {{ $form->employeeNik ? 'bg-primary-100 text-primary-800' : 'bg-surface-200 text-surface-500' }} text-xs font-bold flex items-center justify-center transition">2</span>
                         <h3 class="text-sm font-bold {{ $form->employeeNik ? 'text-surface-900' : 'text-surface-500' }} transition">Penugasan &amp; Posisi Tujuan</h3>
-                    </div>
-                    <span class="text-[11px] font-semibold {{ $form->employeeNik ? 'text-surface-400' : 'text-surface-300' }} uppercase tracking-wider">Tujuan Penempatan</span>
-                </div>
+                    </div>                </div>
 
             @if(!$form->employeeNik)
                 <!-- Disabled Clean Form State (Menunggu Karyawan Dipilih) -->
@@ -229,6 +225,7 @@
                                     <i class="fas fa-user-check text-xs"></i>
                                 </div>
                                 <select wire:model.live="form.statusJabatan"
+                                    title="{{ ['Definitif' => 'Definitif (Pejabat Tetap)', 'Pj' => 'Pj (Pejabat Sementara)', 'Plt' => 'Plt (Pelaksana Tugas)'][$form->statusJabatan] ?? '' }}"
                                     {{ $isStatusLocked ? 'disabled' : '' }}
                                     class="w-full pl-9.5 pr-8 py-2.5 rounded-xl border border-surface-300 bg-white text-surface-800 text-xs sm:text-sm font-medium focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 transition appearance-none {{ $isStatusLocked ? 'bg-surface-100 cursor-not-allowed opacity-80' : 'cursor-pointer' }}">
                                     <option value="Definitif">Definitif (Pejabat Tetap)</option>
