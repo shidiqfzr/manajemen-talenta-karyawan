@@ -32,7 +32,9 @@
                     @else
                         <span class="font-bold text-surface-900">Formulir Mutasi Individual</span>
                     @endif
-                    @if ($this->blockingReason)
+                    @if ($this->resolvableByChain)
+                        <p class="text-xs text-rose-700 font-medium">Pejabat petahana perlu dipindahkan lebih dulu.</p>
+                    @elseif ($this->blockingReason)
                         <p class="text-xs text-rose-700 font-medium">{{ $this->blockingReason }}</p>
                     @else
                         <p class="text-[11px] text-surface-500">Seluruh perubahan disimpan sekaligus; bila gagal, tidak ada data yang berubah.</p>
@@ -46,16 +48,24 @@
                     Batal
                 </a>
 
-                <button type="button" wire:click="openSummaryModal"
-                    @disabled($this->blockingReason)
-                    wire:loading.attr="disabled"
-                    wire:target="openSummaryModal, submitMutasi"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
-                    <i wire:loading.remove wire:target="openSummaryModal" class="fas fa-magnifying-glass-check text-xs"></i>
-                    <i wire:loading wire:target="openSummaryModal" class="fas fa-spinner fa-spin text-xs"></i>
-                    <span wire:loading.remove wire:target="openSummaryModal">Tinjau &amp; Eksekusi Mutasi</span>
-                    <span wire:loading wire:target="openSummaryModal">Memvalidasi Data...</span>
-                </button>
+                @if ($this->resolvableByChain)
+                    <a href="{{ route('admin.mutasi.chain') }}"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow active:scale-95 cursor-pointer">
+                        <i class="fas fa-link text-xs"></i>
+                        <span>Selesaikan melalui Mutasi Berantai</span>
+                    </a>
+                @else
+                    <button type="button" wire:click="openSummaryModal"
+                        @disabled($this->blockingReason)
+                        wire:loading.attr="disabled"
+                        wire:target="openSummaryModal, submitMutasi"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                        <i wire:loading.remove wire:target="openSummaryModal" class="fas fa-magnifying-glass-check text-xs"></i>
+                        <i wire:loading wire:target="openSummaryModal" class="fas fa-spinner fa-spin text-xs"></i>
+                        <span wire:loading.remove wire:target="openSummaryModal">Tinjau &amp; Eksekusi Mutasi</span>
+                        <span wire:loading wire:target="openSummaryModal">Memvalidasi Data...</span>
+                    </button>
+                @endif
             </div>
         </div>
     </div>

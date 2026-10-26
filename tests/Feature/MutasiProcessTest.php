@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MutasiProcessTest extends TestCase
@@ -641,7 +642,80 @@ class MutasiProcessTest extends TestCase
         $this->assertStringContainsString('Mutasi Berantai', $c->instance()->blockingReason);
         $c->assertSeeHtml('data-blocked="true"');
         $this->assertMatchesRegularExpression('/<fieldset\s+disabled/', $c->html());
-        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
+        $this->assertDoesNotMatchRegularExpression('/<button[^>]*wire:click="openSummaryModal"/', $c->html());
+    }
+
+    public function test_occupied_block_shows_chain_link_instead_of_review_button()
+    {
+        $c = $this->blockedPromotion();
+
+        $this->assertTrue($c->instance()->resolvableByChain);
+        $c->assertSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSee('Pejabat petahana perlu dipindahkan lebih dulu.')
+            ->assertDontSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertSeeHtml('data-blocked="true"');
+
+        // card + action bar
+        $this->assertGreaterThanOrEqual(2, substr_count($c->html(), 'href="'.route('admin.mutasi.chain').'"'));
+    }
+
+    #[DataProvider('nonChainBlocks')]
+    public function test_non_chain_blocks_keep_disabled_review_button(string $case)
+    {
+        if ($case === 'retired') {
+            $emp = Employee::factory()->create([
+                'jabatan' => 'Asisten SDM', 'unit_kerja' => 'Bagian SDM',
+                'tanggal_pensiun' => now()->subMonth()->toDateString(),
+            ]);
+            $c = Livewire::test(MutasiProcess::class)->set('form.employeeNik', $emp->nik);
+        } elseif ($case === 'same') {
+            $emp = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+            $c = Livewire::test(MutasiProcess::class)
+                ->set('form.employeeNik', $emp->nik)
+                ->set('form.jenisMutasi', 'ROTASI')
+                ->set('form.targetUnitKerja', 'Bagian SDM')
+                ->set('form.targetJabatan', 'Posisi A');
+        } else {
+            $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+            Employee::factory()->create(['jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+            $successor = Employee::factory()->create(['jabatan' => 'Asisten C', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+            Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+            JobHistory::create([
+                'employee_id' => $successor->id,
+                'employee_nik' => $successor->nik,
+                'jabatan' => 'Asisten Afdeling 1',
+                'unit_kerja' => 'Kebun Sawit A',
+                'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+                'sk_nomor' => 'SK/FUTURE/003',
+                'sk_tanggal' => now()->toDateString(),
+                'is_applied' => false,
+            ]);
+            $c = Livewire::test(MutasiProcess::class)
+                ->set('form.employeeNik', $empA->nik)
+                ->set('form.jenisMutasi', 'ROTASI')
+                ->set('form.targetUnitKerja', 'Kebun Sawit A')
+                ->set('form.targetJabatan', 'Asisten Afdeling 1');
+        }
+
+        $this->assertFalse($c->instance()->resolvableByChain);
+        $c->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertDontSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSeeHtml('data-blocked="true"');
+    }
+
+    public static function nonChainBlocks(): array
+    {
+        return ['retired' => ['retired'], 'same position' => ['same'], 'reserved' => ['reserved']];
+    }
+
+    public function test_unblocked_target_keeps_enabled_review_button()
+    {
+        $c = $this->blockedPromotion()->set('form.targetJabatan', 'Kasubag Kosong');
+
+        $this->assertFalse($c->instance()->resolvableByChain);
+        $c->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertDontSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSeeHtml('data-blocked="false"');
     }
 
     public function test_switching_to_blocked_target_clears_stale_validation_errors()
