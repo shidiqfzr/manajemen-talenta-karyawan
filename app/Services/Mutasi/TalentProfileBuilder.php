@@ -22,6 +22,8 @@ class TalentProfileBuilder
     /** Single duration format for every tenure text on the mutation pages, e.g. 19 → "1 th 7 bln". */
     public static function formatMonths(int $months): string
     {
+        $months = max(0, $months); // a future TMT date must not render as a negative duration
+
         return intdiv($months, 12).' th '.($months % 12).' bln';
     }
 
