@@ -214,6 +214,18 @@ class MutasiProcess extends Component
         };
     }
 
+    /**
+     * True when the only obstacle is an occupied formasi that a chain mutation can resolve.
+     * Mirrors the occupied arm of blockingReason(); retired employees cannot be chained.
+     */
+    #[Computed]
+    public function resolvableByChain(): bool
+    {
+        return ($this->targetAnalysis['type'] ?? null) === 'occupied'
+            && ! $this->isSwapAllowed
+            && ! ($this->employeeDetails['is_retired'] ?? false);
+    }
+
     public function openSummaryModal(): void
     {
         if ($this->validateFormData()) {
