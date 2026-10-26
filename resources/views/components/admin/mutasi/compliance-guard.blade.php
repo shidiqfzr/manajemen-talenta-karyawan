@@ -13,6 +13,7 @@
     'errorTenureReasonKey' => 'alasanDispensasiTenure',
     'errorPromoKey' => 'dispensasiPromosi',
     'errorPromoReasonKey' => 'alasanDispensasiPromosi',
+    'locked' => false,
 ])
 
 @php
@@ -78,15 +79,18 @@
 
                 <div class="pt-3 border-t border-amber-200/90 space-y-2">
                     <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" wire:model.live="{{ $tenureModel }}" class="mt-0.5 w-4 h-4 rounded text-amber-600 border-amber-400 focus:ring-amber-500 cursor-pointer shrink-0">
+                        <input type="checkbox" wire:model.live="{{ $tenureModel }}" @disabled($locked) class="mt-0.5 w-4 h-4 rounded text-amber-600 border-amber-400 focus:ring-amber-500 cursor-pointer shrink-0">
                         <span class="text-xs font-semibold text-amber-950">
                             Rotasi unit sebelum 2 tahun ini telah disetujui melalui Dispensasi Khusus Direksi. <span class="text-rose-500 font-bold">*</span>
                         </span>
                     </label>
+                    @if ($locked)
+                        <p class="text-xs text-surface-500">Berlaku setelah formasi tersedia.</p>
+                    @endif
                     @if ($errors->has($errorTenureKey))
                         <p class="text-rose-600 text-xs font-semibold">{{ $errors->first($errorTenureKey) }}</p>
                     @endif
-                    @if ($isTenureChecked)
+                    @if (! $locked && $isTenureChecked)
                         <input type="text" wire:model.live.debounce.300ms="{{ $tenureReasonModel }}" placeholder="Alasan pertimbangan / Nomor Nota Persetujuan Direksi..."
                             class="w-full px-3.5 py-2 bg-white border border-amber-300 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition shadow-2xs">
                         @if ($errors->has($errorTenureReasonKey))
@@ -135,15 +139,18 @@
 
                 <div class="pt-3 border-t border-indigo-200/80 space-y-2">
                     <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" wire:model.live="{{ $promotionModel }}" class="mt-0.5 w-4 h-4 rounded text-indigo-600 border-indigo-300 focus:ring-indigo-500 cursor-pointer shrink-0">
+                        <input type="checkbox" wire:model.live="{{ $promotionModel }}" @disabled($locked) class="mt-0.5 w-4 h-4 rounded text-indigo-600 border-indigo-300 focus:ring-indigo-500 cursor-pointer shrink-0">
                         <span class="text-xs font-semibold text-indigo-950 leading-relaxed">
                             Pengajuan promosi ini telah memperoleh persetujuan Dispensasi Promosi Dipercepat / Keputusan Khusus Direksi. <span class="text-rose-500 font-bold">*</span>
                         </span>
                     </label>
+                    @if ($locked)
+                        <p class="text-xs text-surface-500">Berlaku setelah formasi tersedia.</p>
+                    @endif
                     @if ($errors->has($errorPromoKey))
                         <p class="text-rose-600 text-xs font-semibold">{{ $errors->first($errorPromoKey) }}</p>
                     @endif
-                    @if ($isPromotionChecked)
+                    @if (! $locked && $isPromotionChecked)
                         <input type="text" wire:model.live.debounce.300ms="{{ $promotionReasonModel }}" placeholder="Alasan pertimbangan promosi / nomor rekomendasi asesmen..."
                             class="w-full px-3.5 py-2 bg-white border border-indigo-200 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200 transition shadow-2xs">
                         @if ($errors->has($errorPromoReasonKey))

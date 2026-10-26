@@ -204,6 +204,7 @@
                 promotion-reason-model="form.alasanDispensasiPromosi"
                 :is-tenure-checked="(bool) $form->dispensasiTenure"
                 :is-promotion-checked="(bool) $form->dispensasiPromosi"
+                :locked="(bool) $this->blockingReason"
                 error-tenure-key="dispensasiTenure"
                 error-tenure-reason-key="alasanDispensasiTenure"
                 error-promo-key="dispensasiPromosi"
