@@ -640,6 +640,28 @@ class MutasiProcessTest extends TestCase
 
         $this->assertStringContainsString('Mutasi Berantai', $c->instance()->blockingReason);
         $c->assertSeeHtml('data-blocked="true"');
+        $this->assertMatchesRegularExpression('/<fieldset\s+disabled/', $c->html());
+        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
+    }
+
+    public function test_switching_to_blocked_target_clears_stale_validation_errors()
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-3']);
+        Employee::factory()->create(['jabatan' => 'Kasubag B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag B', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag Kosong', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()
+            ->attach(Position::whereIn('nama', ['Kasubag B', 'Kasubag Kosong'])->pluck('id')->toArray());
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Kasubag Kosong')
+            ->call('openSummaryModal') // SK fields blank → validation errors
+            ->assertHasErrors()
+            ->set('form.targetJabatan', 'Kasubag B') // occupied, other RM → blocked
+            ->assertHasNoErrors();
     }
 
     public function test_switching_to_vacant_target_clears_blocking_state()
