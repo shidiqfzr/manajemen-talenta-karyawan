@@ -157,12 +157,12 @@
         @keydown.arrow-up.prevent="navigateUp()"
         @keydown.enter.prevent="if(!open) toggleOpen(); else selectActive();"
         tabindex="0"
-        class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-normal flex items-center justify-between transition cursor-pointer hover:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs select-none"
-        :class="selectedValue ? 'text-slate-800' : 'text-slate-400'">
+        class="w-full px-3 py-2 bg-white border border-surface-300 rounded-lg text-xs font-normal flex items-center justify-between transition cursor-pointer hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 shadow-2xs select-none"
+        :class="selectedValue ? 'text-surface-800' : 'text-surface-500'">
         
         <div class="flex items-center gap-2 min-w-0 pr-1 flex-1">
             @if($icon)
-                <i class="{{ $icon }} text-[11px] shrink-0 text-slate-400" :class="selectedValue ? 'text-emerald-600' : ''"></i>
+                <i class="{{ $icon }} text-[11px] shrink-0 text-surface-400" :class="selectedValue ? 'text-primary-600' : ''"></i>
             @endif
             <span class="truncate block" x-text="selectedLabel"></span>
         </div>
@@ -172,12 +172,12 @@
             <button x-show="selectedValue"
                 @click.stop="clearSelection()"
                 type="button"
-                class="text-slate-400 hover:text-red-600 p-0.5 rounded transition cursor-pointer"
+                class="text-surface-500 hover:text-danger p-0.5 rounded transition cursor-pointer"
                 title="Hapus Pilihan">
-                <i class="fas fa-times text-[10px]"></i>
+                <i class="fas fa-times text-[10px]" aria-hidden="true"></i>
             </button>
-            <i class="fas fa-chevron-down text-slate-400 text-[10px] transition-transform duration-200"
-                :class="open ? 'rotate-180 text-emerald-600' : ''"></i>
+            <i class="fas fa-chevron-down text-surface-400 text-[10px] transition-transform duration-200"
+                :class="open ? 'rotate-180 text-primary-600' : ''" aria-hidden="true"></i>
         </div>
     </div>
 
@@ -190,12 +190,12 @@
         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
         x-transition:leave-end="opacity-0 -translate-y-1 scale-98"
         x-cloak
-        class="absolute z-50 mt-1.5 w-full bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden ring-1 ring-black/5">
+        class="absolute z-50 mt-1.5 w-full bg-white rounded-xl border border-surface-200 shadow-xl overflow-hidden ring-1 ring-black/5">
 
         <!-- Sticky Search Bar Header -->
-        <div class="p-2 border-b border-slate-100 bg-slate-50/70">
+        <div class="p-2 border-b border-surface-100 bg-surface-50/70">
             <div class="relative">
-                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-surface-400 text-[10px]" aria-hidden="true"></i>
                 <input x-ref="searchInput"
                     type="text"
                     x-model="search"
@@ -203,31 +203,31 @@
                     @keydown.arrow-up.prevent="navigateUp()"
                     @keydown.enter.prevent="selectActive()"
                     placeholder="{{ $searchPlaceholder }}"
-                    class="w-full pl-7 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 shadow-2xs">
-                <button x-show="search.length > 0"
+                    class="w-full pl-7 pr-7 py-1.5 bg-white border border-surface-200 rounded-lg text-xs text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 shadow-2xs">
+                <button aria-label="Hapus pencarian" x-show="search.length > 0"
                     @click="search = ''; $refs.searchInput.focus();"
                     type="button"
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-[10px]">
-                    <i class="fas fa-times-circle"></i>
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-600 text-[10px]">
+                    <i class="fas fa-times-circle" aria-hidden="true"></i>
                 </button>
             </div>
-            <div class="mt-1 flex items-center justify-between px-1 text-[10px] text-slate-400 font-medium">
+            <div class="mt-1 flex items-center justify-between px-1 text-[10px] text-surface-500 font-medium">
                 <span x-text="filteredOptions.length + ' opsi tersedia'"></span>
-                <span class="text-[9px] text-slate-400 hidden sm:inline">&uarr;&darr; navigasi &bull; Enter pilih</span>
+                <span class="text-[10px] text-surface-500 hidden sm:inline">&uarr;&darr; navigasi &bull; Enter pilih</span>
             </div>
         </div>
 
         <!-- Scrollable Options List -->
         <ul x-ref="optionsList"
-            class="overflow-y-auto py-1 divide-y divide-slate-50 {{ $maxHeight }}"
+            class="overflow-y-auto py-1 divide-y divide-surface-50 {{ $maxHeight }}"
             style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">
 
             @if($hasAllOption)
                 <li @click="selectOption('')"
-                    class="px-3 py-2 text-xs font-medium cursor-pointer transition flex items-center justify-between hover:bg-slate-50"
-                    :class="!selectedValue ? 'bg-emerald-50/80 text-emerald-800 font-semibold' : 'text-slate-600'">
+                    class="px-3 py-2 text-xs font-medium cursor-pointer transition flex items-center justify-between hover:bg-surface-50"
+                    :class="!selectedValue ? 'bg-primary-50/80 text-primary-800 font-semibold' : 'text-surface-600'">
                     <span class="truncate">{{ $allOptionText }}</span>
-                    <i x-show="!selectedValue" class="fas fa-check text-emerald-600 text-[10px]"></i>
+                    <i x-show="!selectedValue" class="fas fa-check text-primary-600 text-[10px]" aria-hidden="true"></i>
                 </li>
             @endif
 
@@ -237,18 +237,18 @@
                     @mouseenter="activeIndex = idx"
                     class="px-3 py-2 text-xs cursor-pointer transition flex items-center justify-between"
                     :class="{
-                        'bg-emerald-50 text-emerald-800 font-medium': activeIndex === idx && String(selectedValue) !== String(opt.value),
-                        'bg-emerald-50/90 text-emerald-800 font-semibold': String(selectedValue) === String(opt.value),
-                        'text-slate-700 hover:bg-slate-50': activeIndex !== idx && String(selectedValue) !== String(opt.value)
+                        'bg-primary-50 text-primary-800 font-medium': activeIndex === idx && String(selectedValue) !== String(opt.value),
+                        'bg-primary-50/90 text-primary-800 font-semibold': String(selectedValue) === String(opt.value),
+                        'text-surface-700 hover:bg-surface-50': activeIndex !== idx && String(selectedValue) !== String(opt.value)
                     }">
                     <span class="truncate pr-2" x-text="opt.label"></span>
-                    <i x-show="String(selectedValue) === String(opt.value)" class="fas fa-check text-emerald-600 text-[10px] shrink-0"></i>
+                    <i x-show="String(selectedValue) === String(opt.value)" class="fas fa-check text-primary-600 text-[10px] shrink-0" aria-hidden="true"></i>
                 </li>
             </template>
 
             <!-- Empty State -->
-            <li x-show="filteredOptions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400 font-normal">
-                <i class="fas fa-folder-open text-slate-300 text-base mb-1 block"></i>
+            <li x-show="filteredOptions.length === 0" class="px-3 py-6 text-center text-xs text-surface-500 font-normal">
+                <i class="fas fa-folder-open text-surface-300 text-base mb-1 block" aria-hidden="true"></i>
                 <span>{{ $emptyText }}</span>
             </li>
         </ul>
