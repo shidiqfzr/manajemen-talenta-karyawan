@@ -16,3 +16,4 @@ Artisan::command('hris:purge-import-files {--hours=2 : Batas jam kedaluwarsa ber
 })->purpose('Membersihkan berkas sementara impor pegawai yang terbengkalai (UU PDP Compliance)');
 
 Schedule::command('hris:purge-import-files')->hourly();
+Schedule::command('hr:apply-effective-mutations')->dailyAt('00:01');

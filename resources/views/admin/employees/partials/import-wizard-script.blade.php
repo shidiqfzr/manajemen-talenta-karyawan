@@ -197,7 +197,7 @@ function employeeImportWizard() {
             this.commitTimestamp = '';
             this.showDiffModal = false;
             this.activeDiffRow = null;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
         pollJobStatus(token, type) {
@@ -245,14 +245,14 @@ function employeeImportWizard() {
                                 this.previewSearch = '';
                                 this.currentPage = 1;
                                 this.currentStep = 2;
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (type === 'commit') {
                                 this.isCommitting = false;
                                 this.commitSummary = data.summary;
                                 const now = new Date();
                                 this.commitTimestamp = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' \u2022 ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
                                 this.currentStep = 3;
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                             }
                         } else if (data.status === 'failed') {
                             clearInterval(this.pollInterval);
@@ -306,7 +306,7 @@ function employeeImportWizard() {
                         this.previewSearch = '';
                         this.currentPage = 1;
                         this.currentStep = 2;
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 } else {
                     alert(data.message || (data.errors ? Object.values(data.errors).flat().join('\n') : 'Gagal memvalidasi berkas spreadsheet. Pastikan format sesuai template.'));
@@ -351,7 +351,7 @@ function employeeImportWizard() {
                         const now = new Date();
                         this.commitTimestamp = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' \u2022 ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
                         this.currentStep = 3;
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 } else {
                     alert(data.message || 'Gagal menyimpan data pegawai.');
@@ -380,13 +380,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, function() {
-                dropZone.classList.add('border-emerald-500', 'bg-emerald-50/60');
+                dropZone.classList.add('border-primary-500', 'bg-primary-50/60');
             }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, function() {
-                dropZone.classList.remove('border-emerald-500', 'bg-emerald-50/60');
+                dropZone.classList.remove('border-primary-500', 'bg-primary-50/60');
             }, false);
         });
 

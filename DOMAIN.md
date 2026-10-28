@@ -77,7 +77,11 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `tmt_awal` | `date` | Tanggal mulai efektif menjabat. |
 | `tmt_akhir` | `date?` | Tanggal berakhir menjabat (NULL jika masih aktif). |
 | `status_jabatan` | `string` | Status jabatan: `Definitif`, `Pj (Pejabat Sementara)`, `Plt (Pelaksana Tugas)`. |
-| `jenis_mutasi` | `string` | `MUTASI_UNIT`, `PROMOSI`, `DEMOSI`, `ROTASI`. |
+| `jenis_mutasi` | `string` | Wajib salah satu dari `JobHistory::MUTASI_TYPES`: `PROMOSI`, `ROTASI`, `DEMOSI`, `MUTASI_UNIT`, `PENUGASAN`, `PENUGASAN_KHUSUS`, `SANKSI_INDISIPLINER`. |
+| `batch_id` / `chain_order` | `uuid?` / `int?` | Penanda satu SK yang wajib diaktivasi/dibatalkan bersama (pasangan Swap & gerbong SK Kolektif). |
+| `is_applied` | `boolean` | `false` = mutasi terjadwal (TMT di masa depan, formasi target berstatus *Reserved*). |
+| `tanggal_berakhir_sanksi` | `date?` | Batas waktu sanksi indisipliner; diterapkan ke profil pegawai saat mutasi diaktivasi. |
+| `cancelled_by` / `alasan_pembatalan` / `deleted_at` | `fk?` / `string?` / `timestamp?` | Jejak audit pembatalan. Riwayat jabatan **tidak pernah dihapus permanen** (soft delete). |
 
 ### 2.3 Entitas Evaluasi Kinerja & 9-Box (`Evaluation` / `evaluations`)
 
@@ -261,18 +265,34 @@ Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService
 ### 5.2 Regulasi Mutasi & Chain Vacancy (`MutasiService`)
 1. **Masa Dinas Minimal di Unit Kerja**:
    - Pegawai minimal menjabat **2 hingga 3 tahun** (`tmt_unit_kerja`) sebelum diperbolehkan rotasi unit, demi menjaga stabilitas rotasi panen dan olah pabrik.
-2. **Dua Mode Transaksi Mutasi**:
+2. **Tiga Mode Transaksi Mutasi**:
    - **Straight Transfer (Target Posisi Kosong)**:
      - Pegawai dipindahkan ke posisi jabatan/unit baru yang sedang lowong.
      - Posisi lama pegawai yang ditinggalkan **otomatis menjadi formasi kosong baru (1 chain vacancy)**.
      - Sistem mencatat riwayat jabatan baru di `job_histories` dengan `tmt_awal` mutasi dan menutup posisi sebelumnya dengan `tmt_akhir`.
-   - **Swap Transfer (Target Posisi Terisi)**:
+   - **Swap Transfer (Target Posisi Terisi / 2 Arah)**:
      - Pegawai A dipindahkan ke posisi Pegawai B, dan Pegawai B secara atomik ditukar menempati posisi Pegawai A.
      - Dijalankan dalam satu DB Transaction atomik (`DB::transaction`).
      - **Net zero vacancy** (tidak memunculkan formasi kosong baru).
-3. **Jalur Karir & Promosi**:
+     - Hanya untuk eselon/RM setara (*Lateral Swap*) dan status **Definitif**. Penugasan sementara (Pj/Plt) tidak melepaskan jabatan definitif asal, sehingga hanya dapat ditempatkan pada formasi kosong.
+     - Kedua baris riwayat berbagi satu `batch_id` sehingga aktivasi/pembatalan jadwal selalu berlaku untuk pasangan tersebut.
+   - **Chain / Collective Transfer (Mutasi Berantai / Gerbong SK Kolektif, $\ge 2$ Pegawai)**:
+     - Pemindahan sekelompok pegawai yang saling mengisi posisi dalam satu SK Direksi Kolektif berskala besar.
+     - **Rantai Tertutup (Cyclic Loop)**: $A \to B \to C \to D \to A$ (posisi awal A diisi oleh D), menghasilkan **Net zero vacancy** tanpa ketergantungan urutan (*deadlock-free atomic assignment*).
+     - **Rantai Terbuka (Open Domino Loop)**: $A \to \text{Posisi Kosong/Pensiun}, B \to A, C \to B, D \to C$ (posisi lama D menjadi formasi kosong baru), menghasilkan **1 chain vacancy** di ujung akhir rantai.
+     - Seluruh riwayat mutasi dalam satu gerbong ditandai dengan `batch_id` yang sama pada `job_histories`.
+     - Formasi yang dijabat peserta berstatus Pj/Plt dianggap **tidak dilepaskan** dan tidak boleh ditargetkan peserta lain.
+3. **Guard Tata Kelola di Service Layer (wajib, tidak boleh hanya di UI)**:
+   - `jenis_mutasi` dan `status_jabatan` wajib bernilai dari daftar baku; pegawai yang melewati Batas Usia Pensiun ditolak.
+   - `ROTASI` wajib unit kerja yang sama; `MUTASI_UNIT` wajib unit kerja berbeda.
+   - Penempatan **Definitif** ke RM lebih tinggi wajib berjenis `PROMOSI`, ke RM lebih rendah wajib `DEMOSI` (kecuali formasi pool Advisor/Diperbantukan).
+   - Masa dinas unit < 24 bulan dan promosi yang belum memenuhi kriteria hanya dapat diproses dengan dispensasi **beserta alasan tertulis**.
+4. **Siklus Mutasi Terjadwal**:
+   - Aktivasi manual satu mutasi hanya mengaktifkan baris tersebut beserta anggota `batch_id`-nya; mutasi terjadwal lain tidak ikut teraktivasi.
+   - Pembatalan dilakukan dengan soft delete yang mencatat `cancelled_by` dan `alasan_pembatalan`.
+5. **Jalur Karir & Promosi**:
    - **RM-3 $\rightarrow$ RM-2**: Syarat minimal Golongan `IIIC` atau masa dinas Asisten $\ge 4$ tahun dengan evaluasi kinerja minimal kategori "Baik".
-   - **RM-2 $\rightarrow$ RM-1**: Syarat minimal Golongan `IIID` / `IVA`, telah menjabat Askep minimal 3 tahun, dan mengantongi sertifikat asesmen kompetensi holding.
+   - **RM-2 $\rightarrow$ RM-1**: Syarat minimal Golongan `IIID` / `IVA` dan telah menjabat Askep/Kasubag minimal 3 tahun. (Kriteria sertifikat asesmen holding ditangguhkan).
 
 ### 5.3 Validasi Integritas Data Pegawai
 1. `nik` harus 8 digit numerik dan unik.
@@ -363,8 +383,30 @@ AI dan pengembang harus memanfaatkan Service Layer yang ada:
 - `getBaselineData(): array` $\rightarrow$ Data standar formasi BUMN perkebunan.
 
 ### 9.2 `MutasiService`
+`MutasiService` adalah pintu masuk tunggal modul mutasi. Ia mengorkestrasi tiga mode transaksi (Straight, Swap, Chain) dan mendelegasikan tugas lain ke kolaborator di `App\Services\Mutasi\` — pemanggil (Livewire, controller, test) tetap memakai `MutasiService`:
+
+| Kolaborator | Tanggung jawab |
+|---|---|
+| `FormationService` | Analisis formasi: kosong / terisi / *Reserved*, daftar jabatan target yang layak, RM band jabatan (`'RM-n'`), klasifikasi Karpim/Karpel. |
+| `MutasiGovernanceGuard` | Aturan tata kelola: batas usia pensiun, masa dinas unit, kriteria promosi, arah RM (Promosi/Demosi). |
+| `ChainTopologyAnalyzer` | Analisis graf SK Kolektif (siklis / domino / bentrok), normalisasi peserta & dispensasi, urutan alur domino. |
+| `PlacementWriter` | Jalur tulis tunggal: salin penempatan ke master pegawai & catat `job_histories`. |
+| `ScheduledMutationService` | Siklus mutasi terjadwal: aktivasi TMT, aktivasi satu SK, pembatalan (soft delete + jejak audit). |
+| `MutasiHistoryReader` | Riwayat/audit trail, KPI, gerbong, detail. |
+| `TalentProfileBuilder` | Profil talenta (9-box, SMKBK/CLI, masa dinas, proyeksi pensiun, pelatihan). |
+| `MutasiLookup` | Data pendukung layar (kandidat, unit, jabatan, pratinjau kepatuhan). |
+| `MutasiPolicy` | Konstanta kebijakan SDM (24 bulan masa dinas unit, ambang golongan promosi, skor kinerja "Baik", minimal peserta SK Kolektif). Perubahan pedoman cukup di satu berkas. |
+
+Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan aman ditampilkan ke admin); data master tidak konsisten sebagai `MutasiIntegrityException`. Kesalahan lain tidak boleh ditelan komponen UI.
+
 - `analyzeTarget(string $jabatan, string $unitKerja): array` $\rightarrow$ Cek ketersediaan formasi (vacant vs occupied) untuk preview live impact panel UI.
-- `processMutasi(...): array` $\rightarrow$ Transaksi atomik perubahan jabatan, pembentukan chain vacancy, dan update riwayat jabatan.
+- `processMutasi(MutasiRequest $request): array` $\rightarrow$ Transaksi atomik perubahan jabatan biner (Straight & Swap), pembentukan chain vacancy, dan update riwayat jabatan. Menjalankan seluruh guard tata kelola §5.2.3 di sisi server. Input berupa value object `App\Services\Data\MutasiRequest` (immutable, string kosong dinormalisasi menjadi `null`); setiap peserta SK Kolektif dibentuk dengan `MutasiRequest::fromChainNode()`.
+- `applyPlacementToEmployee(...)` $\rightarrow$ Satu-satunya jalur tulis yang menyalin penempatan ke master pegawai (tanpa memicu `EmployeeObserver`). Dipakai oleh Straight/Swap/Chain, aktivasi mutasi terjadwal, dan pemeliharaan riwayat jabatan manual.
+- **Read model UI** (`getSelectableEmployees`, `getGroupedUnits`, `listTargetPositions`, `tenureComplianceFor`, `promotionEligibilityFor`, `getEmployeeSnapshot`, `getMutasiDetail`, `getPositionFlags`) $\rightarrow$ Komponen Livewire modul mutasi tidak boleh memanggil Eloquent/`DB::` secara langsung; seluruh akses data melalui `MutasiService`.
+- `validateChainTopology(array $nodes): array` $\rightarrow$ Validasi integritas graf rantai mutasi ($\ge 2$ pegawai), deteksi loop siklis vs domino terbuka, dan deteksi bentrok formasi ganda.
+- `processChainMutasi(array $headerData, array $nodes): array` $\rightarrow$ Eksekusi transaksional atomik seluruh mata rantai mutasi dalam 1 SK Kolektif berskala besar dengan penandaan `batch_id`. Peserta yang belum lengkap disaring dan kolom dispensasi per kriteria dilipat menjadi satu penanda + satu alasan tertulis oleh service (`prepareChainNodes`), bukan oleh komponen UI.
+- `resolvePositionRm(string $jabatan): string` / `deriveLevelForRm(string $rm): ?string` $\rightarrow$ Sumber tunggal RM band (format baku `'RM-n'`) dan klasifikasi Karpim/Karpel untuk seluruh alur penempatan.
+- `applyEffectiveMutations(?string $date)` / `applyScheduledMutation(int $id)` / `cancelScheduledMutation(...)` $\rightarrow$ Siklus hidup mutasi terjadwal (§5.2.4).
 
 ### 9.3 `JobVacancyService`
 - Mendeteksi formasi kosong manajerial aktif berdasarkan standar formasi unit vs pejabat definitif yang bertugas.

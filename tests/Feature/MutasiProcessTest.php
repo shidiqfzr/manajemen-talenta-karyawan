@@ -873,13 +873,13 @@ class MutasiProcessTest extends TestCase
         $c->assertSee('Perlu Dispensasi')->assertDontSee('indigo-');
     }
 
-    public function test_incumbent_pill_is_neutral()
+    public function test_incumbent_uses_profile_card_without_status_badges()
     {
         $c = $this->occupiedRm1Promotion();
 
         $c->assertSee('Profil Pejabat Petahana Saat Ini')
-            ->assertDontSee('bg-rose-100 text-rose-900');
-        $this->assertMatchesRegularExpression('/incumbent-status-pill[^"]*bg-surface-100 text-surface-700 border border-surface-200/', $c->html());
+            ->assertDontSee('incumbent-status-pill')
+            ->assertDontSee('Occupied');
     }
 
     public function test_candidate_and_incumbent_tenure_are_separate_values()

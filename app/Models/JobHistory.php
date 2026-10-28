@@ -4,10 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JobHistory extends Model
 {
     use HasFactory;
+
+    // Audit Trail (SECURITY.md §5): riwayat jabatan tidak pernah dihapus permanen.
+    use SoftDeletes;
 
     public const MUTASI_TYPES = [
         'PROMOSI',
@@ -26,6 +30,9 @@ class JobHistory extends Model
     ];
 
     protected $fillable = [
+        'batch_id',
+        'chain_order',
+        'is_applied',
         'employee_nik',
         'created_by',
         'jabatan',
@@ -33,9 +40,11 @@ class JobHistory extends Model
         'status_penugasan',
         'level',
         'golongan',
+        'job_grade',
         'tmt_awal',
         'tmt_akhir',
         'tmt_akhir_estimasi',
+        'tanggal_berakhir_sanksi',
         'jenis_mutasi',
         'nomor_sk',
         'tanggal_sk',
@@ -43,19 +52,71 @@ class JobHistory extends Model
         'catatan',
         'is_dispensasi',
         'alasan_dispensasi',
+        'cancelled_by',
+        'alasan_pembatalan',
     ];
 
     protected $casts = [
+        'job_grade' => 'integer',
+        'is_applied' => 'boolean',
         'tmt_awal' => 'date',
         'tmt_akhir' => 'date',
         'tmt_akhir_estimasi' => 'date',
+        'tanggal_berakhir_sanksi' => 'date',
         'tanggal_sk' => 'date',
         'is_dispensasi' => 'boolean',
     ];
 
+    /**
+     * Scope to only applied (active/historical) records.
+     */
+    public function scopeApplied($query)
+    {
+        return $query->where('is_applied', true);
+    }
+
+    /**
+     * Scope to only scheduled (future staging) records.
+     */
+    public function scopeScheduled($query)
+    {
+        return $query->where('is_applied', false);
+    }
+
+    /**
+     * Scope to scheduled records that are due for activation on or before the given date.
+     */
+    public function scopeDueForActivation($query, $date = null)
+    {
+        $targetDate = $date ?? now()->toDateString();
+
+        return $query->where('is_applied', false)
+            ->whereDate('tmt_awal', '<=', $targetDate);
+    }
+
+    public function setTmtAkhirEstimasiAttribute($value): void
+    {
+        $this->attributes['tmt_akhir_estimasi'] = ! empty($value) ? $value : null;
+    }
+
+    public function setTanggalSkAttribute($value): void
+    {
+        $this->attributes['tanggal_sk'] = ! empty($value) ? $value : null;
+    }
+
+    public function setTmtAkhirAttribute($value): void
+    {
+        $this->attributes['tmt_akhir'] = ! empty($value) ? $value : null;
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function employee()
@@ -63,13 +124,16 @@ class JobHistory extends Model
         return $this->belongsTo(Employee::class, 'employee_nik', 'nik');
     }
 
-    public function getJenisMutasiLabelAttribute(): string
+    /**
+     * Business label of a mutation type code, e.g. MUTASI_UNIT → "Mutasi Unit".
+     */
+    public static function labelFor(?string $type): string
     {
-        if (! $this->jenis_mutasi) {
+        if (! $type) {
             return '—';
         }
 
-        return match ($this->jenis_mutasi) {
+        return match ($type) {
             'PROMOSI' => 'Promosi',
             'ROTASI' => 'Rotasi',
             'DEMOSI' => 'Demosi',
@@ -77,7 +141,24 @@ class JobHistory extends Model
             'PENUGASAN', 'PENUGASAN_SEMENTARA' => 'Penugasan',
             'PENUGASAN_KHUSUS' => 'Penugasan Khusus',
             'SANKSI_INDISIPLINER' => 'Sanksi Indisipliner',
-            default => $this->jenis_mutasi,
+            default => $type,
+        };
+    }
+
+    public function getJenisMutasiLabelAttribute(): string
+    {
+        return self::labelFor($this->jenis_mutasi);
+    }
+
+    public function getJenisMutasiBadgeClassAttribute(): string
+    {
+        return match ($this->jenis_mutasi) {
+            'PROMOSI' => 'bg-primary-50 text-primary-800 border-primary-200',
+            'ROTASI' => 'bg-info-50 text-info-800 border-info-200',
+            'MUTASI_UNIT' => 'bg-primary-50 text-primary-800 border-primary-300',
+            'PENUGASAN', 'PENUGASAN_SEMENTARA' => 'bg-surface-100 text-surface-800 border-surface-300',
+            'DEMOSI' => 'bg-danger-50 text-danger-800 border-danger-200',
+            default => 'bg-surface-100 text-surface-700 border-surface-200',
         };
     }
 }
