@@ -142,6 +142,30 @@ class EmployeeCrudTest extends TestCase
         $employee->delete();
     }
 
+    public function test_directory_selection_uses_real_named_checkboxes_for_keyboard_users(): void
+    {
+        foreach (['88990041' => 'PEGAWAI SATU', '88990042' => 'PEGAWAI DUA'] as $nik => $nama) {
+            Employee::create([
+                'nik' => $nik,
+                'nama' => $nama,
+                'jabatan' => 'Operator Pabrik',
+                'unit_kerja' => 'PKS Parindu',
+                'level' => 'Karpel',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->get(route('admin.employees.index'));
+
+        $response->assertOk()
+            ->assertSee('type="checkbox"', false)
+            ->assertSee('aria-label="Pilih PEGAWAI SATU"', false)
+            ->assertSee('aria-label="Pilih PEGAWAI DUA"', false)
+            ->assertSee('aria-label="Pilih semua pegawai di halaman ini"', false)
+            ->assertSee('x-effect="$el.indeterminate', false)
+            ->assertSee('role="status"', false)
+            ->assertDontSee('Pilih Semua Pegawai di Halaman Ini (Tips');
+    }
+
     public function test_admin_can_delete_employee(): void
     {
         $nik = '88990033';
