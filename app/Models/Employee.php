@@ -312,14 +312,18 @@ class Employee extends Model
     public function currentJob()
     {
         return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
-            ->whereNull('tmt_akhir')
-            ->where('status_penugasan', 'Definitif')
-            ->latestOfMany('tmt_awal');
+            ->ofMany(
+                ['tmt_awal' => 'max'],
+                fn ($query) => $query->where('is_applied', true)
+                    ->whereNull('tmt_akhir')
+                    ->where('status_penugasan', 'Definitif')
+            );
     }
 
     public function activeJobs()
     {
         return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', true)
             ->whereNull('tmt_akhir')
             ->orderByDesc('tmt_awal');
     }
@@ -327,9 +331,31 @@ class Employee extends Model
     public function concurrentJobs()
     {
         return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', true)
             ->whereNull('tmt_akhir')
             ->where('status_penugasan', '!=', 'Definitif')
             ->orderByDesc('tmt_awal');
+    }
+
+    public function scheduledJobs()
+    {
+        return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', false)
+            ->orderBy('tmt_awal');
+    }
+
+    public function latestScheduledJob()
+    {
+        return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
+            ->ofMany(
+                ['tmt_awal' => 'max'],
+                fn ($query) => $query->where('is_applied', false)
+            );
+    }
+
+    public function hasScheduledMutation(): bool
+    {
+        return $this->scheduledJobs()->exists();
     }
 
     public function hasConcurrentJobs(): bool
@@ -568,7 +594,7 @@ class Employee extends Model
      */
     public function getBidangThemeAttribute(): string
     {
-        return 'bg-slate-100 text-slate-600 border-slate-200';
+        return 'bg-surface-100 text-surface-600 border-surface-200';
     }
 
     /**
@@ -580,8 +606,8 @@ class Employee extends Model
             'RM-1' => 'bg-orange-50 text-orange-800 border-orange-200',
             'RM-2' => 'bg-sky-50 text-sky-800 border-sky-200',
             'RM-3' => 'bg-purple-50 text-purple-800 border-purple-200',
-            'RM-4' => 'bg-slate-100 text-slate-700 border-slate-200',
-            default => 'bg-slate-100 text-slate-700 border-slate-200',
+            'RM-4' => 'bg-surface-100 text-surface-700 border-surface-200',
+            default => 'bg-surface-100 text-surface-700 border-surface-200',
         };
     }
 
@@ -592,6 +618,6 @@ class Employee extends Model
     {
         return $this->is_karpim
             ? 'bg-primary-50 text-primary-800 border-primary-200'
-            : 'bg-slate-100 text-slate-700 border-slate-200';
+            : 'bg-surface-100 text-surface-700 border-surface-200';
     }
 }

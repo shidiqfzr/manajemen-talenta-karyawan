@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <head>
     <meta charset="UTF-8">
@@ -53,7 +53,7 @@
     @stack('styles')
 </head>
 
-<body class="bg-surface-50 text-surface-900 min-h-screen antialiased selection:bg-primary-500 selection:text-white"
+<body class="bg-surface-50 text-surface-900 h-dvh overflow-hidden antialiased selection:bg-primary-500 selection:text-white"
     x-data="{
         sidebarCollapsed: localStorage.getItem('sidebar_collapsed') === 'true',
         mobileSidebarOpen: false,
@@ -63,7 +63,7 @@
         }
     }">
 
-    <div class="flex min-h-screen">
+    <div class="flex h-dvh overflow-hidden">
         <!-- Mobile Menu Overlay -->
         <div x-show="mobileSidebarOpen"
             x-transition:enter="transition-opacity ease-linear duration-200"
@@ -85,7 +85,7 @@
                 'lg:w-20': sidebarCollapsed,
                 'lg:w-64': !sidebarCollapsed
             }"
-            class="fixed top-0 left-0 z-50 h-screen bg-white border-r border-surface-200 transition-all duration-300 ease-in-out flex flex-col shrink-0 shadow-xl lg:shadow-none lg:static">
+            class="fixed top-0 left-0 z-50 h-dvh bg-white border-r border-surface-200 transition-all duration-300 ease-in-out flex flex-col shrink-0 shadow-xl lg:shadow-none lg:static">
 
             <!-- Sidebar Header / Branding -->
             <div class="h-16 flex items-center justify-between px-4 border-b border-surface-200 shrink-0">
@@ -98,18 +98,18 @@
                 </a>
 
                 <!-- Mobile Close Button -->
-                <button type="button" @click="mobileSidebarOpen = false"
-                    class="lg:hidden p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-100 transition">
-                    <i class="fas fa-times text-sm"></i>
+                <button aria-label="Tutup menu" type="button" @click="mobileSidebarOpen = false"
+                    class="lg:hidden p-1.5 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 transition">
+                    <i class="fas fa-times text-sm" aria-hidden="true"></i>
                 </button>
             </div>
 
             <!-- Sidebar Navigation Menu (Structured by DESIGN.md Section 3) -->
-            <nav class="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
+            <nav aria-label="Navigasi utama" class="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
                 <!-- Group 1: CORE HR -->
                 <div>
                     <div class="px-2 pb-1.5" x-show="!sidebarCollapsed">
-                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-400">Core HR</span>
+                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-500">Core HR</span>
                     </div>
                     <div class="my-1.5 border-t border-surface-200" x-show="sidebarCollapsed"></div>
 
@@ -119,13 +119,14 @@
                                 ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                 : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                         :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                        title="Data Karyawan">
+                        title="Data Karyawan"
+                        @if (request()->routeIs('admin.employees.*')) aria-current="page" @endif>
                         <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.employees.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                            <i class="fas fa-users text-sm"></i>
+                            <i class="fas fa-users text-sm" aria-hidden="true"></i>
                         </div>
                         <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                             <p class="text-sm leading-tight truncate">Karyawan</p>
-                            <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">Data Induk &amp; Formasi</p>
+                            <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Data Induk &amp; Formasi</p>
                         </div>
                     </a>
                 </div>
@@ -133,7 +134,7 @@
                 <!-- Group 2: TALENT & MOBILITY -->
                 <div>
                     <div class="px-2 pb-1.5" x-show="!sidebarCollapsed">
-                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-400">Talent &amp; Mobility</span>
+                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-500">Talent &amp; Mobility</span>
                     </div>
                     <div class="my-1.5 border-t border-surface-200" x-show="sidebarCollapsed"></div>
 
@@ -143,13 +144,14 @@
                                 ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                 : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                         :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                        title="Mutasi & Penempatan">
+                        title="Mutasi & Penempatan"
+                        @if (request()->routeIs('admin.mutasi.*') || request()->routeIs('admin.vacancies.*')) aria-current="page" @endif>
                         <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.mutasi.*') || request()->routeIs('admin.vacancies.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                            <i class="fas fa-arrows-split-up-and-left text-sm"></i>
+                            <i class="fas fa-arrows-split-up-and-left text-sm" aria-hidden="true"></i>
                         </div>
                         <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                             <p class="text-sm leading-tight truncate">Mutasi &amp; Penempatan</p>
-                            <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">Monitoring &amp; MPP</p>
+                            <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Monitoring &amp; MPP</p>
                         </div>
                     </a>
                 </div>
@@ -157,7 +159,7 @@
                 <!-- Group 3: DEVELOPMENT & PERFORMANCE -->
                 <div>
                     <div class="px-2 pb-1.5" x-show="!sidebarCollapsed">
-                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-400">Development &amp; Performance</span>
+                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-500">Development &amp; Performance</span>
                     </div>
                     <div class="my-1.5 border-t border-surface-200" x-show="sidebarCollapsed"></div>
 
@@ -169,13 +171,14 @@
                                     ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                     : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                             :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Pelatihan">
+                            title="Pelatihan"
+                        @if (request()->routeIs('admin.trainings.*')) aria-current="page" @endif>
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.trainings.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-chalkboard-user text-sm"></i>
+                                <i class="fas fa-chalkboard-user text-sm" aria-hidden="true"></i>
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Pelatihan</p>
-                                <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">L&amp;D &amp; Sertifikasi</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">L&amp;D &amp; Sertifikasi</p>
                             </div>
                         </a>
 
@@ -186,13 +189,14 @@
                                     ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                     : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                             :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Penilaian">
+                            title="Penilaian"
+                        @if (request()->routeIs('admin.evaluations.*')) aria-current="page" @endif>
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.evaluations.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-clipboard-check text-sm"></i>
+                                <i class="fas fa-clipboard-check text-sm" aria-hidden="true"></i>
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Penilaian</p>
-                                <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">Kinerja &amp; Evaluasi</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Kinerja &amp; Evaluasi</p>
                             </div>
                         </a>
                     </div>
@@ -201,7 +205,7 @@
                 <!-- Group 4: MASTER DATA & REFERENSI -->
                 <div>
                     <div class="px-2 pb-1.5" x-show="!sidebarCollapsed">
-                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-400">Master Data</span>
+                        <span class="text-[10px] font-extrabold tracking-wider uppercase text-surface-500">Master Data</span>
                     </div>
                     <div class="my-1.5 border-t border-surface-200" x-show="sidebarCollapsed"></div>
 
@@ -213,13 +217,14 @@
                                     ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                     : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                             :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Master Unit Kerja">
+                            title="Master Unit Kerja"
+                        @if (request()->routeIs('admin.master.units.*')) aria-current="page" @endif>
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.units.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-building-flag text-sm"></i>
+                                <i class="fas fa-building-flag text-sm" aria-hidden="true"></i>
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Unit Kerja</p>
-                                <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">43 Unit &amp; Wilayah</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">43 Unit &amp; Wilayah</p>
                             </div>
                         </a>
 
@@ -230,13 +235,14 @@
                                     ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                     : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                             :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Master Jabatan">
+                            title="Master Jabatan"
+                        @if (request()->routeIs('admin.master.positions.*')) aria-current="page" @endif>
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.positions.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-id-card-clip text-sm"></i>
+                                <i class="fas fa-id-card-clip text-sm" aria-hidden="true"></i>
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Jabatan &amp; Posisi</p>
-                                <p class="text-[11px] text-surface-400 font-normal leading-tight truncate">Bidang &amp; RM Level</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Bidang &amp; RM Level</p>
                             </div>
                         </a>
                     </div>
@@ -249,7 +255,7 @@
                 <div x-show="!sidebarCollapsed" class="flex items-center gap-3 p-2 rounded-lg bg-white border border-surface-200 shadow-2xs">
                     <div class="relative w-8 h-8 rounded-full bg-primary-700 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                         {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 2)) }}
-                        <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                        <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-primary-500 ring-2 ring-white"></span>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-xs font-bold text-surface-900 truncate leading-tight">{{ auth()->user()->name ?? 'Administrator' }}</p>
@@ -259,9 +265,9 @@
                         @csrf
                         <button type="submit" 
                             onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')"
-                            class="p-1.5 rounded-md text-surface-400 hover:text-danger hover:bg-red-50 transition cursor-pointer" 
+                            class="p-1.5 rounded-md text-surface-500 hover:text-danger hover:bg-danger-50 transition cursor-pointer" 
                             title="Keluar">
-                            <i class="fas fa-arrow-right-from-bracket text-xs"></i>
+                            <i class="fas fa-arrow-right-from-bracket text-xs" aria-hidden="true"></i>
                         </button>
                     </form>
                 </div>
@@ -271,15 +277,15 @@
                     <div class="relative w-8 h-8 rounded-full bg-primary-700 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs" 
                         title="{{ auth()->user()->name ?? 'Administrator' }}">
                         {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 2)) }}
-                        <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                        <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-primary-500 ring-2 ring-white"></span>
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" 
                             onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')"
-                            class="p-2 rounded-md text-surface-400 hover:text-danger hover:bg-red-50 transition cursor-pointer"
+                            class="p-2 rounded-md text-surface-500 hover:text-danger hover:bg-danger-50 transition cursor-pointer"
                             title="Logout">
-                            <i class="fas fa-power-off text-xs"></i>
+                            <i class="fas fa-power-off text-xs" aria-hidden="true"></i>
                         </button>
                     </form>
                 </div>
@@ -287,8 +293,9 @@
         </aside>
 
         <!-- Main Layout Container -->
-        <div class="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-            <!-- Enterprise Sticky Topbar (Navbar) -->
+        {{-- Single scroll container: the window itself never scrolls, so the sticky topbar and sidebar stay pinned --}}
+        <div id="admin-main" class="flex-1 flex flex-col min-w-0 h-dvh overflow-y-auto">
+            <!-- Enterprise Sticky Topbar (Navbar) - Clean Enterprise Light Chrome -->
             <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-surface-200 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4 transition-all">
                 <!-- Left: Mobile Menu Trigger, Desktop Collapse Toggle & Global Search -->
                 <div class="flex items-center gap-3 flex-1 max-w-xl">
@@ -296,27 +303,27 @@
                     <button type="button" @click="mobileSidebarOpen = true" 
                         class="lg:hidden p-2 rounded-lg text-surface-600 hover:bg-surface-100 hover:text-surface-900 transition cursor-pointer"
                         aria-label="Buka Menu Navigasi">
-                        <i class="fas fa-bars text-base"></i>
+                        <i class="fas fa-bars text-base" aria-hidden="true"></i>
                     </button>
 
                     <!-- Desktop Collapse Toggle Button -->
                     <button type="button" @click="toggleCollapse()" 
                         class="hidden lg:inline-flex items-center justify-center w-9 h-9 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100 transition border border-surface-200 cursor-pointer"
                         title="Ciutkan / Lebarkan Sidebar">
-                        <i class="fas" :class="sidebarCollapsed ? 'fa-indent text-primary-700' : 'fa-outdent'"></i>
+                        <i class="fas" :class="sidebarCollapsed ? 'fa-indent text-primary-700' : 'fa-outdent'" aria-hidden="true"></i>
                     </button>
 
                     <!-- Global Quick Search Bar with Ctrl+K shortcut -->
                     <form action="{{ route('admin.employees.index') }}" method="GET" class="relative flex-1">
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-surface-400">
-                                <i class="fas fa-search text-xs"></i>
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-surface-500">
+                                <i class="fas fa-search text-xs" aria-hidden="true"></i>
                             </span>
                             <input type="text" id="globalSearchInput" name="search"
                                 placeholder="Cari cepat data karyawan, NIK, formasi jabatan..."
                                 class="w-full pl-9 pr-14 py-1.5 bg-surface-50 hover:bg-white focus:bg-white border border-surface-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 rounded-lg text-xs text-surface-900 placeholder-surface-400 transition outline-none">
                             <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                                <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-surface-400 bg-white border border-surface-200 rounded shadow-2xs">Ctrl K</kbd>
+                                <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-surface-500 bg-white border border-surface-200 rounded shadow-2xs">Ctrl K</kbd>
                             </div>
                         </div>
                     </form>
@@ -326,7 +333,7 @@
                 <div class="flex items-center gap-3 shrink-0">
                     <!-- Organization Context Badge -->
                     <div class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-100 border border-surface-200 text-xs font-medium text-surface-700">
-                        <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                        <span class="w-2 h-2 rounded-full bg-primary-600"></span>
                         <span class="font-semibold text-surface-900">PTPN IV</span>
                         <span class="text-surface-300">|</span>
                         <span class="text-surface-500">Regional V</span>
@@ -337,8 +344,8 @@
                         <button type="button" @click="notificationOpen = !notificationOpen"
                             class="relative p-2 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100 transition border border-surface-200 cursor-pointer"
                             title="Pemberitahuan Sistem">
-                            <i class="fas fa-bell text-sm"></i>
-                            <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center animate-pulse">2</span>
+                            <i class="fas fa-bell text-sm" aria-hidden="true"></i>
+                            <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center motion-safe:animate-pulse">2</span>
                         </button>
 
                         <!-- Notification Popover -->
@@ -360,22 +367,22 @@
                             <div class="divide-y divide-surface-100 max-h-72 overflow-y-auto">
                                 <a wire:navigate href="{{ route('admin.mutasi.index', ['tab' => 'mpp']) }}" class="flex items-start gap-3 p-3 hover:bg-surface-50 transition">
                                     <div class="w-8 h-8 rounded-lg bg-earth-100 text-earth-700 flex items-center justify-center shrink-0 mt-0.5">
-                                        <i class="fas fa-chart-pie text-xs"></i>
+                                        <i class="fas fa-chart-pie text-xs" aria-hidden="true"></i>
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-xs font-semibold text-surface-900">Validasi Formasi MPP Tersedia</p>
                                         <p class="text-[11px] text-surface-500 line-clamp-2 mt-0.5">Formasi baku kebun memiliki selisih kebutuhan tenaga kerja (-14 posisi). Mohon verifikasi.</p>
-                                        <span class="text-[10px] text-surface-400 mt-1 block">10 menit yang lalu</span>
+                                        <span class="text-[10px] text-surface-500 mt-1 block">10 menit yang lalu</span>
                                     </div>
                                 </a>
                                 <a wire:navigate href="{{ route('admin.mutasi.index', ['tab' => 'audit']) }}" class="flex items-start gap-3 p-3 hover:bg-surface-50 transition">
                                     <div class="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 mt-0.5">
-                                        <i class="fas fa-clock-rotate-left text-xs"></i>
+                                        <i class="fas fa-clock-rotate-left text-xs" aria-hidden="true"></i>
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-xs font-semibold text-surface-900">Sinkronisasi Riwayat Mutasi</p>
                                         <p class="text-[11px] text-surface-500 line-clamp-2 mt-0.5">Audit log mutasi penempatan karyawan diperbarui secara otomatis.</p>
-                                        <span class="text-[10px] text-surface-400 mt-1 block">1 jam yang lalu</span>
+                                        <span class="text-[10px] text-surface-500 mt-1 block">1 jam yang lalu</span>
                                     </div>
                                 </a>
                             </div>
@@ -391,13 +398,13 @@
                     <div class="relative" x-data="{ profileOpen: false }">
                         <button type="button" @click="profileOpen = !profileOpen"
                             class="flex items-center gap-2 p-1.5 pl-2 rounded-lg border border-surface-200 hover:bg-surface-50 transition cursor-pointer">
-                            <div class="w-7 h-7 rounded-full bg-primary-700 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                            <div class="w-7 h-7 rounded-full bg-primary-700 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
                                 {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 2)) }}
                             </div>
                             <span class="hidden sm:inline-block text-xs font-bold text-surface-800 max-w-[120px] truncate">
                                 {{ auth()->user()->name ?? 'Administrator' }}
                             </span>
-                            <i class="fas fa-chevron-down text-[10px] text-surface-400 transition" :class="profileOpen ? 'rotate-180' : ''"></i>
+                            <i class="fas fa-chevron-down text-[10px] text-surface-400 transition" :class="profileOpen ? 'rotate-180' : ''" aria-hidden="true"></i>
                         </button>
 
                         <!-- Dropdown Menu -->
@@ -418,11 +425,11 @@
                             </div>
                             <div class="py-1">
                                 <a wire:navigate href="{{ route('admin.employees.index') }}" class="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-surface-700 hover:bg-surface-50 hover:text-surface-900">
-                                    <i class="fas fa-users text-surface-400 w-4"></i>
+                                    <i class="fas fa-users text-surface-400 w-4" aria-hidden="true"></i>
                                     <span>Direktori Karyawan</span>
                                 </a>
                                 <a wire:navigate href="{{ route('admin.mutasi.index', ['tab' => 'mpp']) }}" class="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-surface-700 hover:bg-surface-50 hover:text-surface-900">
-                                    <i class="fas fa-chart-line text-surface-400 w-4"></i>
+                                    <i class="fas fa-chart-line text-surface-400 w-4" aria-hidden="true"></i>
                                     <span>Perencanaan Formasi (MPP)</span>
                                 </a>
                             </div>
@@ -431,8 +438,8 @@
                                     @csrf
                                     <button type="submit" 
                                         onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')"
-                                        class="flex items-center gap-2.5 w-full text-left px-4 py-2 text-xs font-medium text-danger hover:bg-red-50 transition cursor-pointer">
-                                        <i class="fas fa-arrow-right-from-bracket w-4"></i>
+                                        class="flex items-center gap-2.5 w-full text-left px-4 py-2 text-xs font-medium text-danger hover:bg-danger-50 transition cursor-pointer">
+                                        <i class="fas fa-arrow-right-from-bracket w-4" aria-hidden="true"></i>
                                         <span>Keluar (Logout)</span>
                                     </button>
                                 </form>

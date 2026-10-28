@@ -133,6 +133,7 @@ Route::prefix('admin')
         Route::prefix('mutasi')->name('mutasi.')->group(function () {
             Route::get('/', [MutasiController::class, 'index'])->name('index');
             Route::get('/create', [MutasiController::class, 'create'])->name('create');
+            Route::get('/chain', [MutasiController::class, 'chain'])->name('chain');
             Route::get('/history', [MutasiController::class, 'history'])->name('history');
             Route::get('/job-history/{jobHistory}/download-sk', [MutasiController::class, 'downloadSk'])->name('downloadSk');
         });

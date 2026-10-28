@@ -39,6 +39,14 @@ class MutasiController extends Controller
     }
 
     /**
+     * Show the dedicated form for creating a multi-employee Chain Transfer.
+     */
+    public function chain(Request $request)
+    {
+        return view('admin.mutasi.chain');
+    }
+
+    /**
      * Backward compatibility redirect for old history route.
      */
     public function history()

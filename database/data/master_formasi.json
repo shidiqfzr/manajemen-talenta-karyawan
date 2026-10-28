@@ -7,6 +7,13 @@
         "urutan": 1,
         "positions": [
             {
+                "nama": "Kepala Bagian",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
                 "nama": "Kepala Sub Bagian Kesekretariatan dan Humas",
                 "bidang": "UMU",
                 "level": "Karpim",

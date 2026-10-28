@@ -1,234 +1,84 @@
-<div class="space-y-4">
+<div class="space-y-6">
 
-    <!-- Filter Bar -->
-    <div class="bg-white rounded-lg border border-surface-200 shadow-sm p-4 sm:p-5">
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-            <!-- Search Input -->
-            <div class="md:col-span-6">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400">
-                        <i class="fas fa-search text-xs"></i>
-                    </div>
-                    <input wire:model.live.debounce.350ms="search"
-                        placeholder="Cari nama karyawan, NIK, jabatan, atau unit..."
-                        class="w-full pl-9 pr-9 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition">
-                    @if ($search)
-                        <button wire:click="$set('search', '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-surface-600">
-                            <i class="fas fa-times-circle text-xs"></i>
-                        </button>
-                    @endif
+    @include('livewire.admin.partials.mutasi-history.flash')
+
+    <!-- ── 2. EXECUTIVE KPI SUMMARY CARDS (INTERACTIVE FILTER TABS) ── -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <x-admin.kpi-card
+            title="Total Riwayat Mutasi"
+            :value="$totalCount"
+            subtitle="Semua riwayat mutasi & SK"
+            icon="fas fa-history"
+            theme="primary"
+            :coloredValue="false"
+            :active="$statusFilter === ''"
+            wire:click="toggleStatusFilter('')"
+        />
+        <x-admin.kpi-card
+            title="Aktif Menjabat"
+            :value="$activeCount"
+            :badge="$totalCount > 0 ? round(($activeCount / $totalCount) * 100) . '%' : null"
+            subtitle="Pejabat definitif aktif"
+            icon="fas fa-user-check"
+            theme="info"
+            :coloredValue="false"
+            :active="$statusFilter === 'applied'"
+            wire:click="toggleStatusFilter('applied')"
+        />
+        <x-admin.kpi-card
+            title="Terjadwal (Staging)"
+            :value="$scheduledCount"
+            :badge="$totalCount > 0 && $scheduledCount > 0 ? round(($scheduledCount / $totalCount) * 100) . '%' : null"
+            subtitle="Menunggu jadwal TMT efektif"
+            icon="fas fa-clock"
+            theme="earth"
+            :coloredValue="false"
+            :active="$statusFilter === 'scheduled'"
+            wire:click="toggleStatusFilter('scheduled')"
+        />
+        <x-admin.kpi-card
+            title="Siap Diaktifkan"
+            :value="$dueCount"
+            :badge="$dueCount > 0 ? 'Perlu Tindakan' : null"
+            subtitle="Jatuh tempo perlu aktivasi"
+            icon="fas fa-bolt"
+            theme="danger"
+            :coloredValue="true"
+            :active="$statusFilter === 'due'"
+            wire:click="toggleStatusFilter('due')"
+        />
+    </div>
+
+    <!-- ── 3. DUE SCHEDULED MUTATIONS NOTIFICATION BANNER ── -->
+    @if ($dueCount > 0)
+        <div class="p-4 bg-warning-50 border border-warning-200 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs animate-fade-in">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-warning-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <i class="fas fa-clock text-sm" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs sm:text-sm font-bold text-warning-800 flex items-center gap-2">
+                        <span>Aktivasi TMT Jatuh Tempo</span>
+                        <span class="px-2 py-0.2 rounded-full text-[10px] font-bold bg-warning-200 text-warning-800 border border-warning-200">{{ $dueCount }} Antrean</span>
+                    </h4>
+                    <p class="text-xs text-warning-800 mt-0.5">
+                        Terdapat <strong>{{ $dueCount }}</strong> mutasi terjadwal yang telah mencapai tanggal TMT efektif dan siap diaktifkan ke data master pegawai.
+                    </p>
                 </div>
             </div>
-
-            <!-- Unit Filter -->
-            <div class="md:col-span-3">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400">
-                        <i class="fas fa-building text-xs"></i>
-                    </div>
-                    <select wire:model.live="unitFilter"
-                        class="w-full pl-9 pr-8 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition appearance-none cursor-pointer">
-                        <option value="">Semua Unit Kerja</option>
-                        @foreach ($units as $unit)
-                            <option value="{{ $unit }}">{{ $unit }}</option>
-                        @endforeach
-                    </select>
-                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-surface-400">
-                        <i class="fas fa-chevron-down text-[10px]"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Jenis Mutasi Filter -->
-            <div class="md:col-span-3">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400">
-                        <i class="fas fa-tag text-xs"></i>
-                    </div>
-                    <select wire:model.live="mutasiFilter"
-                        class="w-full pl-9 pr-8 py-2.5 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition appearance-none cursor-pointer">
-                        <option value="">Semua Jenis Mutasi</option>
-                        @foreach ($mutasiTypes as $type)
-                            <option value="{{ $type }}">{{ ucwords(strtolower(str_replace('_', ' ', $type))) }}</option>
-                        @endforeach
-                    </select>
-                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-surface-400">
-                        <i class="fas fa-chevron-down text-[10px]"></i>
-                    </div>
-                </div>
-            </div>
+            <button wire:click="applyAllDue" wire:loading.attr="disabled"
+                class="px-4 py-2 rounded-xl bg-warning-700 hover:bg-warning-700 text-white text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0">
+                <i class="fas fa-bolt text-xs" aria-hidden="true"></i>
+                <span>Aktivasi Semua Sekarang</span>
+            </button>
         </div>
-    </div>
+    @endif
 
-    <!-- Table Card -->
-    <div class="bg-white rounded-lg border border-surface-200 shadow-sm overflow-hidden">
-        <div wire:loading.delay class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 animate-pulse"></div>
+    @include('livewire.admin.partials.mutasi-history.history-table')
 
-        @if ($history->isEmpty())
-            <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-                <div class="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center text-surface-400 text-2xl mb-3 border border-surface-200">
-                    <i class="fas fa-history"></i>
-                </div>
-                <h4 class="text-base font-bold text-surface-900">Tidak Ada Catatan Riwayat Mutasi</h4>
-                <p class="text-xs text-surface-500 max-w-sm mt-1 leading-relaxed">
-                    @if ($search || $unitFilter || $mutasiFilter)
-                        Tidak ditemukan catatan dengan kriteria filter saat ini. Coba bersihkan filter pencarian.
-                    @else
-                        Belum ada mutasi atau transfer yang dicatat dalam sistem.
-                    @endif
-                </p>
-                @if ($search || $unitFilter || $mutasiFilter)
-                    <button wire:click="$set('search', ''); $set('unitFilter', ''); $set('mutasiFilter', '');"
-                        class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-surface-100 hover:bg-surface-200 text-surface-800 text-xs font-semibold border border-surface-300 transition">
-                        <i class="fas fa-undo text-[10px]"></i>
-                        Reset Filter
-                    </button>
-                @endif
-            </div>
-        @else
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-700 uppercase tracking-wider">
-                            <th scope="col" class="py-3.5 px-5 w-64">Karyawan</th>
-                            <th scope="col" class="py-3.5 px-5 w-72">Jabatan &amp; Unit Kerja</th>
-                            <th scope="col" class="py-3.5 px-5 w-36 text-center">Jenis Mutasi</th>
-                            <th scope="col" class="py-3.5 px-5 w-36">TMT Efektif</th>
-                            <th scope="col" class="py-3.5 px-5 w-32 text-center">Status</th>
-                            <th scope="col" class="py-3.5 px-5 w-52">Dasar SK / Catatan</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-surface-200 text-sm">
-                        @foreach ($history as $record)
-                            @php
-                                $isActive = $record->tmt_akhir === null;
-                                $badgeStyle = match($record->jenis_mutasi) {
-                                    'PROMOSI'     => 'bg-primary-50 text-primary-800 border-primary-200',
-                                    'ROTASI'      => 'bg-blue-50 text-info border-blue-200',
-                                    'MUTASI_UNIT' => 'bg-earth-100 text-earth-800 border-earth-300',
-                                    'PENUGASAN'   => 'bg-surface-100 text-surface-800 border-surface-300',
-                                    'DEMOSI'      => 'bg-red-50 text-danger border-red-200',
-                                    default       => 'bg-surface-100 text-surface-700 border-surface-200',
-                                };
-                            @endphp
-                            <tr class="hover:bg-surface-50/75 transition duration-150 {{ $isActive ? 'bg-primary-50/20' : '' }}">
-                                <!-- Employee -->
-                                <td class="py-3.5 px-5 align-top">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-800 border border-primary-200 flex items-center justify-center text-xs font-bold shrink-0">
-                                            {{ strtoupper(substr($record->employee?->nama ?? '?', 0, 1)) }}
-                                        </div>
-                                        <div class="min-w-0">
-                                            @if ($record->employee)
-                                                <a href="{{ route('admin.employees.show', $record->employee_nik) }}"
-                                                    class="font-semibold text-xs text-surface-900 hover:text-primary-700 transition block truncate"
-                                                    title="{{ $record->employee->nama }}">
-                                                    {{ $record->employee->nama }}
-                                                </a>
-                                            @else
-                                                <span class="font-semibold text-xs text-surface-900 block truncate">{{ $record->employee_nik }}</span>
-                                            @endif
-                                            <span class="text-[11px] text-surface-500 font-mono tabular-nums">NIK: {{ $record->employee_nik }}</span>
-                                        </div>
-                                    </div>
-                                </td>
+    @include('livewire.admin.partials.mutasi-history.detail-modal')
 
-                                <!-- Position & Unit -->
-                                <td class="py-3.5 px-5 align-top">
-                                    <div class="font-semibold text-surface-900 text-xs leading-snug">
-                                        {{ $record->jabatan }}
-                                    </div>
-                                    <div class="text-[11px] text-surface-500 mt-1 flex items-center gap-1.5">
-                                        <i class="fas fa-building text-[10px] text-surface-400"></i>
-                                        <span>{{ $record->unit_kerja }}</span>
-                                    </div>
-                                </td>
+    @include('livewire.admin.partials.mutasi-history.batch-modal')
 
-                                <!-- Mutation Type -->
-                                <td class="py-3.5 px-5 align-top text-center whitespace-nowrap">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border {{ $badgeStyle }}">
-                                        {{ $record->jenis_mutasi_label }}
-                                    </span>
-                                </td>
 
-                                <!-- TMT Efektif -->
-                                <td class="py-3.5 px-5 align-top text-xs">
-                                    <div class="font-medium text-surface-900 tabular-nums">
-                                        {{ $record->tmt_awal ? \Carbon\Carbon::parse($record->tmt_awal)->translatedFormat('d M Y') : '—' }}
-                                    </div>
-                                    @if ($record->tmt_awal && \Carbon\Carbon::parse($record->tmt_awal)->isFuture())
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 mt-1 tabular-nums">
-                                            <i class="fas fa-clock mr-1 text-[9px]"></i> TMT Mendatang
-                                        </span>
-                                    @endif
-                                    <span class="text-[11px] text-surface-500 block mt-0.5 tabular-nums">
-                                        Sampai: {{ $record->tmt_akhir ? \Carbon\Carbon::parse($record->tmt_akhir)->translatedFormat('d M Y') : 'Sekarang' }}
-                                    </span>
-                                </td>
-
-                                <!-- Status -->
-                                <td class="py-3.5 px-5 align-top text-center whitespace-nowrap">
-                                    @if ($isActive)
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-800 border border-primary-200 text-xs font-semibold">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-primary-600 animate-pulse"></span>
-                                            Aktif Menjabat
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-100 text-surface-700 border border-surface-200 text-xs font-medium">
-                                            Selesai (Mutasi)
-                                        </span>
-                                    @endif
-
-                                    @if ($record->is_dispensasi)
-                                        <div class="mt-1">
-                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="{{ $record->alasan_dispensasi }}">
-                                                <i class="fas fa-exclamation-circle text-[9px]"></i> Dispensasi
-                                            </span>
-                                        </div>
-                                    @endif
-                                </td>
-
-                                <!-- SK & Catatan -->
-                                <td class="py-3.5 px-5 align-top text-xs space-y-1">
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        @if ($record->nomor_sk)
-                                            <div class="font-mono text-[11px] font-semibold text-surface-800 bg-surface-100 px-2 py-0.5 rounded border border-surface-200 inline-block tabular-nums">
-                                                {{ $record->nomor_sk }}
-                                            </div>
-                                        @endif
-                                        @if ($record->file_sk)
-                                            <a href="{{ route('admin.mutasi.downloadSk', $record->id) }}" target="_blank"
-                                                class="inline-flex items-center gap-1 text-[11px] font-semibold text-danger hover:text-red-700 transition"
-                                                title="Lihat Berkas SK Digital (Aman)">
-                                                <i class="fas fa-file-pdf"></i>
-                                                <span>Unduh SK</span>
-                                            </a>
-                                        @endif
-                                    </div>
-                                    @if ($record->catatan)
-                                        <p class="text-[11px] text-surface-500 line-clamp-2" title="{{ $record->catatan }}">
-                                            {{ $record->catatan }}
-                                        </p>
-                                    @elseif (!$record->nomor_sk)
-                                        <span class="text-surface-400 italic text-[11px]">—</span>
-                                    @endif
-                                    @if ($record->creator)
-                                        <span class="text-[10px] text-surface-400 block pt-0.5">
-                                            Oleh: {{ $record->creator->name }}
-                                        </span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            @if ($history->hasPages())
-                <div class="px-6 py-4 border-t border-surface-200 bg-surface-50">
-                    {{ $history->links() }}
-                </div>
-            @endif
-        @endif
-    </div>
 </div>
