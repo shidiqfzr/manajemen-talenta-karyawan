@@ -1,23 +1,27 @@
 @props(['employee'])
 
-<tr :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-slate-50/70 border-l-4 border-l-primary-600' : ''"
-    class="cursor-pointer hover:bg-slate-50/80 transition duration-150 group select-none"
+<tr :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-surface-50/70 border-l-4 border-l-primary-600' : ''"
+    class="cursor-pointer hover:bg-surface-50/80 transition duration-150 group select-none"
     @click="handleRowClick('{{ $employee->nik }}', $event, '{{ route('admin.employees.show', $employee->nik) }}')">
     
     <!-- Checkbox Kolom Tunggal Rapi -->
-    <td class="py-3.5 pl-5 pr-2 w-10 text-center whitespace-nowrap" @click.stop="toggleSelect('{{ $employee->nik }}', $event)">
-        <div class="w-4 h-4 rounded border flex items-center justify-center cursor-pointer transition mx-auto shrink-0"
-             :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-primary-600 border-primary-600 text-white shadow-xs' : 'bg-white border-slate-300 hover:border-primary-500 shadow-2xs'"
-             title="{{ $employee->nama }} (Klik untuk memilih, Shift+Klik untuk rentang)">
-            <i class="fas fa-check text-[9px] text-white" x-show="selectedNiks.includes('{{ $employee->nik }}')" x-cloak></i>
-        </div>
+    {{-- Area klik seluruh sel memperbesar target mouse; kotak centang asli melayani keyboard & pembaca layar.
+         Spasi = pilih/lepas, Shift+Spasi atau Shift+klik = pilih rentang (browser mengirim Spasi sebagai klik). --}}
+    <td class="py-3.5 pl-5 pr-2 w-10 text-center whitespace-nowrap"
+        @click.stop="$event.target === $el && toggleSelect('{{ $employee->nik }}', $event)">
+        <input type="checkbox"
+               class="block mx-auto w-4 h-4 cursor-pointer accent-primary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+               aria-label="Pilih {{ $employee->nama }}"
+               title="{{ $employee->nama }} (Klik atau Spasi untuk memilih, Shift untuk rentang)"
+               :checked="selectedNiks.includes('{{ $employee->nik }}')"
+               @click="toggleSelect('{{ $employee->nik }}', $event); $nextTick(() => $el.checked = selectedNiks.includes('{{ $employee->nik }}'))">
     </td>
 
     <!-- Pegawai (Nama, Foto Profil jika ada, NIK) -->
     <td class="py-3.5 px-3 whitespace-nowrap">
         <div class="flex items-center gap-3">
             @if ($employee->foto && Storage::disk('public')->exists($employee->foto))
-                <div class="w-9 h-9 rounded-full overflow-hidden border border-slate-200 shadow-2xs shrink-0">
+                <div class="w-9 h-9 rounded-full overflow-hidden border border-surface-200 shadow-2xs shrink-0">
                     <img src="{{ Storage::disk('public')->url($employee->foto) }}" alt="{{ $employee->nama }}"
                         class="w-full h-full object-cover">
                 </div>
@@ -35,9 +39,9 @@
                         <x-highlight :text="$employee->nik" />
                     </span>
                     <button type="button" @click.stop="copyNik('{{ $employee->nik }}')"
-                        class="text-surface-400 hover:text-surface-700 text-[11px] transition cursor-pointer"
+                        class="text-surface-500 hover:text-surface-700 text-[11px] transition cursor-pointer"
                         title="Salin NIK">
-                        <i :class="copiedNik === '{{ $employee->nik }}' ? 'fas fa-check text-primary-600' : 'far fa-copy'"></i>
+                        <i :class="copiedNik === '{{ $employee->nik }}' ? 'fas fa-check text-primary-600' : 'far fa-copy'" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -51,51 +55,51 @@
 
             {{-- Badge Kasus Spesial 1: Sanksi Indisipliner Aktif / Kedaluwarsa --}}
             @if($employee->isSanctionActive())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 shadow-2xs"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-danger-50 text-danger-700 border border-danger-200 shadow-2xs"
                     title="Pegawai dalam masa sanksi indisipliner (Diperban) hingga {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}">
-                    <i class="fas fa-gavel text-[9px]"></i>
+                    <i class="fas fa-gavel text-[10px]" aria-hidden="true"></i>
                     Masa Sanksi s/d {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }}
                 </span>
             @elseif($employee->isSanctionExpired())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs animate-pulse"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning-50 text-warning-800 border border-warning-200 shadow-2xs motion-safe:animate-pulse"
                     title="Masa sanksi kedaluwarsa sejak {{ $employee->tanggal_berakhir_sanksi?->format('d M Y') }} - Harap terbitkan Mutasi Pencabutan Sanksi">
-                    <i class="fas fa-exclamation-triangle text-[9px] text-amber-600"></i>
+                    <i class="fas fa-exclamation-triangle text-[10px] text-warning-700" aria-hidden="true"></i>
                     Sanksi Kedaluwarsa
                 </span>
             @endif
 
             {{-- Badge Kasus Spesial 2: Jabatan Overflow / Pool Penampungan (Advisor) --}}
             @if($employee->isOverflow())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 shadow-2xs"
                     title="Formasi penampungan fungsional non-struktural (Advisor/Overflow Pool)">
-                    <i class="fas fa-layer-group text-[9px] text-slate-500"></i>
+                    <i class="fas fa-layer-group text-[10px] text-surface-500" aria-hidden="true"></i>
                     Fungsional Pool
                 </span>
             @endif
 
             {{-- Badge Kasus Spesial 3: Batas Usia Pensiun / MBT --}}
             @if($employee->isPensionReached())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-300 shadow-2xs"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-danger-100 text-danger-800 border border-danger-200 shadow-2xs"
                     title="Pegawai telah mencapai Batas Usia Pensiun (BUP 56 Tahun) per {{ $employee->effective_tanggal_pensiun?->format('d M Y') }}">
-                    <i class="fas fa-user-clock text-[9px] text-red-700"></i>
+                    <i class="fas fa-user-clock text-[10px] text-danger-700" aria-hidden="true"></i>
                     Masa Pensiun (BUP)
                 </span>
             @elseif($employee->isMbtActive())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning-100 text-warning-800 border border-warning-200 shadow-2xs"
                     title="Pegawai dalam Masa Bebas Tugas (MBT 55 Tahun) sejak {{ $employee->effective_tanggal_mbt?->format('d M Y') }} s/d {{ $employee->effective_tanggal_pensiun?->format('d M Y') }}">
-                    <i class="fas fa-hourglass-half text-[9px] text-amber-700"></i>
+                    <i class="fas fa-hourglass-half text-[10px] text-warning-700" aria-hidden="true"></i>
                     Masa Bebas Tugas (MBT)
                 </span>
             @elseif($employee->isApproachingMbt())
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs"
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-warning-50 text-warning-800 border border-warning-200 shadow-2xs"
                     title="Pegawai menjelang MBT pada {{ $employee->effective_tanggal_mbt?->format('d M Y') }} (sisa {{ $employee->mbt_countdown }})">
-                    <i class="fas fa-clock text-[9px] text-amber-600"></i>
+                    <i class="fas fa-clock text-[10px] text-warning-700" aria-hidden="true"></i>
                     Menjelang MBT ({{ $employee->mbt_countdown }})
                 </span>
             @endif
         </div>
         <div class="text-xs text-surface-500 flex items-center gap-1.5 mt-0.5 flex-wrap" title="{{ $employee->unit_kerja }}">
-            <i class="fas fa-building text-[10px] text-surface-400 shrink-0"></i>
+            <i class="fas fa-building text-[10px] text-surface-400 shrink-0" aria-hidden="true"></i>
             <span class="truncate max-w-[240px] sm:max-w-md"><x-highlight :text="$employee->unit_kerja" /></span>
             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border shadow-2xs {{ $employee->bidang_theme }}"
                 title="Bidang Fungsional: {{ $employee->bidang }}">
@@ -106,16 +110,12 @@
             <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                 @foreach($employee->concurrentJobs as $cj)
                     @php
-                        $badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
-                        if ($cj->status_penugasan === 'Plt') {
-                            $badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
-                        } elseif ($cj->status_penugasan === 'Diperbantukan') {
-                            $badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
-                        }
+                        // Tugas rangkap satu perlakuan warna; jenisnya dibedakan oleh label teks.
+                        $badgeStyle = 'bg-info-50 text-info-800 border-info-200';
                     @endphp
                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold border shadow-2xs {{ $badgeStyle }}"
                         title="Tugas Tambahan Aktif: {{ $cj->jabatan }} di {{ $cj->unit_kerja }} (sejak {{ $cj->tmt_awal?->format('d M Y') }})">
-                        <i class="fas fa-briefcase text-[10px] opacity-75 shrink-0"></i>
+                        <i class="fas fa-briefcase text-[10px] opacity-75 shrink-0" aria-hidden="true"></i>
                         <span>{{ $cj->status_penugasan }}: {{ $cj->jabatan }} <span class="font-normal opacity-85">— {{ $cj->unit_kerja }}</span></span>
                     </span>
                 @endforeach
@@ -133,12 +133,12 @@
                     default => \App\Models\Employee::LEVELS[$employee->level] ?? $employee->level,
                 };
             @endphp
-            <span class="text-xs {{ $employee->is_karpim ? 'text-slate-800 font-semibold' : 'text-slate-500 font-medium' }}"
+            <span class="text-xs {{ $employee->is_karpim ? 'text-surface-800 font-semibold' : 'text-surface-500 font-medium' }}"
                 title="{{ $levelTitle }}">
                 {{ $employee->level }}
             </span>
         @else
-            <span class="text-surface-400 text-xs">-</span>
+            <span class="text-surface-500 text-xs">-</span>
         @endif
     </td>
 
@@ -150,19 +150,19 @@
                 {{ $employee->rm_level }}
             </span>
         @else
-            <span class="text-surface-400 text-xs">-</span>
+            <span class="text-surface-500 text-xs">-</span>
         @endif
     </td>
 
     <!-- Golongan - Clean Tabular Monospaced Text -->
     <td class="py-3.5 px-5 whitespace-nowrap text-center">
         @if($employee->golongan)
-            <span class="font-mono text-xs font-semibold text-slate-800 tabular-nums"
+            <span class="font-mono text-xs font-semibold text-surface-800 tabular-nums"
                 title="Tingkat Golongan: {{ $employee->golongan }}">
                 {{ $employee->golongan }}
             </span>
         @else
-            <span class="text-surface-400 text-xs">-</span>
+            <span class="text-surface-500 text-xs">-</span>
         @endif
     </td>
 
@@ -170,9 +170,9 @@
     <td class="py-3.5 px-5 whitespace-nowrap text-right" @click.stop>
         <div class="relative inline-block text-right" x-data="{ open: false }">
             <button type="button" @click="open = !open"
-                class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer inline-flex items-center justify-center"
+                class="p-2 text-surface-500 hover:text-surface-700 hover:bg-surface-100 rounded-lg transition cursor-pointer inline-flex items-center justify-center"
                 title="Menu Aksi">
-                <i class="fas fa-ellipsis-v text-xs"></i>
+                <i class="fas fa-ellipsis-v text-xs" aria-hidden="true"></i>
             </button>
 
                 <div x-show="open" @click.away="open = false" x-cloak
@@ -182,32 +182,32 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="transform opacity-100 scale-100"
                     x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute right-0 z-30 mt-1 w-48 origin-top-right rounded-xl bg-white p-1 text-xs shadow-lg ring-1 ring-slate-900/5 focus:outline-none border border-slate-200 text-left">
+                    class="absolute right-0 z-30 mt-1 w-48 origin-top-right rounded-xl bg-white p-1 text-xs shadow-lg ring-1 ring-surface-900/5 focus:outline-none border border-surface-200 text-left">
                     
                     <a href="{{ route('admin.employees.show', $employee->nik) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition font-medium">
-                        <i class="fas fa-id-card text-slate-400 w-3.5"></i>
+                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
+                        <i class="fas fa-id-card text-surface-400 w-3.5" aria-hidden="true"></i>
                         <span>Profil Lengkap</span>
                     </a>
 
                     <a href="{{ route('admin.employees.edit', $employee->nik) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition font-medium">
-                        <i class="fas fa-pencil-alt text-slate-400 w-3.5"></i>
+                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
+                        <i class="fas fa-pencil-alt text-surface-400 w-3.5" aria-hidden="true"></i>
                         <span>Ubah Data Pegawai</span>
                     </a>
 
                     <a href="{{ route('admin.mutasi.create', ['nik' => $employee->nik]) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition font-medium">
-                        <i class="fas fa-exchange-alt text-emerald-600 w-3.5"></i>
+                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
+                        <i class="fas fa-exchange-alt text-primary-600 w-3.5" aria-hidden="true"></i>
                         <span>Ajukan Mutasi</span>
                     </a>
 
-                    <div class="my-1 border-t border-slate-100"></div>
+                    <div class="my-1 border-t border-surface-100"></div>
 
                     <button type="button"
                         @click="open = false; confirmDelete('{{ $employee->nik }}', '{{ addslashes($employee->nama) }}', '{{ route('admin.employees.destroy', $employee->nik) }}')"
-                        class="flex w-full items-center gap-2 px-3 py-2 text-danger hover:bg-red-50 rounded-lg transition cursor-pointer font-medium">
-                        <i class="fas fa-trash-alt text-danger w-3.5"></i>
+                        class="flex w-full items-center gap-2 px-3 py-2 text-danger hover:bg-danger-50 rounded-lg transition cursor-pointer font-medium">
+                        <i class="fas fa-trash-alt text-danger w-3.5" aria-hidden="true"></i>
                         <span>Hapus Pegawai</span>
                     </button>
                 </div>
