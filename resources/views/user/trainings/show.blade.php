@@ -5,9 +5,9 @@
 
     {{-- Detail Pelatihan --}}
     <div class="bg-white shadow-md rounded-xl p-6">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">{{ $training->judul }}</h1>
+        <h1 class="text-3xl font-bold text-surface-800 mb-6 border-b pb-2">{{ $training->judul }}</h1>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-sm text-gray-700">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-sm text-surface-700">
             <div><span class="font-semibold">Tanggal:</span> {{ $training->tanggal_mulai }}</div>
             <div><span class="font-semibold">Jenis:</span> {{ $training->jenis }}</div>
             <div><span class="font-semibold">Metode:</span> {{ $training->metode }}</div>
@@ -23,34 +23,34 @@
 
     {{-- Tabel Peserta --}}
     <div class="bg-white shadow-md rounded-xl p-6">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Peserta Pelatihan</h2>
+        <h2 class="text-2xl font-semibold text-surface-800 mb-4">Peserta Pelatihan</h2>
 
         <div class="overflow-x-auto rounded-md">
-            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
+            <table class="min-w-full divide-y divide-surface-200 text-sm">
+                <thead class="bg-surface-50">
                     <tr>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Nama</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Jabatan</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Level</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Unit Kerja</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Sertifikat</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Nama</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Jabatan</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Level</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Unit Kerja</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Sertifikat</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-100">
+                <tbody class="bg-white divide-y divide-surface-100">
                     @forelse ($training->employees as $employee)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 text-gray-900">{{ $employee->nama }}</td>
-                            <td class="px-4 py-2 text-gray-700">{{ $employee->jabatan }}</td>
-                            <td class="px-4 py-2 text-gray-700">{{ $employee->level }}</td>
-                            <td class="px-4 py-2 text-gray-700">{{ $employee->unit_kerja }}</td>
+                        <tr class="hover:bg-surface-50">
+                            <td class="px-4 py-2 text-surface-900">{{ $employee->nama }}</td>
+                            <td class="px-4 py-2 text-surface-700">{{ $employee->jabatan }}</td>
+                            <td class="px-4 py-2 text-surface-700">{{ $employee->level }}</td>
+                            <td class="px-4 py-2 text-surface-700">{{ $employee->unit_kerja }}</td>
                             <td class="px-4 py-2">
                                 @if (!empty($employee->pivot->sertifikat))
                                     <a href="{{ asset('storage/' . $employee->pivot->sertifikat) }}" target="_blank"
-                                       class="inline-flex items-center px-3 py-1 bg-blue-500 text-white hover:bg-blue-600 rounded-md text-xs font-medium transition">
+                                       class="inline-flex items-center px-3 py-1 bg-info text-white hover:bg-info rounded-md text-xs font-medium transition">
                                         📄 Unduh
                                     </a>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-danger-100 text-danger-700">
                                         Tidak Ada
                                     </span>
                                 @endif
@@ -58,7 +58,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center py-4 text-gray-500">Belum ada peserta.</td>
+                            <td colspan="4" class="text-center py-4 text-surface-500">Belum ada peserta.</td>
                         </tr>
                     @endforelse
                 </tbody>

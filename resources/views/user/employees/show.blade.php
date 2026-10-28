@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-2 pb-10">
-        <a href="{{ route('user.employees.index') }}" class="text-blue-600 hover:underline mb-6 inline-block text-sm">
+        <a href="{{ route('user.employees.index') }}" class="text-info hover:underline mb-6 inline-block text-sm">
             ← Kembali ke Daftar Karyawan
         </a>
 
@@ -13,15 +13,15 @@
                 <!-- foto Section -->
                 <div class="w-full md:w-1/3 flex justify-center md:justify-start">
                     <img src="{{ asset('storage/' . ($employee->foto ?? 'images/default.png')) }}" alt="{{ $employee->nama }}"
-                        class="rounded-xl w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 object-cover border border-gray-300 shadow-sm">
+                        class="rounded-xl w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 object-cover border border-surface-300 shadow-sm">
                 </div>
 
                 <!-- Employee Info -->
                 <div class="w-full md:w-2/3">
                     <!-- Header -->
                     <div class="mb-6">
-                        <h1 class="text-2xl sm:text-3xl font-bold text-blue-700">{{ $employee->nama }}</h1>
-                        <p class="text-sm text-gray-500 mt-1">NIK: {{ $employee->nik }}</p>
+                        <h1 class="text-2xl sm:text-3xl font-bold text-info-700">{{ $employee->nama }}</h1>
+                        <p class="text-sm text-surface-500 mt-1">NIK: {{ $employee->nik }}</p>
                     </div>
 
                     @php
@@ -53,10 +53,10 @@
 
                     @foreach ($sections as $sectionTitle => $fields)
                         <div class="mb-8">
-                            <h2 class="text-lg sm:text-xl font-semibold text-gray-700 mb-4 border-b pb-1">
+                            <h2 class="text-lg sm:text-xl font-semibold text-surface-700 mb-4 border-b pb-1">
                                 {{ $sectionTitle }}
                             </h2>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-800">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-surface-800">
                                 @foreach ($fields as $label => $value)
                                     <p>
                                         <span class="font-medium">{{ $label }}:</span>
