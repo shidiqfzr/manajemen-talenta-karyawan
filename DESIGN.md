@@ -1,749 +1,625 @@
 # DESIGN.md — Design System & UX Guidelines
-## Human Resources Information System (HRIS) PT. Perkebunan Nusantara
+## Sistem Informasi Manajemen Talenta & Formasi Pegawai — PTPN IV Regional V
 
-> Dokumen ini adalah **acuan desain tunggal (single source of truth for UI/UX)** untuk pengembangan HRIS PTPN menggunakan **TALL Stack** (Tailwind CSS, Alpine.js, Laravel, Livewire) di Antigravity IDE. Gunakan dokumen ini berdampingan dengan [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) (single source of truth untuk aturan bisnis, data dictionary, dan struktur organisasi) sebagai konteks/prompt dasar setiap kali melakukan vibe coding agar hasil UI dan logika sistem konsisten, tidak generik, dan setara standar industri enterprise (Workday, SAP SuccessFactors, Mekari Talenta).
-
----
-
-## 1. Tujuan & Filosofi Desain
-
-HRIS ini digunakan oleh populasi pengguna yang sangat beragam — dari **pekerja lapangan di kebun/afdeling** yang mengakses lewat HP dengan koneksi terbatas, hingga **direksi holding** yang membutuhkan dashboard analitik strategis. Desain harus:
-
-1. **Jelas sebelum indah (clarity over decoration).** Data HR (gaji, cuti, kinerja) adalah data sensitif dan berdampak langsung ke penghidupan karyawan — hierarki visual, status, dan angka harus tidak ambigu.
-2. **Konsisten lintas modul.** Satu tombol "Ajukan" harus terlihat & berperilaku sama di modul Cuti, Reimbursement, maupun Rekrutmen.
-3. **Berperan ganda: enterprise & lapangan.** Bukan sekadar "SaaS dashboard generik" — harus mengakomodasi konteks perkebunan (struktur Kebun/Afdeling/Mandor, kategori pekerja PKWT/harian lepas/musiman, absensi berbasis lokasi).
-4. **Dapat diakses (accessible).** Kontras cukup, target sentuh besar untuk pengguna lapangan, dan dapat dioperasikan dengan keyboard.
-5. **Cepat dirasakan (performant by design).** Karena berbasis Livewire, UI harus dirancang dengan status loading/skeleton yang eksplisit, bukan halaman yang terasa "diam" saat request server berjalan.
-
-Hindari default tampilan "generated AI dashboard" (kartu rounded seragam dengan shadow abu-abu yang sama, gradient dekoratif, label ALL-CAPS bertaburan, badge emoji berlebihan). Setiap elemen visual harus punya alasan fungsional.
-
----
-
-## 2. Pengguna & Konteks Penggunaan
-
-| Persona | Perangkat Utama | Kebutuhan Kunci |
-|---|---|---|
-| **Pekerja Lapangan** (harian lepas, musiman, karyawan afdeling) | Mobile (Android low-end), sering offline-prone | Absensi cepat (GPS/foto), lihat slip gaji, ajukan cuti, 1 tangan, teks besar |
-| **Karyawan Kantor (ESS)** | Desktop & Mobile | Self-service: profil, cuti, absensi, payslip, training |
-| **Atasan Langsung / Mandor / Asisten Kebun (MSS)** | Mobile & Desktop | Approval cepat, lihat tim, absensi anak buah |
-| **HR Admin / HRBP (per Kebun/Unit)** | Desktop | Kelola data induk, proses payroll, rekrutmen, administrasi |
-| **HR Corporate / Kantor Pusat** | Desktop | Analitik lintas unit kebun, kebijakan, konsolidasi |
-| **Direksi / Manajemen Puncak** | Desktop & Tablet | Dashboard eksekutif, ringkasan strategis, bukan input data |
-| **Super Admin / IT** | Desktop | Konfigurasi sistem, hak akses, integrasi |
-
-**Implikasi desain:** setiap layar harus dirancang **mobile-first untuk alur transaksional** (absensi, approval, self-service) dan **desktop-first untuk alur analitik & administratif** (payroll processing, laporan, konfigurasi master data).
-
----
-
-## 3. Arsitektur Informasi — Modul (Setara Workday/SuccessFactors)
-
-Struktur navigasi utama berbasis modul, dengan penyesuaian struktur organisasi perkebunan (**Holding → Wilayah/Direktorat → Kebun/Unit → Afdeling → Mandor → Pekerja**):
-
-1. **Core HR (Employee Central)** — data induk karyawan, struktur organisasi multi-level (Holding/Kebun/Afdeling), riwayat jabatan & mutasi, dokumen kepegawaian.
-2. **Recruitment & Onboarding (ATS)** — permintaan tenaga kerja (PKWT/tetap/musiman), pipeline kandidat (kanban), seleksi, offer letter, onboarding checklist.
-3. **Time & Attendance** — absensi berbasis GPS/geofence untuk lokasi kebun, shift kerja, lembur, rekap kehadiran per afdeling.
-4. **Leave Management** — pengajuan & approval cuti berjenjang, saldo cuti, kalender tim.
-5. **Payroll & Benefits** — komponen gaji (termasuk premi panen/borongan bila relevan), BPJS, PPh 21, slip gaji digital, simulasi.
-6. **Performance Management** — goal setting (OKR/KPI), penilaian berjenjang, kalibrasi, 360 feedback.
-7. **Learning & Development** — katalog pelatihan, sertifikasi (K3, kompetensi teknis kebun), tracking progress.
-8. **Succession & Career Planning** — talent pool, matriks 9-box, rencana suksesi posisi kritis (Manajer Kebun, Asisten Kepala).
-9. **Employee/Manager Self-Service (ESS/MSS)** — hub personal: profil, payslip, cuti, absensi, approval inbox.
-10. **Analytics & Reporting** — dashboard headcount, turnover, biaya tenaga kerja per kebun, produktivitas.
-11. **Administration & Settings** — manajemen hak akses (RBAC per Kebun/Unit), workflow approval, master data (jabatan, grade, lokasi kebun).
-
-> Saat vibe coding satu modul, selalu rujuk ke **nomor modul di atas** agar Antigravity IDE memahami konteks & hierarki data (mis. "Modul 3 harus tahu struktur Afdeling dari Modul 1").
-
----
-
-## 4. Design Tokens
-
-### 4.1 Palet Warna — "Perkebunan Modern" (Hijau & Earth Tone)
-
-Warna dipilih agar terasa korporat-institusional (bukan startup playful), terinspirasi kanopi daun, tanah, dan hasil bumi — namun tetap memenuhi kontras WCAG AA untuk teks & UI enterprise.
-
-```
-Primary (Hijau Daun — aksi utama, brand, navigasi aktif)
-  primary-950: #0B2416
-  primary-900: #123A22
-  primary-800: #1B5330      <- utama untuk header/sidebar gelap
-  primary-700: #256B3E
-  primary-600: #2F8250      <- primary button default
-  primary-500: #3E9A63
-  primary-400: #66B586
-  primary-300: #9BD1B0
-  primary-200: #C9E8D5
-  primary-100: #E7F5EC
-  primary-50 : #F3FAF6
-
-Secondary (Earth / Khaki — aksen sekunder, kartu highlight, ikon sekunder)
-  earth-700: #6B5B3A
-  earth-600: #8A7550
-  earth-500: #A8916A   <- aksen sekunder / highlight
-  earth-300: #D8C9A8
-  earth-100: #F2ECDD
-
-Neutral (UI chrome — teks, border, background)
-  neutral-900: #1B1F1D   <- teks utama (bukan hitam pekat #000)
-  neutral-700: #40473F
-  neutral-500: #737A70
-  neutral-300: #C3C9BE
-  neutral-200: #DEE3D8
-  neutral-100: #F1F3EE
-  neutral-50 : #F8F9F6   <- background halaman
-  white      : #FFFFFF   <- background kartu/panel
-
-Semantic
-  success: #2F8250 (pakai primary-600)
-  warning: #B8860B  (amber earth, bukan kuning terang generik)
-  danger : #C0392B  (merah bata, selaras earth tone)
-  info   : #2E6E9E
-```
-
-**Konfigurasi Tailwind (`tailwind.config.js`):**
-```js
-theme: {
-  extend: {
-    colors: {
-      primary: {
-        50:'#F3FAF6',100:'#E7F5EC',200:'#C9E8D5',300:'#9BD1B0',
-        400:'#66B586',500:'#3E9A63',600:'#2F8250',700:'#256B3E',
-        800:'#1B5330',900:'#123A22',950:'#0B2416',
-      },
-      earth: { 100:'#F2ECDD',300:'#D8C9A8',500:'#A8916A',600:'#8A7550',700:'#6B5B3A' },
-      surface: { 50:'#F8F9F6',100:'#F1F3EE',200:'#DEE3D8',300:'#C3C9BE',500:'#737A70',700:'#40473F',900:'#1B1F1D' },
-    },
-    fontFamily: {
-      sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui'],
-    },
-  }
-}
-```
-
-**Aturan pemakaian warna:**
-- Sidebar & top bar: `primary-800` (bukan hitam), teks putih.
-- Aksi utama (Simpan, Ajukan, Setujui): `primary-600`, hover `primary-700`.
-- Aksi destruktif (Hapus, Tolak): `danger`, selalu minta konfirmasi modal.
-- Status "Menunggu Persetujuan": `warning` (badge earth-amber, bukan kuning saturasi tinggi).
-- Jangan pernah pakai warna primary untuk body text panjang — gunakan `surface-900` di atas `surface-50`.
-
-### 4.2 Tipografi
-
-- **Font UI utama:** `Plus Jakarta Sans` (geometris, hangat, cocok nuansa institusional-modern; muat via Google Fonts/self-host, fallback `system-ui`).
-- **Font data/tabular (opsional):** `Inter` untuk kolom angka/tabel besar (payroll, laporan) karena tabular figures-nya rapi — gunakan `font-variant-numeric: tabular-nums`.
-- **Skala tipe** (berbasis rem, rasio ~1.2):
-
-| Token | Ukuran | Pemakaian |
-|---|---|---|
-| `text-xs` | 12px | Label meta, caption, timestamp |
-| `text-sm` | 14px | Body default di tabel & form padat |
-| `text-base` | 16px | Body default halaman & ESS mobile |
-| `text-lg` | 18px | Sub-judul kartu |
-| `text-xl` | 20px | Judul section |
-| `text-2xl` | 24px | Judul halaman |
-| `text-3xl` | 30px | Angka besar dashboard (KPI) |
-
-Berat: `font-semibold` untuk judul, `font-medium` untuk label, `font-normal` untuk body. **Hindari** all-caps untuk label kecuali kode singkat (mis. status "AKTIF" pada badge memang lazim, tapi jangan all-caps judul section).
-
-### 4.3 Spacing, Radius, Shadow
-
-- Spacing: skala default Tailwind (4px base) — konsisten `gap-4`/`p-4` sebagai default kartu, `gap-6` antar section.
-- Radius: `rounded-lg` (8px) untuk kartu & input, `rounded-full` hanya untuk avatar/badge status, `rounded-md` (6px) untuk tombol. **Jangan** samakan radius kartu dengan radius tombol — beri perbedaan halus untuk hierarki.
-- Shadow: gunakan elevasi tipis & jarang. `shadow-sm` untuk kartu di atas `surface-50`. Hindari shadow abu-abu tebal generik di semua elemen — cukup pada elemen yang benar "mengambang" (dropdown, modal, toast).
-
-### 4.4 Ikonografi
-
-Gunakan **Heroicons** (via package `blade-ui-kit/blade-heroicons`, native cocok dengan Blade/Livewire). Outline style untuk ikon navigasi/aksi umum, solid style untuk status/state aktif. Konsisten 1 set ikon di seluruh aplikasi — jangan campur dengan emoji atau icon set lain.
-
----
-
-## 5. Layout & App Shell
-
-```
-Desktop (≥1024px)
-┌─────────────────────────────────────────────┐
-│ Topbar: Logo | Global Search | 🔔 | Avatar   │
-├───────────┬─────────────────────────────────┤
-│ Sidebar   │  Breadcrumb                      │
-│ (per      │  ─────────────────────────────   │
-│  modul,   │  Konten Halaman                  │
-│  collaps- │  (Card / Table / Form)           │
-│  ible)    │                                  │
-│           │                                  │
-└───────────┴─────────────────────────────────┘
-
-Mobile (<768px) — prioritas ESS/absensi lapangan
-┌─────────────────────┐
-│ Topbar ringkas + 🔔 │
-├─────────────────────┤
-│ Konten (1 kolom)     │
-│ Kartu aksi cepat     │
-│ (Absen, Cuti, Slip)  │
-├─────────────────────┤
-│ Bottom Nav (4-5 item)│
-└─────────────────────┘
-```
-
-- **Sidebar** collapsible (icon-only saat collapsed), grouping modul sesuai daftar Bagian 3, dengan indikator modul aktif memakai `primary-100` background + `primary-700` text + left-border 3px `primary-600`.
-- **Topbar** menampung: global search (Alpine `x-data` untuk command palette ringan), notification bell dengan badge count (via Livewire polling tiap 30–60 detik), avatar dropdown (profil, ganti unit kerja bila multi-kebun, logout).
-- **Container** max-width `1440px` untuk layar analitik/tabel lebar; `768px` untuk form panjang agar mudah dibaca (line length wajar).
-- **Bottom navigation** khusus mobile ESS: maksimal 5 item (Beranda, Absen, Cuti, Slip Gaji, Profil) — ini yang paling sering dipakai pekerja lapangan.
-
----
-
-## 6. Pola Komponen (Blade/Livewire Component Library)
-
-Bangun sebagai **Blade Component** reusable di `resources/views/components/` dan **Livewire Component** untuk yang stateful, agar konsisten dan tidak duplikasi markup di setiap modul.
-
-### 6.1 Tombol
-```
-<x-button variant="primary|secondary|ghost|danger" size="sm|md|lg" :loading="false">
-```
-- `primary`: solid `primary-600`, teks putih.
-- `secondary`: outline `primary-600` di atas putih.
-- `ghost`: tanpa border, untuk aksi tersier di dalam tabel.
-- `danger`: solid `danger`, selalu memicu `x-modal` konfirmasi sebelum Livewire action dijalankan.
-- State loading: tampilkan spinner inline + disable tombol via `wire:loading.attr="disabled"` — **jangan biarkan tombol bisa diklik ganda** (penting untuk aksi approval/payroll agar tidak duplikat transaksi).
-
-### 6.2 Form & Input
-- Semua input punya: label jelas, helper text opsional, pesan error inline (bukan alert generik di atas form), dan state fokus terlihat jelas (ring `primary-300`).
-- Gunakan `wire:model.live.debounce.400ms` untuk field yang memicu pencarian/validasi real-time (mis. cek NIK duplikat), `wire:model.blur` untuk field form standar agar tidak membebani server tiap ketikan.
-- Date picker, select searchable (mis. pilih Kebun/Afdeling dari ratusan opsi) → gunakan Alpine.js + Livewire combo (Alpine untuk UI dropdown lokal, Livewire untuk fetch data saat query berubah).
-- Upload dokumen (KTP, ijazah, sertifikat K3) memakai pola **Livewire temporary file upload** dengan preview & progress bar eksplisit.
-- Form panjang (data karyawan baru, rekrutmen) → pecah jadi **wizard multi-step** (lihat 6.6), jangan satu form raksasa.
-
-### 6.3 Tabel Data
-Tabel adalah komponen paling sering dipakai (daftar karyawan, riwayat absensi, payroll run). Standar wajib:
-- Header sticky saat scroll vertikal.
-- Kolom kunci (Nama, NIK, Status) sticky saat scroll horizontal pada tabel lebar.
-- Sorting per kolom (indikator panah), filter per kolom di baris kedua header atau panel filter samping.
-- Pagination Livewire bawaan (`WithPagination`), tampilkan "Menampilkan 1–20 dari 1.240 data".
-- Bulk action (checkbox baris + action bar muncul saat ada yang dipilih — mis. "Setujui 12 pengajuan cuti").
-- Status pakai **badge berwarna** (bukan teks polos): Aktif=primary, Menunggu=warning, Ditolak=danger, Selesai=neutral.
-- Skeleton loading (baris abu-abu berdenyut) saat `wire:loading` pada perubahan filter/halaman — jangan biarkan tabel "kosong sekejap" tanpa indikasi.
-- Tombol "Export" (Excel/PDF) konsisten posisinya di kanan-atas tabel di semua modul.
-
-### 6.4 Kartu (Card)
-- Kartu statistik dashboard: angka besar (`text-3xl font-semibold`) + label kecil + indikator tren (naik/turun dengan ikon panah & warna semantic, bukan hanya angka telanjang).
-- Kartu aksi cepat (mobile ESS): ikon besar + label, grid 2–3 kolom, target sentuh minimal 44×44px.
-
-### 6.5 Modal & Konfirmasi
-- Modal dikontrol Alpine (`x-show`, `x-transition`) untuk UI lokal (buka/tutup cepat tanpa round-trip server), isi konten via Livewire component di dalamnya untuk yang butuh data server.
-- Modal konfirmasi aksi kritis (hapus data, submit payroll run, tolak pengajuan) wajib: judul jelas, deskripsi konsekuensi dalam bahasa manusia ("Data karyawan akan dihapus permanen dan tidak dapat dikembalikan"), tombol destruktif diberi warna `danger` dan diletakkan di kanan dengan tombol batal netral di kirinya.
-
-### 6.6 Wizard / Stepper
-Dipakai untuk: onboarding karyawan baru, proses rekrutmen (tahap seleksi), pengajuan resign/offboarding, payroll run (kalkulasi → review → approve → disburse).
-- Tampilkan progress stepper horizontal di desktop, vertikal ringkas di mobile.
-- Setiap step harus bisa disimpan sebagai draft (Livewire persist state) — pekerja lapangan dengan koneksi tidak stabil tidak boleh kehilangan input.
-
-### 6.7 Alur Approval Berjenjang
-Pola khas HRIS enterprise (cuti, reimbursement, rekrutmen) yang butuh visual **timeline persetujuan**:
-```
-[✓] Diajukan — Budi (Pekerja)         12 Jan
-[✓] Disetujui — Mandor Afdeling 3     13 Jan
-[●] Menunggu — Asisten Kebun          (sedang diproses)
-[ ] Persetujuan HR Kebun
-```
-Ikon centang hijau (selesai), lingkaran terisi kuning/earth (sedang berjalan), lingkaran outline abu (belum). Ini dipakai konsisten di semua modul yang punya approval chain.
-
-### 6.8 Struktur Organisasi & Talent Pool
-Untuk Modul Core HR & Succession Planning: komponen **org chart** interaktif (collapsible per level Kebun/Afdeling) dan **9-box grid** (Performance vs Potential) untuk talent review — render sebagai SVG/HTML ringan, bukan library berat, agar tetap performan di koneksi lapangan.
-
-### 6.9 Notifikasi
-- Toast (Livewire `dispatch` → Alpine listener global di layout) untuk konfirmasi aksi: sukses (`primary`), gagal (`danger`), muncul kanan-bawah, auto-dismiss 4 detik, bisa ditutup manual.
-- Notification center (bell icon) untuk item aktif yang perlu tindakan (approval pending) — beda dari toast yang sifatnya sekilas.
-
-### 6.10 Empty State
-Setiap tabel/list kosong wajib punya empty state: ilustrasi ringan/ikon + kalimat aktif ("Belum ada pengajuan cuti. Ajukan cuti pertama Anda.") + tombol aksi terkait jika relevan. Jangan biarkan tabel kosong tanpa penjelasan.
-
----
-
-## 7. Pola Interaksi Alpine.js ↔ Livewire
-
-Prinsip pembagian tanggung jawab agar aplikasi terasa cepat:
-
-| Gunakan **Alpine.js** untuk... | Gunakan **Livewire** untuk... |
+| | |
 |---|---|
-| Toggle UI murni lokal (buka/tutup dropdown, tab, accordion) | Apapun yang butuh data dari database |
-| Animasi/transisi (`x-transition`) | Validasi form server-side |
-| State sementara sebelum submit (mis. preview upload) | Aksi yang mengubah data (approve, submit, delete) |
-| Client-side filter kecil pada data yang sudah dimuat | Search/filter yang query ke database |
+| **Versi** | 3.4 (28/10/2026) |
+| **Status** | Normatif. Satu-satunya acuan UI/UX; menggantikan seluruh addendum v1.1–v2.1. |
+| **Stack** | Laravel 13 · Livewire 4 · Alpine.js · Tailwind CSS v4 |
+| **Sumber nilai token** | `resources/css/app.css` (blok `@theme`). Bila dokumen ini dan `@theme` berbeda, `@theme` yang benar dan dokumen ini yang diperbaiki. |
+| **Dokumen pendamping** | [DOMAIN.md](DOMAIN.md) (aturan bisnis, kamus data) · [ENGINEERING.md](ENGINEERING.md) (standar kode) · [SECURITY.md](SECURITY.md) (privasi & audit) |
 
-- Gunakan `wire:loading` + target spesifik (`wire:target="submit"`) agar hanya elemen relevan yang menunjukkan loading, bukan seluruh halaman memutih.
-- Polling (`wire:poll.30s`) dipakai secukupnya (badge notifikasi, status payroll run yang sedang diproses) — jangan polling di halaman berat/tabel besar.
-- Debounce wajib pada semua input pencarian (`debounce.400ms`) agar tidak membanjiri server.
-
----
-
-## 8. Dashboard per Peran
-
-- **ESS (Karyawan):** kartu ringkas Absensi Hari Ini, Sisa Cuti, Slip Gaji Terbaru, Pengumuman Perusahaan. Fokus mobile.
-- **MSS (Atasan/Mandor):** Inbox Approval (prioritas #1, di paling atas), Ringkasan Kehadiran Tim hari ini, Kinerja Tim (jika periode review aktif).
-- **HR Admin/HRBP unit:** Headcount unit, status proses rekrutmen berjalan, payroll run status, alert dokumen kepegawaian akan kedaluwarsa (kontrak PKWT, sertifikasi K3).
-- **HR Corporate/Direksi:** Analitik lintas kebun/wilayah — turnover rate, biaya tenaga kerja vs anggaran, distribusi tenaga kerja per kategori (tetap/PKWT/harian lepas/musiman), peta sebaran (opsional, bila ada modul geospasial). Visualisasi chart (bar/line) memakai palet primary+earth secara konsisten, hindari warna chart acak dari library default.
+**Cara membaca.** Kata **wajib** / **dilarang** adalah aturan yang diperiksa saat review. Kata **sebaiknya** adalah default yang boleh disimpangi dengan alasan tertulis di PR. Bagian 17 (Utang Desain) mencatat kode lama yang belum sesuai; jangan meniru pola dari sana. Bagian 18 (Roadmap) **tidak normatif**.
 
 ---
 
-## 9. Aksesibilitas
+## 1. Prinsip Desain
 
-- Kontras teks minimal **4.5:1** (AA) — semua kombinasi warna di Bagian 4.1 sudah divalidasi untuk teks di atas latar putih/`surface-50`.
-- Fokus keyboard selalu terlihat (`focus:ring-2 focus:ring-primary-400`), jangan pernah `outline-none` tanpa pengganti.
-- Semua ikon aksi (tanpa label teks) wajib `aria-label`.
-- Tabel data memakai elemen `<table>` semantik dengan `<th scope="col">`, bukan `<div>` yang disusun seperti tabel.
-- Target sentuh minimal 44×44px pada semua tombol/ikon di tampilan mobile lapangan.
-- Hormati `prefers-reduced-motion` untuk animasi non-esensial.
+1. **Jelas sebelum indah.** Data kepegawaian (formasi, mutasi, sanksi, masa pensiun) berdampak langsung pada karier orang. Status dan angka harus tidak ambigu.
+2. **Warna dengan maksud.** Warna jenuh disisihkan untuk kondisi yang menuntut tindakan. Atribut normal tampil netral (Bagian 4).
+3. **Konsisten lintas modul.** Satu aksi = satu label, satu warna, satu posisi di semua halaman.
+4. **Arti tidak bergantung warna saja.** Setiap status punya label teks; warna hanya penguat (buta warna, cetak hitam-putih).
+5. **Terasa responsif.** Setiap request Livewire punya umpan balik visual yang terarah, tidak ada layar yang "diam".
+6. **Padat tapi terbaca.** Pengguna utama adalah admin SDM yang bekerja 6–8 jam/hari di laptop dinas 1366×768. Kepadatan data tinggi, ornamen rendah.
 
----
-
-## 10. Lokalisasi & Format Data
-
-- Bahasa default: **Indonesia**, siapkan struktur i18n Laravel agar bisa ditambah Bahasa Inggris untuk direksi/investor asing.
-- Format tanggal: `DD/MM/YYYY` (mis. 24/09/2026), format waktu 24 jam.
-- Format mata uang: `Rp` + pemisah ribuan titik (`Rp 4.500.000`), selalu rata kanan di kolom tabel.
-- Format NIK (16 digit), NPWP, dan nomor kepesertaan BPJS mengikuti pola resmi dengan validasi input & mask.
+**Anti-pola yang dilarang:** kotak abu-abu di sekitar setiap field (*boxitis*), badge berwarna pada setiap atribut (*badge soup*), gradien dekoratif, judul ALL-CAPS, emoji sebagai ikon, shadow tebal pada semua kartu.
 
 ---
 
-## 11. Konten & Nada Bahasa (Microcopy)
+## 2. Pengguna & Cakupan
 
-- Tombol memakai kata kerja aktif spesifik: **"Ajukan Cuti"**, bukan "Submit"; **"Setujui"** / **"Tolak"**, bukan "Proses".
-- Konsistensi istilah di seluruh sistem: sekali dipakai "Ajukan", jangan di modul lain berubah jadi "Kirim" untuk aksi yang sama.
-- Pesan error dalam nada sistem yang jelas dan solutif: "Nomor KTP sudah terdaftar atas nama lain. Periksa kembali atau hubungi HR unit Anda." — bukan "Error: duplicate entry".
-- Empty state & pesan sukses ditulis mengundang tindakan, bukan sekadar informatif pasif.
+### 2.1 Persona aktif
 
----
-
-## 12. Konvensi Struktur Proyek (untuk konsistensi saat vibe coding)
-
-```
-resources/
-  views/
-    components/          → Blade component reusable (button, card, badge, modal, table)
-    layouts/
-      app.blade.php       → shell utama (sidebar + topbar)
-      guest.blade.php
-  css/app.css             → import Tailwind + font
-app/
-  Livewire/
-    CoreHr/
-    Attendance/
-    Leave/
-    Payroll/
-    Recruitment/
-    Performance/
-    Learning/
-    Succession/
-    Reports/
-    Admin/
-```
-- Penamaan Livewire component: `Modul/AksiSubjek` (mis. `Leave/RequestForm`, `Payroll/RunReview`).
-- Setiap komponen Blade reusable didokumentasikan dengan contoh pemakaian singkat di komentar atas file.
-- Satu file `resources/views/components/design-tokens.blade.php` (atau dokumentasi terpisah) berisi swatch warna & tipografi hidup sebagai referensi visual tim.
-
----
-
-## 13. Checklist QA Desain Sebelum Merge
-
-- [ ] Konsisten memakai token warna Bagian 4.1 (tidak ada hex color baru ditulis manual di Blade).
-- [ ] Semua tombol aksi punya state loading & disabled saat proses berjalan.
-- [ ] Tabel punya empty state, pagination, dan skeleton loading.
-- [ ] Form tervalidasi server-side dengan pesan error inline berbahasa manusia.
-- [ ] Responsif diuji minimal di 3 breakpoint: mobile (375px), tablet (768px), desktop (1440px).
-- [ ] Kontras warna & fokus keyboard diperiksa.
-- [ ] Istilah/microcopy konsisten dengan modul lain.
-- [ ] Aksi destruktif memakai modal konfirmasi.
-
----
-
-## 14. Prompt Pendamping untuk Antigravity IDE
-
-Saat meminta Antigravity IDE membangun satu layar/komponen, sertakan potongan konteks berikut agar hasil selalu selaras dokumen ini:
-
-> "Ikuti DESIGN.md: gunakan token warna primary (hijau #2F8250) & earth tone, font Plus Jakarta Sans, komponen Blade/Livewire reusable dari `resources/views/components`, sertakan state loading, empty state, dan validasi sesuai standar di Bagian 6 & 9."
-
----
-
----
----
-
-# ADDENDUM v1.1 — Penyempurnaan Best Practice Industri HRIS
-
-> Ditambahkan setelah review implementasi awal (modul Core HR & Mutasi/Penempatan). Addendum ini **wajib dibaca bersama Bagian 1–14** dan menggantikan bagian yang bertentangan (khususnya soal pemakaian warna di Bagian 4.1).
-
-## 15. Aturan Pemakaian Warna — "Confident, Not Pale"
-
-Temuan review: token warna sudah benar secara nilai hex, tetapi di implementasi hampir seluruhnya memakai varian paling pucat (`-50`/`-100`), sehingga UI terasa datar/suram dan kartu KPI sulit dipindai cepat. Perbaiki dengan aturan berikut:
-
-### 15.1 Rasio Pemakaian (60/30/10)
-- **60% netral** (`surface-50/100`, putih) — latar halaman & kartu.
-- **30% warna brand di elemen struktural** — sidebar aktif, header tabel, garis pembatas section, tab aktif (boleh solid, bukan cuma garis tipis 2px).
-- **10% aksen jenuh (saturated)** — KPI icon, badge status, indikator urgensi, tombol utama. Justru di 10% inilah warna **wajib solid/jenuh**, bukan pucat — karena fungsinya menarik perhatian, bukan sekadar dekorasi.
-
-### 15.2 Diferensiasi Warna Kartu KPI/Statistik
-Setiap kartu KPI di dashboard **wajib** memakai salah satu dari 4 warna aksen berikut secara bergilir sesuai kategori data — **dilarang** seluruh kartu memakai warna ikon yang sama:
-
-| Kategori Data | Warna Ikon (background solid + icon putih/gelap kontras) |
-|---|---|
-| Populasi/Headcount (netral kuantitatif) | `primary-600` (hijau) |
-| Kepemimpinan/Struktural | `info` (`#2E6E9E`, biru) |
-| Operasional/Pelaksana | `earth-600` (`#8A7550`, khaki solid) |
-| Unit/Entitas/Lokasi | teal aksen baru: `#1F7A6C` |
-
-Icon container memakai background **solid** dari warna di atas (bukan tint 100/50), ikon berwarna putih di atasnya. Ini standar di Workday/SuccessFactors — setiap kategori KPI langsung teridentifikasi lewat warna tanpa membaca label.
-
-### 15.3 Badge & Status — Filled, Bukan Dot
-Badge status (Aktif, Menunggu, Kritis, Perhatian, dll.) **wajib** berupa pill dengan **background solid tint kuat** (bukan `-50`) + teks warna gelap kontras dari keluarga warna yang sama, contoh:
-
-```
-Kritis (>90 hari)   → bg #FCE4E1 → ganti ke bg #F8D2CC, teks #8A2A1E, dot solid #C0392B
-Perhatian (30-90)   → bg #FBEFD2, teks #7A5B06, dot solid #B8860B
-Baru Kosong (<30)   → bg #DCF0E4, teks #1B5330, dot solid #2F8250
-Aktif Menjabat       → bg #E7F5EC, teks #1B5330
-Selesai (Mutasi)     → bg surface-200, teks surface-700
-```
-Dot indikator boleh tetap ada di dalam badge (sebagai penguat), tapi **badge itu sendiri harus punya warna latar yang cukup jenuh untuk terbaca dari jarak scan**, bukan sekadar teks abu-abu + dot kecil.
-
-### 15.4 Persentase/Progress Indicator — Netral vs Semantik
-Pisahkan dua jenis angka persen agar tidak salah baca:
-- **Persentase proporsi netral** (mis. "75% Level Pimpinan dari total pegawai") → gunakan warna **netral** (`surface-700` teks, badge abu-abu), karena ini bukan indikator baik/buruk.
-- **Persentase performa/progress terhadap target** (mis. "Realisasi Formasi 77.5%") → boleh semantik (hijau jika mendekati/mencapai target, amber jika di bawah ambang, merah jika kritis) — **dengan threshold yang didefinisikan eksplisit** di dokumentasi modul terkait (mis. ≥90% hijau, 70–89% amber, <70% merah), bukan hijau default untuk semua persen.
-
-### 15.5 Sidebar & Header — KEPUTUSAN FINAL
-
-**Ditetapkan: Sidebar terang + Header/Topbar gelap.** Ini bukan lagi opsi A/B — seluruh halaman wajib konsisten memakai pola ini, alasan keputusan didokumentasikan di Bagian 26 (Riwayat Revisi).
-
-Spesifikasi wajib:
-- **Sidebar**: background putih/`surface-50` (dipertahankan seperti implementasi saat ini, karena lebih nyaman untuk sesi kerja panjang HR Admin/HRBP dan selaras pola Workday/SuccessFactors/Talenta yang dominan terang).
-- **Item navigasi aktif**: background **solid** `primary-600`, teks **putih**, ikon putih. **Dilarang** memakai tint pucat (`primary-50`) + garis kiri tipis sebagai satu-satunya penanda — itu kontrasnya terlalu lemah untuk scan cepat.
-- **Header/Topbar**: background solid `primary-800` (bukan putih), teks & ikon putih/`primary-50`, search bar memakai `primary-700` sebagai background input agar tetap kontras di atas header gelap. Ini adalah elemen yang membawa identitas hijau PTPN paling konsisten di setiap layar.
-- **Alasan tidak memakai sidebar gelap penuh**: mayoritas pengguna desktop (HR Admin, Manajer, Direksi) menghadapi layar 6–8 jam/hari dengan tabel data padat — panel navigasi gelap besar menambah beban visual berkepanjangan. Pengguna lapangan mengakses lewat bottom navigation mobile (Bagian 5), sehingga warna sidebar desktop tidak berdampak ke persona tersebut. Identitas brand tetap terjaga lewat header solid + konsistensi aksen di Bagian 15.2/15.3.
-
-### 15.6 Grafik & Visualisasi Data
-Chart (bar/line/pie) di modul Analytics wajib memakai urutan warna tetap dari palet brand: `primary-600 → earth-600 → info → primary-300 → earth-300`, **bukan** warna default library (biru-oranye-hijau acak dari Chart.js/ApexCharts). Satu kategori data = satu warna konsisten di seluruh dashboard (mis. "Karyawan Tetap" selalu hijau di chart manapun ia muncul).
-
----
-
-## 16. Matriks State Komponen (Wajib per Komponen Interaktif)
-
-Setiap komponen interaktif (tombol, input, tab, checkbox, row tabel) harus punya definisi eksplisit untuk 6 state berikut — tidak boleh hanya default+hover:
-
-| State | Contoh Tombol Primary | Contoh Input |
+| Persona | Perangkat | Kebutuhan kunci |
 |---|---|---|
-| Default | `bg-primary-600 text-white` | `border-surface-300` |
+| **Admin SDM Regional** | Desktop 1366–1920px | Kelola data induk pegawai, impor Excel, proses mutasi & SK, monitoring formasi kosong |
+| **Pimpinan SDM / Manajemen** | Desktop & tablet | MPP, ringkasan formasi, talent review 9-box, riwayat mutasi |
+| **Pegawai (layout `user`)** | Mobile & desktop | Lihat data diri, pelatihan, evaluasi |
+
+Implikasi: **desktop-first** untuk seluruh modul admin; **mobile-first** hanya untuk halaman pegawai.
+
+### 2.2 Modul dalam cakupan
+
+| Modul | Lokasi view |
+|---|---|
+| Direktori & Profil Pegawai (termasuk impor) | `admin/employees`, `livewire/admin/employees` |
+| Mutasi & Penempatan (tunggal, rantai, riwayat, SK) | `admin/mutasi`, `livewire/admin/mutasi-*` |
+| Monitoring Formasi Kosong | `admin/vacancies`, `livewire/tables/job-vacancy-table` |
+| Man Power Planning (MPP) | `livewire/admin/man-power-planning` |
+| Pelatihan | `admin/trainings` |
+| Evaluasi & Talenta 9-box | `admin/evaluations` |
+| Master Data (unit, jabatan) | `admin/master` |
+
+Payroll, absensi, cuti, dan rekrutmen **di luar cakupan**. Jangan membangun UI untuk modul tersebut berdasarkan dokumen ini.
+
+---
+
+## 3. Design Tokens
+
+### 3.1 Aturan umum
+
+- Nilai token **hanya** didefinisikan di `@theme` pada `resources/css/app.css`. Tidak ada `tailwind.config.js`.
+- **Dilarang** menulis hex atau `rgb()` manual di Blade/CSS (`bg-[#2F8250]`, `style="color:…"`).
+- **Dilarang** memakai palet bawaan Tailwind untuk peran yang sudah punya token (dijaga otomatis, §16.1). Pengecualian terbatas pada hue kategoris di Tabel Status (Bagian 5). Pemetaan baku:
+
+| Palet bawaan | Token | Aturan shade |
+|---|---|---|
+| `slate`, `gray`, `zinc` | `surface` | shade sama (50–950) |
+| `emerald`, `green` | `primary` | shade sama (50–950) |
+| `red`, `rose` | `danger` | 50/100/200 sama; 300→200; 400–600→DEFAULT (`bg-danger`); 700→700; ≥800→800 |
+| `amber`, `yellow` | `warning` | seperti `danger`, kecuali teks dan latar ber-teks-putih pada 400–600 memakai `warning-700` (kontras §3.4) |
+| `blue` | `info` | seperti `danger` |
+
+### 3.2 Palet
+
+**Primary — Hijau Daun** (brand, aksi utama, navigasi aktif)
+
+| 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `#F3FAF6` | `#E7F5EC` | `#C9E8D5` | `#9BD1B0` | `#66B586` | `#3E9A63` | **`#2F8250`** | `#256B3E` | `#1B5330` | `#123A22` | `#0B2416` |
+
+**Earth — Khaki** (aksen sekunder, kategori "operasional/pelaksana")
+
+| 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 |
+|---|---|---|---|---|---|---|---|---|---|
+| `#FAF8F2` | `#F2ECDD` | `#E5DBC5` | `#D8C9A8` | `#C2AD84` | `#A8916A` | `#8A7550` | `#6B5B3A` | `#4D4129` | `#332B1B` |
+
+**Surface — Netral hangat** (teks, border, latar)
+
+| 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `#F8F9F6` | `#F1F3EE` | `#DEE3D8` | `#C3C9BE` | `#878E84` | `#6B7268` | `#555C53` | `#40473F` | `#2D332E` | `#1B1F1D` | `#111412` |
+
+**Semantik** — `DEFAULT` untuk isian & ikon; `-700`/`-800` untuk teks; `-50`…`-200` untuk latar badge.
+
+| Token | 50 | 100 | 200 | DEFAULT | 700 | 800 |
+|---|---|---|---|---|---|---|
+| `danger` | `#FDF1EF` | `#FCE4E1` | `#F8D2CC` | `#C0392B` | `#A02F23` | `#8A2A1E` |
+| `warning` | `#FDF8EC` | `#FBEFD2` | `#F3DDA4` | `#B8860B` | `#8A6508` | `#6B4E05` |
+| `info` | `#EFF5FA` | `#DCEAF4` | `#B9D4E8` | `#2E6E9E` | `#255A82` | `#1D4766` |
+| `success` | — | — | — | memakai `primary-*` | `primary-700` | `primary-800` |
+
+### 3.3 Peran warna (semantic roles)
+
+Pakai tabel ini saat memilih kelas. Jangan memilih shade berdasarkan selera.
+
+| Peran | Kelas |
+|---|---|
+| Latar halaman (canvas) | `bg-surface-50` |
+| Latar kartu / panel / tabel | `bg-white` |
+| Latar strip filter, header tabel, area tenang | `bg-surface-50` atau `bg-surface-100` |
+| Border kartu | `border-surface-200` (boleh `/80`) |
+| Garis pemisah baris | `divide-surface-200` / `border-surface-100` |
+| Border input | `border-surface-300`, hover `border-surface-400` |
+| Teks utama | `text-surface-900` |
+| Teks sekunder (label `<dt>`, meta, caption) | `text-surface-500` atau `text-surface-600` |
+| Teks tersier: placeholder, disabled, ikon dekoratif | `text-surface-400` (**bukan** untuk teks informatif) |
+| Link / teks aksen brand | `text-primary-700` |
+| Teks error di bawah field | `text-danger-700` |
+| Teks peringatan | `text-warning-800` (**dilarang** `text-warning`) |
+
+### 3.4 Kontras (terukur, WCAG 2.1)
+
+Rasio diukur terhadap putih / `surface-50`. Ambang: teks normal 4.5:1, teks besar & elemen non-teks 3:1.
+
+| Token | vs putih | vs surface-50 | Boleh dipakai untuk |
+|---|---|---|---|
+| `surface-900` | 16.6 | 15.7 | Semua teks |
+| `surface-600` | 6.9 | 6.5 | Teks sekunder |
+| `surface-500` | 5.0 | 4.7 | Teks sekunder (batas minimum) |
+| `surface-400` | 3.4 | 3.2 | Ikon, border fokus, placeholder. **Bukan teks informatif** |
+| `primary-700` | 6.5 | 6.1 | Teks & link brand |
+| `primary-600` | 4.7 | 4.5 | Latar tombol dengan teks putih; teks hanya di atas putih |
+| `primary-500`, `earth-500`, `earth-400` | ≤3.5 | ≤3.3 | Dekorasi, chart, ikon. **Bukan teks** |
+| `earth-700` | 6.6 | 6.2 | Teks aksen earth |
+| `danger` / `danger-700` | 5.4 / 7.2 | 5.2 / 6.8 | Teks & latar tombol teks putih |
+| `warning` | 3.3 | 3.1 | Ikon & dot saja. **Dilarang** teks dan **dilarang** teks putih di atasnya |
+| `warning-700` / `-800` | 5.3 / 7.7 | 5.0 / 7.3 | Teks peringatan |
+| `info` / `info-700` | 5.5 / 7.3 | 5.2 / 6.9 | Teks & latar tombol teks putih |
+
+Pasangan badge yang lolos AA: `danger-800` di `danger-100` (7.1), `warning-800` di `warning-100` (6.8), `info-800` di `info-100` (8.0), `primary-800` di `primary-100` (8.0), `surface-700` di `surface-200` (7.3).
+
+### 3.5 Tipografi
+
+- **Font UI:** `Plus Jakarta Sans`, fallback `system-ui` (token `--font-sans`).
+- **Angka & kode:** `font-mono tabular-nums` **wajib** untuk NIK, golongan, angka di tabel, dan nilai KPI, supaya kolom rata vertikal.
+
+| Kelas | Ukuran | Pemakaian |
+|---|---|---|
+| `text-[10px]` | 10px | Micro-chip, ikon di tombol kecil. **Dilarang** untuk kalimat |
+| `text-xs` | 12px | Label `<dt>`, meta, badge, caption |
+| `text-sm` | 14px | Default isi tabel & form admin |
+| `text-base` | 16px | Default halaman pegawai & mobile |
+| `text-lg` | 18px | Judul kartu |
+| `text-xl` / `text-2xl` | 20 / 24px | Judul section / judul halaman |
+| `text-2xl sm:text-3xl` | 24–30px | Nilai KPI |
+
+Berat: `font-semibold`/`font-bold` judul, `font-medium` label, `font-normal` isi, `font-black` **hanya** nilai KPI. ALL-CAPS hanya untuk kode pendek (`RM-1`, `KEU`) dan header kolom tabel matriks MPP; **dilarang** untuk judul section.
+
+### 3.6 Spacing, radius, elevasi
+
+- **Spacing:** skala Tailwind 4px. Default padding kartu `p-4`/`p-5`, jarak antar section `gap-6`.
+- **Radius** (mengikuti implementasi):
+
+| Elemen | Radius |
+|---|---|
+| Badge kecil, micro-chip | `rounded` / `rounded-md` |
+| Input, tombol `sm`, kotak ikon | `rounded-lg` (8px) |
+| Tombol `md`/`lg`, kartu kecil, strip | `rounded-xl` (12px) |
+| Kartu utama, KPI card, modal | `rounded-2xl` (16px) |
+| Avatar, pill status | `rounded-full` |
+
+  **Dilarang** `rounded-2xl` pada input teks.
+- **Elevasi:** kartu statis `shadow-xs` atau tanpa shadow (border cukup). `shadow-lg`/`shadow-2xl` hanya untuk elemen mengambang: dropdown, modal, drawer, toast, floating action dock.
+
+### 3.7 Motion & z-index
+
+| Token | Durasi | Untuk |
+|---|---|---|
+| fast | 100ms | hover, toggle |
+| base | 200ms | dropdown, tab |
+| slow | 300ms | modal, drawer, toast |
+
+Easing `ease-out` saat masuk, `ease-in` saat keluar. Di bawah `prefers-reduced-motion: reduce` hanya transisi opacity yang dipertahankan; `animate-pulse`/slide/scale **wajib** dimatikan (`motion-safe:` prefix).
+
+| z | Lapisan |
+|---|---|
+| 10 | Header & kolom sticky tabel |
+| 20 | Dropdown, combobox |
+| 30 | Overlay sidebar mobile |
+| 40 | Modal, drawer |
+| 50 | Toast, floating action dock |
+
+### 3.8 Breakpoint & grid
+
+Default Tailwind: `sm` 640 · `md` 768 · `lg` 1024 (sidebar terbuka) · `xl` 1280 · `2xl` 1536. Kontainer konten maks. `1440px`; form panjang maks. `768px`. **Wajib** diuji di 375px, 1366px, dan 1920px. Tabel direktori **wajib** muat tanpa scroll horizontal pada 1366px.
+
+### 3.9 Ikonografi
+
+**Font Awesome 6 Free**, style solid (`fas fa-*`), dimuat di `layouts/admin.blade.php`. Satu-satunya set ikon: **dilarang** emoji, SVG ad-hoc, atau set lain. Ikon dekoratif **wajib** `aria-hidden="true"`; tombol ikon tanpa teks **wajib** `aria-label` pada elemen pembungkus. Ukuran ikon mengikuti teks di sekitarnya.
+
+### 3.10 Mode gelap
+
+**Di luar cakupan.** Tidak ada token gelap. **Dilarang** menambahkan kelas `dark:` sampai ada keputusan desain tersendiri.
+
+---
+
+## 4. Anggaran Warna (Color Budget)
+
+### 4.1 Proporsi
+
+- **~60% netral:** canvas `surface-50`, kartu putih.
+- **~30% struktur brand halus:** navigasi aktif, tab aktif, tombol utama, header section.
+- **≤10% aksen jenuh:** hanya alert Tier 1 dan indikator urgensi.
+
+### 4.2 Empat tingkat warna di tabel padat
+
+| Tier | Jenis data | Perlakuan | Contoh |
+|---|---|---|---|
+| **1 — Alert** | Pengecualian yang menuntut tindakan: sanksi, BUP/MBT, tugas rangkap | Pill berwarna kuat + ikon. Satu-satunya tempat warna jenuh | Lihat Tabel Status §5.1 |
+| **2 — Jangkar struktural** | RM Band (eselon) | Chip pastel lembut, satu kolom saja | §5.2 |
+| **3 — Kategori makro** | Strata Karpim/Karpel (≥90% baris seragam) | Teks saja, **dilarang** chip | `font-semibold text-surface-800` vs `font-medium text-surface-500` |
+| **4 — Metadata** | Bidang (KEU/TAN/TEK/UMU) | Micro-chip netral | `bg-surface-100 text-surface-600 border-surface-200 text-[10px] font-semibold px-1.5 py-0.5 rounded` |
+
+Aturan: kolom "Status: Aktif" untuk setiap baris **dilarang**. Tampilkan status hanya bila menyimpang dari normal (*exception-driven*).
+
+### 4.3 Persentase
+
+- **Proporsi netral** (mis. komposisi Karpim vs Karpel) → warna netral `surface-700`.
+- **Capaian terhadap target** (mis. realisasi formasi) → semantik dengan ambang tertulis: **≥90% primary, 70–89% warning, <70% danger**. Ambang lain harus didefinisikan di DOMAIN.md untuk modul terkait.
+
+---
+
+## 5. Tabel Status Induk
+
+Satu-satunya acuan warna status. Status baru **wajib** ditambahkan di sini lebih dulu sebelum dipakai di view. Label pada kolom "Label" adalah teks yang tampil ke pengguna.
+
+### 5.1 Status siklus & pengecualian
+
+| Status | Label | Latar | Teks | Border / dot | Ikon | Tier |
+|---|---|---|---|---|---|---|
+| Sanksi disiplin aktif | Masa Sanksi | `danger-50` | `danger-700` | `danger-200` | `fa-gavel` | 1 |
+| Sanksi akan berakhir | Sanksi Berakhir | `danger-50` | `danger-700` | `danger-200`, `motion-safe:animate-pulse` | `fa-gavel` | 1 |
+| Mencapai BUP (56 th) | Pensiun BUP | `danger-100` | `danger-800` | `danger-200` | `fa-user-clock` | 1 |
+| Masa Bebas Tugas (55 th) | MBT | `warning-100` | `warning-800` | `warning-200` | `fa-hourglass-half` | 1 |
+| Menjelang MBT ≤12 bulan | Menjelang MBT | `warning-50` | `warning-800` | `warning-200` | `fa-hourglass-start` | 1 |
+| Tugas rangkap (Plt/Pj/Diperbantukan) | Plt · Pj · Diperbantukan | `info-50` | `info-800` | `info-200` | `fa-layer-group` | 1 |
+| Formasi kosong >90 hari | Kritis | `danger-100` | `danger-800` | dot `danger` | — | 1 |
+| Formasi kosong 30–90 hari | Perhatian | `warning-100` | `warning-800` | dot `warning` | — | 1 |
+| Formasi kosong <30 hari | Baru Kosong | `primary-100` | `primary-800` | dot `primary-600` | — | 3 |
+| Menunggu persetujuan / draft | Menunggu | `warning-100` | `warning-800` | — | `fa-clock` | 3 |
+| Aktif menjabat | Aktif Menjabat | `primary-100` | `primary-800` | — | — | 3 |
+| Selesai / riwayat | Selesai | `surface-200` | `surface-700` | — | — | 3 |
+| Dibatalkan / ditolak | Dibatalkan | `surface-100` | `surface-600` | `surface-300` | `fa-ban` | 3 |
+| Memenuhi syarat (compliance) | Memenuhi Syarat | `primary-50` | `primary-800` | `primary-200` | `fa-check` | 3 |
+| Butuh dispensasi | Perlu Dispensasi | `warning-50` | `warning-800` | `warning-200` | `fa-triangle-exclamation` | 1 |
+| Terblokir (aturan keras) | Tidak Dapat Diproses | `danger-50` | `danger-800` | `danger-200` | `fa-lock` | 1 |
+
+### 5.2 Kategori (bukan status)
+
+| Kategori | Perlakuan |
+|---|---|
+| RM-1 | `bg-orange-50 text-orange-800 border-orange-200` |
+| RM-2 | `bg-sky-50 text-sky-800 border-sky-200` |
+| RM-3 | `bg-purple-50 text-purple-800 border-purple-200` |
+| RM-4 (Karpel) | `bg-surface-100 text-surface-700 border-surface-200` |
+| Karpim / Karpel | Teks saja (Tier 3) |
+| Bidang KEU/TAN/TEK/UMU | Micro-chip netral (Tier 4) |
+
+**Kebijakan hue kategori.** Hue `orange`/`sky`/`purple` **hanya** untuk chip RM Band (RM-1/RM-2/RM-3) dan matriks MPP; hue lain (`indigo`, `pink`, `violet`, `cyan`, dst.) tidak dipakai. Kategori non-RM memakai token yang sudah ada, supaya jumlah hue tetap sedikit (anggaran warna §4):
+
+| Kategori | Token | Contoh |
+|---|---|---|
+| Penampungan, pasokan, topologi campuran | `earth` | Formasi Penampungan (pool), kolom Pasokan MPP, topologi rantai campuran |
+| Struktural, talenta, informasi | `info` | Kategori 9-Box, riwayat mutasi, catatan informasi |
+| Metadata deskriptif (bidang, jam, kriteria nilai) | `surface` netral | Ubin detail pelatihan, kartu nilai per kriteria |
+| Unit, entitas, lokasi | `teal` | KPI jumlah unit |
+
+Tugas rangkap memakai satu perlakuan `info` agar tidak bertabrakan dengan RM-3; jenisnya (Plt/Pj/Diperbantukan) dibedakan oleh label teks. Bidang (KEU/TAN/TEK/UMU) tidak diberi warna per bidang (Tier 4). Gradien dekoratif tidak dipakai. Dijaga penjaga §16.1.
+
+### 5.3 Tema KPI Card
+
+`<x-admin.kpi-card theme="…">` dipilih berdasarkan **arti data**, bukan rotasi warna. Kategori yang sama memakai tema yang sama di semua halaman.
+
+| Kategori data | `theme` | Contoh |
+|---|---|---|
+| Populasi, realisasi sesuai target | `primary` | Total Pegawai, Formasi Terisi |
+| Kepemimpinan/struktural | `info` | Karpim, RM-1/RM-2 |
+| Operasional/pelaksana; penampungan & pasokan | `earth` | Karpel, Formasi Penampungan |
+| Unit/entitas/lokasi | `teal` | Jumlah Unit Kerja |
+| Perlu ditinjau, belum kritis | `warning` | Baris impor berubah |
+| Gap, defisit, kritis | `danger` | Kebutuhan Bersih > 0 |
+| Netral: komposisi, biaya, anggaran | `neutral` | Komposisi (%), Total Biaya Investasi |
+
+Alias lama (`sky`, `blue`, `rose`, `red`, `amber`, `slate`, `gray`, `emerald`) hanya untuk kompatibilitas; kode baru **wajib** memakai nama di tabel. Maksimal 4–5 kartu per baris dan maksimal satu kartu `danger` per kelompok.
+
+---
+
+## 6. Inventaris Komponen
+
+Semua UI admin **wajib** dibangun dari komponen di bawah. Membuat markup sendiri untuk peran yang sudah ada komponennya **dilarang**. Komponen baru **wajib** punya docblock `{{-- --}}` berisi contoh pemakaian di baris atas file.
+
+### 6.1 Dasar (`resources/views/components/admin/`)
+
+| Komponen | Props kunci | Aturan |
+|---|---|---|
+| `x-admin.button` | `variant` primary·secondary·ghost·danger, `size` sm·md·lg, `type`, `icon`, `href`, `target`, `once` | Satu `primary` per area aksi. Aksi Livewire **wajib** `target="namaAction"` (disabled + spinner). Form biasa yang mengubah data **wajib** `once`. `danger` **wajib** didahului modal konfirmasi |
+| `x-admin.kpi-card` | `title`, `value`, `icon`, `theme`, `subtitle`, `badge`, `href`, `tabKey`, `active`, `coloredValue` | Lihat §5.3. Nilai `surface-900` kecuali kartu berfungsi sebagai tab filter. Kartu statis tanpa efek hover |
+| `x-admin.page-header` | `title`, `subtitle`, `icon`, `backUrl`, `breadcrumbs` | Wajib di setiap halaman admin; satu `<h1>` per halaman |
+| `x-admin.form.input` | `name`, `label`, `type`, `required`, `icon`, `hint` | Label selalu terlihat, error inline di bawah field |
+| `x-admin.form.select` | — | Untuk ≤15 opsi statis |
+| `x-admin.searchable-select` | `options`, `model`, `placeholder`, `icon`, `hasAllOption` | Untuk opsi banyak (>15) |
+| `x-admin.employee-combobox`, `x-admin.unit-combobox` | — | Pemilihan pegawai/unit; jangan membuat pencarian sendiri |
+| `x-admin.search-input` | `model`, `placeholder`, `shortcut` (`/`), `debounce` (`300ms`) | Debounce **wajib** 300ms |
+| `x-admin.file-upload` | `wireModel`, `accept`, `label`, `helper`, `errorKey` | `accept` **wajib** spesifik (MIME); progres & nama berkas terlihat |
+| `x-admin.table.wrapper`, `.th`, `.sort-th`, `.empty-state` | `empty-state`: `colspan`, `message`, `icon` | Tabel semantik `<table>` + `<th scope="col">` |
+| `x-pagination-ui` | `data` | Tampilkan "Menampilkan 1–20 dari 1.240 data" |
+| `x-toast` | — | Satu instance di layout |
+| `x-highlight` | `text`, `term` | Sorot kata kunci hasil pencarian |
+| `x-admin.employee-profile-card` | — | Ringkasan identitas pegawai di alur mutasi & drawer |
+
+### 6.2 Domain mutasi (`components/admin/mutasi/`)
+
+| Komponen | Peran |
+|---|---|
+| `compliance-guard` | Menampilkan hasil cek aturan masa jabatan & promosi, serta input dispensasi. Lihat §7.2 |
+| `employee-selector` | Pilih pegawai yang dimutasi |
+| `node-card` | Satu simpul pada rantai mutasi |
+| `talent-drawer` | Drawer kandidat pengganti |
+| `review-modal` | Ringkasan sebelum eksekusi mutasi |
+
+### 6.3 Matriks state
+
+Setiap komponen interaktif **wajib** mendefinisikan keenam state:
+
+| State | Tombol primary | Input |
+|---|---|---|
+| Default | `bg-primary-600 text-white` | `border-surface-300 bg-white` |
 | Hover | `bg-primary-700` | `border-surface-400` |
-| Focus (keyboard) | `ring-2 ring-primary-300 ring-offset-2` | `ring-2 ring-primary-300 border-primary-500` |
-| Active/Pressed | `bg-primary-800 scale-[0.98]` | — |
-| Disabled | `bg-surface-200 text-surface-500 cursor-not-allowed` | `bg-surface-100 text-surface-400` |
-| Error/Invalid | — | `border-danger ring-danger/20`, teks pesan error `text-danger text-sm` di bawah field |
+| Focus (keyboard) | `focus-visible:ring-2 ring-primary-500 ring-offset-2` | `ring-2 ring-primary-500/20 border-primary-600` |
+| Active | `bg-primary-800` | — |
+| Disabled | `opacity-60 cursor-not-allowed` | `bg-surface-100 text-surface-400` |
+| Error | — | `border-danger ring-danger/20` + pesan `text-danger-700 text-sm` |
 
-Baris tabel tambahan: `hover:bg-primary-50`, `selected:bg-primary-100` (untuk bulk action checkbox aktif).
-
----
-
-## 17. Data Sensitif — Privacy by Design di UI
-
-Karena HRIS menyimpan data gaji & pribadi, UI wajib menerapkan:
-- **Masking default** untuk data finansial di tampilan list/dashboard non-payroll-officer: `Rp ••••.•••` dengan ikon mata untuk toggle tampil, log akses tercatat.
-- **Redaksi berbasis role** — kolom yang tidak berwenang dilihat role tertentu (mis. Mandor tidak boleh lihat gaji pokok bawahannya) tidak ditampilkan sama sekali di tabel (bukan cuma di-disable/blur), agar tidak bocor lewat inspect element.
-- **Watermark dinamis** pada dokumen sensitif yang di-preview/print (slip gaji, kontrak) berisi nama pengakses + timestamp, mencegah screenshot disebar tanpa jejak.
-- **Session timeout otomatis** untuk halaman payroll (mis. 10 menit idle) dengan modal re-autentikasi, lebih ketat dari halaman umum lain.
+Fokus memakai `focus-visible:` (bukan `focus:`) agar ring muncul untuk keyboard, tidak untuk klik mouse. **Dilarang** `outline-none` tanpa pengganti.
 
 ---
 
-## 18. Grid & Breakpoint Eksplisit
+## 7. Pola UI
 
-```
-Grid: 12 kolom, gutter 24px (desktop), 16px (tablet/mobile)
-Breakpoint (selaras default Tailwind):
-  sm:  640px   → mobile besar / mulai 2 kolom form
-  md:  768px   → tablet, sidebar mulai collapsible
-  lg:  1024px  → desktop, sidebar expanded default
-  xl:  1280px  → tabel data lebar penuh
-  2xl: 1536px  → dashboard analitik multi-panel
-Container max-width: 1440px (2xl:mx-auto)
-```
+### 7.1 Form
 
----
+- Form panjang dipecah menjadi 2–3 kartu bersegmen dengan judul bernomor + deskripsi satu baris; alur multi-langkah memakai stepper.
+- Input tinggi `h-10`/`h-11`, `px-3.5`, `rounded-lg`, border `surface-300`.
+- Field wajib diberi tanda `*` setelah label + `aria-required="true"`; legenda "* wajib diisi" sekali di atas form.
+- `wire:model.blur` untuk field biasa; `wire:model.live.debounce.300ms` hanya untuk field yang memicu cek langsung (mis. NIK duplikat).
+- **Read-only vs disabled:** nilai turunan yang tetap perlu dibaca (mis. RM hasil klasifikasi jabatan) memakai `readonly` dengan latar `surface-50`; `disabled` hanya untuk kontrol yang memang tidak berlaku.
+- Footer aksi: Batal (`secondary`/`ghost`) di kiri, aksi utama (`primary`) di kanan; sticky di bawah pada form panjang.
 
-## 19. Token Motion & Elevasi
+### 7.2 Validasi aturan bisnis: blokir vs peringatan
 
-```
-Durasi transisi:
-  fast:   100ms  → hover state, toggle kecil
-  base:   200ms  → dropdown, tab switch
-  slow:   300ms  → modal open/close, page transition
-Easing: ease-out (masuk), ease-in (keluar)
+Aturan kepegawaian (masa jabatan, kelayakan promosi, BUP/MBT, formasi terisi) dibagi tiga tingkat. Logika penentuannya berada di service layer (lihat DOMAIN.md); view hanya menampilkan.
 
-Skala z-index:
-  10  → sticky header tabel
-  20  → dropdown/select menu
-  30  → sidebar mobile overlay
-  40  → modal/dialog
-  50  → toast/notification (selalu paling atas)
-```
-Hormati `prefers-reduced-motion: reduce` — nonaktifkan transisi non-esensial (skala/slide), pertahankan hanya perubahan opacity untuk pengguna dengan preferensi ini.
+| Tingkat | Kapan | Tampilan | Aksi utama |
+|---|---|---|---|
+| **Lolos** | Semua syarat terpenuhi | Strip ringkas `primary-50` + ikon centang, satu baris | Aktif |
+| **Perlu dispensasi** | Syarat tidak terpenuhi tetapi boleh dikecualikan | Panel `warning-50`, centang dispensasi + alasan tertulis wajib | Aktif setelah dispensasi + alasan diisi |
+| **Terblokir** | Aturan keras (mis. formasi tujuan masih terisi) | Panel `danger-50` + ikon kunci, kontrol dispensasi terkunci, penjelasan apa yang harus diselesaikan dulu | Nonaktif, dengan alasan terlihat di dekat tombol |
 
----
+Aturan: tombol yang nonaktif karena blokir **wajib** menjelaskan alasannya di dekat tombol (bukan hanya tooltip) dan diumumkan lewat `aria-live="polite"`. Bila ada beberapa masalah, tampilkan ringkasan jumlah di atas sebelum rinciannya. Dispensasi dan alasannya **wajib** tercatat di `job_histories` (SECURITY.md).
 
-## 20. Halaman Sistem (System Pages)
+### 7.3 Tampilan data (definition list)
 
-Wajib dirancang dengan identitas visual sama seperti halaman utama (bukan halaman error generik framework):
-- **403 (Tidak Berwenang)** — jelaskan alasan singkat + tombol "Kembali ke Beranda" / "Hubungi Admin Unit".
-- **404** — untuk data spesifik (mis. NIK tidak ditemukan) beri saran pencarian ulang.
-- **500 / Terjadi Kesalahan** — nada tenang, tombol "Coba Lagi", info kontak IT support jika berulang.
-- **Session Timeout** — modal (bukan redirect mendadak) dengan opsi "Perpanjang Sesi" agar input form tidak hilang.
-- **Maintenance Mode** — halaman terjadwal dengan estimasi waktu selesai, penting saat periode payroll run.
-- **Offline State** (mobile ESS/absensi) — banner persisten "Anda sedang offline, data akan tersinkron otomatis" — lihat Bagian 22.
+Data detail ditampilkan sebagai `<dl>` dalam grid 2–3 kolom: `<dt>` `text-xs font-medium text-surface-500`, `<dd>` `text-sm font-semibold text-surface-900`, pemisah opsional `border-b border-surface-100`. **Dilarang** membungkus setiap field dengan kotak berlatar/border sendiri.
 
----
+### 7.4 Halaman profil pegawai
 
-## 21. Progressive Disclosure untuk Data Padat
+1. **Hero:** avatar 80–96px (foto asli; tanpa foto → inisial), nama `<h1>`, strata, NIK `font-mono` + tombol salin, jabatan & unit. Aksi di kanan atas: Edit, Ajukan Mutasi, Cetak.
+2. **Tab horizontal (Alpine):** Biodata · Kepegawaian & Formasi · Riwayat Jabatan · Pelatihan & Kinerja. Tab mengikuti pola ARIA tabs: `role="tablist"` berlabel, `role="tab"` dengan `aria-controls`, `aria-selected` dan roving `tabindex` (hanya tab aktif yang dapat di-Tab), panel `role="tabpanel"` + `aria-labelledby`; panah kiri/kanan, Home, dan End memindahkan sekaligus mengaktifkan tab. Dijaga penjaga §16.1.
 
-Untuk tabel/matriks kompleks seperti Formasi MPP (multi-header per bidang KEU/TAN/TEK/UMU):
-- **Sticky first column** (nama indikator/karyawan) saat scroll horizontal.
-- **Expandable row** — baris ringkasan bisa expand untuk detail per bidang, daripada memaksa semua kolom tampil sekaligus di layar sempit.
-- **Comparison toggle** — untuk data periode (mis. Realisasi vs Standar Formasi), sediakan toggle "Tampilkan selisih (gap)" agar user tidak menghitung manual.
-- **Column visibility control** — ikon "Atur Kolom" di kanan atas tabel lebar, user bisa sembunyikan kolom tidak relevan bagi tugasnya.
-- **Hover row+column highlight** pada tabel matriks besar agar mata tidak tersesat membaca perpotongan baris-kolom.
+### 7.5 Tabel data
 
----
+- Header sticky; kolom identitas sticky saat scroll horizontal.
+- Urutan kolom makro ke mikro: **Pegawai → Jabatan & Unit → Strata → Eselon → Golongan → Aksi**, maksimal 6 kolom data. Data sekunder (NIK, unit, bidang) di sub-baris.
+- Sort per kolom dengan indikator arah + `aria-sort`.
+- Skeleton saat `wire:loading` pada ganti filter/halaman. **Dilarang** tabel kosong sesaat tanpa indikasi.
+- Empty state memakai `x-admin.table.empty-state` dengan kalimat yang mengarahkan tindakan.
+- Export di kanan atas tabel, posisinya sama di semua modul.
+- Aksi baris: satu menu kebab (`…`, `aria-label="Aksi untuk {nama}"`).
+- Teks panjang dipotong `truncate` dengan `title` berisi teks penuh; nama pegawai dan jabatan **dilarang** dipotong pada 1366px.
 
-## 22. Pola Offline-First (Absensi & ESS Lapangan)
+**Seleksi & aksi massal**
 
-Krusial untuk pekerja di area kebun dengan sinyal terbatas:
-- Form absensi (check-in/out, GPS, foto) disimpan dulu ke **local storage/IndexedDB** saat submit, ditandai status "Menunggu Sinkronisasi" dengan ikon jam, baru dikirim ke server saat koneksi kembali (background sync).
-- Indikator status koneksi persisten di topbar mobile (Online/Offline/Menyinkronkan).
-- Data referensi yang sering dipakai offline (jadwal shift, saldo cuti terakhir diketahui) di-cache lokal dengan label "Data terakhir diperbarui: [waktu]" agar user tahu ini bukan data real-time.
-- **Tidak ada aksi kritis** (approval, submit payroll) yang boleh dilakukan dalam mode offline — batasi offline hanya untuk input transaksional milik sendiri (absensi, draft form).
+- Kolom checkbox khusus di kiri (`w-10`), checkbox header untuk pilih semua di halaman (tri-state lewat `indeterminate`). Kotak centang **wajib** `<input type="checkbox">` sungguhan dengan `aria-label` berisi nama baris; **dilarang** `<div>` yang digayakan seperti kotak centang. Area klik sel boleh lebih lebar dari kotak untuk pengguna mouse.
+- Shift+klik memilih rentang; Ctrl/Cmd+klik toggle per baris; Esc membatalkan seleksi. Setiap pintasan mouse **wajib** punya padanan keyboard: Spasi pada baris terfokus untuk toggle, Shift+Spasi untuk rentang.
+- Baris terpilih: `bg-surface-50` + `border-l-4 border-l-primary-600`. Jangan membanjiri baris dengan hijau.
+- Saat ≥1 baris terpilih, tampilkan action bar dengan jumlah terpilih ("12 terpilih"), diumumkan via `aria-live`. Aksi destruktif massal tetap lewat modal konfirmasi yang menyebut jumlahnya.
 
----
+**Data padat (matriks)**
 
-## 23. Onboarding & Bantuan Kontekstual
+Kolom pertama sticky, baris ringkasan yang bisa di-expand, kontrol "Atur Kolom", highlight baris+kolom saat hover, dan toggle "Tampilkan selisih" untuk perbandingan.
 
-- **Tooltip kontekstual** (ikon "?" kecil) pada istilah teknis HR yang mungkin asing bagi pekerja baru (mis. "TMT", "Golongan", "BUP").
-- **Product tour ringan** (Alpine-driven spotlight, 3–5 langkah) saat pertama kali membuka modul baru — bisa di-skip, tidak muncul ulang kecuali direset admin.
-- **Help center in-app** dapat diakses dari ikon "?" di topbar, berisi FAQ per modul & kontak HR unit — bukan mengarahkan keluar aplikasi.
+### 7.6 Modal, drawer, konfirmasi
 
----
+- Modal: `role="dialog"`, `aria-modal="true"`, `aria-labelledby`; fokus pindah ke modal saat dibuka, terkunci di dalamnya, kembali ke pemicu saat ditutup; Esc menutup.
+- Konfirmasi destruktif: judul berupa pertanyaan spesifik, konsekuensi dalam bahasa manusia ("Data pegawai akan dihapus permanen."), tombol `danger` di kanan, Batal netral di kiri dan menjadi fokus awal.
+- Drawer kanan (lebar 480–520px) untuk drilldown yang perlu tetap melihat tabel di belakangnya; overlay `bg-surface-950/30` tanpa blur.
 
-## 24. Notifikasi Multi-Channel
+### 7.7 Loading & umpan balik
 
-Selain bell icon in-app (Bagian 6.9), definisikan preferensi channel per jenis notifikasi (dikonfigurasi user di halaman Profil):
-- **Push/in-app**: semua notifikasi.
-- **Email**: ringkasan approval pending harian, slip gaji terbit, pengumuman resmi.
-- **WhatsApp/SMS** (opsional, untuk pekerja tanpa akses rutin ke aplikasi): reminder absensi, status cuti disetujui/ditolak.
-Setiap notifikasi transaksional harus konsisten kata kerjanya dengan aksi di UI (lihat Bagian 11).
+- `wire:loading` **wajib** diberi `wire:target` agar hanya area terkait yang berubah.
+- Tombol yang memicu request: disabled + spinner selama proses.
+- Toast (kanan atas, `z-50`): sukses `primary`, gagal `danger`; auto-tutup 4–8 detik, bisa ditutup manual, `role="status"` (sukses) atau `role="alert"` (gagal). Pesan gagal yang perlu dibaca lengkap tidak boleh auto-tutup.
+- `wire:poll` hanya untuk status yang benar-benar berjalan (mis. impor), **dilarang** pada tabel besar.
+
+### 7.8 Pembagian Alpine vs Livewire
+
+| Alpine.js | Livewire |
+|---|---|
+| Buka/tutup dropdown, tab, accordion, modal | Semua yang membaca/mengubah database |
+| Transisi | Validasi server-side |
+| Filter lokal atas data yang sudah dimuat (mis. cari di drawer) | Pencarian/filter yang query ke database |
+| State sementara sebelum submit | Aksi approve, simpan, hapus, mutasi |
 
 ---
 
-## 25. Print-Friendly Layout
+## 8. Pola Modul
 
-Dokumen yang lazim dicetak (slip gaji, surat keputusan/SK, kontrak kerja, kartu identitas pegawai) **wajib** punya CSS `@media print` terpisah dari layout web:
-- Hilangkan sidebar, topbar, tombol aksi saat print/export PDF.
-- Layout A4 dengan margin standar, kop surat resmi PTPN, nomor halaman.
-- Font untuk dokumen resmi boleh lebih formal (mis. serif) berbeda dari font UI aplikasi — dokumen cetak punya konvensi berbeda dari layar.
-- Watermark "SALINAN" atau QR verifikasi keaslian dokumen untuk SK/kontrak.
+Rincian kelas per piksel tinggal di view masing-masing. Bagian ini hanya memuat aturan perilaku.
+
+### 8.1 Man Power Planning
+
+- Horizon dinamis **T** dan **T+1** dari filter tahun; label baris ikut tahun (`Pensiun sd Des {T}`, `Kebutuhan {T+1}`), termasuk KPI dan nama berkas export (`mpp_perencanaan_formasi_{T}_{T+1}`).
+- Mode sumber data **Baseline** (formasi baku) vs **Live** (agregasi pegawai aktif) sebagai segmented control.
+- Toolbar terintegrasi dua tingkat dalam kartu tabel: tingkat 1 judul + Export/Cetak, tingkat 2 strip filter. **Dilarang** kartu toolbar terpisah di atas tabel.
+- Header grup RM tidak boleh patah baris (`whitespace-nowrap`).
+- Sel angka >0 bisa diklik (`cursor-pointer`, garis bawah titik-titik) dan membuka drawer drilldown: rumus `Formasi − Realisasi + Pensiun − Pasokan = Kebutuhan Bersih`, pencarian lokal, kartu personel, export subset. Sel 0 statis.
+- Kolom JUMLAH/TOTAL tebal `font-mono`, termasuk nilai 0. Teks indikator rata kiri tanpa ikon.
+
+### 8.2 Monitoring Formasi Kosong
+
+- Filter & pencarian di dalam kartu tabel; strip status urgensi (Semua · Kritis · Perhatian · Baru Kosong) dengan jumlah per status, warna dari §5.1.
+- Opsi pengisian per baris ditumpuk vertikal dengan lebar sama: **Mutasi Internal** (`primary`) di atas, **Rekrut Baru** (`secondary`) di bawah.
+
+### 8.3 Mutasi & penempatan
+
+- Alur memakai stepper; setiap langkah menampilkan dampak (formasi asal jadi kosong, rantai pengganti) sebelum eksekusi.
+- Cek aturan memakai pola §7.2 lewat `x-admin.mutasi.compliance-guard`.
+- Eksekusi selalu lewat `review-modal` yang merangkum siapa pindah ke mana, dispensasi yang dipakai, dan SK.
+
+### 8.4 Direktori pegawai
+
+- KPI card berfungsi sebagai tab filter Semua · Karpim · Karpel.
+- Pencarian utama dengan pintasan `/`; filter lanjutan di panel yang bisa dibuka-tutup.
+- Kolom mengikuti §7.5 dan tier warna §4.2. Foto hanya bila berkas asli tersedia; tanpa lingkaran inisial di tabel.
 
 ---
 
-## 26. Riwayat Revisi Dokumen
+## 9. Visualisasi Data
+
+- Urutan warna seri tetap: `primary-600 → earth-600 → info → primary-300 → earth-300 → surface-500`. **Dilarang** palet bawaan library.
+- Satu kategori = satu warna di semua chart (mis. Karpim selalu `info`).
+- Lebih dari 6 seri → gabungkan sisanya menjadi "Lainnya" atau ganti jenis chart.
+- Setiap chart punya judul, satuan, dan alternatif tabel/teks ringkas untuk pembaca layar.
+- **9-box:** sumbu Kinerja (X) × Potensi (Y), tiap sel berlabel nama kotak + jumlah. Gradasi `danger-100` (rendah-rendah) → `surface-100` (tengah) → `primary-200` (tinggi-tinggi). Jangan memakai merah-kuning-hijau jenuh, dan label tetap wajib karena warna saja tidak cukup.
+
+---
+
+## 10. Aksesibilitas (WCAG 2.1 AA)
+
+- Kontras mengikuti §3.4. Pasangan warna baru **wajib** diukur sebelum dipakai.
+- Seluruh fungsi bisa dioperasikan dengan keyboard; fokus selalu terlihat (`focus-visible:ring-2`).
+- Satu `<h1>` per halaman, heading berurutan, landmark `<nav>`, `<main>`.
+- Perubahan dinamis Livewire yang penting (hasil filter, jumlah terpilih, status blokir, toast) diumumkan via `aria-live`.
+- Modal, drawer, tab, combobox mengikuti pola ARIA APG (fokus, role, atribut state).
+- Target sentuh minimal 44×44px di halaman pegawai/mobile; 32×32px di tabel admin desktop.
+- Tabel memakai `<table>`, `<th scope>`, `aria-sort`.
+- `prefers-reduced-motion` dihormati (§3.7).
+
+---
+
+## 11. Privasi Data di UI
+
+Selaras SECURITY.md dan UU No. 27/2022 (PDP):
+
+- Kolom yang tidak berhak dilihat suatu peran **tidak dirender sama sekali** (bukan disembunyikan dengan CSS atau blur).
+- Data keluarga dan skor evaluasi 9-box hanya tampil di halaman detail untuk peran berwenang, tidak di tabel daftar.
+- Export dan cetak dokumen sensitif mencantumkan nama pengakses + waktu.
+- Pesan error tidak membocorkan data orang lain (mis. jangan menyebut nama pemilik NIK yang bentrok kepada peran yang tidak berwenang).
+
+---
+
+## 12. Format Data & Lokalisasi
+
+| Data | Format |
+|---|---|
+| NIK pegawai | **8 digit string**, `font-mono`, pertahankan nol di depan |
+| NIK KTP | 16 digit, input dengan mask |
+| Golongan | `[Gol]/[Berkala]`, `font-mono tabular-nums` |
+| Tanggal | `DD/MM/YYYY`; tanggal panjang `24 September 2026` |
+| Waktu | 24 jam `HH:mm` |
+| Mata uang | `Rp 4.500.000`, rata kanan di tabel |
+| Angka | Pemisah ribuan titik, desimal koma; rata kanan di tabel |
+| Durasi | "3 tahun 2 bulan", bukan desimal tahun |
+
+Bahasa antarmuka: Indonesia baku. Struktur `lang/` Laravel disiapkan untuk Inggris.
+
+---
+
+## 13. Microcopy
+
+- Tombol memakai kata kerja spesifik: **Simpan Data**, **Ajukan Mutasi**, **Terbitkan SK**. Hindari Submit, Proses, OK.
+- Satu aksi = satu kata di seluruh sistem.
+- Pesan error menyebut masalah dan jalan keluar: "NIK sudah terdaftar. Periksa kembali atau buka data pegawai tersebut." Hindari "Error: duplicate entry".
+- Pesan blokir menyebut **apa** yang menghalangi dan **apa yang harus dilakukan**, tanpa menyalahkan pengguna.
+- **Dilarang** menampilkan nama file dokumentasi internal (`DESIGN.md`, `DOMAIN.md`, dst.) atau istilah internal pengembang di teks yang dilihat pengguna. Rujuk regulasi dengan istilah bisnis resmi: *Pedoman Tata Kelola SDM & Peraturan Kepegawaian*, *Aturan Batas Usia Kerja*, *Standar Grade Karpim/Karpel*, *Regulasi Masa Kerja/Tenure*.
+- Istilah teknis kepegawaian (TMT, BUP, MBT, RM) sebaiknya diberi tooltip penjelasan saat pertama muncul di halaman.
+
+---
+
+## 14. Layout & Shell
+
+**Unified Light Shell** (acuan: `layouts/admin.blade.php`):
+
+- **Sidebar:** `bg-white`, `border-r border-surface-200`, collapsible ke mode ikon. Item aktif: `bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600`, kotak ikon `bg-primary-100 text-primary-700`, plus `aria-current="page"`. Item non-aktif: `text-surface-600`, hover `bg-surface-100 text-surface-900`.
+- **Topbar:** `bg-white/95 backdrop-blur-md border-b border-surface-200`; pencarian `bg-surface-50`, fokus `bg-white`.
+- **Identitas:** "Talenta Hub" + "PTPN IV Regional V" dengan logo resmi.
+- Brand hijau dibawa lewat aksen fungsional (tombol utama, navigasi aktif, stepper), bukan blok gelap pada chrome.
+- **Layout pegawai** (`layouts/user.blade.php`): satu kolom, mobile-first, target sentuh 44px.
+
+---
+
+## 15. Halaman Sistem & Cetak
+
+- **403 / 404 / 419 / 429 / 500 / 503** memakai `errors/layout.blade.php`: layout **mandiri** dengan identitas visual yang sama (logo, token, font) tetapi tanpa sesi, database, atau Livewire, supaya halaman galat tetap tampil ketika komponen itu yang bermasalah. Tiap halaman menjelaskan apa yang terjadi dalam bahasa pengguna, memberi satu jalan keluar (Kembali ke Beranda / Coba Lagi / Muat Ulang), dan menampilkan kode serta waktu kejadian untuk dilaporkan ke Admin SDM. Pesan pengecualian asli **tidak pernah** ditampilkan, dan pesan tidak boleh menjanjikan hal yang tidak dapat dijamin (mis. "data aman"). Diuji di `ErrorPagesTest`, termasuk tanpa database.
+- **Sesi habis:** modal dengan opsi perpanjang agar isian form tidak hilang, bukan redirect mendadak.
+- **Cetak (SK, surat tugas, profil):** `@media print` tersendiri: sembunyikan sidebar/topbar/tombol, layout A4 dengan kop resmi dan nomor halaman, font serif boleh dipakai, QR verifikasi untuk SK.
+
+---
+
+## 16. Checklist Review Desain (sebelum merge)
+
+### 16.1 Penjaga otomatis
+
+`tests/Unit/ViewDesignGuardTest.php` memindai seluruh `resources/views` (komentar diabaikan) dan string PHP di `app/`, dan berjalan bersama `php artisan test`. Semua aturan **ketat** (0 pelanggaran); kegagalan menampilkan daftar `berkas:baris`.
+
+| Kelompok | Aturan |
+|---|---|
+| Aksesibilitas | Ikon FA dan SVG inline `aria-hidden`; `<th scope>`; `<nav aria-label>`; `<html lang="id">`; dialog = `role="dialog"` + `aria-modal` + `aria-labelledby` + `x-trap`; tab = `role="tab"` + `aria-controls` + `:aria-selected` + `:tabindex`, tablist berlabel, tabpanel `aria-labelledby`, tanpa `<nav aria-label="Tabs">`; elemen interaktif yang menghapus outline wajib punya ring pengganti |
+| Token | Tanpa kelas palet bawaan Tailwind (view dan string PHP); hue `orange`/`sky`/`purple` hanya pada baris ber-`RM-n` dan matriks MPP, hue lain tidak dipakai; tanpa hex manual pada kelas; tanpa `dark:` |
+| Tipografi & gerak | Tanpa teks <10px; `animate-pulse` hanya sebagai `motion-safe:animate-pulse` |
+| Konten | Tanpa nama dokumen internal di teks view maupun string PHP |
+
+Bila aturan baru belum bisa dipenuhi seluruh kode, bereskan dulu kodenya (catat di §17), jangan dilonggarkan dengan baseline atau daftar pengecualian.
+
+### 16.2 Checklist manual
+
+Hal yang belum dapat diperiksa otomatis:
+
+- [ ] Hanya token dari `@theme`. Tidak ada hex manual dan tidak ada `slate`/`emerald`/`red`/`amber`/`blue` baru.
+- [ ] Pasangan warna teks baru lolos §3.4; tidak ada `text-surface-400` / `text-warning` untuk teks informatif.
+- [ ] Status memakai warna dan label dari Tabel Status §5; status baru sudah ditambahkan ke tabel.
+- [ ] Memakai komponen dari §6, bukan markup tiruan.
+- [ ] Tombol aksi: loading + disabled; aksi destruktif lewat modal konfirmasi.
+- [ ] Tabel: empty state, skeleton, pagination, `<th scope>`, muat di 1366px.
+- [ ] Form: label, tanda wajib, error inline, validasi server-side.
+- [ ] Keyboard: semua bisa dicapai, fokus terlihat, modal mengunci & mengembalikan fokus.
+- [ ] Diuji di 375px, 1366px, 1920px.
+- [ ] Microcopy sesuai §13, tanpa istilah internal pengembang.
+
+---
+
+## 17. Utang Desain (Kode Lama yang Belum Sesuai)
+
+Daftar ini dipakai untuk perbaikan bertahap. **Jangan meniru pola di bawah** pada kode baru; saat menyentuh file terkait, perbaiki sekalian.
+
+| # | Masalah | Lingkup (28/10/2026) | Perbaikan | Status |
+|---|---|---|---|---|
+| D1 | Palet bawaan Tailwind (`slate`, `gray`, `emerald`, `green`, `red`, `rose`, `amber`, `yellow`, `blue`) dipakai langsung | 2.707 kelas, 88 berkas (view + accessor model) | Dipetakan ke token dengan tabel §3.1; 99 teks informatif `surface-400` dinaikkan ke `surface-500`; kini dijaga ketat (0 pelanggaran) | Selesai 28/10/2026 |
+| D2 | `text-surface-400` dipakai untuk teks informatif | 137 elemen, 21 view | Diganti ke `text-surface-500`; 400 tersisa hanya pada `<i>` ikon & placeholder | Selesai 28/10/2026 |
+| D3 | `kpi-card` memetakan `info` → `blue-*`, `earth` → `amber-*`, default → `emerald-*` | 1 komponen + 17 pemanggil | Tema memakai token `info`/`earth`/`warning`/`danger`/`surface`/`primary`; pemanggil memakai nama tema baku | Selesai 28/10/2026 |
+| D4 | Tugas rangkap memakai `purple`, sama dengan RM-3 | Direktori (chip filter + badge baris) | Pindah ke `info` sesuai §5.1 | Selesai 28/10/2026 |
+| D5 | `compliance-guard` memakai `emerald-*`/`amber-*`/`rose-*` | 1 komponen | Diganti ke `primary-*`/`warning-*`/`danger-*` | Selesai 28/10/2026 |
+| D6 | `x-admin.button` belum punya perlindungan klik ganda; 3 tombol aksi memakai markup sendiri | 1 komponen + 3 pemakai | Prop `target` (disabled + spinner selama action Livewire) dan `once` (disabled setelah form terkirim); 3 tombol dipindah ke komponen; diuji di `AdminButtonTest` | Selesai 28/10/2026 |
+| D7 | Seleksi baris direktori hanya bisa lewat mouse: kotak centang berupa `<div>` | Direktori (baris + header) | Kotak centang sungguhan ber-`aria-label`; Spasi memilih, Shift+klik/Shift+Spasi memilih rentang, header tri-state; diuji di `EmployeeCrudTest` | Selesai 28/10/2026 |
+| D8 | Halaman error 403/404/500 masih bawaan framework | Global | `errors/layout` mandiri + 403, 404, 419, 429, 500, 503; diuji di `ErrorPagesTest` (termasuk tanpa database) | Selesai 28/10/2026 |
+| D9 | KPI "Total Biaya Investasi" pelatihan memakai `theme="purple"` | `admin/trainings/index` | Tema `neutral` (kategori "biaya/anggaran" ditambahkan di §5.3); tema `purple` dihapus dari `kpi-card` | Selesai 28/10/2026 |
+| D10 | Ikon Font Awesome dan SVG dekoratif tanpa `aria-hidden`; tombol ikon tanpa nama aksesibel | 601 ikon + 3 SVG, 68 view; 21 tombol | `aria-hidden="true"` pada semua ikon/SVG dekoratif; `aria-label` (+ `aria-expanded` pada toggle dropdown) pada 21 tombol ikon | Selesai 28/10/2026 |
+| D11 | `<th>` tanpa `scope`; urutan kolom tidak terbaca | 80 header; `th`, `sort-th` | `scope="col"`; `aria-sort` pada kolom aktif; header sortable Livewire memakai `<button>` (bisa keyboard) | Selesai 28/10/2026 |
+| D12 | Navigasi tanpa penanda halaman aktif, `<nav>` tanpa label, menu seluler tanpa nama/state, dokumen berbahasa `en` | `layouts/admin`, `layouts/user`, `auth/login` | `aria-current="page"` pada link aktif; `aria-label` pada semua `<nav>`; toggle menu `aria-expanded`/`aria-label` dinamis; dropdown Data menutup dengan Esc; `<html lang="id">` di tiga shell | Selesai 28/10/2026 |
+| D13 | Perubahan dinamis tidak diumumkan pembaca layar | Flash, toast, mutasi, direktori, tabel Livewire | `role="status"`/`role="alert"` pada 14 wadah notifikasi; alasan blokir mutasi dalam wilayah `aria-live` permanen; jumlah baris terpilih lewat wilayah `sr-only`; overlay impor async `role="status"`; jumlah hasil tabel Livewire (formasi lowong, riwayat mutasi) diumumkan. Direktori/pelatihan/evaluasi memuat ulang halaman sehingga tidak butuh wilayah live | Selesai 28/10/2026 |
+| D14 | Modal tanpa focus trap, pengembalian fokus, atau semantik dialog | 13 modal | `x-trap.noscroll` + `tabindex="-1"` pada semua dialog; dialog konfirmasi mutasi dan dua modal tambah-cepat diberi `role="dialog"`/`aria-modal`/`aria-labelledby`; Esc pada konfirmasi mutasi; fokus awal pada Batal di dialog hapus; dijaga `test_every_dialog_is_modal_labelled_and_traps_focus` | Selesai 28/10/2026 |
+| D15 | `focus:outline-none` tanpa ring `focus-visible` pengganti | 10 dari 65 elemen (sisanya sudah punya pengganti; 2 panel dropdown non-fokus dikecualikan) | Ring `focus-visible:ring-2 focus-visible:ring-primary-500`; dijaga penjaga §16.1 | Selesai 28/10/2026 |
+| D16 | Tab profil & tab mutasi tanpa semantik tab, memakai `<nav>` | Profil pegawai (4 tab), mutasi (3 tab) | Pola ARIA tabs lengkap + navigasi keyboard (§7.4); dijaga penjaga §16.1 | Selesai 28/10/2026 |
+| D17 | Teks di bawah 10px; `animate-pulse` tanpa `motion-safe:` | 99 teks + 10 pulse, 23 view | Dinaikkan ke `text-[10px]`; pulse memakai `motion-safe:`; dijaga penjaga §16.1 | Selesai 28/10/2026 |
+| D18 | Hue `purple`/`orange`/`sky`/`indigo`/`pink` dipakai di luar RM Band | 12 view, 74 baris | Kebijakan hue kategori di §5.2: pool/pasokan → `earth`, struktural/talenta → `info`, metadata deskriptif → `surface`; gradien dekoratif dan warna per-bidang dihapus; tugas rangkap satu perlakuan `info`; dijaga penjaga §16.1 | Selesai 28/10/2026 |
+
+---
+
+## 18. Roadmap (Tidak Normatif)
+
+Gagasan untuk fase berikutnya. Tidak boleh dijadikan dasar implementasi sebelum dipindahkan ke bagian normatif:
+
+- Portal pegawai mobile lengkap (bottom navigation maks. 5 item).
+- Mode offline untuk input lapangan (antrean sinkronisasi + label "data terakhir diperbarui").
+- Notifikasi multi-kanal (email, WhatsApp) dengan preferensi per pengguna.
+- Tur produk ringan per modul dan pusat bantuan in-app.
+- Mode kepadatan tabel (ringkas/nyaman).
+- Mode gelap.
+
+---
+
+## 19. Riwayat Revisi
 
 | Versi | Tanggal | Perubahan |
 |---|---|---|
-| v1.0 | Rilis awal | Struktur dasar design system: token, komponen, modul |
-| v1.1 | Rilis lanjutan | Aturan pemakaian warna (anti-pucat), state komponen, data masking, grid/motion token, system pages, offline pattern, onboarding, notifikasi multi-channel, print layout |
-| v1.2 | Revisi shell | Eksperimen sidebar terang + header gelap |
-| v2.0 | 24/09/2026 | **Overhaul Standar Industri HRIS (Workday & Mekari Talenta Standard)**: Penghapusan boxitis/wireframe kaku, standarisasi Profil Karyawan (Hero Banner + Horizontal Tabs + Definition Lists), form enterprise tersegmentasi, filter direktori modern, dan penyelarasan Unified Modern Light Shell. |
-
----
-
-# ADDENDUM v2.0 — Standar Industri HRIS & Anti-Boxitis (Workday & Mekari Talenta Benchmark)
-
-> Addendum ini wajib menjadi acuan implementasi UI di seluruh aplikasi. Segala bentuk pembungkusan field individual ke dalam kotak abu-abu/border terisolasi dilarang keras.
-
-## 27. Aturan Anti-"Boxitis" & Surface Layering
-
-### 27.1 Masalah "Boxitis" (Wireframe Syndrome)
-Pada implementasi sebelumnya, setiap data kecil (seperti NIK, Tanggal Lahir, Agama, Tempat Lahir) dibungkus dalam kotak persegi tersendiri ber-border tebal (`bg-gray-50 border rounded-lg`). Ini adalah anti-pattern yang membuat antarmuka terasa seperti *wireframe mockup* mentah atau grid formulir kuno.
-
-### 27.2 Prinsip Surface Layering Bersih
-1. **Canvas (`bg-slate-50` / `#F8FAFC`)**: Latar belakang dasar halaman yang bersih dan lapang.
-2. **Container Card (`bg-white` + `border border-slate-200/80` + `shadow-xs`)**: Hanya kartu pembungkus kelompok logis besar (mis. Kartu Biodata, Kartu Riwayat Jabatan).
-3. **Data Rows / Definition List (`<dl>`)**:
-   - Di dalam kartu, data ditampilkan sebagai pasangan Label (`<dt>`) dan Nilai (`<dd>`) yang bersih.
-   - Gunakan layout grid 2 atau 3 kolom dengan garis pemisah bawah tipis (`border-b border-slate-100 pb-3`) jika perlu pemisah visual, **bukan** membuat kotak abu-abu di sekeliling tiap item.
-   - Label: `text-xs font-medium text-slate-500` (atau `text-surface-500`).
-   - Nilai: `text-sm font-semibold text-slate-900` (atau `text-surface-900`).
-
----
-
-## 28. Standar Halaman Profil & Detail Karyawan (`show.blade.php`)
-
-Format standar industri (Workday, SuccessFactors, Mekari Talenta) untuk halaman detail karyawan wajib mengikuti struktur 2 bagian utama:
-
-### 28.1 Profile Hero Banner (Header Profil)
-Terletak di bagian paling atas dengan latar putih berborder halus atau aksen gradasi hijau korporat tipis:
-- **Avatar Foto**: Berukuran proporsional (80x80px hingga 96x96px), `rounded-2xl` atau `rounded-full` dengan border halus putih & cincin status.
-- **Identitas Utama**:
-  - Nama Lengkap (h1, `text-2xl font-bold text-slate-900`).
-  - Badge Status Kepegawaian (mis. `Pimpinan` / `Pelaksana`, status `Aktif` hijau pastel).
-  - NIK dengan tombol copy interaktif.
-  - Jabatan & Unit Kerja saat ini.
-- **Action Toolbar (Kanan Atas)**:
-  - Tombol aksi cepat: *Kembali ke Direktori*, *Edit Profil*, *Ajukan Mutasi*, *Cetak Profil*.
-
-### 28.2 Horizontal Navigation Tabs
-Tepat di bawah Hero Banner, sediakan navigasi tab berbasis Alpine.js (`x-data="{ activeTab: 'biodata' }"`):
-1. **Tab 1: Biodata & Data Pribadi**: Informasi tempat/tgl lahir, usia, agama, susunan keluarga, pendidikan terakhir, institusi pendidikan, alamat & kontak. Ditampilkan dalam format clean definition list.
-2. **Tab 2: Kepegawaian & Formasi**: Level (Karpim/Pelaksana), Golongan, Job Grade, Person Grade, TMT Bekerja, Tanggal Dalam Jabatan, Tanggal MBT.
-3. **Tab 3: Riwayat Karir & Jabatan**: Tabel atau timeline vertikal mutasi/promosi/rotasi.
-4. **Tab 4: Pelatihan & Kinerja**: Riwayat pelatihan yang diikuti, sertifikasi, serta hasil evaluasi kinerja tahunan.
-
----
-
-## 29. Standar Form Input Enterprise (`add-employee.blade.php` & `edit-employee.blade.php`)
-
-1. **Card Segmentasi Logis**:
-   - Pisahkan form panjang menjadi 2-3 card putih bersih (mis. "1. Data Identitas Pribadi" dan "2. Formasi Jabatan & Penempatan").
-   - Header tiap section memiliki ikon penanda dan deskripsi singkat 1 baris.
-2. **Input Fields**:
-   - Border halus netral: `border border-slate-300 rounded-lg`.
-   - Tinggi standar: `h-10` (40px) atau `h-11` (44px) untuk desktop, padding horizontal `px-3.5`.
-   - Focus ring: `focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600`.
-   - Hindari radius gelembung yang terlalu membulat (`rounded-2xl` pada input teks biasa membuat form terlihat kekanak-kanakan).
-3. **File Upload Interaktif**:
-   - Area drag & drop modern dengan preview langsung gambar profil saat file dipilih.
-4. **Action Footer Sticky**:
-   - Baris tombol di bawah card: tombol Batal (`text-slate-600 hover:bg-slate-100`) di kiri, tombol Simpan Data (`bg-emerald-600 hover:bg-emerald-700 text-white`) di kanan.
-
----
-
-## 30. Standar Direktori & Tabel Karyawan (`index.blade.php`)
-
-1. **KPI Metric Cards**:
-   - Gunakan container putih dengan border `border-slate-200/80` dan shadow mikro (`shadow-xs`).
-   - Ikon metrik menggunakan container bulat atau rounded-xl dengan warna pastel lembut (Emerald-50, Amber-50, Blue-50) dan teks angka yang tegas (`font-bold font-mono text-2xl`).
-2. **Filter Bar**:
-   - Filter cepat (Quick Tabs): Tab pill instan untuk beralih antara "Semua Pegawai", "Karyawan Pimpinan", dan "Karyawan Pelaksana".
-   - Search input utama dengan ikon kaca pembesar dan shortcut `Ctrl + K`.
-   - Tombol "Filter Lanjutan" (Toggle drawer/accordion) untuk menyembunyikan 5-6 dropdown filter agar antarmuka tidak sesak.
-3. **Tabel Data Karyawan (Standar Enterprise Workday & Mekari Talenta)**:
-   - **Ultra-Clean Selection (Dedicated Clean Checkbox Column + Workday Standard)**: Kolom checkbox mandiri yang rapi di sisi kiri (`w-10 text-center`) selaras dengan checkbox header `[ ]`. Kotak centang berupa persegi putih bersih kosong murni `[ ]` tanpa bayangan ikon samar saat belum dipilih. Meniadakan lingkaran inisial nama generik (`AY`, `A`, `BH`) yang redundan; foto profil ditampilkan murni sebagai thumbnail bulat hanya jika berkas foto asli tersedia, kemudian langsung diikuti Nama Pegawai tebal dan NIK.
-   - **Modern Minimalist Hybrid Bulk Action (Stripe & Linear Enterprise Standard)**:
-     - *Google Drive & Gmail Keyboard Shortcuts (Range Select & Toggle)*:
-       - **Ctrl+Click / Cmd+Click**: Menekan Ctrl (atau Cmd pada Mac) dan mengklik di mana saja pada baris tabel akan langsung memilih/mencentang pegawai tersebut secara individual tanpa berpindah halaman.
-       - **Shift+Click (Range Selection)**: Mengklik pegawai pertama lalu menahan tombol Shift dan mengklik pegawai kedua akan otomatis memilih seluruh baris di antara keduanya (rentang kontigu A sampai B), persis seperti di Google Drive dan Gmail.
-       - **Active Selection Mode**: Saat $\ge 1$ pegawai sedang terpilih, mengklik di mana saja pada baris (selain teks nama/link) otomatis melakukan toggle centang tanpa mewajibkan pengguna membidik avatar kecil 40px. Teks nama pegawai tetap dapat diklik untuk membuka profil secara presisi.
-     - *Subtle Row Selection Highlight*: Meniadakan "green sea syndrome" (banjir warna hijau pekat saat banyak baris dipilih). Baris yang dicentang diberi latar netral yang sangat lembut (`bg-slate-50/70`) dengan aksen garis kiri hijau korporat (`border-l-4 border-l-primary-600`) dan avatar tercentang hijau solid (`bg-primary-600 text-white`). Hal ini memastikan seluruh badge data tetap memiliki kontras tinggi dan mudah dipindai (*high scannability*).
-     - *Slim Neutral Contextual Bar (Toolbar Atas Tabel)*: Bertransformasi secara elegan menjadi baris netral yang tenang (`bg-slate-50/90 border-slate-200`) dengan tipografi mikro yang rapi (`[X] Terpilih • Pilih Semua • Batalkan Pilihan • Shift + klik untuk rentang`) dan tombol sekunder *Export* serta *Hapus* bergaris halus.
-     - *Floating Action Dock (Bawah Layar)*: Mengambang di tengah bawah layar (`fixed bottom-6 left-1/2 -translate-x-1/2 z-50`) dengan gaya *Dark Slate Glassmorphism* (`bg-slate-900/95 text-white backdrop-blur-md shadow-2xl rounded-2xl border border-slate-700/80`). Berisi indikator counter, shortcut keyboard pembatalan `Esc`, tombol aksi utama *Export Excel*, dan tombol destruktif terproteksi *Hapus*.
-   - **Pemisahan Kolom Atomik & Tipografi Bersih (Anti-Badge Overload)**: Mempertahankan pemisahan kolom independen untuk *Pegawai*, *Jabatan & Unit Kerja*, *Strata*, *Eselon*, dan *Golongan* dengan tipografi korporat bersih:
-      - *Pegawai*: Nama tebal dengan NIK monospaced + copy action di sub-baris.
-      - *Jabatan & Unit Kerja*: Jabatan di baris atas, Unit Kerja di baris bawah disertai **micro-chip Bidang netral** (`bg-slate-100 text-slate-600 border border-slate-200`) tanpa warna pelangi yang bertabrakan.
-      - *Strata*: Ditampilkan sebagai **tipografi bersih (Clean Enterprise Typography)** tanpa border pill (`text-xs font-semibold text-slate-800` untuk Karpim dan `text-xs font-medium text-slate-500` untuk Karpel) guna mencegah banjir chip berulang di setiap baris.
-      - *Eselon*: Ditampilkan dengan chip warna semantik RM Band lembut (`RM-1` orange soft, `RM-2` sky soft, `RM-3` purple soft, `RM-4` slate netral) sebagai aksen tunggal yang teratur di kolom tengah tabel.
-      - *Golongan*: Ditampilkan sebagai teks monospaced tegas (`font-mono text-xs font-semibold text-slate-800 tabular-nums`) tanpa kontainer pill.
-    - **Exception-Driven Lifecycle Badges**: Menghindari kolom "Status: Aktif" generik yang redundan; sebagai gantinya, kolom *Jabatan & Unit Kerja* secara cerdas menampilkan badge khusus untuk anomali/siklus kritis:
-      - Sanksi Indisipliner Aktif (`bg-red-50 text-red-700`) & Sanksi Kedaluwarsa (`animate-pulse`).
-      - Tugas Rangkap / Penugasan Khusus (Plt/Pj/Diperbantukan) ditempatkan di bawah jabatan & unit definitif (Tier 3) dengan compact badge pill Title Case dan shadow mikro (tanpa border samping warna ungu agar ritme visual tabel tetap bersih & seragam).
-      - Masa Pensiun BUP 56 Tahun (`bg-red-100 text-red-800`), Masa Bebas Tugas MBT 55 Tahun (`bg-amber-100 text-amber-900`), dan Menjelang MBT $\le 12$ bulan (`bg-amber-50 text-amber-800`).
-    - **Aksi Baris Terproteksi (Single Kebab Menu ...)**: Tombol aksi disederhanakan menjadi tombol tunggal titik tiga (`...`) tanpa ikon mata terpisah. Seluruh opsi (Profil Lengkap, Ubah Data, Ajukan Mutasi, Hapus Pegawai) tersaji rapi di dalam dropdown menu untuk menjaga kerapian kolom aksi.
-
----
-
-## 31. Unified Modern Light Shell
-
-Sesuai konsensus evaluasi UI terbaru, seluruh aplikasi distandarisasi menggunakan **Unified Modern Light Shell**:
-- **Sidebar**: Latar putih bersih (`bg-white`), border kanan halus `border-slate-200`.
-- **Active Navigation Item**: Latar hijau lembut `bg-emerald-50`, teks hijau tua `text-emerald-800 font-semibold`, dan indikator bar aktif di kiri `border-l-4 border-emerald-600`.
-- **Topbar**: Latar putih bersih (`bg-white/95 backdrop-blur-md`), border bawah `border-slate-200`.
-- **Header Identitas Perusahaan**: Tulisan "Talenta Hub" dan "PTPN IV Regional V" dengan logo resmi.
-
----
-
-## 32. Standar Man Power Planning (MPP) & Dynamic Planning Horizon
-
-Untuk perencanaan kebutuhan formasi tenaga kerja (MPP):
-1. **Dynamic Rolling 2-Year Horizon ($T$ & $T+1$)**:
-   - Kolom indikator perencanaan formasi tidak boleh dikunci secara statis pada tahun tertentu (mis. hanya 2026–2027).
-   - Pengguna (HR / Manajemen) dapat memilih **Tahun Perencanaan ($T$)** melalui dropdown filter di toolbar (mis. 2024–2031).
-   - Baris indikator pensiun otomatis berlabel: `Pensiun sd Des {T}` dan `Pensiun sd Des {T+1}`.
-   - Baris pasokan & kebutuhan otomatis berlabel: `RBB {T}`, `Kebutuhan {T}`, dan `Kebutuhan {T+1}`.
-   - Kartu KPI Ringkasan Eksekutif (Card 3 BUP & Card 4 Kebutuhan Bersih) otomatis sinkron dengan tahun yang dipilih.
-2. **Sinkronisasi Mode Data (Baseline vs. Live Database)**:
-   - **Mode Baseline (Formasi Baku Korporasi 444)**: Menjaga konsistensi data referensi korporasi dengan formula dinamis per horizon.
-   - **Mode Live (Sync Karyawan Database)**: Mengagregasi data real time karyawan aktif berdasarkan BUP pensiun $\le T$ dan $= T+1$, dipetakan ke tingkat golongan RM-1, RM-2, dan RM-3 serta bidang fungsional (KEU, TAN, TEK, UMU).
-3. **Export Fleksibel**:
-   - Fitur unduh Excel / CSV otomatis menyertakan label tahun perencanaan yang aktif dan menghasilkan nama berkas dinamis (mis. `mpp_perencanaan_formasi_2026_2027.csv`).
-4. **Integrated Table Header Toolbar (Anti-Whitespace & Zero Awkward Wrapping)**:
-   - Kontrol toolbar tidak boleh dibungkus dalam kartu mengambang terpisah di atas tabel yang menyisakan ruang kosong besar dan menyebabkan wrapping tombol.
-   - Gunakan layout **2-Tier Integrated Header**:
-     - *Tier 1 (Atas)*: Judul Matriks Formasi bersih tanpa redundant badge (konteks enterprise sudah berada di Topbar utama), Subtitle deskripsi, dan Action Buttons (Export Excel & Cetak) di kanan.
-     - *Tier 2 (Bawah)*: Sub-Header Filter Strip berlatar tipis (`bg-surface-50 border-b border-surface-200`) yang menyeimbangkan Mode Sumber Data (Segmented Tab) di kiri serta Filter Tahun & Bidang di kanan.
-5. **Standar Header Grup RM pada Filter Bidang (Single-Line Layout)**:
-   - Saat memfilter berdasarkan bidang fungsional (KEU, TAN, TEK, UMU), header grup manajerial (RM-1, RM-2, RM-3) wajib mempertahankan teks dalam **1 baris lurus utuh** (`whitespace-nowrap`).
-   - Berikan `min-w-[220px]` untuk RM-1 & RM-2, serta `min-w-[240px]` untuk RM-3 guna mencegah kata patah (seperti `"RM-"` dan `"1"` terpisah secara vertikal).
-6. **Standar Interaksi Drilldown Sel Angka (Slide-Over Drawer & Rich Employee Cards)**:
-   - Klik pada sel angka bernilai $> 0$ memicu **Slide-Over Drawer (Panel Samping Kanan)** selebar `480px–520px` tanpa mengaburkan tabel (`bg-slate-900/30` tanpa CSS blur), sehingga tabel MPP di sebelah kiri tetap terlihat dan dapat dibandingkan secara langsung.
-   - **Affordance Bersih**: Hanya sel yang memiliki data personil $> 0$ yang dapat diklik (`cursor-pointer`, hover highlight emerald halus, dan garis bawah titik-titik `underline decoration-dotted`). Sel yang bernilai `0` atau `-` bersifat statis (`cursor-default`).
-   - **Formula Breakdown Header**: Khusus saat mengklik sel baris hasil perhitungan (seperti *Kebutuhan 2026/2027*), drawer menampilkan kartu persamaan matematika: `Formasi - Realisasi + Pensiun - Pasokan = Kebutuhan Bersih` lengkap dengan badge *Surplus Pasokan* / *Defisit Formasi*, diikuti daftar pemangku jabatan aktif saat ini (*incumbents*).
-   - **Instant Personnel Search**: Input pencarian cepat di bagian atas drawer (`x-data="{ search: '' }"`) untuk memfilter nama, NIK, atau jabatan seketika tanpa jeda jaringan (sangat krusial untuk sel dengan puluhan hingga ratusan personil).
-   - **Rich Profile Cards**: Personil disajikan dalam kartu profil terstruktur: avatar inisial, Nama Lengkap tebal, NIK, Status Karyawan, Jabatan, Unit Kerja, Golongan badge, Tanggal Pensiun, dan tombol aksi `"Lihat Profil ↗"` menuju halaman detail karyawan (`admin.employees.show`).
-   - **Subset Export**: Tombol `"Export CSV"` di footer drawer untuk mengunduh daftar personil yang sedang difilter.
-
-7. **Standar Tipografi & Perataan Tabel Matriks MPP (HRIS Industry Best Practice)**:
-   - **Header `No.` & `URAIAN INDIKATOR`**: Judul kolom header (`th`) keduanya dibuat rata tengah (`text-center`) agar seimbang dengan grup-grup kolom di bawahnya.
-   - **Teks Baris Indikator (Clean Enterprise Scannability)**: Isi teks baris indikator (`td`) dipertahankan **rata kiri (`text-left px-4`)** dan **tanpa ikon dekoratif** (seperti ikon kalkulator, lapisan, atau centang) guna menciptakan garis baca vertikal yang lurus, rapi, dan profesional setara software enterprise (SAP SuccessFactors, Workday).
-   - **Penekanan Visual Kolom Agregat (JUMLAH & TOTAL)**: Seluruh angka pada kolom Subtotal per golongan (`JUMLAH`) dan Kolom Akumulasi Akhir (`TOTAL`) dicetak **tebal (`font-bold` / `font-extrabold font-mono text-surface-900`)**, termasuk ketika nilainya `0`, untuk membedakan secara tegas antara sel data masukan bidang dengan sel agregasi ringkasan.
-
----
-
-## 33. Standar Monitoring Formasi & Opsi Pengisian Lowongan (Fulfillment Actions)
-
-Untuk menjaga konsistensi operasional pada modul Monitoring Formasi Kosong:
-1. **Integrated Header Toolbar**:
-   - Filter dan pencarian disatukan langsung ke dalam kartu tabel (`rounded-xl overflow-hidden shadow-sm border border-surface-200`) untuk menghilangkan kartu mengambang yang terpisah dan menghemat ruang vertikal.
-   - **Tier 1 (Main Controls)**: Search input fleksibel dengan tombol *clear* cepat, dropdown filter Unit Kerja, dan tombol *Reset* yang muncul dinamis saat ada filter aktif.
-   - **Tier 2 (Urgency Status Strip)**: Sub-header berlatar tipis (`bg-surface-50 border-t border-b border-surface-200`) yang menyajikan filter pil status durasi kekosongan (Semua, Kritis >90 hari, Perhatian 30–90 hari, Baru Kosong <30 hari) dengan badge kuantitas yang halus dan modern, disertai counter total formasi lowong di sisi kanan.
-2. **Standar Tombol Opsi Pengisian (Equal-Width Vertical Stack)**:
-   - Tombol aksi pengisian formasi disusun **bertumpuk vertikal dengan lebar seragam (`w-32 items-stretch ml-auto`)** agar lebar kolom aksi menjadi ringkas (~140px) dan menghemat ~100px+ ruang horizontal untuk kolom *Unit Kerja* dan *Jabatan Lowong* sehingga nama panjang tidak terpotong/terhimpit.
-   - Karena kolom lain (Unit, Jabatan, Pejabat Terakhir, Kosong Sejak) secara alami memiliki tinggi 2–3 baris (~65px), susunan 2 tombol bertumpuk ini mengisi ruang vertikal secara presisi tanpa menambah ketinggian baris tabel.
-   - **Dimensi & Lebar Identik**: Kedua tombol mengisi lebar penuh kontainer (`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold`).
-   - **Mutasi Internal (Primary Talent Mobility Path)**: Berada di atas dengan gaya emerald solid (`bg-emerald-600 hover:bg-emerald-700 text-white`) dan ikon mutasi `fas fa-exchange-alt text-[10px]`.
-   - **Rekrut Baru (Secondary Fulfillment Path)**: Berada di bawah dengan gaya outline bersih (`bg-white hover:bg-surface-50 text-surface-700 border border-surface-300`) dan ikon `fas fa-user-plus text-[10px] text-surface-400`.
-
----
-
-## 34. Standar Ergonomi Kognitif & Anti-Badge Fatigue (Intentional Color System)
-
-### 34.1 Anatomi Masalah "Badge Fatigue" & Visual Clutter pada HRIS
-Pada sistem informasi enterprise, tabel data master (seperti Direktori Pegawai, Riwayat Mutasi, dan Formasi) memiliki densitas data yang tinggi. Ketika setiap atribut (Strata, Eselon, Bidang, Golongan, Status) dibungkus ke dalam *chip/pill* berwarna-warni yang berbeda, muncul fenomena anti-pattern:
-1. **The "Christmas Tree" / "Badge Soup" Effect**: Layar dipenuhi kotak-kotak warna pelangi (merah, hijau, ungu, biru, oranye, kuning) di setiap baris.
-2. **Hilangnya Kemampuan Deteksi Anomali (*Lost Signal-to-Noise Ratio*)**:
-   > *"When everything is highlighted, nothing is highlighted."*  
-   Ketika atribut statis normal (seperti Karpim atau TAN) diberi badge berwarna mencolok, mata admin HR gagal mendeteksi sinyal kritis yang membutuhkan tindakan cepat (seperti *Masa Sanksi Disiplin*, *Menjelang MBT*, atau *Tugas Rangkap*).
-3. **Kelelahan Visual & Kognitif (*Eye & Cognitive Fatigue*)**: Pengguna HR yang mengaudit puluhan hingga ratusan baris per hari mengalami keletihan mata karena otak dipaksa memecahkan kode warna (*color decoding*) pada setiap sel.
-
-### 34.2 Matriks 4-Tier "Color with Intent" (Color Budgeting)
-Untuk mencegah *badge fatigue*, seluruh tabel data padat di aplikasi wajib mengadopsi sistem anggaran warna 4 tingkat (*4-Tier Intentional Color Budgeting*):
-
-| Tingkat Hierarki | Definisi & Sifat Data | Perlakuan Desain UI/UX | Contoh Implementasi |
-|---|---|---|---|
-| **Tier 1: Critical Exception & Lifecycle Alerts** | Anomali tata kelola, hukuman disiplin, atau batas waktu legal yang menuntut tindakan/perhatian segera. | **Aksen Warna Jenuh Penuh (High-Contrast Saturated Pills)** dengan ikon semantik. Dialokasikan $\le 10\%$ dari total ruang visual. | • Masa Sanksi (`bg-red-50 text-red-700 border-red-200`)<br>• MBT/Pensiun (`bg-amber-100 text-amber-900 border-amber-300`)<br>• Tugas Rangkap (`bg-purple-50 text-purple-700 border-purple-200`) |
-| **Tier 2: Key Managerial Echelon (RM Band)** | Eselon formasi manajerial (RM-1 s/d RM-4) yang menjadi jangkar struktural organisasi. | **Single-Anchor Soft Semantic Chips**. Satu-satunya kolom klasifikasi yang diberi warna pastel lembut di tengah tabel agar menjadi pemisah ritme baca. | • RM-1: Orange pastel (`bg-orange-50 text-orange-800 border-orange-200`)<br>• RM-2: Sky pastel (`bg-sky-50 text-sky-800 border-sky-200`)<br>• RM-3: Purple pastel (`bg-purple-50 text-purple-800 border-purple-200`)<br>• RM-4: Slate netral (`bg-slate-100 text-slate-700 border-slate-200`) |
-| **Tier 3: Macro Categorical (Strata Pegawai)** | Pengelompokan makro (Karpim vs Karpel) di mana $\ge 90\%$ populasi baris bernilai seragam. | **Clean Enterprise Typography (Dilarang Memakai Chip)**. Meniadakan kotak chip berulang; gunakan kontras bobot teks. | • Karpim: `text-xs font-semibold text-slate-800`<br>• Karpel: `text-xs font-medium text-slate-500` |
-| **Tier 4: Operational Metadata (Bidang Fungsional)** | Informasi pendukung teknis operasional (KEU, TAN, TEK, UMU). | **Neutral Subtle Micro-Chip**. Kotak mikro abu-abu tanpa warna pelangi agar menyatu halus dengan Unit Kerja tanpa mencuri fokus. | • Micro-chip netral: `bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-semibold px-1.5 py-0.5 rounded` |
-
-### 34.3 Prinsip Kenyamanan Sesi Kerja Panjang (Ergonomi Tampilan HR)
-1. **Pola Scanning Horizontal Mengalir (Flow F-Pattern)**:
-   - Urutan kolom dari makro ke mikro: `Identitas Pegawai` $\rightarrow$ `Jabatan & Unit Kerja` $\rightarrow$ `Strata` $\rightarrow$ `Eselon` $\rightarrow$ `Golongan` $\rightarrow$ `Aksi`.
-   - Pola ini memastikan mata bergerak mulus dari kiri ke kanan tanpa "lompatan kognitif" yang melelahkan.
-2. **Pencegahan Horizontal Overflow (2-Tier Row Grouping)**:
-   - Data sekunder (NIK di bawah Nama, Unit Kerja + Micro-chip Bidang di bawah Jabatan) disematkan di tingkat sub-baris (*tier-2*), menjaga jumlah kolom tetap ramping ($\le 6$ kolom data) sehingga tabel tampil utuh 100% pada resolusi laptop dinas (1366×768) tanpa memicu horizontal scrollbar.
-3. **Monospaced Visual Rhythm untuk Kode & Angka**:
-   - NIK, Golongan, dan kode numerik wajib menggunakan `font-mono tabular-nums`. Karakter monospaced menciptakan garis lurus vertikal yang menstabilkan ritme baca saat memindai ke bawah secara cepat.
-4. **Dominasi Kanvas Terang & Kontras AA (Unified Light Shell)**:
-   - Latar tabel putih bersih (`bg-white`) di atas kanvas `bg-slate-50` dengan garis pemisah tipis `divide-surface-200` memberikan kontras WCAG AA yang menenangkan mata dan mencegah sakit kepala pada sesi kerja administratif intensif (6–8 jam/hari).
-
----
-
-*Dokumen ini hidup (living document) — perbarui seiring modul baru dibangun agar Antigravity IDE selalu punya konteks desain terbaru.*
+| v1.0 | — | Struktur dasar: token, komponen, modul |
+| v1.1 | — | Aturan pemakaian warna, matriks state, masking, grid/motion, halaman sistem, offline, cetak |
+| v1.2 | — | Eksperimen sidebar terang + header gelap |
+| v2.0 | 24/09/2026 | Anti-boxitis, standar profil, form tersegmentasi, Unified Light Shell |
+| v2.1 | 26/10/2026 | Font Awesome 6, navigasi aktif tint + bar kiri, tema KPI per kategori |
+| **v3.0** | **28/10/2026** | **Konsolidasi menjadi satu dokumen tanpa addendum.** Skala `surface` dilengkapi (400/600/800/950) dan `surface-500` digelapkan agar lolos AA; skala `danger`/`warning`/`info` ditambah; tabel kontras terukur menggantikan klaim "sudah divalidasi"; `tailwind.config.js` yang tidak dipakai dihapus (Tailwind v4 membaca `@theme`); NIK diselaraskan ke 8 digit dan debounce ke 300ms; ruang lingkup dibatasi ke modul yang ada; ditambah peran warna, Tabel Status Induk, inventaris komponen, pola blokir vs dispensasi, aksesibilitas modal/tab/seleksi, 9-box, privasi UI, utang desain, dan roadmap terpisah. Prompt khusus IDE dan istilah pemasaran dihapus. |
+| v3.1 | 28/10/2026 | Penjaga otomatis `ViewDesignGuardTest` (§16.1) dengan aturan ketat + baseline ratchet; `rose` ditambahkan ke pemetaan `danger` (§3.1); utang D10–D12 diperluas (ikon/SVG, `lang`, navigasi) dan D13–D17 dicatat. |
+| v3.2 | 28/10/2026 | Migrasi D1: 2.707 kelas palet bawaan Tailwind dipetakan ke token (tabel §3.1) dan kini dijaga ketat termasuk string PHP; D4, D6, D13 (sebagian), D14 selesai; `x-admin.button` mendapat `target` dan `once`; semua dialog memakai `x-trap`; penjaga bertambah aturan dialog; D18 (hue `purple` di luar RM Band) dicatat. |
+| v3.3 | 28/10/2026 | Halaman galat mandiri (§15); kotak centang sungguhan + keyboard pada direktori (§7.5); pola ARIA tabs (§7.4); ring fokus pengganti, teks minimum 10px, dan pulse `motion-safe:` di seluruh view. D7, D8, D15, D16, D17 selesai. Penjaga §16.1 seluruhnya ketat: mekanisme baseline/ratchet dan berkasnya dihapus karena tidak lagi diperlukan. |
+| v3.4 | 28/10/2026 | Kebijakan hue kategori (§5.2): `orange`/`sky`/`purple` hanya untuk RM Band, kategori non-RM memakai `earth`/`info`/`surface`/`teal`; kategori KPI netral diperluas ke biaya/anggaran; tema `purple` dihapus; penjaga bertambah aturan hue. Jumlah hasil tabel Livewire diumumkan (D13). D9, D13, D18 selesai: seluruh utang desain §17 tertutup. |
