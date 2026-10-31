@@ -10,6 +10,7 @@ use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -23,6 +24,8 @@ class MasterFormasiService
 {
     private const REASON_MIN_LENGTH = 10;
 
+    private const MAX_KUOTA = 1000;
+
     // ───────────────────────── Kursi (position_unit) ─────────────────────────
 
     /**
@@ -34,14 +37,18 @@ class MasterFormasiService
             $this->assertSeatInput($position, $kuota, $bidang);
             $this->assertNotBlocked($this->previewImpact('seat.add', ['unit_id' => $unit->id, 'position_id' => $position->id]));
 
-            $id = DB::table('position_unit')->insertGetId([
-                'unit_id' => $unit->id,
-                'position_id' => $position->id,
-                'kuota' => $kuota,
-                'bidang' => $bidang,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            try {
+                $id = DB::table('position_unit')->insertGetId([
+                    'unit_id' => $unit->id,
+                    'position_id' => $position->id,
+                    'kuota' => $kuota,
+                    'bidang' => $bidang,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                throw new FormasiRuleViolationException("Unit '{$unit->nama}' sudah memiliki kursi untuk jabatan '{$position->nama}'. Ubah kuota pada kursi yang ada.");
+            }
 
             MasterAuditLog::record(
                 $user, 'seat.added', 'seat', $id, $this->seatLabel($unit->nama, $position->nama),
@@ -159,6 +166,7 @@ class MasterFormasiService
 
             if ($isRename) {
                 Employee::where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
+                JobHistory::where('is_applied', false)->where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
             }
 
             MasterAuditLog::record(
@@ -288,6 +296,7 @@ class MasterFormasiService
 
             if ($isRename) {
                 Employee::where('jabatan', $oldName)->update(['jabatan' => $position->nama]);
+                JobHistory::where('is_applied', false)->where('jabatan', $oldName)->update(['jabatan' => $position->nama]);
             }
 
             MasterAuditLog::record(
@@ -362,15 +371,19 @@ class MasterFormasiService
     {
         $unit = Unit::findOrFail($unitId);
         $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        $pending = $this->pendingMutations($unit->nama);
+        $blockers = [];
 
         if ($employees > 0) {
-            return ImpactResult::blocked(
-                ["Unit '{$unit->nama}' tidak dapat dinonaktifkan: {$employees} pegawai masih tercatat di unit ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu."],
-                $employees
-            );
+            $blockers[] = "{$employees} pegawai masih tercatat di unit ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+        }
+        if ($pending > 0) {
+            $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju unit ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
         }
 
-        return ImpactResult::ok();
+        return $blockers === []
+            ? ImpactResult::ok()
+            : ImpactResult::blocked(["Unit '{$unit->nama}' tidak dapat dinonaktifkan: ".implode(' ', $blockers)], $employees);
     }
 
     private function previewUnitDelete(int $unitId): ImpactResult
@@ -410,26 +423,36 @@ class MasterFormasiService
         }
 
         $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        $pending = $this->pendingMutations($unit->nama);
+        $warnings = [];
 
-        return ImpactResult::ok(
-            $employees > 0 ? ["{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan tetap memakai nama lama."] : [],
-            $employees
-        );
+        if ($employees > 0) {
+            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+        }
+        if ($pending > 0) {
+            $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama unit tujuannya.";
+        }
+
+        return ImpactResult::ok($warnings, $employees);
     }
 
     private function previewPositionDeactivate(int $positionId): ImpactResult
     {
         $position = Position::findOrFail($positionId);
         $employees = Employee::where('jabatan', $position->nama)->count();
+        $pending = $this->pendingMutations(null, $position->nama);
+        $blockers = [];
 
         if ($employees > 0) {
-            return ImpactResult::blocked(
-                ["Jabatan '{$position->nama}' tidak dapat dinonaktifkan: {$employees} pegawai masih memegang jabatan ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu."],
-                $employees
-            );
+            $blockers[] = "{$employees} pegawai masih memegang jabatan ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+        }
+        if ($pending > 0) {
+            $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju jabatan ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
         }
 
-        return ImpactResult::ok();
+        return $blockers === []
+            ? ImpactResult::ok()
+            : ImpactResult::blocked(["Jabatan '{$position->nama}' tidak dapat dinonaktifkan: ".implode(' ', $blockers)], $employees);
     }
 
     private function previewPositionDelete(int $positionId): ImpactResult
@@ -469,11 +492,17 @@ class MasterFormasiService
         }
 
         $employees = Employee::where('jabatan', $position->nama)->count();
+        $pending = $this->pendingMutations(null, $position->nama);
+        $warnings = [];
 
-        return ImpactResult::ok(
-            $employees > 0 ? ["{$employees} pegawai akan ikut diperbarui nama jabatannya; riwayat jabatan tetap memakai nama lama."] : [],
-            $employees
-        );
+        if ($employees > 0) {
+            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama jabatannya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+        }
+        if ($pending > 0) {
+            $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama jabatan tujuannya.";
+        }
+
+        return ImpactResult::ok($warnings, $employees);
     }
 
     private function previewPositionRmChange(int $positionId): ImpactResult
@@ -525,15 +554,19 @@ class MasterFormasiService
     {
         $seat = $this->findSeat($seatId);
         $filled = $this->filled($seat->unit_nama, $seat->jabatan);
+        $pending = $this->pendingMutations($seat->unit_nama, $seat->jabatan);
+        $blockers = [];
 
         if ($filled > 0) {
-            return ImpactResult::blocked(
-                ["Kursi tidak dapat dihapus: {$filled} pegawai masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu."],
-                $filled
-            );
+            $blockers[] = "{$filled} pegawai masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+        }
+        if ($pending > 0) {
+            $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju kursi ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
         }
 
-        return ImpactResult::ok();
+        return $blockers === []
+            ? ImpactResult::ok()
+            : ImpactResult::blocked(['Kursi tidak dapat dihapus: '.implode(' ', $blockers)], $filled);
     }
 
     // ─────────────────────────────── Pembantu ───────────────────────────────
@@ -640,6 +673,10 @@ class MasterFormasiService
             throw new FormasiRuleViolationException('Kuota harus berupa bilangan bulat minimal 1.');
         }
 
+        if ($kuota > self::MAX_KUOTA) {
+            throw new FormasiRuleViolationException('Kuota maksimal '.self::MAX_KUOTA.' per kursi.');
+        }
+
         if ($bidang !== null && ! array_key_exists($bidang, Position::BIDANG_LIST)) {
             throw new FormasiRuleViolationException('Bidang harus salah satu dari KEU, TAN, TEK, atau UMU.');
         }
@@ -668,6 +705,18 @@ class MasterFormasiService
         $seat->kuota = (int) $seat->kuota;
 
         return $seat;
+    }
+
+    /**
+     * Mutasi terjadwal (belum berlaku) yang menuju unit dan/atau jabatan tertentu.
+     * Saat TMT tiba, teks unit dan jabatan pada pegawai disalin dari baris ini.
+     */
+    private function pendingMutations(?string $unitNama, ?string $jabatan = null): int
+    {
+        return JobHistory::where('is_applied', false)
+            ->when($unitNama !== null, fn ($q) => $q->where('unit_kerja', $unitNama))
+            ->when($jabatan !== null, fn ($q) => $q->where('jabatan', $jabatan))
+            ->count();
     }
 
     private function filled(string $unitNama, string $jabatan): int

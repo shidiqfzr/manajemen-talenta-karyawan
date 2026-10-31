@@ -190,10 +190,10 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 
    | Situasi | Perilaku |
    |---|---|
-   | Kuota diturunkan di bawah jumlah pegawai | **Diizinkan**, kursi ditandai "melebihi kuota" pada layar Formasi dan MPP |
-   | Kursi dihapus / unit atau jabatan dinonaktifkan saat masih ada pegawai | **Ditolak**; pesan menyebut jumlah pegawai dan mengarahkan ke modul Mutasi |
+   | Kuota diturunkan di bawah jumlah pegawai | **Diizinkan**, kursi ditandai "melebihi kuota" pada layar Formasi (pada MPP, kelebihan tampak sebagai kebutuhan negatif) |
+   | Kursi dihapus / unit atau jabatan dinonaktifkan saat masih ada pegawai atau mutasi terjadwal yang belum berlaku | **Ditolak**; pesan menyebut jumlahnya dan mengarahkan ke modul Mutasi |
    | Unit atau jabatan dihapus | Hanya bila tidak dipakai pegawai, kursi, maupun riwayat jabatan; selain itu gunakan penonaktifan |
-   | Unit atau jabatan diganti nama | Diizinkan; teks pada `employees` diselaraskan, `job_histories` tetap memakai nama lama |
+   | Unit atau jabatan diganti nama | Diizinkan; teks pada `employees` dan mutasi terjadwal yang belum berlaku diselaraskan, riwayat jabatan yang sudah berlaku tetap memakai nama lama |
    | Level RM jabatan diubah | Diizinkan dengan peringatan jumlah unit pemakai (berlaku untuk seluruh unit) |
    | Kursi baru | Unit dan jabatan harus aktif, pasangan tidak boleh ganda, kuota bilangan bulat minimal 1, **bidang wajib** untuk jabatan Karpim (KEU, TAN, TEK, UMU) |
    | Alasan perubahan (minimal 10 karakter) | **Wajib** untuk hapus kursi, nonaktifkan, hapus, ganti nama, dan ubah Level RM |

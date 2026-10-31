@@ -9,6 +9,7 @@ use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -502,6 +503,118 @@ class MasterFormasiServiceTest extends TestCase
 
         $this->assertDatabaseMissing('positions', ['id' => $position->id]);
         $this->assertSame('position.deleted', MasterAuditLog::firstOrFail()->action);
+    }
+
+    private function pending(string $unitNama, string $jabatan): JobHistory
+    {
+        $employee = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+
+        return JobHistory::create([
+            'employee_nik' => $employee->nik,
+            'jabatan' => $jabatan,
+            'unit_kerja' => $unitNama,
+            'tmt_awal' => '2030-01-01',
+            'is_applied' => false,
+        ]);
+    }
+
+    public function test_rename_unit_also_updates_pending_scheduled_mutations(): void
+    {
+        $unit = $this->unit('Kebun Lama');
+        $this->history('Kebun Lama', 'Manajer');
+        $pending = $this->pending('Kebun Lama', 'Manajer');
+
+        $this->service->updateUnit($unit, ['nama' => 'Kebun Nama Baru'], 'Penyesuaian nama unit resmi', $this->admin);
+
+        $this->assertSame('Kebun Nama Baru', $pending->fresh()->unit_kerja);
+        $this->assertDatabaseHas('job_histories', ['unit_kerja' => 'Kebun Lama', 'is_applied' => true]);
+    }
+
+    public function test_rename_position_also_updates_pending_scheduled_mutations(): void
+    {
+        $position = $this->position('Asisten Lama');
+        $this->history('Kebun Uji', 'Asisten Lama');
+        $pending = $this->pending('Kebun Uji', 'Asisten Lama');
+
+        $this->service->updatePosition($position, ['nama' => 'Asisten Nama Baru'], 'Penyesuaian nomenklatur jabatan', $this->admin);
+
+        $this->assertSame('Asisten Nama Baru', $pending->fresh()->jabatan);
+        $this->assertDatabaseHas('job_histories', ['jabatan' => 'Asisten Lama', 'is_applied' => true]);
+    }
+
+    public function test_deactivating_a_unit_is_blocked_by_a_pending_scheduled_mutation(): void
+    {
+        $unit = $this->unit('Kebun Terjadwal');
+        $this->pending('Kebun Terjadwal', 'Manajer');
+
+        try {
+            $this->service->setUnitActive($unit, false, 'Unit digabung ke unit lain', $this->admin);
+            $this->fail('Mutasi terjadwal seharusnya memblokir penonaktifan.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('mutasi terjadwal', $e->getMessage());
+        }
+
+        $this->assertTrue($unit->fresh()->is_active);
+    }
+
+    public function test_deactivating_a_position_is_blocked_by_a_pending_scheduled_mutation(): void
+    {
+        $position = $this->position('Asisten Terjadwal');
+        $this->pending('Kebun Uji', 'Asisten Terjadwal');
+
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->expectExceptionMessage('mutasi terjadwal');
+        $this->service->setPositionActive($position, false, 'Jabatan tidak dipakai lagi', $this->admin);
+    }
+
+    public function test_removing_a_seat_is_blocked_by_a_pending_scheduled_mutation(): void
+    {
+        $unit = $this->unit();
+        $position = $this->position('Asisten Terjadwal');
+        $seatId = $this->seat($unit, $position);
+        $this->pending('Kebun Uji', 'Asisten Terjadwal');
+
+        try {
+            $this->service->removeSeat($seatId, 'Kursi dihapus karena restrukturisasi', $this->admin);
+            $this->fail('Mutasi terjadwal seharusnya memblokir penghapusan kursi.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('mutasi terjadwal', $e->getMessage());
+        }
+
+        $this->assertDatabaseHas('position_unit', ['id' => $seatId]);
+    }
+
+    public function test_concurrent_duplicate_seat_insert_gives_a_rule_message(): void
+    {
+        $unit = $this->unit();
+        $position = $this->position();
+        $this->seat($unit, $position);
+
+        // Pratinjau lolos (balapan: kursi dibuat permintaan lain setelah pemeriksaan), insert menabrak indeks unik.
+        $racing = new class extends MasterFormasiService
+        {
+            public function previewImpact(string $operation, array $params): ImpactResult
+            {
+                return ImpactResult::ok();
+            }
+        };
+
+        try {
+            $racing->addSeat($unit, $position, 1, 'TAN', $this->admin);
+            $this->fail('Kursi ganda seharusnya ditolak.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('sudah memiliki', $e->getMessage());
+        }
+
+        $this->assertSame(1, DB::table('position_unit')->count());
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_kuota_above_the_maximum_is_refused(): void
+    {
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->expectExceptionMessage('maksimal');
+        $this->service->addSeat($this->unit(), $this->position(), 1001, 'TAN', $this->admin);
     }
 
     public function test_audit_failure_rolls_back_the_change(): void
