@@ -263,6 +263,24 @@
                                 <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Kursi &amp; Kuota</p>
                             </div>
                         </a>
+
+                        <!-- Riwayat Perubahan Master -->
+                        <a wire:navigate href="{{ route('admin.master.riwayat.index') }}"
+                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
+                                {{ request()->routeIs('admin.master.riwayat.*')
+                                    ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
+                                    : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
+                            :class="sidebarCollapsed ? 'justify-center px-2' : ''"
+                            title="Riwayat Perubahan Master"
+                        @if (request()->routeIs('admin.master.riwayat.*')) aria-current="page" @endif>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.riwayat.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
+                                <i class="fas fa-clock-rotate-left text-sm" aria-hidden="true"></i>
+                            </div>
+                            <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
+                                <p class="text-sm leading-tight truncate">Riwayat Perubahan</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Audit Master Data</p>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </nav>

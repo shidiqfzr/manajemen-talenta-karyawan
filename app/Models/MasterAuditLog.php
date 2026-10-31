@@ -34,6 +34,54 @@ class MasterAuditLog extends Model
         'created_at' => 'datetime',
     ];
 
+    public const ACTION_LABELS = [
+        'seat.added' => 'Kursi ditambahkan',
+        'seat.updated' => 'Kursi diubah',
+        'seat.removed' => 'Kursi dihapus',
+        'unit.created' => 'Unit dibuat',
+        'unit.updated' => 'Unit diubah',
+        'unit.renamed' => 'Nama unit diubah',
+        'unit.activated' => 'Unit diaktifkan',
+        'unit.deactivated' => 'Unit dinonaktifkan',
+        'unit.deleted' => 'Unit dihapus',
+        'position.created' => 'Jabatan dibuat',
+        'position.updated' => 'Jabatan diubah',
+        'position.renamed' => 'Nama jabatan diubah',
+        'position.activated' => 'Jabatan diaktifkan',
+        'position.deactivated' => 'Jabatan dinonaktifkan',
+        'position.deleted' => 'Jabatan dihapus',
+    ];
+
+    public const ENTITY_LABELS = [
+        'unit' => 'Unit Kerja',
+        'position' => 'Jabatan',
+        'seat' => 'Kursi Formasi',
+    ];
+
+    public static function actionLabel(string $action): string
+    {
+        return self::ACTION_LABELS[$action] ?? $action;
+    }
+
+    /**
+     * Ringkasan perubahan yang mudah dibaca, mis. "kuota: 1 → 3".
+     *
+     * @return list<string>
+     */
+    public function changeSummary(): array
+    {
+        $old = $this->old_values ?? [];
+        $new = $this->new_values ?? [];
+        $keys = array_values(array_unique([...array_keys($old), ...array_keys($new)]));
+        $show = fn (mixed $value): string => match (true) {
+            $value === null => '-',
+            is_bool($value) => $value ? 'ya' : 'tidak',
+            default => (string) $value,
+        };
+
+        return array_map(fn (string $key): string => $key.': '.$show($old[$key] ?? null).' → '.$show($new[$key] ?? null), $keys);
+    }
+
     protected static function booted(): void
     {
         static::updating(function (): never {

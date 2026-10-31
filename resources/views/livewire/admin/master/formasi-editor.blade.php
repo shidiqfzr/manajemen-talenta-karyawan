@@ -1,15 +1,4 @@
 @php
-    $actionLabels = [
-        'seat.added' => 'Kursi ditambahkan',
-        'seat.updated' => 'Kursi diubah',
-        'seat.removed' => 'Kursi dihapus',
-        'unit.created' => 'Unit dibuat',
-        'unit.updated' => 'Unit diubah',
-        'unit.renamed' => 'Nama unit diubah',
-        'unit.activated' => 'Unit diaktifkan',
-        'unit.deactivated' => 'Unit dinonaktifkan',
-        'unit.deleted' => 'Unit dihapus',
-    ];
     $fieldClass = 'w-full px-3 py-2 bg-surface-50/70 border border-surface-200 rounded-xl text-xs font-medium text-surface-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition';
 @endphp
 <div class="space-y-6">
@@ -175,7 +164,7 @@
             <ul class="divide-y divide-surface-100">
                 @forelse ($this->recentChanges as $log)
                     <li wire:key="log-{{ $log->id }}" class="py-2.5 text-xs">
-                        <p class="font-bold text-surface-800">{{ $actionLabels[$log->action] ?? $log->action }} — {{ $log->entity_label }}</p>
+                        <p class="font-bold text-surface-800">{{ \App\Models\MasterAuditLog::actionLabel($log->action) }} — {{ $log->entity_label }}</p>
                         <p class="text-surface-500">{{ $log->user_name }} · {{ $log->created_at->diffForHumans() }}@if ($log->reason) · {{ $log->reason }}@endif</p>
                     </li>
                 @empty

@@ -144,6 +144,9 @@ Route::prefix('admin')
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
             Route::resource('units', UnitController::class)->except(['show']);
 
+            // Riwayat perubahan master (read-only)
+            Route::get('riwayat', [\App\Http\Controllers\Admin\Master\MasterAuditLogController::class, 'index'])->name('riwayat.index');
+
             // Formasi (kursi per unit)
             Route::view('formasi', 'admin.master.formasi.index')->name('formasi.index');
 
