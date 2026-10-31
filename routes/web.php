@@ -144,6 +144,9 @@ Route::prefix('admin')
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
             Route::resource('units', UnitController::class)->except(['show']);
 
+            // Formasi (kursi per unit)
+            Route::view('formasi', 'admin.master.formasi.index')->name('formasi.index');
+
             // Positions
             Route::post('positions/{position}/toggle', [PositionController::class, 'toggleStatus'])->name('positions.toggle');
             Route::resource('positions', PositionController::class)->except(['show']);

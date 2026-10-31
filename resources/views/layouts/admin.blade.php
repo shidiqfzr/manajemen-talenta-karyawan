@@ -245,6 +245,24 @@
                                 <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Bidang &amp; RM Level</p>
                             </div>
                         </a>
+
+                        <!-- Formasi -->
+                        <a wire:navigate href="{{ route('admin.master.formasi.index') }}"
+                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
+                                {{ request()->routeIs('admin.master.formasi.*')
+                                    ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
+                                    : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
+                            :class="sidebarCollapsed ? 'justify-center px-2' : ''"
+                            title="Formasi Unit Kerja"
+                        @if (request()->routeIs('admin.master.formasi.*')) aria-current="page" @endif>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.formasi.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
+                                <i class="fas fa-table-list text-sm" aria-hidden="true"></i>
+                            </div>
+                            <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
+                                <p class="text-sm leading-tight truncate">Formasi</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Kursi &amp; Kuota</p>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </nav>
