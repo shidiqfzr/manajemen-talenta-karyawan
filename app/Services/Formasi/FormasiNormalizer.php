@@ -31,7 +31,8 @@ class FormasiNormalizer
 
     public static function unit(string $raw): string
     {
-        return self::format(str_replace('&', ' DAN ', $raw));
+        // Nama unit memakai '&' (bukan 'dan'), mengikuti penulisan master unit.
+        return str_replace(' dan ', ' & ', self::format($raw));
     }
 
     public static function jabatan(string $raw): string

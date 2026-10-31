@@ -1,6 +1,6 @@
 [
     {
-        "nama": "Bagian Sekretariat dan Hukum",
+        "nama": "Bagian Sekretariat & Hukum",
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -107,7 +107,7 @@
         ]
     },
     {
-        "nama": "Bagian Sumber Daya Manusia dan Sistem Manajemen",
+        "nama": "Bagian Sumber Daya Manusia & Sistem Manajemen",
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -235,7 +235,7 @@
         ]
     },
     {
-        "nama": "Bagian Akuntansi dan Keuangan",
+        "nama": "Bagian Akuntansi & Keuangan",
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -335,7 +335,7 @@
         ]
     },
     {
-        "nama": "Bagian Pengadaan dan Teknologi Informasi",
+        "nama": "Bagian Pengadaan & Teknologi Informasi",
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -528,7 +528,7 @@
         ]
     },
     {
-        "nama": "Bagian Teknik dan Pengolahan",
+        "nama": "Bagian Teknik & Pengolahan",
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -723,7 +723,7 @@
         ]
     },
     {
-        "nama": "PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng",
+        "nama": "PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng",
         "kode": "PMO",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,
@@ -3003,7 +3003,7 @@
         ]
     },
     {
-        "nama": "PMO Batu Bara dan Bisnis Lainnya",
+        "nama": "PMO Batu Bara & Bisnis Lainnya",
         "kode": "PMO",
         "wilayah": "Regional Office (Pontianak)",
         "is_active": true,

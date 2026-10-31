@@ -33,13 +33,13 @@ class Employee extends Model
      */
     public const GROUPED_UNITS = [
         'Regional Office (Kantor Direksi Pontianak)' => [
-            'Bagian Sekretariat dan Hukum',
-            'Bagian Sumber Daya Manusia dan Sistem Manajemen',
+            'Bagian Sekretariat & Hukum',
+            'Bagian Sumber Daya Manusia & Sistem Manajemen',
             'Bagian Tanaman',
-            'Bagian Teknik dan Pengolahan',
-            'Bagian Akuntansi dan Keuangan',
+            'Bagian Teknik & Pengolahan',
+            'Bagian Akuntansi & Keuangan',
             'Tim Penguatan ERP SAP',
-            'Bagian Pengadaan dan Teknologi Informasi',
+            'Bagian Pengadaan & Teknologi Informasi',
             'Divisi Sistem Manajemen & Sustainability',
             'Project Management Office (PMO)',
             'Satuan Pengawasan Internal (SPI)',

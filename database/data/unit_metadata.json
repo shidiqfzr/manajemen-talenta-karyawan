@@ -1,10 +1,10 @@
 {
-    "Bagian Sekretariat dan Hukum": {
+    "Bagian Sekretariat & Hukum": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 1
     },
-    "Bagian Sumber Daya Manusia dan Sistem Manajemen": {
+    "Bagian Sumber Daya Manusia & Sistem Manajemen": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 2
@@ -14,12 +14,12 @@
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 3
     },
-    "Bagian Teknik dan Pengolahan": {
+    "Bagian Teknik & Pengolahan": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 4
     },
-    "Bagian Akuntansi dan Keuangan": {
+    "Bagian Akuntansi & Keuangan": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 5
@@ -29,7 +29,7 @@
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 6
     },
-    "Bagian Pengadaan dan Teknologi Informasi": {
+    "Bagian Pengadaan & Teknologi Informasi": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 7
@@ -49,12 +49,12 @@
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 10
     },
-    "PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng": {
+    "PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng": {
         "kode": "PMO",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 11
     },
-    "PMO Batu Bara dan Bisnis Lainnya": {
+    "PMO Batu Bara & Bisnis Lainnya": {
         "kode": "PMO",
         "wilayah": "Regional Office (Pontianak)",
         "urutan": 12

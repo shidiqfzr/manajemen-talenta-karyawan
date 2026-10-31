@@ -89,9 +89,9 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
      * Hanya pemetaan yang tidak ambigu; nama unit yang sudah tidak ada pada formasi tidak dipetakan.
      */
     public const UNIT_ALIASES = [
-        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng',
-        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng',
-        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'PMO Batu Bara dan Bisnis Lainnya',
+        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'PMO Batu Bara & Bisnis Lainnya',
     ];
 
     public function collection(Collection $rows): void
@@ -549,6 +549,14 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         // 2. Case-insensitive match dengan unit resmi
         foreach ($this->officialUnits as $official) {
             if (strcasecmp($trimmed, $official) === 0) {
+                return $official;
+            }
+        }
+
+        // 2b. Abaikan perbedaan penulisan '&' dan 'dan' serta spasi ganda
+        $canonical = fn (string $name): string => strtolower(preg_replace('/\s+/', ' ', str_replace('&', ' dan ', $name)));
+        foreach ($this->officialUnits as $official) {
+            if ($canonical($trimmed) === $canonical($official)) {
                 return $official;
             }
         }
