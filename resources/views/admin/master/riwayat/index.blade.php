@@ -10,6 +10,8 @@
         <p class="text-xs text-surface-500">Catatan siapa mengubah apa pada unit kerja, jabatan, dan kursi formasi. Catatan tidak dapat diubah atau dihapus.</p>
     </div>
 
+    <x-admin.master.section-nav />
+
     <form method="GET" action="{{ route('admin.master.riwayat.index') }}" class="bg-white rounded-2xl border border-surface-200/80 p-5 shadow-xs grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
         <div>
             <label for="riwayat-entitas" class="block text-xs font-bold text-surface-700 mb-1.5">Jenis Data</label>

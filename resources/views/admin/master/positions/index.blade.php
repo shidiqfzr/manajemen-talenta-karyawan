@@ -41,6 +41,8 @@
         </button>
     </div>
 
+    <x-admin.master.section-nav />
+
     @if (session('success'))
         <div role="status" class="p-4 bg-primary-100 text-primary-800 border border-primary-200 rounded-lg shadow-sm text-xs font-semibold">
             {{ session('success') }}

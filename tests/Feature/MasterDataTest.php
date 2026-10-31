@@ -423,6 +423,46 @@ class MasterDataTest extends TestCase
         $this->assertContains('RM-4', array_column($rm['options'], 'value'));
     }
 
+    public function test_master_pages_share_the_section_navigation_with_their_own_link_marked_current(): void
+    {
+        $pages = [
+            'admin.master.formasi.index' => 'Formasi',
+            'admin.master.units.index' => 'Unit Kerja',
+            'admin.master.positions.index' => 'Jabatan & Posisi',
+            'admin.master.riwayat.index' => 'Riwayat Perubahan',
+        ];
+
+        foreach ($pages as $route => $currentLabel) {
+            $html = $this->actingAs($this->admin)->get(route($route))->assertOk()->getContent();
+
+            $this->assertSame(1, substr_count($html, 'aria-label="Bagian Master Data"'), "{$route}: navigasi seksi harus ada tepat satu.");
+            preg_match('/<nav aria-label="Bagian Master Data".*?<\/nav>/s', $html, $nav);
+            $links = [];
+            preg_match_all('/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s', $nav[0], $links, PREG_SET_ORDER);
+
+            $this->assertCount(4, $links, "{$route}: empat bagian harus tersedia.");
+            $this->assertSame(
+                array_map(fn ($name) => route($name), array_keys($pages)),
+                array_map(fn ($link) => html_entity_decode($link[1]), $links),
+                "{$route}: urutan bagian harus Formasi, Unit Kerja, Jabatan, Riwayat."
+            );
+
+            $current = array_values(array_filter($links, fn ($link) => str_contains($link[0], 'aria-current="page"')));
+            $this->assertCount(1, $current, "{$route}: tepat satu tautan bertanda halaman aktif.");
+            $this->assertStringContainsString(htmlspecialchars($currentLabel), strip_tags($current[0][2]), "{$route}: tautan aktif harus {$currentLabel}.");
+        }
+    }
+
+    public function test_sidebar_has_a_single_master_data_entry(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.master.units.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('title="Master Formasi"', $html);
+        foreach (['Master Unit Kerja', 'Master Jabatan', 'Formasi Unit Kerja', 'Riwayat Perubahan Master'] as $oldTitle) {
+            $this->assertStringNotContainsString('title="'.$oldTitle.'"', $html, "Sidebar tidak boleh lagi memuat entri terpisah '{$oldTitle}'.");
+        }
+    }
+
     public function test_ajax_json_quick_store_position(): void
     {
         $posName = 'Asisten AJAX Quick Add Test';

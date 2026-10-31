@@ -104,7 +104,7 @@
                 </button>
             </div>
 
-            <!-- Sidebar Navigation Menu (Structured by DESIGN.md Section 3) -->
+            <!-- Sidebar Navigation Menu (DESIGN.md §14: satu entri per modul) -->
             <nav aria-label="Navigasi utama" class="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
                 <!-- Group 1: CORE HR -->
                 <div>
@@ -210,75 +210,21 @@
                     <div class="my-1.5 border-t border-surface-200" x-show="sidebarCollapsed"></div>
 
                     <div class="space-y-1">
-                        <!-- Unit Kerja -->
-                        <a wire:navigate href="{{ route('admin.master.units.index') }}"
-                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
-                                {{ request()->routeIs('admin.master.units.*')
-                                    ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
-                                    : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
-                            :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Master Unit Kerja"
-                        @if (request()->routeIs('admin.master.units.*')) aria-current="page" @endif>
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.units.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-building-flag text-sm" aria-hidden="true"></i>
-                            </div>
-                            <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
-                                <p class="text-sm leading-tight truncate">Unit Kerja</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Unit &amp; Wilayah</p>
-                            </div>
-                        </a>
-
-                        <!-- Jabatan & Formasi -->
-                        <a wire:navigate href="{{ route('admin.master.positions.index') }}"
-                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
-                                {{ request()->routeIs('admin.master.positions.*')
-                                    ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
-                                    : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
-                            :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Master Jabatan"
-                        @if (request()->routeIs('admin.master.positions.*')) aria-current="page" @endif>
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.positions.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-id-card-clip text-sm" aria-hidden="true"></i>
-                            </div>
-                            <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
-                                <p class="text-sm leading-tight truncate">Jabatan &amp; Posisi</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Bidang &amp; RM Level</p>
-                            </div>
-                        </a>
-
-                        <!-- Formasi -->
+                        <!-- Master Data: satu entri per modul; bagian-bagiannya ada pada navigasi seksi di dalam halaman -->
                         <a wire:navigate href="{{ route('admin.master.formasi.index') }}"
                             class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
-                                {{ request()->routeIs('admin.master.formasi.*')
+                                {{ request()->routeIs('admin.master.*')
                                     ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
                                     : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
                             :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Formasi Unit Kerja"
-                        @if (request()->routeIs('admin.master.formasi.*')) aria-current="page" @endif>
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.formasi.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-table-list text-sm" aria-hidden="true"></i>
+                            title="Master Formasi"
+                        @if (request()->routeIs('admin.master.*')) aria-current="page" @endif>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
+                                <i class="fas fa-sitemap text-sm" aria-hidden="true"></i>
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
-                                <p class="text-sm leading-tight truncate">Formasi</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Kursi &amp; Kuota</p>
-                            </div>
-                        </a>
-
-                        <!-- Riwayat Perubahan Master -->
-                        <a wire:navigate href="{{ route('admin.master.riwayat.index') }}"
-                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition group relative
-                                {{ request()->routeIs('admin.master.riwayat.*')
-                                    ? 'bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600'
-                                    : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium' }}"
-                            :class="sidebarCollapsed ? 'justify-center px-2' : ''"
-                            title="Riwayat Perubahan Master"
-                        @if (request()->routeIs('admin.master.riwayat.*')) aria-current="page" @endif>
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {{ request()->routeIs('admin.master.riwayat.*') ? 'bg-primary-100 text-primary-700' : 'text-surface-500 group-hover:text-primary-700 group-hover:bg-primary-50' }} transition">
-                                <i class="fas fa-clock-rotate-left text-sm" aria-hidden="true"></i>
-                            </div>
-                            <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
-                                <p class="text-sm leading-tight truncate">Riwayat Perubahan</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Audit Master Data</p>
+                                <p class="text-sm leading-tight truncate">Master Formasi</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Unit, Jabatan &amp; Kursi</p>
                             </div>
                         </a>
                     </div>
