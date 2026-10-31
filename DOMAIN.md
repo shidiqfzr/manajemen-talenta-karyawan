@@ -187,8 +187,8 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
    - Jika nama unit atau jabatan diperbarui di Master Data, sistem secara transaksional menyelaraskan data terkait di tabel `employees` guna mencegah inkonsistensi pelaporan dan audit kepegawaian.
 
 ### 3.6 Sumber Master Formasi Karpim (Excel)
-1. **Sumber tunggal**: berkas `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas ini bersifat mutlak: unit atau jabatan di luar berkas bukan bagian formasi.
-2. **Alur**: Excel → `php artisan formasi:build-seed <berkas>` → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`.
+1. **Baseline awal**: master formasi Karpim ini diturunkan satu kali dari berkas acuan `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas tersebut hanya pengetahuan domain untuk memperbaiki master dan tidak disimpan di repositori; setelah master diperbaiki, **basis data adalah sumber kebenaran** dan perubahan selanjutnya dilakukan melalui Master Data di Admin Panel (§3.5).
+2. **Alur baseline**: Excel → `php artisan formasi:build-seed <berkas>` (alat konversi sekali pakai) → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`. Seeder hanya untuk instalasi baru dan pengembangan; seeder tidak boleh dijalankan ulang pada basis data produksi karena menyelaraskan ulang atribut master.
 3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas; `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
 4. **Penulisan nama**: nama unit memakai `&` (bukan "dan"); singkatan (mis. QC, ESG, SDM, ERP) dan angka romawi tetap huruf besar; salah ketik yang diketahui dikoreksi oleh `FormasiNormalizer`.
 5. **Total formasi**: 45 unit, 392 kombinasi jabatan-unit, 444 kursi (RM-1: 45, RM-2: 71, RM-3: 328; KEU 70, TAN 211, TEK 84, UMU 79).
@@ -434,7 +434,7 @@ Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan
 - `FormasiExcelParser::parse(string $path): array` $\rightarrow$ `['seats' => [...], 'errors' => [...]]`; membaca Excel formasi menjadi kursi per (unit, jabatan), menolak Level RM/Bidang tidak valid, kursi ganda bertentangan, dan jabatan dengan Level RM berbeda antar unit. Tidak mengakses database.
 - `FormasiNormalizer::unit()` / `::jabatan()` $\rightarrow$ Penyeragaman penulisan nama (kapitalisasi, singkatan, angka romawi, `&` pada nama unit, koreksi salah ketik).
 - `FormasiCatalog::seatBidang(string $unitNama, string $jabatan): ?string` $\rightarrow$ Bidang kursi; `null` bila tidak ada kursinya. `FormasiCatalog::standarFormasi(): array` $\rightarrow$ Standar Formasi per RM Band (RM-1..RM-3) dan bidang. Hanya dipakai melalui `ManPowerPlanningService`.
-- `php artisan formasi:build-seed {file}` $\rightarrow$ Membangun `database/data/master_formasi.json` dari Excel formasi; gagal bila ada kesalahan berkas atau unit tanpa metadata (kode/wilayah/urutan).
+- `php artisan formasi:build-seed {file}` $\rightarrow$ Alat konversi sekali pakai: membangun `database/data/master_formasi.json` dari Excel acuan; gagal bila ada kesalahan berkas, wilayah tidak dikenal, atau unit tanpa metadata (kode/wilayah/urutan).
 
 ---
 
