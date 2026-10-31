@@ -354,6 +354,156 @@ class MasterFormasiServiceTest extends TestCase
         $this->assertSame('unit.deleted', MasterAuditLog::firstOrFail()->action);
     }
 
+    public function test_create_position_validates_and_audits(): void
+    {
+        $position = $this->service->createPosition(['nama' => 'Asisten Baru', 'bidang' => 'TAN', 'level' => 'Karpim', 'rm_level' => 'RM-3'], $this->admin);
+
+        $this->assertTrue($position->is_active);
+        $this->assertSame('RM-3', $position->rm_level);
+        $this->assertSame('position.created', MasterAuditLog::firstOrFail()->action);
+
+        $karpel = $this->service->createPosition(['nama' => 'Mandor Baru', 'level' => 'Karpel', 'rm_level' => 'RM-3'], $this->admin);
+        $this->assertNull($karpel->rm_level);
+
+        try {
+            $this->service->createPosition(['nama' => 'Jabatan Salah', 'level' => 'Pimpinan', 'rm_level' => 'RM-1'], $this->admin);
+            $this->fail('Level tidak dikenal seharusnya ditolak.');
+        } catch (FormasiRuleViolationException) {
+            $this->assertDatabaseMissing('positions', ['nama' => 'Jabatan Salah']);
+        }
+
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->service->createPosition(['nama' => 'Asisten Baru', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'bidang' => 'TAN'], $this->admin);
+    }
+
+    public function test_rename_position_updates_employees_text_but_not_job_histories(): void
+    {
+        $unit = $this->unit();
+        $position = $this->position('Asisten Lama');
+        $this->employees($unit, $position, 2);
+        $this->history('Kebun Uji', 'Asisten Lama');
+
+        $this->service->updatePosition($position, ['nama' => 'Asisten Nama Baru'], 'Penyesuaian nomenklatur jabatan', $this->admin);
+
+        $this->assertSame(2, Employee::where('jabatan', 'Asisten Nama Baru')->count());
+        $this->assertSame(0, Employee::where('jabatan', 'Asisten Lama')->count());
+        $this->assertDatabaseHas('job_histories', ['jabatan' => 'Asisten Lama']);
+        $this->assertSame('position.renamed', MasterAuditLog::firstOrFail()->action);
+    }
+
+    public function test_rename_position_to_an_existing_name_is_refused(): void
+    {
+        $position = $this->position('Asisten A');
+        $this->position('Asisten B');
+
+        try {
+            $this->service->updatePosition($position, ['nama' => 'Asisten B'], 'Penyesuaian nomenklatur jabatan', $this->admin);
+            $this->fail('Nama jabatan ganda seharusnya ditolak.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('sudah digunakan', $e->getMessage());
+        }
+
+        $this->assertSame('Asisten A', $position->fresh()->nama);
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_change_rm_requires_a_reason_and_warns_with_the_unit_count(): void
+    {
+        $position = $this->position('Asisten Afdeling', 'Karpim', 'RM-3');
+        foreach (['Kebun A', 'Kebun B', 'Kebun C'] as $nama) {
+            $this->seat($this->unit($nama), $position);
+        }
+
+        $preview = $this->service->previewImpact('position.rm_change', ['position_id' => $position->id, 'rm_level' => 'RM-2']);
+        $this->assertFalse($preview->blocked);
+        $this->assertStringContainsString('3 unit', implode(' ', $preview->warnings));
+
+        try {
+            $this->service->updatePosition($position, ['rm_level' => 'RM-2'], null, $this->admin);
+            $this->fail('Alasan seharusnya wajib untuk perubahan RM.');
+        } catch (FormasiRuleViolationException) {
+            $this->assertSame('RM-3', $position->fresh()->rm_level);
+        }
+
+        $this->service->updatePosition($position, ['rm_level' => 'RM-2'], 'Penyesuaian eselon sesuai pedoman', $this->admin);
+        $this->assertSame('RM-2', $position->fresh()->rm_level);
+        $this->assertSame('position.updated', MasterAuditLog::firstOrFail()->action);
+    }
+
+    public function test_update_position_without_changes_writes_no_audit_row(): void
+    {
+        $position = $this->position('Asisten A', 'Karpim', 'RM-3');
+
+        $this->service->updatePosition($position, ['nama' => 'Asisten A', 'level' => 'Karpim', 'rm_level' => 'RM-3'], null, $this->admin);
+
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_deactivate_position_held_by_employees_is_blocked(): void
+    {
+        $position = $this->position('Asisten Afdeling');
+        $this->employees($this->unit(), $position, 2);
+
+        try {
+            $this->service->setPositionActive($position, false, 'Jabatan tidak dipakai lagi', $this->admin);
+            $this->fail('Menonaktifkan jabatan yang dipegang pegawai seharusnya ditolak.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('2', $e->getMessage());
+            $this->assertStringContainsString('Mutasi', $e->getMessage());
+        }
+
+        $this->assertTrue($position->fresh()->is_active);
+    }
+
+    public function test_deactivate_empty_position_requires_a_reason_and_audits(): void
+    {
+        $position = $this->position('Asisten Kosong');
+
+        try {
+            $this->service->setPositionActive($position, false, null, $this->admin);
+            $this->fail('Alasan seharusnya wajib.');
+        } catch (FormasiRuleViolationException) {
+            $this->assertTrue($position->fresh()->is_active);
+        }
+
+        $this->service->setPositionActive($position, false, 'Jabatan tidak dipakai lagi', $this->admin);
+        $this->assertFalse($position->fresh()->is_active);
+        $this->assertSame('position.deactivated', MasterAuditLog::firstOrFail()->action);
+    }
+
+    public function test_delete_position_is_blocked_by_seats_employees_or_history(): void
+    {
+        $withSeat = $this->position('Jabatan Berkursi');
+        $this->seat($this->unit('Kebun A'), $withSeat);
+
+        $withEmployee = $this->position('Jabatan Berpegawai');
+        $this->employees($this->unit('Kebun B'), $withEmployee, 1);
+
+        $withHistory = $this->position('Jabatan Berriwayat');
+        $this->history('Kebun C', 'Jabatan Berriwayat');
+
+        foreach ([$withSeat, $withEmployee, $withHistory] as $position) {
+            try {
+                $this->service->deletePosition($position, 'Jabatan dihapus dari master', $this->admin);
+                $this->fail("Jabatan {$position->nama} seharusnya tidak dapat dihapus.");
+            } catch (FormasiRuleViolationException) {
+                $this->assertDatabaseHas('positions', ['id' => $position->id]);
+            }
+        }
+
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_delete_unused_position_succeeds_and_audits(): void
+    {
+        $position = $this->position('Jabatan Kosong');
+
+        $this->service->deletePosition($position, 'Jabatan dihapus dari master', $this->admin);
+
+        $this->assertDatabaseMissing('positions', ['id' => $position->id]);
+        $this->assertSame('position.deleted', MasterAuditLog::firstOrFail()->action);
+    }
+
     public function test_audit_failure_rolls_back_the_change(): void
     {
         $unit = $this->unit();
