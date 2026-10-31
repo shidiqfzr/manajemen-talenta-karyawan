@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Employee;
+use App\Models\Unit;
 use App\Services\Import\ConcurrentJobTextParser;
 use App\Services\Import\EmployeeImportRowValidator;
 use Carbon\Carbon;
@@ -62,6 +63,13 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     private array $existingEmployeesCache = [];
 
     /**
+     * Cache nama unit master (dimuat sekali per proses import).
+     *
+     * @var list<string>|null
+     */
+    private ?array $officialUnits = null;
+
+    /**
      * Cache penampung NIK yang sudah diproses dalam batch berkas yang sama: [nik => rowNumber]
      */
     private array $seenNiksInFile = [];
@@ -76,13 +84,14 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         'tanggal_pensiun',
     ];
 
+    /**
+     * Variasi penulisan unit pada berkas pegawai yang dipetakan ke unit master saat ini.
+     * Hanya pemetaan yang tidak ambigu; nama unit yang sudah tidak ada pada formasi tidak dipetakan.
+     */
     public const UNIT_ALIASES = [
-        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'Project Management Office (PMO)',
-        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE (PMO)' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE' => 'Project Management Office (PMO)',
-        'PMO' => 'Project Management Office (PMO)',
+        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng',
+        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng',
+        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'PMO Batu Bara dan Bisnis Lainnya',
     ];
 
     public function collection(Collection $rows): void
@@ -520,7 +529,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     }
 
     /**
-     * Menormalisasi nama Unit Kerja dari data import Excel ke 43 Unit Kerja resmi.
+     * Menormalisasi nama Unit Kerja dari data import Excel ke Unit Kerja resmi pada master formasi.
      */
     public function normalizeUnitKerja(?string $rawUnit): string
     {
@@ -530,13 +539,15 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
         $trimmed = trim($rawUnit);
 
+        $this->officialUnits ??= Unit::officialNames();
+
         // 1. Direct match dengan unit resmi
-        if (in_array($trimmed, Employee::OFFICIAL_UNITS, true)) {
+        if (in_array($trimmed, $this->officialUnits, true)) {
             return $trimmed;
         }
 
         // 2. Case-insensitive match dengan unit resmi
-        foreach (Employee::OFFICIAL_UNITS as $official) {
+        foreach ($this->officialUnits as $official) {
             if (strcasecmp($trimmed, $official) === 0) {
                 return $official;
             }
@@ -546,11 +557,6 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         $upper = strtoupper($trimmed);
         if (isset(self::UNIT_ALIASES[$upper])) {
             return self::UNIT_ALIASES[$upper];
-        }
-
-        // 4. Pattern regex untuk unit PMO (Project Management Office)
-        if (preg_match('/^(PROJECT\s+MANAGEMENT\s+OFFICE|PMO)\b/i', $trimmed)) {
-            return 'Project Management Office (PMO)';
         }
 
         return $trimmed;

@@ -45,9 +45,6 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
     {
         // 1. Ambil 43 Unit Kerja resmi
         $activeUnits = Unit::active()->orderBy('urutan')->orderBy('nama')->pluck('nama')->toArray();
-        if (empty($activeUnits)) {
-            $activeUnits = Employee::OFFICIAL_UNITS;
-        }
 
         // 2. Ambil Jabatan aktif
         $activePositions = Position::active()->orderBy('level')->orderBy('nama')->pluck('nama')->toArray();

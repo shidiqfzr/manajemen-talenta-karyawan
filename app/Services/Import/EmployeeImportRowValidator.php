@@ -177,7 +177,7 @@ class EmployeeImportRowValidator
             if (! $unit) {
                 $this->unitPositionsCache[$unitName] = [
                     'exists' => false,
-                    'is_official' => in_array($unitName, Employee::OFFICIAL_UNITS, true),
+                    'is_official' => false, // master unit kini sepenuhnya dari database
                     'positions' => [],
                 ];
             } else {
