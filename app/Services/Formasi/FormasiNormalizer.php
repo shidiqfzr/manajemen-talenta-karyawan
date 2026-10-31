@@ -20,7 +20,14 @@ class FormasiNormalizer
     /** Singkatan yang tetap ditulis huruf besar. */
     private const ACRONYMS = [
         'PKS', 'PKR', 'PMO', 'ERP', 'SAP', 'TI', 'TJSL', 'UMK', 'HPS', 'URTA', 'KKPA', 'T3M', 'PSDM', 'SDM',
+        'QC', 'ESG', 'HI', 'CO', 'FI', 'HCM', 'MM', 'PM', 'SD', 'PP', 'QM', 'FM', 'PS', 'BKM', 'SPB',
     ];
+
+    /** Kata sambung yang ditulis huruf kecil. */
+    private const LOWERCASE_WORDS = ['DAN' => 'dan', 'OF' => 'of'];
+
+    /** Angka romawi I sampai XXXIX, dengan akhiran huruf A/B (mis. IIA). */
+    private const ROMAN_PATTERN = '/^(?=[IVXL]+[AB]?$)X{0,3}(?:IX|IV|V?I{0,3})[AB]?$/';
 
     public static function unit(string $raw): string
     {
@@ -44,12 +51,12 @@ class FormasiNormalizer
         return preg_replace_callback('/[A-Z0-9]+/u', function (array $match): string {
             $word = $match[0];
 
-            if (in_array($word, self::ACRONYMS, true) || preg_match('/^(?:I{1,3}|IV|VI{0,3}|IX|XI{0,2})[AB]?$/', $word)) {
+            if (in_array($word, self::ACRONYMS, true) || preg_match(self::ROMAN_PATTERN, $word)) {
                 return $word;
             }
 
-            if ($word === 'DAN') {
-                return 'dan';
+            if (isset(self::LOWERCASE_WORDS[$word])) {
+                return self::LOWERCASE_WORDS[$word];
             }
 
             return ucfirst(strtolower($word));

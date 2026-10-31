@@ -37,6 +37,8 @@ class FormasiExcelParser
         $seats = [];
         $conflicted = [];
         $errors = [];
+        // Level RM pertama yang terlihat per jabatan: RM bersifat melekat pada nama jabatan, bukan pada unit.
+        $rmByJabatan = [];
 
         foreach (array_slice($rows, 1, null, true) as $index => $row) {
             $excelRow = $index + 1;
@@ -78,6 +80,14 @@ class FormasiExcelParser
 
                 continue;
             }
+
+            if (isset($rmByJabatan[$jabatan]) && $rmByJabatan[$jabatan]['rm'] !== $rm) {
+                $first = $rmByJabatan[$jabatan];
+                $errors[] = ['row' => $excelRow, 'message' => "Jabatan '{$jabatan}' memakai Level RM {$rm} di '{$unit}' tetapi {$first['rm']} di baris {$first['row']}; Level RM harus sama di seluruh unit."];
+
+                continue;
+            }
+            $rmByJabatan[$jabatan] ??= ['rm' => $rm, 'row' => $excelRow];
 
             $seats[$key] = ['unit' => $unit, 'jabatan' => $jabatan, 'rm_level' => $rm, 'bidang' => $bidang, 'kuota' => 1];
         }

@@ -58,6 +58,19 @@ class FormasiExcelParserTest extends TestCase
         $this->assertSame('Asisten Afdeling IIA', FormasiNormalizer::jabatan('ASISTEN AFDELING IIA'));
     }
 
+    public function test_normalizer_keeps_acronyms_and_roman_numerals_up_to_xiii_uppercase(): void
+    {
+        $this->assertSame('Asisten Afdeling XIII', FormasiNormalizer::jabatan('ASISTEN AFDELING XIII'));
+        $this->assertSame('Asisten QC Pengolahan Kelapa Sawit', FormasiNormalizer::jabatan('ASISTEN QC PENGOLAHAN KELAPA SAWIT'));
+        $this->assertSame('Kepala Sub Bagian QC & Administrasi Tanaman', FormasiNormalizer::jabatan('KEPALA SUB BAGIAN QC & ADMINISTRASI TANAMAN'));
+        $this->assertSame('Asisten ESG dan Sustainability', FormasiNormalizer::jabatan('ASISTEN ESG DAN SUSTAINABILITY'));
+        $this->assertSame('Kepala Sub Bagian Kesejahteraan dan HI', FormasiNormalizer::jabatan('KEPALA SUB BAGIAN KESEJAHTERAAN DAN HI'));
+        $this->assertSame('Head of PMO Investasi Tanaman Wilayah Kalbar', FormasiNormalizer::jabatan('HEAD OF PMO INVESTASI TANAMAN WILAYAH KALBAR'));
+        $this->assertSame('Key User Modul FI / CO / HCM / MM / PM / SD', FormasiNormalizer::jabatan('KEY USER MODUL FI / CO / HCM / MM / PM / SD'));
+        $this->assertSame('Key User Modul PP, QM, dan Jembatan Timbang', FormasiNormalizer::jabatan('KEY USER MODUL PP, QM, DAN JEMBATAN TIMBANG'));
+        $this->assertSame('Key User Modul FM,PS,BKM,SPB, dan D-Farm', FormasiNormalizer::jabatan('KEY USER MODUL FM,PS,BKM,SPB, DAN D-FARM'));
+    }
+
     public function test_parser_counts_repeated_rows_as_kuota(): void
     {
         $result = (new FormasiExcelParser)->parse($this->workbook([
@@ -97,6 +110,19 @@ class FormasiExcelParserTest extends TestCase
         $this->assertCount(1, $result['errors']);
         $this->assertSame(3, $result['errors'][0]['row']);
         $this->assertSame([], $result['seats']);
+    }
+
+    public function test_parser_reports_jabatan_with_different_rm_across_units(): void
+    {
+        $result = (new FormasiExcelParser)->parse($this->workbook([
+            ['KEBUN TAJATI', 'ASISTEN TATA USAHA', 'RM-3', 'KEU'],
+            ['KEBUN PAMUKAN', 'ASISTEN TATA USAHA', 'RM-2', 'KEU'],
+        ]));
+
+        $this->assertSame([3], array_column($result['errors'], 'row'));
+        $this->assertStringContainsString('RM-3', $result['errors'][0]['message']);
+        $this->assertCount(1, $result['seats']);
+        $this->assertSame('Kebun Tajati', $result['seats'][0]['unit']);
     }
 
     public function test_parser_rejects_invalid_rm_and_bidang_with_row_numbers(): void

@@ -135,7 +135,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Kepala Sub Bagian Kesejahteraan dan Hi",
+                "nama": "Kepala Sub Bagian Kesejahteraan dan HI",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-2",
@@ -212,7 +212,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Esg dan Sustainability",
+                "nama": "Asisten ESG dan Sustainability",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -449,7 +449,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Kepala Sub Bagian Qc & Administrasi Tanaman",
+                "nama": "Kepala Sub Bagian QC & Administrasi Tanaman",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-2",
@@ -519,7 +519,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Qc Tanaman Kelapa Sawit",
+                "nama": "Asisten QC Tanaman Kelapa Sawit",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -563,7 +563,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Qc Pengolahan Kelapa Sawit",
+                "nama": "Asisten QC Pengolahan Kelapa Sawit",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -693,7 +693,7 @@
         "urutan": 10,
         "positions": [
             {
-                "nama": "Head Of PMO Investasi Tanaman Wilayah Kalbar",
+                "nama": "Head of PMO Investasi Tanaman Wilayah Kalbar",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-1",
@@ -730,7 +730,7 @@
         "urutan": 11,
         "positions": [
             {
-                "nama": "Head Of PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng",
+                "nama": "Head of PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-1",
@@ -1062,7 +1062,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Afdeling Xiii",
+                "nama": "Asisten Afdeling XIII",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3010,7 +3010,7 @@
         "urutan": 12,
         "positions": [
             {
-                "nama": "Head Of PMO Batubara dan Bisnis Lainnya",
+                "nama": "Head of PMO Batubara dan Bisnis Lainnya",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-1",
@@ -3077,14 +3077,14 @@
         "urutan": 6,
         "positions": [
             {
-                "nama": "Lead Of ERP SAP",
+                "nama": "Lead of ERP SAP",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-1",
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Fi",
+                "nama": "Key User Modul FI",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3098,49 +3098,49 @@
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Co",
+                "nama": "Key User Modul CO",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Fm,Ps,Bkm,Spb, dan D-Farm",
+                "nama": "Key User Modul FM,PS,BKM,SPB, dan D-Farm",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 2
             },
             {
-                "nama": "Key User Modul Pp, Qm, dan Jembatan Timbang",
+                "nama": "Key User Modul PP, QM, dan Jembatan Timbang",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Mm",
+                "nama": "Key User Modul MM",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 2
             },
             {
-                "nama": "Key User Modul Pm",
+                "nama": "Key User Modul PM",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Hcm",
+                "nama": "Key User Modul HCM",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul Sd",
+                "nama": "Key User Modul SD",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
