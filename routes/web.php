@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
 use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\JobVacancyController;
+use App\Http\Controllers\Admin\Master\MasterAuditLogController;
 use App\Http\Controllers\Admin\Master\PositionController;
 use App\Http\Controllers\Admin\Master\UnitController;
 use App\Http\Controllers\Admin\MutasiController;
@@ -145,7 +146,7 @@ Route::prefix('admin')
             Route::resource('units', UnitController::class)->except(['show']);
 
             // Riwayat perubahan master (read-only)
-            Route::get('riwayat', [\App\Http\Controllers\Admin\Master\MasterAuditLogController::class, 'index'])->name('riwayat.index');
+            Route::get('riwayat', [MasterAuditLogController::class, 'index'])->name('riwayat.index');
 
             // Formasi (kursi per unit)
             Route::view('formasi', 'admin.master.formasi.index')->name('formasi.index');
