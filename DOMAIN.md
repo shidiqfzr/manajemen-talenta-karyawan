@@ -186,6 +186,19 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 3. **Penyelarasan Nomenklatur Otomatis**:
    - Jika nama unit atau jabatan diperbarui di Master Data, sistem secara transaksional menyelaraskan data terkait di tabel `employees` guna mencegah inkonsistensi pelaporan dan audit kepegawaian.
 
+4. **Aturan Pengubahan Master Formasi** (seluruhnya melalui `MasterFormasiService`, §9.7; setiap perubahan berlaku langsung dan tercatat pada `master_audit_logs`):
+
+   | Situasi | Perilaku |
+   |---|---|
+   | Kuota diturunkan di bawah jumlah pegawai | **Diizinkan**, kursi ditandai "melebihi kuota" pada layar Formasi dan MPP |
+   | Kursi dihapus / unit atau jabatan dinonaktifkan saat masih ada pegawai | **Ditolak**; pesan menyebut jumlah pegawai dan mengarahkan ke modul Mutasi |
+   | Unit atau jabatan dihapus | Hanya bila tidak dipakai pegawai, kursi, maupun riwayat jabatan; selain itu gunakan penonaktifan |
+   | Unit atau jabatan diganti nama | Diizinkan; teks pada `employees` diselaraskan, `job_histories` tetap memakai nama lama |
+   | Level RM jabatan diubah | Diizinkan dengan peringatan jumlah unit pemakai (berlaku untuk seluruh unit) |
+   | Kursi baru | Unit dan jabatan harus aktif, pasangan tidak boleh ganda, kuota bilangan bulat minimal 1, **bidang wajib** untuk jabatan Karpim (KEU, TAN, TEK, UMU) |
+   | Alasan perubahan (minimal 10 karakter) | **Wajib** untuk hapus kursi, nonaktifkan, hapus, ganti nama, dan ubah Level RM |
+
+   Pemindahan pegawai antarkursi tidak dilakukan oleh editor formasi; tetap melalui modul Mutasi agar setiap perubahan penempatan tercatat pada `job_histories`.
 ### 3.6 Sumber Master Formasi Karpim (Excel)
 1. **Baseline awal**: master formasi Karpim ini diturunkan satu kali dari berkas acuan `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas tersebut hanya pengetahuan domain untuk memperbaiki master dan tidak disimpan di repositori; setelah master diperbaiki, **basis data adalah sumber kebenaran** dan perubahan selanjutnya dilakukan melalui Master Data di Admin Panel (§3.5).
 2. **Alur baseline**: Excel → `php artisan formasi:build-seed <berkas>` (alat konversi sekali pakai) → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`. Seeder hanya untuk instalasi baru dan pengembangan; seeder tidak boleh dijalankan ulang pada basis data produksi karena menyelaraskan ulang atribut master.
@@ -436,6 +449,13 @@ Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan
 - `FormasiCatalog::seatBidang(string $unitNama, string $jabatan): ?string` $\rightarrow$ Bidang kursi; `null` bila tidak ada kursinya. `FormasiCatalog::standarFormasi(): array` $\rightarrow$ Standar Formasi per RM Band (RM-1..RM-3) dan bidang. Hanya dipakai melalui `ManPowerPlanningService`.
 - `php artisan formasi:build-seed {file}` $\rightarrow$ Alat konversi sekali pakai: membangun `database/data/master_formasi.json` dari Excel acuan; gagal bila ada kesalahan berkas, wilayah tidak dikenal, atau unit tanpa metadata (kode/wilayah/urutan).
 
+### 9.7 `MasterFormasiService` (`App\Services\Formasi\`)
+Satu-satunya jalur ubah unit, jabatan, dan kursi formasi. Setiap metode menerima `User` pelaksana, berjalan dalam satu `DB::transaction()`, memanggil `previewImpact()` lebih dulu, lalu menulis `master_audit_logs` pada transaksi yang sama (gagal mencatat berarti perubahan dibatalkan). Pelanggaran aturan dilempar sebagai `FormasiRuleViolationException` (pesan aman ditampilkan ke admin).
+- Unit: `createUnit(array, User)`, `updateUnit(Unit, array, ?string $reason, User)`, `setUnitActive(Unit, bool, ?string $reason, User)`, `deleteUnit(Unit, ?string $reason, User)`
+- Jabatan: `createPosition(array, User)`, `updatePosition(Position, array, ?string $reason, User)`, `setPositionActive(Position, bool, ?string $reason, User)`, `deletePosition(Position, ?string $reason, User)`
+- Kursi: `addSeat(Unit, Position, int $kuota, ?string $bidang, User): int`, `updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User)`, `removeSeat(int $positionUnitId, ?string $reason, User)`
+- `previewImpact(string $operation, array $params): ImpactResult` $\rightarrow$ `blocked`, `blockers`, `warnings`, `affectedEmployees`; dipakai panel dampak di layar Formasi dan pemeriksaan sisi server yang sama.
+- Layar: `/admin/master/formasi` (Livewire `FormasiEditor`), `/admin/master/riwayat` (riwayat perubahan, baca-saja); layar Unit Kerja dan Jabatan & Posisi memakai metode di atas untuk tambah, ubah, aktif/nonaktif, dan hapus.
 ---
 
 ## 10. Sinkronisasi Domain ke UI ([DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md))

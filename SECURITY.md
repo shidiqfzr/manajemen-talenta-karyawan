@@ -91,7 +91,8 @@ Sistem menerapkan proteksi berlapis sesuai standar keamanan OWASP:
 
 Untuk menjamin akuntabilitas tata kelola BUMN:
 1. **Pencatatan Riwayat Mutasi**: Setiap perpindahan jabatan, promosi, atau demosi wajib mencatat histori di tabel `job_histories` dengan atribut `nomor_sk`, `tanggal_sk`, `tmt_awal`, dan user pelaksana.
-2. **Log Kesalahan & Exception**:
+2. **Riwayat Perubahan Master Formasi**: Setiap perubahan pada unit kerja, jabatan, dan kursi formasi dicatat pada tabel `master_audit_logs` (siapa, kapan, aksi, nama entitas saat itu, nilai lama dan baru, serta alasan). Pencatatan dilakukan dalam transaksi yang sama dengan perubahannya, bersifat *append-only* (model menolak ubah dan hapus), dan hanya menyimpan jumlah pegawai terdampak, bukan NIK atau nama pegawai (UU PDP). Riwayat dapat dibaca admin pada `/admin/master/riwayat`.
+3. **Log Kesalahan & Exception**:
    - Konfigurasi `APP_DEBUG=false` wajib aktif di lingkungan staging dan production agar detail stack trace tidak terekspos ke publik.
    - Seluruh kegagalan transaksi dan anomali sistem dicatat dalam rotasi file log di `storage/logs/laravel.log`.
 
