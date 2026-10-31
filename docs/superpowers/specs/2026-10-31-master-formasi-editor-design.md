@@ -55,12 +55,12 @@ Audit actions: `unit.created|updated|renamed|activated|deactivated|deleted`, `po
 
 | Situation | Behavior |
 |---|---|
-| Lower kuota below filled | **Allowed**, flagged "melebihi kuota" on the Formasi screen and in MPP |
-| Remove a seat that has employees | **Blocked**; message states the count and sends the admin to Mutasi |
+| Lower kuota below filled | **Allowed**, flagged "melebihi kuota" on the Formasi screen (MPP already shows a surplus as a negative kebutuhan) |
+| Remove a seat that has employees or a pending scheduled mutation | **Blocked**; message states the count and sends the admin to Mutasi |
 | Deactivate a unit with employees | **Blocked**, same message |
 | Deactivate a jabatan held by employees | **Blocked**, same message |
 | Delete a unit or jabatan | **Only when** no employees, no seats, and no `job_histories` rows reference it; otherwise deactivate |
-| Rename a unit or jabatan | **Allowed**; `employees` text is updated in the same transaction (DOMAIN.md section 3.5); `job_histories` keeps the original text |
+| Rename a unit or jabatan | **Allowed**; `employees` text and pending (not yet applied) scheduled mutations are updated in the same transaction (DOMAIN.md section 3.5); applied `job_histories` rows keep the original text |
 | Change a jabatan's RM | **Allowed with a warning** naming how many units use it |
 | Add a seat | Jabatan and unit must be active; the pair must not already be a seat; kuota is a whole number of at least 1; **bidang is required** for a Karpim seat and must be one of KEU, TAN, TEK, UMU |
 | Reason | **Required** (at least 10 characters) for: remove seat, deactivate, delete, rename, change RM |

@@ -162,6 +162,32 @@ class FormasiEditorTest extends TestCase
         $this->assertSame(['Calon Kursi'], $names);
     }
 
+    public function test_cleared_kuota_input_gives_a_rule_message_not_a_server_error(): void
+    {
+        $position = $this->position('Asisten Kuota Kosong');
+
+        $this->editor()
+            ->call('startAddSeat', $position->id, '', 'TAN')
+            ->call('confirm')
+            ->assertHasErrors('confirm')
+            ->assertSee('Kuota harus berupa bilangan bulat minimal 1');
+
+        $this->assertDatabaseMissing('position_unit', ['position_id' => $position->id]);
+    }
+
+    public function test_a_seat_of_another_unit_cannot_be_started_from_this_unit(): void
+    {
+        $other = Unit::create(['nama' => 'Kebun Lain', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 2]);
+        $position = $this->position('Asisten Milik Unit Lain');
+        $foreignSeat = DB::table('position_unit')->insertGetId([
+            'unit_id' => $other->id, 'position_id' => $position->id, 'kuota' => 1, 'bidang' => 'TAN',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->editor()->call('startRemoveSeat', $foreignSeat)->assertSet('pendingOperation', null);
+        $this->editor()->call('startUpdateSeat', $foreignSeat, 5, 'TAN')->assertSet('pendingOperation', null);
+    }
+
     public function test_recent_changes_for_the_selected_unit_are_listed(): void
     {
         $position = $this->position('Asisten Riwayat');

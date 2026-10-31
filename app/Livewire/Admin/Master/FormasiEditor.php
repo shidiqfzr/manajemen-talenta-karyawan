@@ -12,6 +12,7 @@ use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
@@ -21,14 +22,17 @@ use Livewire\Component;
  */
 class FormasiEditor extends Component
 {
+    #[Locked]
     public ?int $unitId = null;
 
     public string $search = '';
 
     /** seat.add | seat.update | seat.remove */
+    #[Locked]
     public ?string $pendingOperation = null;
 
     /** @var array<string, mixed> */
+    #[Locked]
     public array $pendingParams = [];
 
     public string $reason = '';
@@ -49,21 +53,27 @@ class FormasiEditor extends Component
         $this->search = '';
     }
 
-    public function startAddSeat(int $positionId, int $kuota, string $bidang): void
+    public function startAddSeat(int $positionId, mixed $kuota, string $bidang): void
     {
         $this->authorizeAdmin();
-        $this->beginPending('seat.add', ['position_id' => $positionId, 'kuota' => $kuota, 'bidang' => $bidang]);
+        $this->beginPending('seat.add', ['position_id' => $positionId, 'kuota' => (int) $kuota, 'bidang' => $bidang]);
     }
 
-    public function startUpdateSeat(int $seatId, int $kuota, string $bidang): void
+    public function startUpdateSeat(int $seatId, mixed $kuota, string $bidang): void
     {
         $this->authorizeAdmin();
-        $this->beginPending('seat.update', ['seat_id' => $seatId, 'kuota' => $kuota, 'bidang' => $bidang]);
+        if (! $this->ownsSeat($seatId)) {
+            return;
+        }
+        $this->beginPending('seat.update', ['seat_id' => $seatId, 'kuota' => (int) $kuota, 'bidang' => $bidang]);
     }
 
     public function startRemoveSeat(int $seatId): void
     {
         $this->authorizeAdmin();
+        if (! $this->ownsSeat($seatId)) {
+            return;
+        }
         $this->beginPending('seat.remove', ['seat_id' => $seatId]);
     }
 
@@ -258,6 +268,12 @@ class FormasiEditor extends Component
         $this->reason = '';
         $this->pendingOperation = $operation;
         $this->pendingParams = $params;
+    }
+
+    private function ownsSeat(int $seatId): bool
+    {
+        return $this->unitId !== null
+            && DB::table('position_unit')->where('id', $seatId)->where('unit_id', $this->unitId)->exists();
     }
 
     private function authorizeAdmin(): void

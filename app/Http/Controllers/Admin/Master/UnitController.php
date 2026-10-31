@@ -134,7 +134,7 @@ class UnitController extends Controller
             'nama.unique' => 'Nama unit kerja ini sudah digunakan oleh unit lain.',
         ]);
 
-        $active = $request->has('is_active') ? (bool) $request->input('is_active') : false;
+        $active = $request->has('is_active') ? $request->boolean('is_active') : $unit->is_active;
 
         try {
             DB::transaction(function () use ($service, $unit, $validated, $active, $request): void {

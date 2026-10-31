@@ -167,7 +167,7 @@ class PositionController extends Controller
             'nama.unique' => 'Nama jabatan ini sudah digunakan oleh posisi lain.',
         ]);
 
-        $active = $request->has('is_active') ? (bool) $request->input('is_active') : false;
+        $active = $request->has('is_active') ? $request->boolean('is_active') : $position->is_active;
 
         try {
             DB::transaction(function () use ($service, $position, $validated, $active, $request): void {

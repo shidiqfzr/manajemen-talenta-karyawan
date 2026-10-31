@@ -390,6 +390,39 @@ class MasterDataTest extends TestCase
             ->assertSee('Mutasi');
     }
 
+    public function test_update_without_is_active_keeps_unit_and_position_active(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Tetap Aktif', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 98]);
+        $position = Position::create(['nama' => 'Asisten Tetap Aktif', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+
+        $this->actingAs($this->admin)->put(route('admin.master.units.update', $unit), [
+            'nama' => 'Kebun Tetap Aktif Baru', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'urutan' => 98,
+            'reason' => 'Penyesuaian nama unit resmi',
+        ])->assertRedirect(route('admin.master.units.index'));
+
+        $this->actingAs($this->admin)->put(route('admin.master.positions.update', $position), [
+            'nama' => 'Asisten Tetap Aktif Baru', 'level' => 'Karpim', 'rm_level' => 'RM-3',
+            'reason' => 'Penyesuaian nomenklatur jabatan',
+        ])->assertRedirect(route('admin.master.positions.index'));
+
+        $this->assertTrue($unit->fresh()->is_active);
+        $this->assertTrue($position->fresh()->is_active);
+        $this->assertSame(['unit.renamed', 'position.renamed'], MasterAuditLog::orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_edit_dialog_for_a_pool_position_keeps_its_current_rm_band(): void
+    {
+        $pool = Position::create(['nama' => 'Advisor RM-4', 'level' => 'Karpim', 'rm_level' => 'RM-4', 'is_active' => true]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index'));
+
+        $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
+        $rm = collect($actions->get('PUT '.route('admin.master.positions.update', $pool))['fields'])->firstWhere('name', 'rm_level');
+
+        $this->assertSame('RM-4', $rm['value']);
+        $this->assertContains('RM-4', array_column($rm['options'], 'value'));
+    }
+
     public function test_ajax_json_quick_store_position(): void
     {
         $posName = 'Asisten AJAX Quick Add Test';

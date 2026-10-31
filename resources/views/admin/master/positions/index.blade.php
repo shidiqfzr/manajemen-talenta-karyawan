@@ -6,6 +6,13 @@
     $rmOptions = collect([['value' => '', 'label' => '— (Karpel tidak memakai RM Band)']])
         ->merge(collect(['RM-1', 'RM-2', 'RM-3'])->map(fn ($rm) => ['value' => $rm, 'label' => \App\Models\Position::RM_LEVEL_LIST[$rm]]))
         ->values()->all();
+    $rmOptionsFor = function (?string $current) use ($rmOptions): array {
+        if ($current && ! collect($rmOptions)->contains('value', $current)) {
+            $rmOptions[] = ['value' => $current, 'label' => $current.' (nilai saat ini)'];
+        }
+
+        return $rmOptions;
+    };
     $reasonHint = 'Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master.';
 @endphp
 <div class="space-y-6">
@@ -87,7 +94,7 @@
                                             'fields' => [
                                                 ['name' => 'nama', 'label' => 'Nama Jabatan', 'type' => 'text', 'value' => $position->nama, 'required' => true],
                                                 ['name' => 'level', 'label' => 'Strata', 'type' => 'select', 'value' => $position->level, 'required' => true, 'options' => $levelOptions],
-                                                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $position->rm_level, 'required' => false, 'options' => $rmOptions],
+                                                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $position->rm_level, 'required' => false, 'options' => $rmOptionsFor($position->rm_level)],
                                                 ['name' => 'is_active', 'type' => 'hidden', 'value' => $position->is_active ? '1' : '0'],
                                                 ['name' => 'reason', 'label' => 'Alasan Perubahan (wajib bila mengubah nama atau RM Band)', 'type' => 'textarea', 'value' => '', 'required' => false, 'placeholder' => $reasonHint],
                                             ],
