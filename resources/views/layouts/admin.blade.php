@@ -224,7 +224,7 @@
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Unit Kerja</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">43 Unit &amp; Wilayah</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Unit &amp; Wilayah</p>
                             </div>
                         </a>
 

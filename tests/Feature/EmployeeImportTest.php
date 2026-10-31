@@ -554,7 +554,7 @@ class EmployeeImportTest extends TestCase
 
         $refSheet = $sheets[1];
         $this->assertEquals('Referensi Master Data', $refSheet->title());
-        $this->assertContains('43 UNIT KERJA RESMI', $refSheet->headings());
+        $this->assertContains('UNIT KERJA RESMI', $refSheet->headings());
         $this->assertContains('JABATAN FORMASI AKTIF', $refSheet->headings());
         $refData = $refSheet->array();
         $this->assertNotEmpty($refData);
@@ -980,7 +980,7 @@ class EmployeeImportTest extends TestCase
         $sheet2 = $spreadsheet->createSheet();
         $sheet2->setTitle('Referensi Master Data');
         $sheet2->fromArray([
-            ['43 UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA PEGAWAI'],
+            ['UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA PEGAWAI'],
             ['Kebun Inti Gunung Meliau', 'Asisten Afdeling', 'Karpim'],
             ['Kebun Gunung Emas', 'Mandor Panen', 'Karpel'],
             ['PKS Longpinang', 'Asisten Pengolahan', 'Karpim'],
