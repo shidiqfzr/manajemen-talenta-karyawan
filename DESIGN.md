@@ -48,7 +48,7 @@ Implikasi: **desktop-first** untuk seluruh modul admin; **mobile-first** hanya u
 | Man Power Planning (MPP) | `livewire/admin/man-power-planning` |
 | Pelatihan | `admin/trainings` |
 | Evaluasi & Talenta 9-box | `admin/evaluations` |
-| Master Data (unit, jabatan) | `admin/master` |
+| Master Data / Master Formasi (unit, jabatan, kursi formasi, riwayat perubahan) | `admin/master`, `livewire/admin/master` |
 
 Payroll, absensi, cuti, dan rekrutmen **di luar cakupan**. Jangan membangun UI untuk modul tersebut berdasarkan dokumen ini.
 
@@ -453,6 +453,16 @@ Rincian kelas per piksel tinggal di view masing-masing. Bagian ini hanya memuat 
 - Pencarian utama dengan pintasan `/`; filter lanjutan di panel yang bisa dibuka-tutup.
 - Kolom mengikuti §7.5 dan tier warna §4.2. Foto hanya bila berkas asli tersedia; tanpa lingkaran inisial di tabel.
 
+### 8.5 Master Data (Master Formasi)
+
+Satu modul, satu entri sidebar ("Master Formasi"), empat bagian pada navigasi seksi di dalam halaman.
+
+1. **Navigasi seksi** (`x-admin.master.section-nav`): Formasi · Unit Kerja · Jabatan & Posisi · Riwayat Perubahan, dalam urutan itu (pekerjaan harian dahulu, tampilan audit terakhir). Tampilan mengikuti tab bergaris bawah modul Mutasi (§8.3). Setiap bagian adalah halaman dengan URL sendiri, maka semantiknya `<nav aria-label="Bagian Master Data">` dengan `aria-current="page"` pada bagian aktif, **bukan** `role="tab"` (pola §7.4 hanya untuk panel yang berganti dalam satu halaman).
+2. **Layar Formasi**: satu unit per kali; ringkasan (jumlah kursi, kuota, terisi, melebihi kuota) di atas tabel kursi. Ubah kuota/bidang di dalam baris, tambah kursi dari daftar jabatan Karpim, hapus kursi. Kursi melebihi kuota memakai pill `danger` (§5.1) karena menuntut perhatian.
+3. **Dampak sebelum eksekusi** memakai pola §7.2: panel dampak pada dialog konfirmasi menampilkan **blokir** (`danger`, tombol terapkan nonaktif) dan **peringatan** (`warning`) beserta jumlah pegawai terdampak. Aturan yang sama dijalankan di server; layar hanya mencerminkannya.
+4. **Alasan perubahan**: kolom alasan muncul dan wajib (minimal 10 karakter) untuk aksi berisiko (hapus kursi, nonaktifkan, hapus, ganti nama, ubah RM Band).
+5. **Aksi pada halaman Unit Kerja dan Jabatan** (Tambah, Ubah, Aktifkan/Nonaktifkan, Hapus) memakai satu dialog bersama (`x-admin.master.action-dialog`, §7.6) yang dibuka lewat event `master-action`; tombol hapus/nonaktifkan memakai nada `danger`.
+6. **Riwayat Perubahan** bersifat baca-saja: filter jenis data, admin, dan rentang tanggal; perubahan ditulis dengan istilah bisnis, tanpa data pegawai.
 ---
 
 ## 9. Visualisasi Data
@@ -522,6 +532,7 @@ Bahasa antarmuka: Indonesia baku. Struktur `lang/` Laravel disiapkan untuk Inggr
 **Unified Light Shell** (acuan: `layouts/admin.blade.php`):
 
 - **Sidebar:** `bg-white`, `border-r border-surface-200`, collapsible ke mode ikon. Item aktif: `bg-primary-50 text-primary-800 font-semibold border-l-4 border-primary-600`, kotak ikon `bg-primary-100 text-primary-700`, plus `aria-current="page"`. Item non-aktif: `text-surface-600`, hover `bg-surface-100 text-surface-900`.
+- **Satu entri sidebar per modul.** Bagian-bagian modul dijangkau lewat navigasi seksi atau tab di dalam halaman (contoh: Mutasi §8.3, Master Formasi §8.5), bukan dengan menambah entri sidebar. Entri aktif untuk seluruh halaman modul.
 - **Topbar:** `bg-white/95 backdrop-blur-md border-b border-surface-200`; pencarian `bg-surface-50`, fokus `bg-white`.
 - **Identitas:** "Talenta Hub" + "PTPN IV Regional V" dengan logo resmi.
 - Brand hijau dibawa lewat aksen fungsional (tombol utama, navigasi aktif, stepper), bukan blok gelap pada chrome.
@@ -623,3 +634,4 @@ Gagasan untuk fase berikutnya. Tidak boleh dijadikan dasar implementasi sebelum 
 | v3.2 | 28/10/2026 | Migrasi D1: 2.707 kelas palet bawaan Tailwind dipetakan ke token (tabel §3.1) dan kini dijaga ketat termasuk string PHP; D4, D6, D13 (sebagian), D14 selesai; `x-admin.button` mendapat `target` dan `once`; semua dialog memakai `x-trap`; penjaga bertambah aturan dialog; D18 (hue `purple` di luar RM Band) dicatat. |
 | v3.3 | 28/10/2026 | Halaman galat mandiri (§15); kotak centang sungguhan + keyboard pada direktori (§7.5); pola ARIA tabs (§7.4); ring fokus pengganti, teks minimum 10px, dan pulse `motion-safe:` di seluruh view. D7, D8, D15, D16, D17 selesai. Penjaga §16.1 seluruhnya ketat: mekanisme baseline/ratchet dan berkasnya dihapus karena tidak lagi diperlukan. |
 | v3.4 | 28/10/2026 | Kebijakan hue kategori (§5.2): `orange`/`sky`/`purple` hanya untuk RM Band, kategori non-RM memakai `earth`/`info`/`surface`/`teal`; kategori KPI netral diperluas ke biaya/anggaran; tema `purple` dihapus; penjaga bertambah aturan hue. Jumlah hasil tabel Livewire diumumkan (D13). D9, D13, D18 selesai: seluruh utang desain §17 tertutup. |
+| v3.5 | 31/10/2026 | Modul Master Data/Master Formasi (§8.5): satu entri sidebar dengan navigasi seksi empat bagian, layar Formasi dengan panel dampak, dialog aksi bersama, dan layar Riwayat Perubahan; aturan satu entri sidebar per modul (§14); ruang lingkup §2.2 diperbarui. |
