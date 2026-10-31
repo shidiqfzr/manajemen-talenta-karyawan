@@ -29,55 +29,6 @@ class Employee extends Model
     protected $keyType = 'string';
 
     /**
-     * Master 43 Unit Kerja resmi PTPN IV Regional V (Sesuai DOMAIN.md Bab 3).
-     */
-    public const OFFICIAL_UNITS = [
-        'Bagian Sekretariat dan Hukum',
-        'Bagian Sumber Daya Manusia dan Sistem Manajemen',
-        'Bagian Tanaman',
-        'Bagian Teknik dan Pengolahan',
-        'Bagian Akuntansi dan Keuangan',
-        'Tim Penguatan ERP SAP',
-        'Bagian Pengadaan dan Teknologi Informasi',
-        'Divisi Sistem Manajemen & Sustainability',
-        'Project Management Office (PMO)',
-        'Satuan Pengawasan Internal (SPI)',
-        'Distrik Petani Mitra',
-        'Kebun Kemitraan Area Kalbar',
-        'Kebun Kemitraan Area Kaltim-Sel',
-        'Unit Group Kalimantan Barat',
-        'Kebun Inti Gunung Meliau',
-        'PKS Gunung Meliau',
-        'Kebun Gunung Emas',
-        'Kebun Inti Sungai Dekan',
-        'Kebun Rimba Belian',
-        'PKS Rimba Belian',
-        'Kebun PKR Sintang',
-        'Kebun Ngabang',
-        'PKS Ngabang',
-        'Kebun Parindu',
-        'PKS Parindu',
-        'Kebun Kembayan',
-        'PKS Kembayan',
-        'Unit Group Kalimantan Selatan/Tengah',
-        'Kebun Danau Salak',
-        'Kebun Pamukan',
-        'PKS Pamukan',
-        'Kebun Batulicin',
-        'Kebun Pelaihari',
-        'PKS Pelaihari',
-        'Proyek Batubara Danau Salak & Buntok',
-        'Kebun Raren Batuah',
-        'Unit Group Wilayah Kalimantan Timur',
-        'Kebun Tabara',
-        'Kebun Tajati',
-        'Kebun Inti Pandawa',
-        'PKS Longpinang',
-        'PKS Samuntai',
-        'Kebun-PKS Longkali',
-    ];
-
-    /**
      * Master 43 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
      */
     public const GROUPED_UNITS = [
