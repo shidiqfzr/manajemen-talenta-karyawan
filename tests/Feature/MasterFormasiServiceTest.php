@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\FormasiRuleViolationException;
 use App\Models\Employee;
+use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
@@ -201,6 +202,156 @@ class MasterFormasiServiceTest extends TestCase
 
         $this->expectException(FormasiRuleViolationException::class);
         $this->service->removeSeat($id, '          ', $this->admin);
+    }
+
+    private function history(string $unitNama, string $jabatan): void
+    {
+        $employee = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create([
+            'employee_nik' => $employee->nik,
+            'jabatan' => $jabatan,
+            'unit_kerja' => $unitNama,
+            'tmt_awal' => '2020-01-01',
+        ]);
+    }
+
+    public function test_create_unit_writes_audit_and_validates_wilayah(): void
+    {
+        $unit = $this->service->createUnit(['nama' => 'Kebun Baru', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'urutan' => 5], $this->admin);
+
+        $this->assertTrue($unit->is_active);
+        $this->assertSame('unit.created', MasterAuditLog::firstOrFail()->action);
+
+        try {
+            $this->service->createUnit(['nama' => 'Kebun Salah', 'kode' => 'Kebun', 'wilayah' => 'Antah Berantah', 'urutan' => 6], $this->admin);
+            $this->fail('Wilayah tidak dikenal seharusnya ditolak.');
+        } catch (FormasiRuleViolationException) {
+            $this->assertDatabaseMissing('units', ['nama' => 'Kebun Salah']);
+        }
+
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->service->createUnit(['nama' => 'Kebun Baru', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'urutan' => 7], $this->admin);
+    }
+
+    public function test_rename_unit_updates_employees_text_but_not_job_histories(): void
+    {
+        $unit = $this->unit('Kebun Lama');
+        $position = $this->position();
+        $this->employees($unit, $position, 2);
+        $this->history('Kebun Lama', 'Manajer');
+
+        $this->service->updateUnit($unit, ['nama' => 'Kebun Nama Baru'], 'Penyesuaian nama unit resmi', $this->admin);
+
+        $this->assertSame(2, Employee::where('unit_kerja', 'Kebun Nama Baru')->count());
+        $this->assertSame(0, Employee::where('unit_kerja', 'Kebun Lama')->count());
+        $this->assertDatabaseHas('job_histories', ['unit_kerja' => 'Kebun Lama']);
+        $log = MasterAuditLog::firstOrFail();
+        $this->assertSame('unit.renamed', $log->action);
+        $this->assertSame('Penyesuaian nama unit resmi', $log->reason);
+        $this->assertSame(['nama' => 'Kebun Lama'], $log->old_values);
+        $this->assertSame(['nama' => 'Kebun Nama Baru'], $log->new_values);
+    }
+
+    public function test_rename_unit_to_an_existing_name_is_refused(): void
+    {
+        $unit = $this->unit('Kebun A');
+        $this->unit('Kebun B');
+
+        try {
+            $this->service->updateUnit($unit, ['nama' => 'Kebun B'], 'Penyesuaian nama unit resmi', $this->admin);
+            $this->fail('Nama unit ganda seharusnya ditolak.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('sudah digunakan', $e->getMessage());
+        }
+
+        $this->assertSame('Kebun A', $unit->fresh()->nama);
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_rename_unit_requires_a_reason(): void
+    {
+        $unit = $this->unit('Kebun A');
+
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->service->updateUnit($unit, ['nama' => 'Kebun Z'], null, $this->admin);
+    }
+
+    public function test_update_unit_without_changes_writes_no_audit_row(): void
+    {
+        $unit = $this->unit('Kebun A');
+
+        $this->service->updateUnit($unit, ['nama' => 'Kebun A', 'kode' => 'Kebun', 'urutan' => 1], null, $this->admin);
+
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_deactivate_unit_with_employees_is_blocked_with_a_count(): void
+    {
+        $unit = $this->unit();
+        $this->employees($unit, $this->position(), 3);
+
+        try {
+            $this->service->setUnitActive($unit, false, 'Unit digabung ke unit lain', $this->admin);
+            $this->fail('Menonaktifkan unit berpenghuni seharusnya ditolak.');
+        } catch (FormasiRuleViolationException $e) {
+            $this->assertStringContainsString('3', $e->getMessage());
+            $this->assertStringContainsString('Mutasi', $e->getMessage());
+        }
+
+        $this->assertTrue($unit->fresh()->is_active);
+    }
+
+    public function test_deactivate_empty_unit_requires_a_reason_and_activation_does_not(): void
+    {
+        $unit = $this->unit();
+
+        try {
+            $this->service->setUnitActive($unit, false, null, $this->admin);
+            $this->fail('Alasan seharusnya wajib.');
+        } catch (FormasiRuleViolationException) {
+            $this->assertTrue($unit->fresh()->is_active);
+        }
+
+        $this->service->setUnitActive($unit, false, 'Unit digabung ke unit lain', $this->admin);
+        $this->assertFalse($unit->fresh()->is_active);
+
+        $this->service->setUnitActive($unit->fresh(), true, null, $this->admin);
+        $this->assertTrue($unit->fresh()->is_active);
+
+        $this->assertSame(['unit.deactivated', 'unit.activated'], MasterAuditLog::orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_delete_unit_is_blocked_by_seats_employees_or_history(): void
+    {
+        $withSeat = $this->unit('Kebun Berkursi');
+        $this->seat($withSeat, $this->position('Manajer Seat'));
+
+        $withEmployee = $this->unit('Kebun Berpegawai');
+        $this->employees($withEmployee, $this->position('Manajer Pegawai'), 1);
+
+        $withHistory = $this->unit('Kebun Berriwayat');
+        $this->history('Kebun Berriwayat', 'Manajer');
+
+        foreach ([$withSeat, $withEmployee, $withHistory] as $unit) {
+            try {
+                $this->service->deleteUnit($unit, 'Unit dihapus dari master', $this->admin);
+                $this->fail("Unit {$unit->nama} seharusnya tidak dapat dihapus.");
+            } catch (FormasiRuleViolationException) {
+                $this->assertDatabaseHas('units', ['id' => $unit->id]);
+            }
+        }
+
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_delete_unused_unit_succeeds_and_audits(): void
+    {
+        $unit = $this->unit('Kebun Kosong');
+
+        $this->service->deleteUnit($unit, 'Unit dihapus dari master', $this->admin);
+
+        $this->assertDatabaseMissing('units', ['id' => $unit->id]);
+        $this->assertSame('unit.deleted', MasterAuditLog::firstOrFail()->action);
     }
 
     public function test_audit_failure_rolls_back_the_change(): void
