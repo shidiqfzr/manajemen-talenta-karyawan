@@ -205,6 +205,135 @@ class MasterFormasiService
         });
     }
 
+    // ───────────────────────────── Jabatan (positions) ─────────────────────────────
+
+    /**
+     * @param  array{nama: string, bidang?: ?string, level: string, rm_level?: ?string}  $data
+     */
+    public function createPosition(array $data, User $user): Position
+    {
+        return DB::transaction(function () use ($data, $user): Position {
+            $nama = trim((string) ($data['nama'] ?? ''));
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
+            }
+            $this->assertPositionNameFree($nama);
+            $level = $data['level'] ?? null;
+            $this->assertKnownLevel($level);
+            $bidang = $data['bidang'] ?? null;
+            $this->assertKnownBidang($bidang);
+            $rm = $level === 'Karpel' ? null : ($data['rm_level'] ?? null);
+            $this->assertKnownRm($rm);
+
+            $position = Position::create([
+                'nama' => $nama,
+                'bidang' => $bidang,
+                'level' => $level,
+                'rm_level' => $rm,
+                'is_active' => true,
+            ]);
+
+            MasterAuditLog::record(
+                $user, 'position.created', 'position', $position->id, $position->nama, null,
+                $position->only(['nama', 'bidang', 'level', 'rm_level'])
+            );
+
+            return $position;
+        });
+    }
+
+    /**
+     * Mengubah atribut jabatan. Perubahan nama menyelaraskan teks jabatan pada pegawai
+     * dalam transaksi yang sama; perubahan Level RM berlaku untuk seluruh unit pemakai jabatan.
+     *
+     * @param  array{nama?: string, bidang?: ?string, level?: string, rm_level?: ?string}  $data
+     */
+    public function updatePosition(Position $position, array $data, ?string $reason, User $user): Position
+    {
+        return DB::transaction(function () use ($position, $data, $reason, $user): Position {
+            $incoming = Arr::only($data, ['nama', 'bidang', 'level', 'rm_level']);
+            if (($incoming['level'] ?? $position->level) === 'Karpel') {
+                $incoming['rm_level'] = null;
+            }
+
+            $changes = $this->changedAttributes($position, $incoming);
+            if ($changes === []) {
+                return $position;
+            }
+
+            if (isset($changes['level'])) {
+                $this->assertKnownLevel($changes['level']);
+            }
+            if (array_key_exists('bidang', $changes)) {
+                $this->assertKnownBidang($changes['bidang']);
+            }
+            if (array_key_exists('rm_level', $changes)) {
+                $this->assertKnownRm($changes['rm_level']);
+            }
+
+            $isRename = isset($changes['nama']);
+            $needsReason = $isRename || array_key_exists('rm_level', $changes);
+
+            if ($isRename) {
+                $this->assertNotBlocked($this->previewImpact('position.rename', ['position_id' => $position->id, 'nama' => $changes['nama']]));
+            }
+            if (array_key_exists('rm_level', $changes)) {
+                $this->assertNotBlocked($this->previewImpact('position.rm_change', ['position_id' => $position->id, 'rm_level' => $changes['rm_level']]));
+            }
+            $reason = $needsReason ? $this->requireReason($reason) : $this->cleanReason($reason);
+
+            $old = Arr::only($position->getAttributes(), array_keys($changes));
+            $oldName = $position->nama;
+            $position->update($changes);
+
+            if ($isRename) {
+                Employee::where('jabatan', $oldName)->update(['jabatan' => $position->nama]);
+            }
+
+            MasterAuditLog::record(
+                $user, $isRename ? 'position.renamed' : 'position.updated', 'position', $position->id, $position->nama,
+                $old, $changes, $reason
+            );
+
+            return $position;
+        });
+    }
+
+    public function setPositionActive(Position $position, bool $active, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($position, $active, $reason, $user): void {
+            if ($position->is_active === $active) {
+                return;
+            }
+
+            if (! $active) {
+                $this->assertNotBlocked($this->previewImpact('position.deactivate', ['position_id' => $position->id]));
+                $reason = $this->requireReason($reason);
+            }
+
+            $position->update(['is_active' => $active]);
+
+            MasterAuditLog::record(
+                $user, $active ? 'position.activated' : 'position.deactivated', 'position', $position->id, $position->nama,
+                ['is_active' => ! $active], ['is_active' => $active],
+                $active ? $this->cleanReason($reason) : $reason
+            );
+        });
+    }
+
+    public function deletePosition(Position $position, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($position, $reason, $user): void {
+            $this->assertNotBlocked($this->previewImpact('position.delete', ['position_id' => $position->id]));
+            $reason = $this->requireReason($reason);
+
+            $snapshot = $position->only(['nama', 'bidang', 'level', 'rm_level']);
+            $position->delete();
+
+            MasterAuditLog::record($user, 'position.deleted', 'position', $position->id, $snapshot['nama'], $snapshot, null, $reason);
+        });
+    }
+
     // ───────────────────────────── Pratinjau dampak ─────────────────────────────
 
     /**
@@ -221,6 +350,10 @@ class MasterFormasiService
             'unit.deactivate' => $this->previewUnitDeactivate((int) $params['unit_id']),
             'unit.delete' => $this->previewUnitDelete((int) $params['unit_id']),
             'unit.rename' => $this->previewUnitRename((int) $params['unit_id'], (string) $params['nama']),
+            'position.deactivate' => $this->previewPositionDeactivate((int) $params['position_id']),
+            'position.delete' => $this->previewPositionDelete((int) $params['position_id']),
+            'position.rename' => $this->previewPositionRename((int) $params['position_id'], (string) $params['nama']),
+            'position.rm_change' => $this->previewPositionRmChange((int) $params['position_id']),
             default => throw new InvalidArgumentException("Operasi pratinjau tidak dikenal: {$operation}"),
         };
     }
@@ -281,6 +414,76 @@ class MasterFormasiService
         return ImpactResult::ok(
             $employees > 0 ? ["{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan tetap memakai nama lama."] : [],
             $employees
+        );
+    }
+
+    private function previewPositionDeactivate(int $positionId): ImpactResult
+    {
+        $position = Position::findOrFail($positionId);
+        $employees = Employee::where('jabatan', $position->nama)->count();
+
+        if ($employees > 0) {
+            return ImpactResult::blocked(
+                ["Jabatan '{$position->nama}' tidak dapat dinonaktifkan: {$employees} pegawai masih memegang jabatan ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu."],
+                $employees
+            );
+        }
+
+        return ImpactResult::ok();
+    }
+
+    private function previewPositionDelete(int $positionId): ImpactResult
+    {
+        $position = Position::findOrFail($positionId);
+        $employees = Employee::where('jabatan', $position->nama)->count();
+        $seats = DB::table('position_unit')->where('position_id', $position->id)->count();
+        $history = JobHistory::where('jabatan', $position->nama)->count();
+        $blockers = [];
+
+        if ($employees > 0) {
+            $blockers[] = "{$employees} pegawai masih memegang jabatan ini.";
+        }
+        if ($seats > 0) {
+            $blockers[] = "Jabatan ini masih menjadi {$seats} kursi formasi.";
+        }
+        if ($history > 0) {
+            $blockers[] = "Jabatan ini tercatat pada {$history} riwayat jabatan.";
+        }
+
+        if ($blockers === []) {
+            return ImpactResult::ok();
+        }
+
+        return ImpactResult::blocked(
+            ["Jabatan '{$position->nama}' tidak dapat dihapus. ".implode(' ', $blockers).' Gunakan fitur Nonaktifkan.'],
+            $employees
+        );
+    }
+
+    private function previewPositionRename(int $positionId, string $nama): ImpactResult
+    {
+        $position = Position::findOrFail($positionId);
+
+        if (Position::where('nama', $nama)->where('id', '!=', $position->id)->exists()) {
+            return ImpactResult::blocked(["Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain."]);
+        }
+
+        $employees = Employee::where('jabatan', $position->nama)->count();
+
+        return ImpactResult::ok(
+            $employees > 0 ? ["{$employees} pegawai akan ikut diperbarui nama jabatannya; riwayat jabatan tetap memakai nama lama."] : [],
+            $employees
+        );
+    }
+
+    private function previewPositionRmChange(int $positionId): ImpactResult
+    {
+        $position = Position::findOrFail($positionId);
+        $units = DB::table('position_unit')->where('position_id', $position->id)->count();
+
+        return ImpactResult::ok(
+            $units > 0 ? ["Perubahan Level RM berlaku untuk seluruh unit yang memakai jabatan ini ({$units} unit)."] : [],
+            Employee::where('jabatan', $position->nama)->count()
         );
     }
 
@@ -394,6 +597,34 @@ class MasterFormasiService
         $reason = trim((string) $reason);
 
         return $reason === '' ? null : $reason;
+    }
+
+    private function assertPositionNameFree(string $nama): void
+    {
+        if (Position::where('nama', $nama)->exists()) {
+            throw new FormasiRuleViolationException("Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain.");
+        }
+    }
+
+    private function assertKnownLevel(mixed $level): void
+    {
+        if (! is_string($level) || ! array_key_exists($level, Position::LEVEL_LIST)) {
+            throw new FormasiRuleViolationException('Level jabatan harus Karpim atau Karpel.');
+        }
+    }
+
+    private function assertKnownBidang(mixed $bidang): void
+    {
+        if ($bidang !== null && ! array_key_exists($bidang, Position::BIDANG_LIST)) {
+            throw new FormasiRuleViolationException('Bidang harus salah satu dari KEU, TAN, TEK, atau UMU.');
+        }
+    }
+
+    private function assertKnownRm(mixed $rm): void
+    {
+        if ($rm !== null && ! in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true)) {
+            throw new FormasiRuleViolationException('Level RM jabatan Karpim harus RM-1, RM-2, atau RM-3.');
+        }
     }
 
     private function assertNotBlocked(ImpactResult $impact): void
