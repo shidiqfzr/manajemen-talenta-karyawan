@@ -1187,6 +1187,28 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('employees', ['nik' => '88001005', 'unit_kerja' => 'Bagian Akuntansi & Keuangan']);
     }
 
+    public function test_import_rejects_a_deactivated_unit_including_via_alias(): void
+    {
+        $kepala = Position::firstOrCreate(['nama' => 'Kepala Bagian', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        foreach (['Kebun Nonaktif', 'PMO Batu Bara & Bisnis Lainnya'] as $i => $name) {
+            $unit = Unit::create(['nama' => $name, 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => false, 'urutan' => 90 + $i]);
+            $unit->positions()->attach($kepala->id, ['kuota' => 1, 'bidang' => 'UMU']);
+        }
+
+        $file = $this->createExcelUploadFile([
+            $this->karpimImportRow('88001006', 'Kepala Bagian', 'Kebun Nonaktif'),
+            $this->karpimImportRow('88001007', 'Kepala Bagian', 'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA'),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $summary = session('import_summary');
+        $this->assertEquals(2, $summary['skipped']);
+        $this->assertStringContainsString('tidak terdaftar di Master Unit', $summary['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001006']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001007']);
+    }
+
     public function test_import_rejects_unit_names_that_were_retired(): void
     {
         $file = $this->createExcelUploadFile([

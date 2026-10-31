@@ -60,8 +60,8 @@ class BuildFormasiSeedCommandTest extends TestCase
             ['BAGIAN TANAMAN', 'KEPALA BAGIAN', 'RM-1', 'TAN'],
         ]);
         $metadata = $this->metadata([
-            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Kalimantan Timur', 'urutan' => 39],
-            'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Pontianak)', 'urutan' => 3],
+            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'urutan' => 39],
+            'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'urutan' => 3],
         ]);
         $out = $this->tempPath('.json');
 
@@ -72,7 +72,7 @@ class BuildFormasiSeedCommandTest extends TestCase
             [
                 'nama' => 'Kebun Tajati',
                 'kode' => 'Kebun',
-                'wilayah' => 'Kalimantan Timur',
+                'wilayah' => 'Wilayah Kalimantan Timur',
                 'is_active' => true,
                 'urutan' => 39,
                 'positions' => [
@@ -83,7 +83,7 @@ class BuildFormasiSeedCommandTest extends TestCase
             [
                 'nama' => 'Bagian Tanaman',
                 'kode' => 'Bagian',
-                'wilayah' => 'Regional Office (Pontianak)',
+                'wilayah' => 'Regional Office (Kantor Direksi Pontianak)',
                 'is_active' => true,
                 'urutan' => 3,
                 'positions' => [
@@ -108,6 +108,21 @@ class BuildFormasiSeedCommandTest extends TestCase
         $this->assertFileDoesNotExist($out);
     }
 
+    public function test_fails_when_metadata_wilayah_is_not_a_known_wilayah(): void
+    {
+        $excel = $this->workbook([['KEBUN TAJATI', 'MANAJER', 'RM-1', 'TAN']]);
+        $metadata = $this->metadata([
+            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Kalimantan Timur', 'urutan' => 39],
+        ]);
+        $out = $this->tempPath('.json');
+
+        $this->artisan('formasi:build-seed', ['file' => $excel, '--out' => $out, '--metadata' => $metadata])
+            ->expectsOutputToContain('Kebun Tajati')
+            ->assertExitCode(1);
+
+        $this->assertFileDoesNotExist($out);
+    }
+
     public function test_fails_when_parser_reports_errors(): void
     {
         $excel = $this->workbook([
@@ -115,7 +130,7 @@ class BuildFormasiSeedCommandTest extends TestCase
             ['KEBUN TAJATI', 'ASISTEN AFDELING I', 'RM-9', 'TAN'],
         ]);
         $metadata = $this->metadata([
-            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Kalimantan Timur', 'urutan' => 39],
+            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'urutan' => 39],
         ]);
         $out = $this->tempPath('.json');
 

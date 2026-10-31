@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Position;
 use App\Models\Unit;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class PositionUnitSeeder extends Seeder
@@ -52,6 +53,8 @@ class PositionUnitSeeder extends Seeder
                     'urutan' => $unitData['urutan'],
                 ]
             );
+            // Seed ulang menyelaraskan atribut master; status aktif yang diatur admin tidak diubah.
+            $unit->fill(Arr::only($unitData, ['kode', 'wilayah', 'urutan']))->save();
 
             if (! empty($unitData['positions'])) {
                 foreach ($unitData['positions'] as $posData) {
@@ -69,6 +72,7 @@ class PositionUnitSeeder extends Seeder
                             'is_diperban' => $isDiperban,
                         ]
                     );
+                    $position->fill(Arr::only($posData, ['level', 'rm_level']))->save();
 
                     $key = $position->id.'_'.$unit->id;
                     if (! isset($positionUnitMap[$key])) {

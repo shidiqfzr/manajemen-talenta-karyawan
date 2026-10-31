@@ -172,7 +172,7 @@ class EmployeeImportRowValidator
         if (! isset($this->unitPositionsCache[$unitName])) {
             $unit = Unit::with(['positions' => function ($query) {
                 $query->where('positions.is_active', true);
-            }])->where('nama', $unitName)->first();
+            }])->where('nama', $unitName)->where('is_active', true)->first();
 
             if (! $unit) {
                 $this->unitPositionsCache[$unitName] = [

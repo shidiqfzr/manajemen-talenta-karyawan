@@ -563,7 +563,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
         // 3. Match dari daftar alias
         $upper = strtoupper($trimmed);
-        if (isset(self::UNIT_ALIASES[$upper])) {
+        if (isset(self::UNIT_ALIASES[$upper]) && in_array(self::UNIT_ALIASES[$upper], $this->officialUnits, true)) {
             return self::UNIT_ALIASES[$upper];
         }
 

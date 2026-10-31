@@ -29,7 +29,8 @@ class Employee extends Model
     protected $keyType = 'string';
 
     /**
-     * Master 43 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
+     * Master 45 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
+     * Hanya cadangan saat tabel `units` kosong; sumber utama adalah database (diisi dari Excel formasi).
      */
     public const GROUPED_UNITS = [
         'Regional Office (Kantor Direksi Pontianak)' => [
@@ -40,22 +41,22 @@ class Employee extends Model
             'Bagian Akuntansi & Keuangan',
             'Tim Penguatan ERP SAP',
             'Bagian Pengadaan & Teknologi Informasi',
-            'Divisi Sistem Manajemen & Sustainability',
-            'Project Management Office (PMO)',
-            'Satuan Pengawasan Internal (SPI)',
             'Distrik Petani Mitra',
             'Kebun Kemitraan Area Kalbar',
+            'PMO Investasi Tanaman Wilayah Kalbar',
+            'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+            'PMO Batu Bara & Bisnis Lainnya',
             'Kebun Kemitraan Area Kaltim-Sel',
         ],
         'Wilayah Kalimantan Barat' => [
-            'Unit Group Kalimantan Barat',
+            'Group Manager Kalbar',
             'Kebun Inti Gunung Meliau',
             'PKS Gunung Meliau',
             'Kebun Gunung Emas',
             'Kebun Inti Sungai Dekan',
             'Kebun Rimba Belian',
             'PKS Rimba Belian',
-            'Kebun PKR Sintang',
+            'Kebun Sintang',
             'Kebun Ngabang',
             'PKS Ngabang',
             'Kebun Parindu',
@@ -63,19 +64,21 @@ class Employee extends Model
             'Kebun Kembayan',
             'PKS Kembayan',
         ],
-        'Wilayah Kalimantan Selatan & Tengah' => [
-            'Unit Group Kalimantan Selatan/Tengah',
+        'Wilayah Kalimantan Selatan/Tengah' => [
+            'Group Manager Kalselteng',
             'Kebun Danau Salak',
             'Kebun Pamukan',
             'PKS Pamukan',
             'Kebun Batulicin',
             'Kebun Pelaihari',
             'PKS Pelaihari',
-            'Proyek Batubara Danau Salak & Buntok',
+            'Kebun Kumai',
+            'PKR Tambarangan',
+            'Proyek Batubara Danau Salak',
             'Kebun Raren Batuah',
         ],
         'Wilayah Kalimantan Timur' => [
-            'Unit Group Wilayah Kalimantan Timur',
+            'Group Manager Kaltim',
             'Kebun Tabara',
             'Kebun Tajati',
             'Kebun Inti Pandawa',
