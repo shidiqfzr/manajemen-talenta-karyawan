@@ -211,7 +211,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                     ],
                     'K1' => [
                         'title' => 'Panduan Unit Kerja (Wajib)',
-                        'prompt' => 'Pilih salah satu dari 43 Unit Kerja resmi pada dropdown.',
+                        'prompt' => 'Pilih salah satu Unit Kerja resmi pada dropdown.',
                     ],
                     'L1' => [
                         'title' => 'Panduan Golongan',

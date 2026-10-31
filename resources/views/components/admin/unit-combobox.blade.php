@@ -177,7 +177,7 @@
                    @click="openDropdown()"
                    @input="isOpen = true; $dispatch('unit-selected', { unit: search })"
                    @keydown.arrow-down.prevent="isOpen = true"
-                   placeholder="Cari atau pilih dari 43 unit kerja..."
+                   placeholder="Cari atau pilih unit kerja..."
                    autocomplete="off"
                    class="w-full pl-8 pr-20 py-2.5 bg-surface-50/70 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-800 placeholder-surface-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition truncate">
             

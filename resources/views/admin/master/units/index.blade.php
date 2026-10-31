@@ -5,7 +5,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-black text-surface-800">Master Unit Kerja</h1>
-            <p class="text-xs text-surface-500">Kelola daftar 43 unit kerja PTPN IV Regional V</p>
+            <p class="text-xs text-surface-500">Kelola daftar unit kerja PTPN IV Regional V</p>
         </div>
     </div>
 

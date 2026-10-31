@@ -273,7 +273,7 @@
                 <span class="w-8 h-8 rounded-xl bg-primary-100 text-primary-800 text-xs font-extrabold flex items-center justify-center shrink-0">2</span>
                 <div>
                     <h3 class="text-base font-extrabold text-surface-900">Formasi Jabatan &amp; Penempatan Unit Kerja</h3>
-                        <p class="text-xs text-surface-500">Struktur posisi, 43 unit kerja definitif, dan strata Karpim/Karpel</p>
+                        <p class="text-xs text-surface-500">Struktur posisi, unit kerja definitif, dan strata Karpim/Karpel</p>
                     </div>
                 </div>
 
