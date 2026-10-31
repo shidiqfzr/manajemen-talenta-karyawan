@@ -311,6 +311,85 @@ class MasterDataTest extends TestCase
         $this->assertDatabaseMissing('positions', ['nama' => 'Asisten Tanpa Bidang']);
     }
 
+    /**
+     * Payload aksi yang dikirim tombol-tombol halaman Master Data (JSON.parse('...') pada atribut @click).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function dispatchedActions(string $html): array
+    {
+        preg_match_all("/JSON\\.parse\\('(.+?)'\\)/s", $html, $matches);
+
+        return array_map(function (string $literal): array {
+            $json = preg_replace_callback(
+                '/\\\\u([0-9a-fA-F]{4})|\\\\(.)/s',
+                fn (array $m) => ($m[1] ?? '') !== '' ? mb_chr(hexdec($m[1])) : $m[2],
+                $literal
+            );
+
+            return json_decode(html_entity_decode($json), true, 512, JSON_THROW_ON_ERROR);
+        }, $matches[1]);
+    }
+
+    public function test_units_index_offers_management_actions_for_each_unit(): void
+    {
+        $active = Unit::create(['nama' => 'Kebun Aksi Aktif', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
+        $inactive = Unit::create(['nama' => 'Kebun Aksi Nonaktif', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => false, 'urutan' => 2]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.units.index'));
+        $response->assertOk()->assertSee('Tambah Unit Kerja')->assertSee('master-action-title', false);
+
+        $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
+
+        $this->assertTrue($actions->has('POST '.route('admin.master.units.store')));
+        $update = $actions->get('PUT '.route('admin.master.units.update', $active));
+        $this->assertSame('Ubah Unit Kerja', $update['title']);
+        $this->assertContains('reason', array_column($update['fields'], 'name'));
+
+        $deactivate = $actions->get('POST '.route('admin.master.units.toggle', $active));
+        $this->assertSame('Nonaktifkan Unit Kerja', $deactivate['title']);
+        $reason = collect($deactivate['fields'])->firstWhere('name', 'reason');
+        $this->assertTrue($reason['required']);
+
+        $activate = $actions->get('POST '.route('admin.master.units.toggle', $inactive));
+        $this->assertSame('Aktifkan Unit Kerja', $activate['title']);
+        $this->assertSame([], $activate['fields']);
+
+        $delete = $actions->get('DELETE '.route('admin.master.units.destroy', $active));
+        $this->assertTrue(collect($delete['fields'])->firstWhere('name', 'reason')['required']);
+    }
+
+    public function test_positions_index_offers_management_actions_for_each_position(): void
+    {
+        $position = Position::create(['nama' => 'Asisten Aksi Uji', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index'));
+        $response->assertOk()->assertSee('Tambah Jabatan');
+
+        $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
+
+        $this->assertTrue($actions->has('POST '.route('admin.master.positions.store')));
+        $update = $actions->get('PUT '.route('admin.master.positions.update', $position));
+        $this->assertContains('rm_level', array_column($update['fields'], 'name'));
+        $this->assertTrue($actions->has('POST '.route('admin.master.positions.toggle', $position)));
+        $this->assertTrue(collect($actions->get('DELETE '.route('admin.master.positions.destroy', $position))['fields'])->firstWhere('name', 'reason')['required']);
+    }
+
+    public function test_master_pages_show_flash_messages_from_blocked_actions(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Pesan Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 97]);
+        Employee::factory()->create(['unit_kerja' => $unit->nama]);
+
+        $this->actingAs($this->admin)
+            ->from(route('admin.master.units.index'))
+            ->post(route('admin.master.units.toggle', $unit), ['reason' => 'Unit digabung ke unit lain'])
+            ->assertRedirect(route('admin.master.units.index'));
+
+        $this->actingAs($this->admin)->get(route('admin.master.units.index'))
+            ->assertSee('1 pegawai', false)
+            ->assertSee('Mutasi');
+    }
+
     public function test_ajax_json_quick_store_position(): void
     {
         $posName = 'Asisten AJAX Quick Add Test';
