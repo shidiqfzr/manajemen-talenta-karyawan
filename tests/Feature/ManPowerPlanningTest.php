@@ -165,7 +165,7 @@ class ManPowerPlanningTest extends TestCase
 
         $employee = new Employee([
             'jabatan' => 'Asisten Penggajian',
-            'unit_kerja' => 'Bagian Sumber Daya Manusia dan Sistem Manajemen',
+            'unit_kerja' => 'Bagian Sumber Daya Manusia & Sistem Manajemen',
         ]);
 
         $this->assertSame('KEU', (new ManPowerPlanningService)->determineBidang($employee));

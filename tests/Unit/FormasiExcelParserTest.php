@@ -41,11 +41,13 @@ class FormasiExcelParserTest extends TestCase
 
     public function test_normalizer_formats_units_like_existing_master(): void
     {
-        $this->assertSame('Bagian Sekretariat dan Hukum', FormasiNormalizer::unit('BAGIAN SEKRETARIAT & HUKUM'));
+        $this->assertSame('Bagian Sekretariat & Hukum', FormasiNormalizer::unit('BAGIAN SEKRETARIAT & HUKUM'));
         $this->assertSame('Kebun-PKS Longkali', FormasiNormalizer::unit('KEBUN-PKS LONGKALI'));
         $this->assertSame('Group Manager Kaltim', FormasiNormalizer::unit('GROUP MANAJER KALTIM'));
-        $this->assertSame('Bagian Akuntansi dan Keuangan', FormasiNormalizer::unit('BAGIAN AKUNTASI DAN KEUANGAN'));
+        $this->assertSame('Bagian Akuntansi & Keuangan', FormasiNormalizer::unit('BAGIAN AKUNTASI DAN KEUANGAN'));
         $this->assertSame('Kebun Kemitraan Area Kaltim-Sel', FormasiNormalizer::unit('KEBUN KEMITRAAN AREA KALTIM-SEL'));
+        $this->assertSame('PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng', FormasiNormalizer::unit('PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG'));
+        $this->assertSame('PMO Batu Bara & Bisnis Lainnya', FormasiNormalizer::unit('PMO BATU BARA DAN BISNIS LAINNYA'));
     }
 
     public function test_normalizer_formats_jabatan(): void

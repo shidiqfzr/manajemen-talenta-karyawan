@@ -1173,6 +1173,20 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('employees', ['nik' => '88001001', 'unit_kerja' => 'Kebun Kumai', 'jabatan' => 'Manajer']);
     }
 
+    public function test_import_matches_unit_names_ignoring_ampersand_versus_dan(): void
+    {
+        $unit = Unit::create(['nama' => 'Bagian Akuntansi & Keuangan', 'kode' => 'Bagian', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true, 'urutan' => 5]);
+        $kepala = Position::firstOrCreate(['nama' => 'Kepala Bagian', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        $unit->positions()->attach($kepala->id, ['kuota' => 1, 'bidang' => 'KEU']);
+
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88001005', 'Kepala Bagian', 'Bagian Akuntansi dan Keuangan')]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? [], 'Baris import seharusnya valid.');
+        $this->assertDatabaseHas('employees', ['nik' => '88001005', 'unit_kerja' => 'Bagian Akuntansi & Keuangan']);
+    }
+
     public function test_import_rejects_unit_names_that_were_retired(): void
     {
         $file = $this->createExcelUploadFile([
@@ -1204,7 +1218,7 @@ class EmployeeImportTest extends TestCase
     public function test_import_with_pmo_unit_alias_and_head_of_pmo_investasi_tanaman(): void
     {
         $pmoUnit = Unit::firstOrCreate(
-            ['nama' => 'PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng'],
+            ['nama' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng'],
             ['kode' => 'PMO', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true]
         );
 
@@ -1250,7 +1264,7 @@ class EmployeeImportTest extends TestCase
         $commitResponse->assertOk()->assertJsonPath('success', true);
 
         $employee = Employee::where('nik', '13001428')->firstOrFail();
-        $this->assertEquals('PMO Investasi Tanaman Wilayah Kaltim dan Kalsel-Teng', $employee->unit_kerja);
+        $this->assertEquals('PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng', $employee->unit_kerja);
         $this->assertEquals('Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng', $employee->jabatan);
         $this->assertEquals('Karpim', $employee->level);
         $this->assertEquals('RM-1', $employee->rm_level);
