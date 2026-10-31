@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Services\Formasi;
+
+/**
+ * Menyeragamkan penulisan nama unit dan jabatan dari berkas formasi (ALL CAPS)
+ * ke gaya penulisan master data yang sudah berlaku.
+ */
+class FormasiNormalizer
+{
+    /** Salah ketik yang diketahui pada berkas formasi (huruf besar semua). */
+    private const TYPOS = [
+        'AKUNTASI' => 'AKUNTANSI',
+        'ADMINISTASI' => 'ADMINISTRASI',
+        'REKRUITMEN' => 'REKRUTMEN',
+        'PERIJINAN' => 'PERIZINAN',
+        'GROUP MANAJER' => 'GROUP MANAGER',
+    ];
+
+    /** Singkatan yang tetap ditulis huruf besar. */
+    private const ACRONYMS = [
+        'PKS', 'PKR', 'PMO', 'ERP', 'SAP', 'TI', 'TJSL', 'UMK', 'HPS', 'URTA', 'KKPA', 'T3M', 'PSDM', 'SDM',
+    ];
+
+    public static function unit(string $raw): string
+    {
+        return self::format(str_replace('&', ' DAN ', $raw));
+    }
+
+    public static function jabatan(string $raw): string
+    {
+        return self::format($raw);
+    }
+
+    private static function format(string $raw): string
+    {
+        $text = mb_strtoupper(trim(preg_replace('/\s+/u', ' ', $raw) ?? ''));
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+
+        foreach (self::TYPOS as $wrong => $right) {
+            $text = preg_replace('/\b'.preg_quote($wrong, '/').'\b/u', $right, $text) ?? $text;
+        }
+
+        return preg_replace_callback('/[A-Z0-9]+/u', function (array $match): string {
+            $word = $match[0];
+
+            if (in_array($word, self::ACRONYMS, true) || preg_match('/^(?:I{1,3}|IV|VI{0,3}|IX|XI{0,2})[AB]?$/', $word)) {
+                return $word;
+            }
+
+            if ($word === 'DAN') {
+                return 'dan';
+            }
+
+            return ucfirst(strtolower($word));
+        }, $text) ?? $text;
+    }
+}
