@@ -4,10 +4,13 @@ namespace App\Services\Formasi;
 
 use App\Exceptions\FormasiRuleViolationException;
 use App\Models\Employee;
+use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -94,6 +97,114 @@ class MasterFormasiService
         });
     }
 
+    // ─────────────────────────────── Unit kerja ───────────────────────────────
+
+    /**
+     * @param  array{nama: string, kode?: ?string, wilayah: string, urutan?: ?int}  $data
+     */
+    public function createUnit(array $data, User $user): Unit
+    {
+        return DB::transaction(function () use ($data, $user): Unit {
+            $nama = trim((string) ($data['nama'] ?? ''));
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama unit kerja wajib diisi.');
+            }
+            $this->assertUnitNameFree($nama);
+            $this->assertKnownWilayah($data['wilayah'] ?? null);
+
+            $unit = Unit::create([
+                'nama' => $nama,
+                'kode' => $data['kode'] ?? null,
+                'wilayah' => $data['wilayah'],
+                'urutan' => $data['urutan'] ?? ((int) Unit::max('urutan') + 1),
+                'is_active' => true,
+            ]);
+
+            MasterAuditLog::record(
+                $user, 'unit.created', 'unit', $unit->id, $unit->nama, null,
+                $unit->only(['nama', 'kode', 'wilayah', 'urutan'])
+            );
+
+            return $unit;
+        });
+    }
+
+    /**
+     * Mengubah atribut unit. Perubahan nama (rename) menyelaraskan teks unit pada pegawai
+     * dalam transaksi yang sama; riwayat jabatan tetap memakai nama lama.
+     *
+     * @param  array{nama?: string, kode?: ?string, wilayah?: string, urutan?: ?int}  $data
+     */
+    public function updateUnit(Unit $unit, array $data, ?string $reason, User $user): Unit
+    {
+        return DB::transaction(function () use ($unit, $data, $reason, $user): Unit {
+            $changes = $this->changedAttributes($unit, Arr::only($data, ['nama', 'kode', 'wilayah', 'urutan']));
+            if ($changes === []) {
+                return $unit;
+            }
+
+            if (isset($changes['wilayah'])) {
+                $this->assertKnownWilayah($changes['wilayah']);
+            }
+
+            $isRename = isset($changes['nama']);
+            if ($isRename) {
+                $this->assertNotBlocked($this->previewImpact('unit.rename', ['unit_id' => $unit->id, 'nama' => $changes['nama']]));
+                $reason = $this->requireReason($reason);
+            }
+
+            $old = Arr::only($unit->getAttributes(), array_keys($changes));
+            $oldName = $unit->nama;
+            $unit->update($changes);
+
+            if ($isRename) {
+                Employee::where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
+            }
+
+            MasterAuditLog::record(
+                $user, $isRename ? 'unit.renamed' : 'unit.updated', 'unit', $unit->id, $unit->nama,
+                $old, $changes, $isRename ? $reason : $this->cleanReason($reason)
+            );
+
+            return $unit;
+        });
+    }
+
+    public function setUnitActive(Unit $unit, bool $active, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($unit, $active, $reason, $user): void {
+            if ($unit->is_active === $active) {
+                return;
+            }
+
+            if (! $active) {
+                $this->assertNotBlocked($this->previewImpact('unit.deactivate', ['unit_id' => $unit->id]));
+                $reason = $this->requireReason($reason);
+            }
+
+            $unit->update(['is_active' => $active]);
+
+            MasterAuditLog::record(
+                $user, $active ? 'unit.activated' : 'unit.deactivated', 'unit', $unit->id, $unit->nama,
+                ['is_active' => ! $active], ['is_active' => $active],
+                $active ? $this->cleanReason($reason) : $reason
+            );
+        });
+    }
+
+    public function deleteUnit(Unit $unit, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($unit, $reason, $user): void {
+            $this->assertNotBlocked($this->previewImpact('unit.delete', ['unit_id' => $unit->id]));
+            $reason = $this->requireReason($reason);
+
+            $snapshot = $unit->only(['nama', 'kode', 'wilayah', 'urutan']);
+            $unit->delete();
+
+            MasterAuditLog::record($user, 'unit.deleted', 'unit', $unit->id, $snapshot['nama'], $snapshot, null, $reason);
+        });
+    }
+
     // ───────────────────────────── Pratinjau dampak ─────────────────────────────
 
     /**
@@ -107,8 +218,70 @@ class MasterFormasiService
             'seat.add' => $this->previewSeatAdd((int) $params['unit_id'], (int) $params['position_id']),
             'seat.update' => $this->previewSeatUpdate((int) $params['seat_id'], (int) $params['kuota']),
             'seat.remove' => $this->previewSeatRemove((int) $params['seat_id']),
+            'unit.deactivate' => $this->previewUnitDeactivate((int) $params['unit_id']),
+            'unit.delete' => $this->previewUnitDelete((int) $params['unit_id']),
+            'unit.rename' => $this->previewUnitRename((int) $params['unit_id'], (string) $params['nama']),
             default => throw new InvalidArgumentException("Operasi pratinjau tidak dikenal: {$operation}"),
         };
+    }
+
+    private function previewUnitDeactivate(int $unitId): ImpactResult
+    {
+        $unit = Unit::findOrFail($unitId);
+        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+
+        if ($employees > 0) {
+            return ImpactResult::blocked(
+                ["Unit '{$unit->nama}' tidak dapat dinonaktifkan: {$employees} pegawai masih tercatat di unit ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu."],
+                $employees
+            );
+        }
+
+        return ImpactResult::ok();
+    }
+
+    private function previewUnitDelete(int $unitId): ImpactResult
+    {
+        $unit = Unit::findOrFail($unitId);
+        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        $seats = DB::table('position_unit')->where('unit_id', $unit->id)->count();
+        $history = JobHistory::where('unit_kerja', $unit->nama)->count();
+        $blockers = [];
+
+        if ($employees > 0) {
+            $blockers[] = "{$employees} pegawai masih tercatat di unit ini.";
+        }
+        if ($seats > 0) {
+            $blockers[] = "Unit ini masih memiliki {$seats} kursi formasi.";
+        }
+        if ($history > 0) {
+            $blockers[] = "Unit ini tercatat pada {$history} riwayat jabatan.";
+        }
+
+        if ($blockers === []) {
+            return ImpactResult::ok();
+        }
+
+        return ImpactResult::blocked(
+            ["Unit '{$unit->nama}' tidak dapat dihapus. ".implode(' ', $blockers).' Gunakan fitur Nonaktifkan.'],
+            $employees
+        );
+    }
+
+    private function previewUnitRename(int $unitId, string $nama): ImpactResult
+    {
+        $unit = Unit::findOrFail($unitId);
+
+        if (Unit::where('nama', $nama)->where('id', '!=', $unit->id)->exists()) {
+            return ImpactResult::blocked(["Nama unit '{$nama}' sudah digunakan oleh unit lain."]);
+        }
+
+        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+
+        return ImpactResult::ok(
+            $employees > 0 ? ["{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan tetap memakai nama lama."] : [],
+            $employees
+        );
     }
 
     private function previewSeatAdd(int $unitId, int $positionId): ImpactResult
@@ -174,6 +347,53 @@ class MasterFormasiService
         }
 
         return $reason;
+    }
+
+    private function assertUnitNameFree(string $nama, ?int $exceptId = null): void
+    {
+        $query = Unit::where('nama', $nama);
+        if ($exceptId !== null) {
+            $query->where('id', '!=', $exceptId);
+        }
+
+        if ($query->exists()) {
+            throw new FormasiRuleViolationException("Nama unit '{$nama}' sudah digunakan oleh unit lain.");
+        }
+    }
+
+    private function assertKnownWilayah(mixed $wilayah): void
+    {
+        if (! in_array($wilayah, Unit::WILAYAH_LIST, true)) {
+            throw new FormasiRuleViolationException('Wilayah harus salah satu dari: '.implode('; ', Unit::WILAYAH_LIST).'.');
+        }
+    }
+
+    /**
+     * Hanya atribut yang benar-benar berbeda dari nilai saat ini.
+     *
+     * @param  array<string, mixed>  $incoming
+     * @return array<string, mixed>
+     */
+    private function changedAttributes(Model $model, array $incoming): array
+    {
+        $changes = [];
+        foreach ($incoming as $key => $value) {
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            if ((string) $model->getAttribute($key) !== (string) $value) {
+                $changes[$key] = $key === 'urutan' && $value !== null ? (int) $value : $value;
+            }
+        }
+
+        return $changes;
+    }
+
+    private function cleanReason(?string $reason): ?string
+    {
+        $reason = trim((string) $reason);
+
+        return $reason === '' ? null : $reason;
     }
 
     private function assertNotBlocked(ImpactResult $impact): void
