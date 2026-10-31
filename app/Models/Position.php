@@ -103,7 +103,7 @@ class Position extends Model
     public function units(): BelongsToMany
     {
         return $this->belongsToMany(Unit::class, 'position_unit')
-            ->withPivot('kuota')
+            ->withPivot('kuota', 'bidang')
             ->withTimestamps();
     }
 

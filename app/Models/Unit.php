@@ -56,7 +56,7 @@ class Unit extends Model
     public function positions(): BelongsToMany
     {
         return $this->belongsToMany(Position::class, 'position_unit')
-            ->withPivot('kuota')
+            ->withPivot('kuota', 'bidang')
             ->withTimestamps();
     }
 
