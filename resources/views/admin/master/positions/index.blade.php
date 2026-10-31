@@ -25,7 +25,7 @@
                     @forelse($positions as $position)
                         <tr>
                             <td class="p-3 font-bold text-surface-800">{{ $position->nama }}</td>
-                            <td class="p-3 text-surface-600">{{ $position->bidang }}</td>
+                            <td class="p-3 text-surface-600">{{ $position->units->pluck('pivot.bidang')->filter()->unique()->sort()->implode(', ') ?: '-' }}</td>
                             <td class="p-3 text-surface-600">{{ $position->level }}</td>
                             <td class="p-3">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-warning-50 text-warning-800 border border-warning-200">

@@ -187,6 +187,42 @@ class MasterDataTest extends TestCase
         Unit::where('nama', $unitName)->delete();
     }
 
+    public function test_creating_position_with_unit_stores_bidang_on_the_seat(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Uji Formasi', 'kode' => 'Kebun', 'wilayah' => 'Kalimantan Barat', 'is_active' => true, 'urutan' => 99]);
+
+        $this->actingAs($this->admin)->post(route('admin.master.positions.store'), [
+            'nama' => 'Asisten Uji Kursi',
+            'bidang' => 'KEU',
+            'level' => 'Karpim',
+            'rm_level' => 'RM-3',
+            'unit_nama' => $unit->nama,
+        ])->assertRedirect(route('admin.master.positions.index'));
+
+        $position = Position::where('nama', 'Asisten Uji Kursi')->firstOrFail();
+        $this->assertDatabaseHas('position_unit', [
+            'position_id' => $position->id,
+            'unit_id' => $unit->id,
+            'kuota' => 1,
+            'bidang' => 'KEU',
+        ]);
+    }
+
+    public function test_position_index_filters_by_seat_bidang(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Uji Filter', 'kode' => 'Kebun', 'wilayah' => 'Kalimantan Barat', 'is_active' => true, 'urutan' => 98]);
+        $tan = Position::create(['nama' => 'Asisten Filter Tanaman', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+        $keu = Position::create(['nama' => 'Asisten Filter Keuangan', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+        $unit->positions()->attach($tan->id, ['kuota' => 1, 'bidang' => 'TAN']);
+        $unit->positions()->attach($keu->id, ['kuota' => 1, 'bidang' => 'KEU']);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index', ['bidang' => 'TAN']));
+
+        $response->assertOk();
+        $response->assertSee('Asisten Filter Tanaman');
+        $response->assertDontSee('Asisten Filter Keuangan');
+    }
+
     public function test_ajax_json_quick_store_position(): void
     {
         $posName = 'Asisten AJAX Quick Add Test';

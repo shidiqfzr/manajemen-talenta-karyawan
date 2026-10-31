@@ -15,16 +15,16 @@ class PositionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Position::query();
+        $query = Position::query()->with('units');
 
         // Search filter
         if ($search = $request->input('search')) {
             $query->where('nama', 'like', "%{$search}%");
         }
 
-        // Bidang filter
+        // Bidang filter (bidang melekat pada kursi di unit, bukan pada nama jabatan)
         if ($bidang = $request->input('bidang')) {
-            $query->where('bidang', $bidang);
+            $query->whereHas('units', fn ($units) => $units->where('position_unit.bidang', $bidang));
         }
 
         // Level filter
@@ -54,7 +54,6 @@ class PositionController extends Controller
         $rmLevelList = Position::RM_LEVEL_LIST;
 
         $positions = $query->orderBy('level', 'asc')
-            ->orderBy('bidang', 'asc')
             ->orderBy('nama', 'asc')
             ->paginate(15)
             ->withQueryString();
@@ -115,7 +114,7 @@ class PositionController extends Controller
             $unit = Unit::where('nama', $unitNama)->first();
             if ($unit) {
                 $unit->positions()->syncWithoutDetaching([
-                    $position->id => ['kuota' => 1],
+                    $position->id => ['kuota' => 1, 'bidang' => $validated['bidang'] ?? null],
                 ]);
             }
         }
