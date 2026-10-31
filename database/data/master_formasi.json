@@ -2,7 +2,7 @@
     {
         "nama": "Bagian Sekretariat & Hukum",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 1,
         "positions": [
@@ -109,7 +109,7 @@
     {
         "nama": "Bagian Sumber Daya Manusia & Sistem Manajemen",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 2,
         "positions": [
@@ -237,7 +237,7 @@
     {
         "nama": "Bagian Akuntansi & Keuangan",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 5,
         "positions": [
@@ -337,7 +337,7 @@
     {
         "nama": "Bagian Pengadaan & Teknologi Informasi",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 7,
         "positions": [
@@ -416,7 +416,7 @@
     {
         "nama": "Bagian Tanaman",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 3,
         "positions": [
@@ -530,7 +530,7 @@
     {
         "nama": "Bagian Teknik & Pengolahan",
         "kode": "Bagian",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 4,
         "positions": [
@@ -616,7 +616,7 @@
     {
         "nama": "Distrik Petani Mitra",
         "kode": "Distrik",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 8,
         "positions": [
@@ -688,7 +688,7 @@
     {
         "nama": "PMO Investasi Tanaman Wilayah Kalbar",
         "kode": "PMO",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 10,
         "positions": [
@@ -725,7 +725,7 @@
     {
         "nama": "PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng",
         "kode": "PMO",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 11,
         "positions": [
@@ -769,7 +769,7 @@
     {
         "nama": "Group Manager Kalbar",
         "kode": "Group",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 14,
         "positions": [
@@ -813,7 +813,7 @@
     {
         "nama": "Group Manager Kalselteng",
         "kode": "Group",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 28,
         "positions": [
@@ -857,7 +857,7 @@
     {
         "nama": "Group Manager Kaltim",
         "kode": "Group",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 39,
         "positions": [
@@ -908,7 +908,7 @@
     {
         "nama": "Kebun Batulicin",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 32,
         "positions": [
@@ -973,7 +973,7 @@
     {
         "nama": "Kebun Danau Salak",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 29,
         "positions": [
@@ -1094,7 +1094,7 @@
     {
         "nama": "Kebun Gunung Emas",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 17,
         "positions": [
@@ -1180,7 +1180,7 @@
     {
         "nama": "Kebun Inti Gunung Meliau",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 15,
         "positions": [
@@ -1287,7 +1287,7 @@
     {
         "nama": "Kebun Inti Pandawa",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 42,
         "positions": [
@@ -1359,7 +1359,7 @@
     {
         "nama": "Kebun Inti Sungai Dekan",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 18,
         "positions": [
@@ -1452,7 +1452,7 @@
     {
         "nama": "Kebun Kembayan",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 26,
         "positions": [
@@ -1538,7 +1538,7 @@
     {
         "nama": "Kebun Kemitraan Area Kalbar",
         "kode": "Kebun",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 9,
         "positions": [
@@ -1603,7 +1603,7 @@
     {
         "nama": "Kebun Kemitraan Area Kaltim-Sel",
         "kode": "Kebun",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 13,
         "positions": [
@@ -1675,7 +1675,7 @@
     {
         "nama": "Kebun Kumai",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 35,
         "positions": [
@@ -1747,7 +1747,7 @@
     {
         "nama": "Kebun Ngabang",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 22,
         "positions": [
@@ -1826,7 +1826,7 @@
     {
         "nama": "Kebun Pamukan",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 30,
         "positions": [
@@ -1891,7 +1891,7 @@
     {
         "nama": "Kebun Parindu",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 24,
         "positions": [
@@ -1977,7 +1977,7 @@
     {
         "nama": "Kebun Pelaihari",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 33,
         "positions": [
@@ -2042,7 +2042,7 @@
     {
         "nama": "Kebun Raren Batuah",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 38,
         "positions": [
@@ -2086,7 +2086,7 @@
     {
         "nama": "Kebun Rimba Belian",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 19,
         "positions": [
@@ -2165,7 +2165,7 @@
     {
         "nama": "Kebun Sintang",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 21,
         "positions": [
@@ -2202,7 +2202,7 @@
     {
         "nama": "Kebun Tabara",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 40,
         "positions": [
@@ -2302,7 +2302,7 @@
     {
         "nama": "Kebun Tajati",
         "kode": "Kebun",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 41,
         "positions": [
@@ -2395,7 +2395,7 @@
     {
         "nama": "Kebun-PKS Longkali",
         "kode": "Kebun-PKS",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 45,
         "positions": [
@@ -2488,7 +2488,7 @@
     {
         "nama": "PKR Tambarangan",
         "kode": "PKR",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 36,
         "positions": [
@@ -2532,7 +2532,7 @@
     {
         "nama": "PKS Gunung Meliau",
         "kode": "PKS",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 16,
         "positions": [
@@ -2583,7 +2583,7 @@
     {
         "nama": "PKS Kembayan",
         "kode": "PKS",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 27,
         "positions": [
@@ -2634,7 +2634,7 @@
     {
         "nama": "PKS Longpinang",
         "kode": "PKS",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 43,
         "positions": [
@@ -2692,7 +2692,7 @@
     {
         "nama": "PKS Ngabang",
         "kode": "PKS",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 23,
         "positions": [
@@ -2743,7 +2743,7 @@
     {
         "nama": "PKS Pamukan",
         "kode": "PKS",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 31,
         "positions": [
@@ -2794,7 +2794,7 @@
     {
         "nama": "PKS Parindu",
         "kode": "PKS",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 25,
         "positions": [
@@ -2852,7 +2852,7 @@
     {
         "nama": "PKS Pelaihari",
         "kode": "PKS",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 34,
         "positions": [
@@ -2903,7 +2903,7 @@
     {
         "nama": "PKS Rimba Belian",
         "kode": "PKS",
-        "wilayah": "Kalimantan Barat",
+        "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
         "urutan": 20,
         "positions": [
@@ -2954,7 +2954,7 @@
     {
         "nama": "PKS Samuntai",
         "kode": "PKS",
-        "wilayah": "Kalimantan Timur",
+        "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
         "urutan": 44,
         "positions": [
@@ -3005,7 +3005,7 @@
     {
         "nama": "PMO Batu Bara & Bisnis Lainnya",
         "kode": "PMO",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 12,
         "positions": [
@@ -3042,7 +3042,7 @@
     {
         "nama": "Proyek Batubara Danau Salak",
         "kode": "Proyek",
-        "wilayah": "Kalimantan Selatan & Tengah",
+        "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
         "urutan": 37,
         "positions": [
@@ -3072,7 +3072,7 @@
     {
         "nama": "Tim Penguatan ERP SAP",
         "kode": "Tim",
-        "wilayah": "Regional Office (Pontianak)",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 6,
         "positions": [

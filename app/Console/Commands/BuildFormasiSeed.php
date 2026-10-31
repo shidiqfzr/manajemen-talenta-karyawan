@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Unit;
 use App\Services\Formasi\FormasiExcelParser;
 use Illuminate\Console\Command;
 
@@ -64,6 +65,16 @@ class BuildFormasiSeed extends Command
             $this->error('Unit berikut belum memiliki kode/wilayah/urutan pada metadata unit:');
             foreach ($missing as $name) {
                 $this->line("- {$name}");
+            }
+
+            return self::FAILURE;
+        }
+
+        $badWilayah = array_values(array_filter(array_keys($units), fn (string $name) => ! in_array($metadata[$name]['wilayah'], Unit::WILAYAH_LIST, true)));
+        if ($badWilayah !== []) {
+            $this->error('Wilayah unit berikut tidak dikenal (harus salah satu dari: '.implode('; ', Unit::WILAYAH_LIST).'):');
+            foreach ($badWilayah as $name) {
+                $this->line("- {$name}: {$metadata[$name]['wilayah']}");
             }
 
             return self::FAILURE;

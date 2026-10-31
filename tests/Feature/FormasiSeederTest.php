@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
 use Database\Seeders\PositionUnitSeeder;
@@ -70,6 +71,39 @@ class FormasiSeederTest extends TestCase
         $this->assertSame(45, Unit::count());
         $this->assertSame(392, DB::table('position_unit')->count());
         $this->assertSame(444, (int) DB::table('position_unit')->sum('kuota'));
+    }
+
+    public function test_seeded_units_use_the_known_wilayah_labels(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $this->assertSame([], Unit::whereNotIn('wilayah', Unit::WILAYAH_LIST)->pluck('nama')->all());
+    }
+
+    public function test_grouped_units_fallback_matches_seeded_units(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $expected = Unit::orderBy('urutan')->get()
+            ->groupBy('wilayah')
+            ->map(fn ($units) => $units->pluck('nama')->all())
+            ->all();
+
+        $this->assertSame($expected, Employee::GROUPED_UNITS);
+    }
+
+    public function test_reseeding_restores_unit_and_position_attributes(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        Unit::where('nama', 'Kebun Tajati')->update(['wilayah' => 'Salah', 'urutan' => 999]);
+        Position::where('nama', 'Manajer')->update(['rm_level' => 'RM-3']);
+
+        $this->seed(PositionUnitSeeder::class);
+
+        $tajati = Unit::where('nama', 'Kebun Tajati')->firstOrFail();
+        $this->assertSame('Wilayah Kalimantan Timur', $tajati->wilayah);
+        $this->assertNotSame(999, $tajati->urutan);
+        $this->assertSame('RM-1', Position::where('nama', 'Manajer')->value('rm_level'));
     }
 
     public function test_pool_positions_exist_without_seats(): void
