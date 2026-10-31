@@ -4,21 +4,26 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\Position;
+use App\Services\Formasi\FormasiCatalog;
 use Carbon\Carbon;
 
 class ManPowerPlanningService
 {
+    public function __construct(private ?FormasiCatalog $catalog = null) {}
+
+    private function catalog(): FormasiCatalog
+    {
+        return $this->catalog ??= app(FormasiCatalog::class);
+    }
+
     /**
      * Standard Baseline Matrix data from Corporate MPP Document (PTPN Reference).
      */
     public function getBaselineData(): array
     {
         return [
-            'standar_formasi' => [
-                'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
-                'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
-                'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
-            ],
+            // Standar Formasi diturunkan dari kursi master formasi (Excel Karpim), bukan angka tetap.
+            'standar_formasi' => $this->catalog()->standarFormasi(),
             'realisasi_baseline' => [
                 'RM-1' => ['KEU' => 2, 'TAN' => 24, 'TEK' => 6, 'UMU' => 4],
                 'RM-2' => ['KEU' => 5, 'TAN' => 30, 'TEK' => 9, 'UMU' => 14],
@@ -155,6 +160,15 @@ class ManPowerPlanningService
      */
     public function determineBidang(Employee $emp): string
     {
+        // Kursi pada master formasi menentukan bidang; heuristik teks hanya cadangan
+        // untuk pegawai tanpa kursi (jabatan pool, Karpel, atau data lama).
+        if (filled($emp->jabatan) && filled($emp->unit_kerja)) {
+            $seatBidang = $this->catalog()->seatBidang((string) $emp->unit_kerja, (string) $emp->jabatan);
+            if ($seatBidang !== null) {
+                return $seatBidang;
+            }
+        }
+
         $text = strtolower($emp->jabatan.' '.$emp->unit_kerja);
 
         if (str_contains($text, 'keu') || str_contains($text, 'akuntan') || str_contains($text, 'anggaran') || str_contains($text, 'pajak') || str_contains($text, 'kas') || str_contains($text, 'perbendaharaan')) {
