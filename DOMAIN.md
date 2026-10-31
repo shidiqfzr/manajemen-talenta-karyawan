@@ -11,7 +11,7 @@
 ## Daftar Isi
 1. [Tujuan & Filosofi Domain](#1-tujuan--filosofi-domain)
 2. [Terminologi & Kamus Data Domain (Data Dictionary)](#2-terminologi--kamus-data-domain-data-dictionary)
-3. [Struktur Wilayah & Master Data 43 Unit Kerja](#3-struktur-wilayah--master-data-43-unit-kerja)
+3. [Struktur Wilayah & Master Data 45 Unit Kerja](#3-struktur-wilayah--master-data-45-unit-kerja)
 4. [Strata Pegawai, RM Band, & 4 Bidang Fungsional](#4-strata-pegawai-rm-band--4-bidang-fungsional)
 5. [Aturan Bisnis HR & Rumus Perhitungan](#5-aturan-bisnis-hr--rumus-perhitungan)
 6. [Manajemen Kinerja & Matriks Talenta (9-Box Grid)](#6-manajemen-kinerja--matriks-talenta-9-box-grid)
@@ -45,7 +45,7 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `rm_level` | `string/enum` | Eselon manajemen dan formasi: RM-1, RM-2, RM-3 (Karpim), dan RM-4 (Karpel). | `RM-1`, `RM-2`, `RM-3`, `RM-4` |
 | `bidang` | `string` | Bidang fungsional operasional pegawai. | `KEU`, `TAN`, `TEK`, `UMU` |
 | `jabatan` | `string` | Nomenklatur jabatan dinas yang sedang diemban saat ini. | `Manajer Kebun`, `Askep Tanaman`, `Asisten Afdeling` |
-| `unit_kerja` | `string` | Nama unit kerja definitif dari 43 unit resmi perusahaan. | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
+| `unit_kerja` | `string` | Nama unit kerja definitif dari 45 unit resmi perusahaan (§3). | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
 | `golongan` | `string` | Tingkat golongan kepangkatan beserta berkala genap (`[Gol]/[Berkala]`). | `IIIA/00`, `IIID/05`, `IVA/05` |
 | `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
 | `person_grade` | `integer` | Tingkat kompetensi individual pegawai (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
@@ -111,68 +111,70 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 
 ---
 
-## 3. Struktur Wilayah & Master Data 43 Unit Kerja
+## 3. Struktur Wilayah & Master Data 45 Unit Kerja
 
-Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 43 unit kerja aktif):
+Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 45 unit kerja aktif, bersumber dari Excel formasi Karpim, lihat §3.6):
 
 ### 3.1 Regional Office (Kantor Direksi / Head Office Pontianak)
 *Kode Wilayah: `REG`*
 
-1. **Bagian Sekretariat dan Hukum** *(Tipe: KANDIR | Bidang: UMU)*
-2. **Bagian Sumber Daya Manusia dan Sistem Manajemen** *(Tipe: KANDIR | Bidang: UMU)*
+1. **Bagian Sekretariat & Hukum** *(Tipe: KANDIR | Bidang: UMU)*
+2. **Bagian Sumber Daya Manusia & Sistem Manajemen** *(Tipe: KANDIR | Bidang: UMU)*
 3. **Bagian Tanaman** *(Tipe: KANDIR | Bidang: TAN)*
-4. **Bagian Teknik dan Pengolahan** *(Tipe: KANDIR | Bidang: TEK)*
-5. **Bagian Akuntansi dan Keuangan** *(Tipe: KANDIR | Bidang: KEU)*
-6. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: UMU)*
-7. **Bagian Pengadaan dan Teknologi Informasi** *(Tipe: KANDIR | Bidang: UMU)*
-8. **Divisi Sistem Manajemen & Sustainability** *(Tipe: KANDIR | Bidang: UMU)*
-9. **Project Management Office (PMO)** *(Tipe: KANDIR | Bidang: UMU)*
-10. **Satuan Pengawasan Internal (SPI)** *(Tipe: KANDIR | Bidang: UMU/KEU)*
-11. **Distrik Petani Mitra** *(Tipe: DISTRIK | Bidang: TAN)*
-12. **Kebun Kemitraan Area Kalbar** *(Tipe: KEBUN | Bidang: TAN)*
+4. **Bagian Teknik & Pengolahan** *(Tipe: KANDIR | Bidang: TEK)*
+5. **Bagian Akuntansi & Keuangan** *(Tipe: KANDIR | Bidang: KEU)*
+6. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: KEU)*
+7. **Bagian Pengadaan & Teknologi Informasi** *(Tipe: KANDIR | Bidang: UMU)*
+8. **Distrik Petani Mitra** *(Tipe: DISTRIK | Bidang: TAN)*
+9. **Kebun Kemitraan Area Kalbar** *(Tipe: KEBUN | Bidang: TAN)*
+10. **PMO Investasi Tanaman Wilayah Kalbar** *(Tipe: KANDIR | Bidang: TAN)*
+11. **PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng** *(Tipe: KANDIR | Bidang: TAN)*
+12. **PMO Batu Bara & Bisnis Lainnya** *(Tipe: KANDIR | Bidang: UMU)*
 13. **Kebun Kemitraan Area Kaltim-Sel** *(Tipe: KEBUN | Bidang: TAN)*
 
 ### 3.2 Wilayah Kalimantan Barat
 *Kode Wilayah: `KALBAR`*
 
-14. **Unit Group Kalimantan Barat** *(Tipe: GROUP | Bidang: TAN/TEK)*
-15. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+14. **Group Manager Kalbar** *(Tipe: GROUP | Bidang: TAN)*
+15. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN)*
 16. **PKS Gunung Meliau** *(Tipe: PKS | Bidang: TEK)*
-17. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
-18. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
-19. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+17. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN)*
+18. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN)*
+19. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN)*
 20. **PKS Rimba Belian** *(Tipe: PKS | Bidang: TEK)*
-21. **Kebun PKR Sintang** *(Tipe: KEBUN | Bidang: TAN | Karet & Sawit)*
-22. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+21. **Kebun Sintang** *(Tipe: KEBUN | Bidang: TAN)*
+22. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN)*
 23. **PKS Ngabang** *(Tipe: PKS | Bidang: TEK)*
-24. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+24. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN)*
 25. **PKS Parindu** *(Tipe: PKS | Bidang: TEK)*
-26. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+26. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN)*
 27. **PKS Kembayan** *(Tipe: PKS | Bidang: TEK)*
 
 ### 3.3 Wilayah Kalimantan Selatan & Kalimantan Tengah
 *Kode Wilayah: `KALSELTENG`*
 
-28. **Unit Group Kalimantan Selatan/Tengah** *(Tipe: GROUP | Bidang: TAN/TEK)*
-29. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN | Karet & Sawit)*
-30. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+28. **Group Manager Kalselteng** *(Tipe: GROUP | Bidang: TAN)*
+29. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN)*
+30. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN)*
 31. **PKS Pamukan** *(Tipe: PKS | Bidang: TEK)*
-32. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN | Karet & Sawit)*
-33. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
+32. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN)*
+33. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN)*
 34. **PKS Pelaihari** *(Tipe: PKS | Bidang: TEK)*
-35. **Proyek Batubara Danau Salak & Buntok** *(Tipe: PROYEK | Bidang: UMU/TEK)*
-36. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN | Karet & Sawit)*
+35. **Kebun Kumai** *(Tipe: KEBUN | Bidang: TAN)*
+36. **PKR Tambarangan** *(Tipe: PKR | Bidang: TEK)*
+37. **Proyek Batubara Danau Salak** *(Tipe: PROYEK | Bidang: UMU)*
+38. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN)*
 
 ### 3.4 Wilayah Kalimantan Timur
 *Kode Wilayah: `KALTIM`*
 
-37. **Unit Group Wilayah Kalimantan Timur** *(Tipe: GROUP | Bidang: TAN/TEK)*
-38. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
-39. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
-40. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN | Kelapa Sawit)*
-41. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
-42. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
-43. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN/TEK)*
+39. **Group Manager Kaltim** *(Tipe: GROUP | Bidang: TAN)*
+40. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN)*
+41. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN)*
+42. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN)*
+43. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
+44. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
+45. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
 
 ### 3.5 Tata Kelola Master Data Dinamis (Hybrid Architecture)
 1. **Pemisahan Kategori Statis vs Dinamis**:
@@ -184,6 +186,14 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 3. **Penyelarasan Nomenklatur Otomatis**:
    - Jika nama unit atau jabatan diperbarui di Master Data, sistem secara transaksional menyelaraskan data terkait di tabel `employees` guna mencegah inkonsistensi pelaporan dan audit kepegawaian.
 
+### 3.6 Sumber Master Formasi Karpim (Excel)
+1. **Sumber tunggal**: berkas `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas ini bersifat mutlak: unit atau jabatan di luar berkas bukan bagian formasi.
+2. **Alur**: Excel → `php artisan formasi:build-seed <berkas>` → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`.
+3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas; `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
+4. **Penulisan nama**: nama unit memakai `&` (bukan "dan"); singkatan (mis. QC, ESG, SDM, ERP) dan angka romawi tetap huruf besar; salah ketik yang diketahui dikoreksi oleh `FormasiNormalizer`.
+5. **Total formasi**: 45 unit, 392 kombinasi jabatan-unit, 444 kursi (RM-1: 45, RM-2: 71, RM-3: 328; KEU 70, TAN 211, TEK 84, UMU 79).
+6. **Di luar berkas**: jabatan pool (Advisor RM-n, Karyawan Diperbantukan RM-n, serta Kepala Bagian, Kepala Sub Bagian, dan Staf Pimpinan Diperbantukan) dibuat oleh seeder sebagai infrastruktur sistem tanpa kursi formasi.
+7. **Unit yang tidak lagi menjadi bagian formasi** pada revisi ini: Divisi Sistem Manajemen & Sustainability, Project Management Office (PMO), Satuan Pengawasan Internal (SPI), Unit Group Kalimantan Barat, Unit Group Kalimantan Selatan/Tengah, Unit Group Wilayah Kalimantan Timur, Kebun PKR Sintang, dan Proyek Batubara Danau Salak & Buntok. Pada basis data yang sudah berjalan, restrukturisasi tetap mengikuti §3.5 (`is_active`, riwayat tidak dihapus); pengosongan basis data hanya dilakukan pada fase pengembangan.
 ---
 
 ## 4. Strata Pegawai, RM Band, & 4 Bidang Fungsional
@@ -234,7 +244,7 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
    - Posisi Kunci: Mandor Panen/Pemeliharaan, Operator PKS, Krani Afdeling/Kantor, Mekanik Bengkel, Satpam/Keamanan Kebun. Disiapkan sebagai talenta internal untuk suksesi ke RM-3 via jalur **CKP**.
 
 ### 4.3 4 Bidang Fungsional
-Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService@determineBidang`:
+Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService@determineBidang` dengan urutan: (1) bidang kursi pada master formasi (`position_unit.bidang`) untuk pasangan (unit kerja, jabatan) pegawai; (2) bila pegawai tidak menempati kursi formasi (jabatan pool, Karpel, atau data lama), pendeteksian kata kunci berikut:
 - **KEU (Keuangan & Akuntansi)**: mendeteksi kata kunci `keu`, `akuntan`, `anggaran`, `pajak`, `kas`, `perbendaharaan`, `tata usaha`.
 - **TAN (Tanaman & Agronomi)**: mendeteksi kata kunci `tanaman`, `agronomi`, `afdeling`, `rayon`, `panen`, `kebun`, `pemeliharaan`, `tbs`.
 - **TEK (Teknik & Pengolahan)**: mendeteksi kata kunci `teknik`, `pabrik`, `pks`, `pengolahan`, `bengkel`, `instalasi`, `mesin`, `mill`, `laboratorium`.
@@ -356,6 +366,7 @@ Modul Pelatihan (`Trainings`) berfungsi memantau investasi kompetensi talenta:
 
 Service `ManPowerPlanningService` memuat data acuan baseline perusahaan:
 1. **Formasi Standar vs Realisasi**:
+   - Formasi Standar per RM Band dan bidang diturunkan dari kursi master formasi (`FormasiCatalog::standarFormasi()`, §3.6), bukan angka tetap; jabatan pool (Advisor/Diperbantukan) tidak dihitung.
    - Menghitung rasio pemenuhan formasi per RM Band (`RM-1`, `RM-2`, `RM-3`, `RM-4`) pada setiap bidang (KEU, TAN, TEK, UMU).
 2. **Pipa Pasokan Talenta Rekrutmen (Recruitment Supply Channels)**:
    - **CKP (Calon Karyawan Pimpinan) Internal**: Pasokan karir internal dari Karyawan Pelaksana (`RM-4`) berprestasi yang lulus seleksi asesmen untuk dipromosikan menjadi staf pimpinan (`RM-3`).
@@ -380,7 +391,7 @@ AI dan pengembang harus memanfaatkan Service Layer yang ada:
 ### 9.1 `ManPowerPlanningService`
 - `determineRmLevel(Employee $emp): string` $\rightarrow$ `'RM-1'`, `'RM-2'`, `'RM-3'`, `'RM-4'`
 - `determineBidang(Employee $emp): string` $\rightarrow$ `'KEU'`, `'TAN'`, `'TEK'`, `'UMU'`
-- `getBaselineData(): array` $\rightarrow$ Data standar formasi BUMN perkebunan.
+- `getBaselineData(): array` $\rightarrow$ Data acuan MPP; `standar_formasi` diturunkan dari kursi master formasi melalui `FormasiCatalog`, sedangkan matriks pasokan dan proyeksi lain tetap berupa baseline.
 
 ### 9.2 `MutasiService`
 `MutasiService` adalah pintu masuk tunggal modul mutasi. Ia mengorkestrasi tiga mode transaksi (Straight, Swap, Chain) dan mendelegasikan tugas lain ke kolaborator di `App\Services\Mutasi\` — pemanggil (Livewire, controller, test) tetap memakai `MutasiService`:
@@ -418,6 +429,12 @@ Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan
 ### 9.5 `EmployeeImportService`
 - `preview(UploadedFile $file): array` $\rightarrow$ Dry-run parsing Excel, validasi integritas master data, dan deteksi anomali formasi sebelum disimpan permanen.
 - `commit(string $token): array` $\rightarrow$ Eksekusi penyimpanan baris valid ke database secara transaksional.
+
+### 9.6 Master Formasi (`App\Services\Formasi\`)
+- `FormasiExcelParser::parse(string $path): array` $\rightarrow$ `['seats' => [...], 'errors' => [...]]`; membaca Excel formasi menjadi kursi per (unit, jabatan), menolak Level RM/Bidang tidak valid, kursi ganda bertentangan, dan jabatan dengan Level RM berbeda antar unit. Tidak mengakses database.
+- `FormasiNormalizer::unit()` / `::jabatan()` $\rightarrow$ Penyeragaman penulisan nama (kapitalisasi, singkatan, angka romawi, `&` pada nama unit, koreksi salah ketik).
+- `FormasiCatalog::seatBidang(string $unitNama, string $jabatan): ?string` $\rightarrow$ Bidang kursi; `null` bila tidak ada kursinya. `FormasiCatalog::standarFormasi(): array` $\rightarrow$ Standar Formasi per RM Band (RM-1..RM-3) dan bidang. Hanya dipakai melalui `ManPowerPlanningService`.
+- `php artisan formasi:build-seed {file}` $\rightarrow$ Membangun `database/data/master_formasi.json` dari Excel formasi; gagal bila ada kesalahan berkas atau unit tanpa metadata (kode/wilayah/urutan).
 
 ---
 
