@@ -14,6 +14,11 @@ class PositionUnitSeeder extends Seeder
      */
     public function run(): void
     {
+        DB::transaction(fn () => $this->seedFormasi());
+    }
+
+    private function seedFormasi(): void
+    {
         $jsonPath = database_path('data/master_formasi.json');
 
         if (! file_exists($jsonPath)) {
@@ -53,10 +58,10 @@ class PositionUnitSeeder extends Seeder
                     $isOverflow = str_contains($posData['nama'], 'Advisor') || str_contains($posData['nama'], 'Diperbantukan');
                     $isDiperban = str_contains($posData['nama'], 'Diperbantukan');
 
+                    // Bidang melekat pada kursi (position_unit), bukan pada nama jabatan.
                     $position = Position::firstOrCreate(
                         ['nama' => $posData['nama']],
                         [
-                            'bidang' => $posData['bidang'],
                             'level' => $posData['level'],
                             'rm_level' => $posData['rm_level'],
                             'is_active' => true,
@@ -71,6 +76,7 @@ class PositionUnitSeeder extends Seeder
                             'position_id' => $position->id,
                             'unit_id' => $unit->id,
                             'kuota' => 0,
+                            'bidang' => $posData['bidang'],
                         ];
                     }
                     $positionUnitMap[$key]['kuota'] += $posData['kuota'];
@@ -90,7 +96,7 @@ class PositionUnitSeeder extends Seeder
         DB::table('position_unit')->upsert(
             $values,
             ['position_id', 'unit_id'],
-            ['kuota']
+            ['kuota', 'bidang']
         );
 
         $this->command->info("Berhasil! {$insertedCount} formasi Karpim dipetakan ke dalam ".count($values).' kombinasi unik Jabatan-Unit Kerja murni.');
