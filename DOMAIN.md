@@ -177,6 +177,8 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 45. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
 
 ### 3.5 Tata Kelola Master Data Dinamis (Hybrid Architecture)
+
+> **Istilah.** Pada antarmuka, pasangan unit–jabatan beserta kuotanya disebut **Formasi Jabatan** (sejalan dengan "Formasi Kosong" di modul Mutasi). Kata "kursi" dan `seat` hanya istilah internal (tabel `position_unit`, kode, dan kunci `entity_type`) dan **tidak** dipakai pada teks yang dilihat pengguna.
 1. **Pemisahan Kategori Statis vs Dinamis**:
    - Kategori regulasi negara & pajak (`jenis_kelamin`, `agama`, `susunan_keluarga`, `pendidikan_terakhir`, `level`) bersifat statis dan didefinisikan terpusat sebagai *Constants* pada model `Employee`.
    - Unit Kerja (`Unit` / `units`) dan Jabatan Formasi (`Position` / `positions`) dikelola secara dinamis melalui antarmuka Master Data di Admin Panel (`/admin/master/units` dan `/admin/master/positions`).
