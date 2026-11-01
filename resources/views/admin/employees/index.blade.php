@@ -86,35 +86,21 @@
 }" class="space-y-6">
 
     <!-- Page Header & Action Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <!-- Breadcrumbs -->
-            <nav class="flex items-center gap-2 text-xs font-medium text-surface-500 mb-1.5" aria-label="Breadcrumb">
-                <span>Core HR</span>
-                <i class="fas fa-chevron-right text-[10px] text-surface-400" aria-hidden="true"></i>
-                <span class="text-primary-700 font-semibold">Manajemen Karyawan</span>
-            </nav>
-            <h1 class="text-2xl lg:text-3xl font-bold tracking-tight text-surface-900">Manajemen Karyawan</h1>
-            <p class="text-sm text-surface-500 mt-0.5">Kelola data induk karyawan, struktur jabatan, formasi, dan rekam jejak talenta.</p>
-        </div>
+    <x-admin.module-header title="Manajemen Karyawan" subtitle="Kelola data induk karyawan, struktur jabatan, formasi, dan rekam jejak talenta." :breadcrumbs="['Core HR', 'Manajemen Karyawan']">
+        <!-- Import Page Navigation Button (Enterprise Workday / SAP Multi-Step Standard) -->
+        <a href="{{ route('admin.employees.import.page') }}"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer">
+            <i class="fas fa-file-arrow-up text-primary-600 text-xs" aria-hidden="true"></i>
+            <span>Import Excel</span>
+        </a>
 
-        <!-- Clean Header Actions: Import Modal & Primary CTA -->
-        <div class="flex items-center gap-2.5 shrink-0">
-            <!-- Import Page Navigation Button (Enterprise Workday / SAP Multi-Step Standard) -->
-            <a href="{{ route('admin.employees.import.page') }}"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer">
-                <i class="fas fa-file-arrow-up text-primary-600 text-xs" aria-hidden="true"></i>
-                <span>Import Excel</span>
-            </a>
-
-            <!-- Tambah Karyawan (Primary CTA) -->
-            <a href="{{ route('admin.employees.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow">
-                <i class="fas fa-plus text-xs" aria-hidden="true"></i>
-                <span>Tambah Karyawan</span>
-            </a>
-        </div>
-    </div>
+        <!-- Tambah Karyawan (Primary CTA) -->
+        <a href="{{ route('admin.employees.create') }}"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow">
+            <i class="fas fa-plus text-xs" aria-hidden="true"></i>
+            <span>Tambah Karyawan</span>
+        </a>
+    </x-admin.module-header>
 
     <!-- Import Result Banner (Shown if an import was recently executed) -->
     @if(session('import_summary'))

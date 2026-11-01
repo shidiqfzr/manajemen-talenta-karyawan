@@ -5,7 +5,7 @@ namespace App\Services\Formasi;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Model baca atas kursi formasi (position_unit): bidang per kursi dan
+ * Model baca atas formasi jabatan (position_unit): bidang per formasi jabatan dan
  * Standar Formasi per Level RM x Bidang. Dimuat sekali per instans.
  */
 class FormasiCatalog
@@ -21,7 +21,7 @@ class FormasiCatalog
     private ?array $standarFormasi = null;
 
     /**
-     * Bidang kursi pada (unit, jabatan); null bila tidak ada kursinya
+     * Bidang formasi jabatan pada (unit, jabatan); null bila tidak ada formasinya
      * (mis. jabatan pool Advisor/Diperbantukan atau unit tidak dikenal).
      */
     public function seatBidang(string $unitNama, string $jabatan): ?string
@@ -32,7 +32,7 @@ class FormasiCatalog
     }
 
     /**
-     * Standar Formasi per Level RM dan Bidang (jumlah kuota kursi definitif).
+     * Standar Formasi per Level RM dan Bidang (jumlah kuota formasi jabatan definitif).
      *
      * @return array<string, array<string, int>>
      */

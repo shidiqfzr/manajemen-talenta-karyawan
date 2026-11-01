@@ -3,29 +3,88 @@
 namespace App\Livewire\Admin\Master;
 
 use App\Exceptions\FormasiRuleViolationException;
+use App\Exports\FormasiExport;
 use App\Models\Employee;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\Formasi\FormasiDialogs;
 use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Layar Formasi: mengelola kursi (jabatan, bidang, kuota) satu unit kerja per kali.
+ * Layar Formasi: mengelola formasi jabatan (jabatan, bidang, kuota) satu unit kerja per kali.
  * Seluruh aturan dan pencatatan riwayat berada di MasterFormasiService; komponen ini
  * hanya menampilkan pratinjau dampak dan meneruskan konfirmasi admin.
  */
 class FormasiEditor extends Component
 {
+    use WithPagination;
+
+    /** Pilihan jumlah baris per halaman pada kedua tabel. */
+    public const PER_PAGE_OPTIONS = [10, 25, 50, 100];
+
+    /** Label status formasi jabatan; dipakai filter, tabel, dan ekspor agar istilahnya sama. */
+    public const SEAT_STATE_LABELS = [
+        'over' => 'Melebihi kuota',
+        'vacant' => 'Ada lowongan',
+        'empty' => 'Kosong',
+        'full' => 'Penuh',
+    ];
+
+    #[Url(as: 'per_page', except: 25)]
+    public int $perPage = 25;
+
     #[Locked]
     public ?int $unitId = null;
 
-    public string $search = '';
+    /** Filter daftar unit (layar awal). */
+    #[Url(as: 'q', except: '')]
+    public string $unitQuery = '';
+
+    #[Url(as: 'wilayah', except: '')]
+    public string $wilayahFilter = '';
+
+    #[Url(as: 'status', except: '')]
+    public string $statusFilter = '';
+
+    /** Filter tabel formasi jabatan (layar detail unit). */
+    #[Url(as: 'sq', except: '')]
+    public string $seatQuery = '';
+
+    #[Url(as: 'rm', except: '')]
+    public string $rmFilter = '';
+
+    #[Url(as: 'bidang', except: '')]
+    public string $bidangFilter = '';
+
+    /** over | empty | vacant | full | inactive */
+    #[Url(as: 'state', except: '')]
+    public string $seatStatusFilter = '';
+
+    #[Url(as: 'sort')]
+    public string $sortField = 'rm_level';
+
+    #[Url(as: 'direction')]
+    public string $sortDirection = 'asc';
+
+    /** Formasi jabatan yang daftar pemegangnya sedang dibuka (drill-down Terisi). */
+    #[Locked]
+    public ?int $occupantSeatId = null;
+
+    /** Formasi jabatan yang kuota/bidangnya sedang diubah pada dialog. */
+    #[Locked]
+    public ?int $editSeatId = null;
 
     /** seat.add | seat.update | seat.remove */
     #[Locked]
@@ -39,29 +98,215 @@ class FormasiEditor extends Component
 
     public ?string $notice = null;
 
-    public function mount(): void
+    /** Dialog Tambah Formasi Jabatan (pilih jabatan yang sudah ada) sedang terbuka. */
+    public bool $addingSeat = false;
+
+    /** Halaman detail unit membuka komponen ini dengan unit terpilih; daftar unit membukanya tanpa unit. */
+    public function mount(?int $unitId = null): void
     {
         $this->authorizeAdmin();
+        $this->unitId = $unitId && Unit::whereKey($unitId)->exists() ? $unitId : null;
     }
 
-    public function selectUnit(int $unitId): void
+    /** Kolom yang dapat diurutkan pada tabel formasi jabatan. */
+    private const SORTABLE = ['jabatan', 'rm_level', 'bidang', 'kuota', 'filled'];
+
+    /** Kolom yang dapat diurutkan pada daftar unit. */
+    private const OVERVIEW_SORTABLE = ['nama', 'wilayah', 'seats', 'kuota', 'filled'];
+
+    /**
+     * Unduh Excel sesuai tampilan: daftar unit (bila belum memilih unit) atau formasi jabatan unit terpilih,
+     * lengkap dengan pencarian, filter, dan urutan yang sedang aktif (seluruh halaman, bukan hanya halaman ini).
+     */
+    public function exportFormasi(): BinaryFileResponse
     {
         $this->authorizeAdmin();
-        $this->unitId = Unit::whereKey($unitId)->exists() ? $unitId : null;
-        $this->cancel();
-        $this->notice = null;
-        $this->search = '';
+
+        if ($this->unit !== null) {
+            $unit = $this->unit;
+            $rows = $this->filteredSeats->values()->map(fn (object $seat, int $i): array => [
+                $i + 1,
+                $unit->nama,
+                $seat->jabatan,
+                $seat->rm_level ?? '-',
+                $seat->bidang ?? '-',
+                $seat->kuota,
+                $seat->filled,
+                self::SEAT_STATE_LABELS[$seat->state],
+                $seat->position_active ? 'Aktif' : 'Nonaktif',
+            ]);
+            $export = new FormasiExport('Formasi Jabatan', ['NO', 'UNIT KERJA', 'JABATAN', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'STATUS FORMASI', 'STATUS JABATAN'], $rows, auth()->user());
+            $filename = 'Formasi_Jabatan_'.str($unit->nama)->slug('_')->limit(40, '').'_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
+        } else {
+            $rows = $this->filteredOverview->values()->map(fn (object $row, int $i): array => [
+                $i + 1,
+                $row->nama,
+                $row->wilayah,
+                $row->is_active ? 'Aktif' : 'Nonaktif',
+                $row->seats,
+                $row->kuota,
+                $row->filled,
+                $row->over,
+            ]);
+            $export = new FormasiExport('Formasi Unit Kerja', ['NO', 'UNIT KERJA', 'WILAYAH', 'STATUS UNIT', 'JUMLAH JABATAN', 'TOTAL KUOTA', 'TERISI', 'FORMASI MELEBIHI KUOTA'], $rows, auth()->user());
+            $filename = 'Formasi_Unit_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
+        }
+
+        return Excel::download($export, $filename);
+    }
+
+    public function updatedPerPage(): void
+    {
+        if (! in_array($this->perPage, self::PER_PAGE_OPTIONS, true)) {
+            $this->perPage = 25;
+        }
+        $this->resetPage();
+    }
+
+    /** Pencarian atau filter berubah: kembali ke halaman pertama agar hasil tidak berada di halaman kosong. */
+    public function updated(string $property): void
+    {
+        if (in_array($property, ['unitQuery', 'wilayahFilter', 'statusFilter', 'seatQuery', 'rmFilter', 'bidangFilter', 'seatStatusFilter'], true)) {
+            $this->resetPage();
+        }
+    }
+
+    public function sortBy(string $field): void
+    {
+        if (! in_array($field, $this->unitId === null ? self::OVERVIEW_SORTABLE : self::SORTABLE, true)) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+        $this->resetPage();
+    }
+
+    public function resetSeatFilters(): void
+    {
+        $this->reset(['seatQuery', 'rmFilter', 'bidangFilter', 'seatStatusFilter']);
+        $this->resetPage();
+    }
+
+    public function hasSeatFilters(): bool
+    {
+        return trim($this->seatQuery) !== '' || $this->rmFilter !== '' || $this->bidangFilter !== '' || $this->seatStatusFilter !== '';
+    }
+
+    /** Kartu KPI "Melebihi Kuota" berfungsi sebagai pintasan filter status. */
+    public function toggleOverQuotaFilter(): void
+    {
+        $this->seatStatusFilter = $this->seatStatusFilter === 'over' ? '' : 'over';
+        $this->resetPage();
+    }
+
+    public function viewOccupants(int $seatId): void
+    {
+        $this->authorizeAdmin();
+        if ($this->ownsSeat($seatId)) {
+            $this->occupantSeatId = $seatId;
+        }
+    }
+
+    public function closeOccupants(): void
+    {
+        $this->occupantSeatId = null;
+    }
+
+    public function openEditSeat(int $seatId): void
+    {
+        $this->authorizeAdmin();
+        if ($this->ownsSeat($seatId)) {
+            $this->editSeatId = $seatId;
+        }
+    }
+
+    public function closeEditSeat(): void
+    {
+        $this->editSeatId = null;
+    }
+
+    public function openAddSeat(): void
+    {
+        $this->authorizeAdmin();
+        if ($this->unitId === null) {
+            return;
+        }
+        $this->addingSeat = true;
+    }
+
+    public function closeAddSeat(): void
+    {
+        $this->addingSeat = false;
+    }
+
+    /**
+     * Satu formulir: nama yang sudah terdaftar memakai jabatan itu, nama baru membuat jabatan baru pada master.
+     */
+    public function startAddJabatan(string $nama, ?string $rmLevel, string $bidang, mixed $kuota): void
+    {
+        $this->authorizeAdmin();
+        $this->resetErrorBag('add');
+        $nama = trim($nama);
+
+        if ($this->unitId === null) {
+            return;
+        }
+        if ($nama === '' || $bidang === '') {
+            $this->addError('add', 'Nama jabatan dan bidang wajib diisi.');
+
+            return;
+        }
+
+        $existing = Position::whereRaw('lower(nama) = ?', [mb_strtolower($nama)])->first();
+
+        if ($existing) {
+            if (! $existing->is_active || $existing->level !== 'Karpim' || $existing->is_overflow) {
+                $this->addError('add', "Jabatan '{$existing->nama}' tidak dapat dijadikan formasi unit (nonaktif, bukan Karpim, atau jabatan penampungan).");
+
+                return;
+            }
+            if (DB::table('position_unit')->where('unit_id', $this->unitId)->where('position_id', $existing->id)->exists()) {
+                $this->addError('add', "Unit ini sudah memiliki formasi untuk jabatan '{$existing->nama}'. Ubah kuota pada formasi yang ada.");
+
+                return;
+            }
+
+            $this->addingSeat = false;
+            $this->beginPending('seat.add', ['position_id' => $existing->id, 'kuota' => (int) $kuota, 'bidang' => $bidang]);
+
+            return;
+        }
+
+        if (! in_array($rmLevel, Position::KARPIM_RM_LEVELS, true)) {
+            $this->addError('add', 'RM Band wajib dipilih untuk jabatan baru.');
+
+            return;
+        }
+
+        $this->addingSeat = false;
+        $this->beginPending('seat.add', [
+            'new_position' => ['nama' => $nama, 'rm_level' => $rmLevel],
+            'kuota' => (int) $kuota,
+            'bidang' => $bidang,
+        ]);
     }
 
     public function startAddSeat(int $positionId, mixed $kuota, string $bidang): void
     {
         $this->authorizeAdmin();
+        $this->addingSeat = false;
         $this->beginPending('seat.add', ['position_id' => $positionId, 'kuota' => (int) $kuota, 'bidang' => $bidang]);
     }
 
     public function startUpdateSeat(int $seatId, mixed $kuota, string $bidang): void
     {
         $this->authorizeAdmin();
+        $this->editSeatId = null;
         if (! $this->ownsSeat($seatId)) {
             return;
         }
@@ -98,13 +343,24 @@ class FormasiEditor extends Component
 
         try {
             match ($this->pendingOperation) {
-                'seat.add' => $service->addSeat(
-                    Unit::findOrFail($this->unitId),
-                    Position::findOrFail($params['position_id']),
-                    (int) $params['kuota'],
-                    $params['bidang'] !== '' ? $params['bidang'] : null,
-                    $user
-                ),
+                'seat.add' => DB::transaction(function () use ($service, $params, $user): int {
+                    $position = isset($params['new_position'])
+                        ? $service->createPosition([
+                            'nama' => $params['new_position']['nama'],
+                            'rm_level' => $params['new_position']['rm_level'],
+                            'bidang' => $params['bidang'],
+                            'level' => 'Karpim',
+                        ], $user)
+                        : Position::findOrFail($params['position_id']);
+
+                    return $service->addSeat(
+                        Unit::findOrFail($this->unitId),
+                        $position,
+                        (int) $params['kuota'],
+                        $params['bidang'] !== '' ? $params['bidang'] : null,
+                        $user
+                    );
+                }),
                 'seat.update' => $service->updateSeat((int) $params['seat_id'], (int) $params['kuota'], $params['bidang'] !== '' ? $params['bidang'] : null, $user),
                 'seat.remove' => $service->removeSeat((int) $params['seat_id'], $this->reason, $user),
             };
@@ -130,6 +386,10 @@ class FormasiEditor extends Component
 
         $params = $this->pendingParams;
 
+        if (isset($params['new_position'])) {
+            return ImpactResult::ok(["Jabatan baru '{$params['new_position']['nama']}' ({$params['new_position']['rm_level']}) akan dibuat pada master jabatan dan ditambahkan ke formasi unit ini."]);
+        }
+
         try {
             return app(MasterFormasiService::class)->previewImpact($this->pendingOperation, match ($this->pendingOperation) {
                 'seat.add' => ['unit_id' => $this->unitId, 'position_id' => $params['position_id']],
@@ -152,7 +412,7 @@ class FormasiEditor extends Component
     #[Computed]
     public function units(): Collection
     {
-        return Unit::active()->orderBy('urutan')->orderBy('nama')->get();
+        return Unit::orderBy('urutan')->orderBy('nama')->get();
     }
 
     #[Computed]
@@ -180,46 +440,98 @@ class FormasiEditor extends Component
         return DB::table('position_unit')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
             ->where('position_unit.unit_id', $unit->id)
-            ->orderBy('positions.rm_level')
-            ->orderBy('positions.nama')
             ->get([
                 'position_unit.id', 'position_unit.kuota', 'position_unit.bidang',
+                'positions.id as position_id', 'positions.is_active as position_active',
                 'positions.nama as jabatan', 'positions.level', 'positions.rm_level',
             ])
             ->map(function (object $seat) use ($filled): object {
                 $seat->kuota = (int) $seat->kuota;
                 $seat->filled = (int) ($filled[$seat->jabatan] ?? 0);
                 $seat->over_quota = $seat->filled > $seat->kuota;
+                $seat->state = match (true) {
+                    $seat->over_quota => 'over',
+                    $seat->filled === 0 => 'empty',
+                    $seat->filled < $seat->kuota => 'vacant',
+                    default => 'full',
+                };
 
                 return $seat;
-            });
+            })
+            ->sortBy(fn (object $seat) => [
+                mb_strtolower((string) ($seat->{$this->sortField} ?? '')),
+                mb_strtolower($seat->jabatan),
+            ], SORT_REGULAR, $this->sortDirection === 'desc')
+            ->values();
     }
 
     /**
-     * Jabatan Karpim aktif yang belum menjadi kursi pada unit terpilih.
+     * Formasi jabatan setelah pencarian dan filter diterapkan. KPI dan dialog tetap memakai seluruh formasi unit.
+     *
+     * @return Collection<int, object>
+     */
+    #[Computed]
+    public function filteredSeats(): Collection
+    {
+        $term = mb_strtolower(trim($this->seatQuery));
+
+        return $this->seats
+            ->when($term !== '', fn ($rows) => $rows->filter(fn ($seat) => str_contains(mb_strtolower($seat->jabatan), $term)))
+            ->when($this->rmFilter !== '', fn ($rows) => $rows->where('rm_level', $this->rmFilter))
+            ->when($this->bidangFilter !== '', fn ($rows) => $rows->where('bidang', $this->bidangFilter))
+            ->when($this->seatStatusFilter === 'inactive', fn ($rows) => $rows->where('position_active', false))
+            ->when(in_array($this->seatStatusFilter, ['over', 'empty', 'vacant', 'full'], true), fn ($rows) => $rows->where('state', $this->seatStatusFilter))
+            ->values();
+    }
+
+    /**
+     * Satu halaman dari formasi jabatan yang sudah difilter.
+     */
+    #[Computed]
+    public function pagedSeats(): LengthAwarePaginator
+    {
+        return $this->paginate($this->filteredSeats);
+    }
+
+    /**
+     * Satu halaman dari daftar unit yang sudah difilter.
+     */
+    #[Computed]
+    public function pagedOverview(): LengthAwarePaginator
+    {
+        return $this->paginate($this->filteredOverview);
+    }
+
+    /**
+     * Bahan saran ketik: jabatan Karpim aktif (bukan penampungan) milik unit sejenis (kode unit sama) yang belum menjadi formasi unit terpilih.
      *
      * @return Collection<int, Position>
      */
     #[Computed]
     public function addablePositions(): Collection
     {
-        if ($this->unitId === null) {
+        $unit = $this->unit;
+        if ($unit === null || ! $unit->kode) {
             return collect();
         }
 
-        $seated = DB::table('position_unit')->where('unit_id', $this->unitId)->pluck('position_id');
+        $seated = DB::table('position_unit')->where('unit_id', $unit->id)->pluck('position_id');
+        $sameKind = DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->where('units.kode', $unit->kode)
+            ->pluck('position_unit.position_id');
 
         return Position::active()
             ->where('level', 'Karpim')
+            ->where('is_overflow', false)
+            ->whereIn('id', $sameKind)
             ->whereNotIn('id', $seated)
-            ->when(trim($this->search) !== '', fn ($q) => $q->where('nama', 'like', '%'.trim($this->search).'%'))
             ->orderBy('nama')
-            ->limit(50)
-            ->get();
+            ->get(['id', 'nama', 'rm_level']);
     }
 
     /**
-     * Lima perubahan terakhir pada unit terpilih (unit itu sendiri dan kursinya).
+     * Lima perubahan terakhir pada unit terpilih (unit itu sendiri dan formasinya).
      *
      * @return Collection<int, MasterAuditLog>
      */
@@ -237,12 +549,150 @@ class FormasiEditor extends Component
         })->latest('id')->limit(5)->get();
     }
 
+    /**
+     * Ringkasan formasi jabatan per unit untuk layar awal (sebelum unit dipilih).
+     *
+     * @return Collection<int, object>
+     */
+    public function resetUnitFilters(): void
+    {
+        $this->reset(['unitQuery', 'wilayahFilter', 'statusFilter']);
+        $this->resetPage();
+    }
+
+    public function hasUnitFilters(): bool
+    {
+        return trim($this->unitQuery) !== '' || $this->wilayahFilter !== '' || $this->statusFilter !== '';
+    }
+
+    /**
+     * Daftar unit setelah pencarian, filter, dan urutan diterapkan. KPI tetap memakai seluruh unit.
+     *
+     * @return Collection<int, object>
+     */
+    #[Computed]
+    public function filteredOverview(): Collection
+    {
+        $term = mb_strtolower(trim($this->unitQuery));
+        $rows = $this->unitOverview
+            ->when($term !== '', fn ($rows) => $rows->filter(fn ($row) => str_contains(mb_strtolower($row->nama), $term)))
+            ->when($this->wilayahFilter !== '', fn ($rows) => $rows->where('wilayah', $this->wilayahFilter))
+            ->when($this->statusFilter === 'active', fn ($rows) => $rows->where('is_active', true))
+            ->when($this->statusFilter === 'inactive', fn ($rows) => $rows->where('is_active', false));
+
+        if (in_array($this->sortField, self::OVERVIEW_SORTABLE, true)) {
+            $rows = $rows->sortBy(fn (object $row) => is_string($row->{$this->sortField}) ? mb_strtolower($row->{$this->sortField}) : $row->{$this->sortField}, SORT_REGULAR, $this->sortDirection === 'desc');
+        }
+
+        return $rows->values();
+    }
+
+    #[Computed]
+    public function unitOverview(): Collection
+    {
+        // Pemegang per formasi jabatan: pegawai dicocokkan dengan (nama unit, nama jabatan), sama seperti layar unit.
+        $occupied = DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->leftJoin('employees', fn ($join) => $join
+                ->on('employees.unit_kerja', '=', 'units.nama')
+                ->on('employees.jabatan', '=', 'positions.nama'))
+            ->groupBy('position_unit.id', 'position_unit.unit_id', 'position_unit.kuota')
+            ->get(['position_unit.unit_id', 'position_unit.kuota', DB::raw('count(employees.nik) as filled')])
+            ->groupBy('unit_id');
+
+        return $this->units->map(function (Unit $unit) use ($occupied): object {
+            $rows = $occupied->get($unit->id, collect());
+
+            return (object) [
+                'id' => $unit->id,
+                'nama' => $unit->nama,
+                'wilayah' => $unit->wilayah,
+                'is_active' => $unit->is_active,
+                'seats' => $rows->count(),
+                'kuota' => (int) $rows->sum('kuota'),
+                'filled' => (int) $rows->sum('filled'),
+                'over' => $rows->filter(fn ($row) => (int) $row->filled > (int) $row->kuota)->count(),
+            ];
+        });
+    }
+
+    /**
+     * Pegawai yang tercatat pada nama unit yang tidak ada di Master Unit. Formasi mencocokkan pegawai dengan nama unit,
+     * sehingga pegawai ini tidak terhitung pada kolom Terisi; daftar ini membuat selisih tersebut terlihat.
+     *
+     * @return Collection<int, object{unit_kerja: string, total: int}>
+     */
+    #[Computed]
+    public function unregisteredEmployeeUnits(): Collection
+    {
+        return Employee::query()
+            ->whereNotNull('unit_kerja')
+            ->whereNotIn('unit_kerja', Unit::query()->select('nama'))
+            ->selectRaw('unit_kerja, count(*) as total')
+            ->groupBy('unit_kerja')
+            ->orderByDesc('total')
+            ->orderBy('unit_kerja')
+            ->get();
+    }
+
+    /**
+     * Total lintas unit untuk KPI layar awal.
+     *
+     * @return array{units: int, seats: int, kuota: int, filled: int, over: int}
+     */
+    #[Computed]
+    public function overviewStats(): array
+    {
+        $rows = $this->unitOverview;
+
+        return [
+            'units' => $rows->count(),
+            'seats' => (int) $rows->sum('seats'),
+            'kuota' => (int) $rows->sum('kuota'),
+            'filled' => (int) $rows->sum('filled'),
+            'over' => (int) $rows->sum('over'),
+        ];
+    }
+
+    #[Computed]
+    public function occupantSeat(): ?object
+    {
+        return $this->occupantSeatId ? $this->seats->firstWhere('id', $this->occupantSeatId) : null;
+    }
+
+    #[Computed]
+    public function editSeat(): ?object
+    {
+        return $this->editSeatId ? $this->seats->firstWhere('id', $this->editSeatId) : null;
+    }
+
+    /**
+     * Pegawai yang menempati formasi jabatan terbuka. Hanya nama, NIK (untuk tautan profil), dan golongan yang dimuat.
+     *
+     * @return Collection<int, Employee>
+     */
+    #[Computed]
+    public function occupants(): Collection
+    {
+        $seat = $this->occupantSeat;
+        if ($seat === null || $this->unit === null) {
+            return collect();
+        }
+
+        return Employee::where('unit_kerja', $this->unit->nama)
+            ->where('jabatan', $seat->jabatan)
+            ->orderBy('nama')
+            ->limit(50)
+            ->get(['nik', 'nama', 'golongan']);
+    }
+
     public function operationTitle(): string
     {
         return match ($this->pendingOperation) {
-            'seat.add' => 'Tambah Kursi',
-            'seat.update' => 'Ubah Kursi',
-            'seat.remove' => 'Hapus Kursi',
+            'seat.add' => 'Tambah Formasi Jabatan',
+            'seat.update' => 'Ubah Formasi Jabatan',
+            'seat.remove' => 'Hapus Formasi Jabatan',
             default => '',
         };
     }
@@ -251,6 +701,11 @@ class FormasiEditor extends Component
     {
         return view('livewire.admin.master.formasi-editor', [
             'bidangList' => Position::BIDANG_LIST,
+            'wilayahList' => Unit::WILAYAH_LIST,
+            'rmList' => Position::RM_LEVEL_LIST,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
+            'seatStateOptions' => self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'],
+            'dialogs' => app(FormasiDialogs::class),
         ]);
     }
 
@@ -268,6 +723,17 @@ class FormasiEditor extends Component
         $this->reason = '';
         $this->pendingOperation = $operation;
         $this->pendingParams = $params;
+    }
+
+    /**
+     * Halaman diklem ke halaman terakhir yang ada, mis. setelah baris dihapus atau filter dipersempit.
+     */
+    private function paginate(Collection $rows): LengthAwarePaginator
+    {
+        $perPage = in_array($this->perPage, self::PER_PAGE_OPTIONS, true) ? $this->perPage : 25;
+        $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $perPage)));
+
+        return new LengthAwarePaginator($rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page);
     }
 
     private function ownsSeat(int $seatId): bool

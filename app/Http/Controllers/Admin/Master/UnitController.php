@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin\Master;
 use App\Exceptions\FormasiRuleViolationException;
 use App\Http\Controllers\Admin\Master\Concerns\RespondsToFormasiViolations;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\Unit;
 use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Http\Request;
@@ -15,64 +14,6 @@ use Illuminate\Support\Facades\DB;
 class UnitController extends Controller
 {
     use RespondsToFormasiViolations;
-
-    /**
-     * Display a listing of master units.
-     */
-    public function index(Request $request)
-    {
-        $query = Unit::query();
-
-        // Search filter
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('kode', 'like', "%{$search}%");
-            });
-        }
-
-        // Wilayah filter
-        if ($wilayah = $request->input('wilayah')) {
-            $query->where('wilayah', $wilayah);
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $query->where('is_active', $request->input('status') === '1');
-        }
-
-        // Metrics
-        $totalUnits = Unit::count();
-        $activeUnits = Unit::where('is_active', true)->count();
-        $inactiveUnits = Unit::where('is_active', false)->count();
-
-        // Distinct wilayah options
-        $wilayahList = Unit::WILAYAH_LIST;
-
-        $units = $query->orderBy('wilayah')
-            ->orderBy('urutan')
-            ->orderBy('nama')
-            ->paginate(15)
-            ->withQueryString();
-
-        return view('admin.master.units.index', compact(
-            'units',
-            'totalUnits',
-            'activeUnits',
-            'inactiveUnits',
-            'wilayahList'
-        ));
-    }
-
-    /**
-     * Show form to create new unit.
-     */
-    public function create()
-    {
-        $wilayahList = Unit::WILAYAH_LIST;
-
-        return view('admin.master.units.create', compact('wilayahList'));
-    }
 
     /**
      * Store new unit.
@@ -103,19 +44,8 @@ class UnitController extends Controller
             ], 201);
         }
 
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, $unit->id)
             ->with('success', "Unit Kerja '{$validated['nama']}' berhasil ditambahkan ke Master Data.");
-    }
-
-    /**
-     * Show form to edit existing unit.
-     */
-    public function edit(Unit $unit)
-    {
-        $wilayahList = Unit::WILAYAH_LIST;
-        $employeeCount = Employee::where('unit_kerja', $unit->nama)->count();
-
-        return view('admin.master.units.edit', compact('unit', 'wilayahList', 'employeeCount'));
     }
 
     /**
@@ -145,7 +75,7 @@ class UnitController extends Controller
             return $this->formasiViolation($request, $e);
         }
 
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, $unit->id)
             ->with('success', "Unit Kerja '{$unit->nama}' berhasil diperbarui.");
     }
 
@@ -169,7 +99,7 @@ class UnitController extends Controller
     }
 
     /**
-     * Remove unit from database (hanya bila tidak dipakai pegawai, kursi, atau riwayat jabatan).
+     * Remove unit from database (hanya bila tidak dipakai pegawai, formasi jabatan, atau riwayat jabatan).
      */
     public function destroy(Request $request, Unit $unit, MasterFormasiService $service)
     {
@@ -181,7 +111,7 @@ class UnitController extends Controller
             return $this->formasiViolation($request, $e);
         }
 
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, 0)
             ->with('success', "Unit Kerja '{$nama}' berhasil dihapus dari Master Data.");
     }
 }

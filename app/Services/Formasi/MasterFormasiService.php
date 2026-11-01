@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Satu-satunya jalur ubah master unit, jabatan, dan kursi formasi (DOMAIN.md §3.5).
+ * Satu-satunya jalur ubah master unit, jabatan, dan formasi jabatan (DOMAIN.md §3.5).
  * Setiap perubahan: dipratinjau dampaknya, diterapkan dalam satu transaksi, dan
  * dicatat pada master_audit_logs. Pemindahan pegawai tetap melalui modul Mutasi.
  */
@@ -26,10 +26,10 @@ class MasterFormasiService
 
     private const MAX_KUOTA = 1000;
 
-    // ───────────────────────── Kursi (position_unit) ─────────────────────────
+    // ───────────────────────── Formasi jabatan (position_unit) ─────────────────────────
 
     /**
-     * @return int id kursi (position_unit) yang dibuat
+     * @return int id formasi jabatan (position_unit) yang dibuat
      */
     public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user): int
     {
@@ -47,7 +47,7 @@ class MasterFormasiService
                     'updated_at' => now(),
                 ]);
             } catch (UniqueConstraintViolationException) {
-                throw new FormasiRuleViolationException("Unit '{$unit->nama}' sudah memiliki kursi untuk jabatan '{$position->nama}'. Ubah kuota pada kursi yang ada.");
+                throw new FormasiRuleViolationException("Unit '{$unit->nama}' sudah memiliki formasi untuk jabatan '{$position->nama}'. Ubah kuota pada formasi yang ada.");
             }
 
             MasterAuditLog::record(
@@ -398,7 +398,7 @@ class MasterFormasiService
             $blockers[] = "{$employees} pegawai masih tercatat di unit ini.";
         }
         if ($seats > 0) {
-            $blockers[] = "Unit ini masih memiliki {$seats} kursi formasi.";
+            $blockers[] = "Unit ini masih memiliki {$seats} formasi jabatan.";
         }
         if ($history > 0) {
             $blockers[] = "Unit ini tercatat pada {$history} riwayat jabatan.";
@@ -467,7 +467,7 @@ class MasterFormasiService
             $blockers[] = "{$employees} pegawai masih memegang jabatan ini.";
         }
         if ($seats > 0) {
-            $blockers[] = "Jabatan ini masih menjadi {$seats} kursi formasi.";
+            $blockers[] = "Jabatan ini masih menjadi {$seats} formasi jabatan.";
         }
         if ($history > 0) {
             $blockers[] = "Jabatan ini tercatat pada {$history} riwayat jabatan.";
@@ -523,13 +523,13 @@ class MasterFormasiService
         $blockers = [];
 
         if (! $unit->is_active) {
-            $blockers[] = "Unit '{$unit->nama}' nonaktif sehingga tidak dapat menerima kursi baru.";
+            $blockers[] = "Unit '{$unit->nama}' nonaktif sehingga tidak dapat menerima formasi jabatan baru.";
         }
         if (! $position->is_active) {
-            $blockers[] = "Jabatan '{$position->nama}' nonaktif sehingga tidak dapat dijadikan kursi.";
+            $blockers[] = "Jabatan '{$position->nama}' nonaktif sehingga tidak dapat dijadikan formasi jabatan.";
         }
         if (DB::table('position_unit')->where('unit_id', $unitId)->where('position_id', $positionId)->exists()) {
-            $blockers[] = "Unit '{$unit->nama}' sudah memiliki kursi untuk jabatan '{$position->nama}'. Ubah kuota pada kursi yang ada.";
+            $blockers[] = "Unit '{$unit->nama}' sudah memiliki formasi untuk jabatan '{$position->nama}'. Ubah kuota pada formasi yang ada.";
         }
 
         return $blockers === [] ? ImpactResult::ok() : ImpactResult::blocked($blockers);
@@ -542,7 +542,7 @@ class MasterFormasiService
 
         if ($kuota < $filled) {
             return ImpactResult::ok(
-                ["Kuota {$kuota} lebih kecil dari {$filled} pegawai yang menempati kursi ini; kursi akan ditandai melebihi kuota."],
+                ["Kuota {$kuota} lebih kecil dari {$filled} pegawai yang menempati formasi ini; formasi ini akan ditandai melebihi kuota."],
                 $filled
             );
         }
@@ -561,12 +561,12 @@ class MasterFormasiService
             $blockers[] = "{$filled} pegawai masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
-            $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju kursi ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
+            $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju formasi ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
         }
 
         return $blockers === []
             ? ImpactResult::ok()
-            : ImpactResult::blocked(['Kursi tidak dapat dihapus: '.implode(' ', $blockers)], $filled);
+            : ImpactResult::blocked(['Formasi jabatan tidak dapat dihapus: '.implode(' ', $blockers)], $filled);
     }
 
     // ─────────────────────────────── Pembantu ───────────────────────────────
@@ -674,7 +674,7 @@ class MasterFormasiService
         }
 
         if ($kuota > self::MAX_KUOTA) {
-            throw new FormasiRuleViolationException('Kuota maksimal '.self::MAX_KUOTA.' per kursi.');
+            throw new FormasiRuleViolationException('Kuota maksimal '.self::MAX_KUOTA.' per formasi jabatan.');
         }
 
         if ($bidang !== null && ! array_key_exists($bidang, Position::BIDANG_LIST)) {
@@ -682,7 +682,7 @@ class MasterFormasiService
         }
 
         if ($bidang === null && $position->level === 'Karpim') {
-            throw new FormasiRuleViolationException("Bidang wajib diisi untuk kursi Karpim jabatan '{$position->nama}'.");
+            throw new FormasiRuleViolationException("Bidang wajib diisi untuk formasi Karpim jabatan '{$position->nama}'.");
         }
     }
 
@@ -699,7 +699,7 @@ class MasterFormasiService
             ]);
 
         if ($seat === null) {
-            throw new FormasiRuleViolationException('Kursi formasi tidak ditemukan.');
+            throw new FormasiRuleViolationException('Formasi jabatan tidak ditemukan.');
         }
 
         $seat->kuota = (int) $seat->kuota;

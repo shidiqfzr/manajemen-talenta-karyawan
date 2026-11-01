@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
- * Riwayat perubahan master unit, jabatan, dan kursi formasi (SECURITY.md §5).
+ * Riwayat perubahan master unit, jabatan, dan formasi jabatan (SECURITY.md §5).
  * Append-only: baris tidak dapat diubah atau dihapus melalui aplikasi.
  */
 class MasterAuditLog extends Model
@@ -35,9 +35,9 @@ class MasterAuditLog extends Model
     ];
 
     public const ACTION_LABELS = [
-        'seat.added' => 'Kursi ditambahkan',
-        'seat.updated' => 'Kursi diubah',
-        'seat.removed' => 'Kursi dihapus',
+        'seat.added' => 'Formasi jabatan ditambahkan',
+        'seat.updated' => 'Formasi jabatan diubah',
+        'seat.removed' => 'Formasi jabatan dihapus',
         'unit.created' => 'Unit dibuat',
         'unit.updated' => 'Unit diubah',
         'unit.renamed' => 'Nama unit diubah',
@@ -55,7 +55,21 @@ class MasterAuditLog extends Model
     public const ENTITY_LABELS = [
         'unit' => 'Unit Kerja',
         'position' => 'Jabatan',
-        'seat' => 'Kursi Formasi',
+        'seat' => 'Formasi Jabatan',
+    ];
+
+    /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
+    public const FIELD_LABELS = [
+        'nama' => 'Nama',
+        'kode' => 'Kode',
+        'wilayah' => 'Wilayah',
+        'urutan' => 'Urutan',
+        'is_active' => 'Status',
+        'level' => 'Strata',
+        'rm_level' => 'RM Band',
+        'bidang' => 'Bidang',
+        'kuota' => 'Kuota',
+        'filled' => 'Terisi',
     ];
 
     public static function actionLabel(string $action): string
@@ -64,7 +78,7 @@ class MasterAuditLog extends Model
     }
 
     /**
-     * Ringkasan perubahan yang mudah dibaca, mis. "kuota: 1 → 3".
+     * Ringkasan perubahan dengan istilah bisnis, mis. "Kuota: 1 → 3".
      *
      * @return list<string>
      */
@@ -73,13 +87,17 @@ class MasterAuditLog extends Model
         $old = $this->old_values ?? [];
         $new = $this->new_values ?? [];
         $keys = array_values(array_unique([...array_keys($old), ...array_keys($new)]));
-        $show = fn (mixed $value): string => match (true) {
-            $value === null => '-',
-            is_bool($value) => $value ? 'ya' : 'tidak',
-            default => (string) $value,
-        };
 
-        return array_map(fn (string $key): string => $key.': '.$show($old[$key] ?? null).' → '.$show($new[$key] ?? null), $keys);
+        return array_map(function (string $key) use ($old, $new): string {
+            $show = fn (mixed $value): string => match (true) {
+                $value === null => '-',
+                $key === 'is_active' => $value ? 'Aktif' : 'Nonaktif',
+                is_bool($value) => $value ? 'ya' : 'tidak',
+                default => (string) $value,
+            };
+
+            return (self::FIELD_LABELS[$key] ?? $key).': '.$show($old[$key] ?? null).' → '.$show($new[$key] ?? null);
+        }, $keys);
     }
 
     protected static function booted(): void

@@ -44,19 +44,7 @@
     @endif
 
     <!-- Page Header & Action Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <!-- Breadcrumbs -->
-            <nav class="flex items-center gap-2 text-xs font-medium text-surface-500 mb-1.5" aria-label="Breadcrumb">
-                <span>Core HR</span>
-                <i class="fas fa-chevron-right text-[10px] text-surface-400" aria-hidden="true"></i>
-                <span class="text-primary-700 font-semibold">Mutasi &amp; Penempatan</span>
-            </nav>
-            <h1 class="text-2xl lg:text-3xl font-bold tracking-tight text-surface-900">Mutasi &amp; Penempatan</h1>
-            <p class="text-sm text-surface-500 mt-0.5">Monitoring formasi kosong, Man Power Planning (MPP), dan audit riwayat karir karyawan.</p>
-        </div>
-
-        <!-- Primary Header Action: Dedicated Create Flow -->
+    <x-admin.module-header title="Mutasi & Penempatan" subtitle="Monitoring formasi kosong, Man Power Planning (MPP), dan audit riwayat karir karyawan." :breadcrumbs="['Core HR', 'Mutasi & Penempatan']">
         <!-- Primary Header Action: Split Dropdown Flow -->
         <div class="flex items-center gap-3 shrink-0" x-data="{ openDropdown: false }">
             <div class="inline-flex rounded-xl shadow-xs relative">
@@ -103,7 +91,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </x-admin.module-header>
 
     <!-- Modern Clean Underline Tabs Navigation -->
     <div class="border-b border-surface-200">

@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Admin\Master\AuditHistory;
 use App\Models\Employee;
 use App\Models\MasterAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use LogicException;
 use Tests\TestCase;
 
@@ -102,7 +104,7 @@ class MasterAuditLogTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'));
 
-        $response->assertSee('kuota: 1 → 3')->assertSee('bidang: - → TAN')->assertSee('is_active: ya → tidak');
+        $response->assertSee('Kuota: 1 → 3')->assertSee('Bidang: - → TAN')->assertSee('Status: Aktif → Nonaktif');
     }
 
     public function test_record_stores_the_audit_row_with_a_user_snapshot(): void
@@ -149,5 +151,40 @@ class MasterAuditLogTest extends TestCase
         $log = $log->fresh();
         $this->assertNull($log->user_id);
         $this->assertSame($name, $log->user_name);
+    }
+
+    public function test_history_component_searches_resets_and_sorts(): void
+    {
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Unit A — Kursi Cari', null, ['kuota' => 1], 'Alasan khusus ABC');
+        MasterAuditLog::record($this->admin, 'unit.created', 'unit', 2, 'Unit Lain Dua');
+
+        Livewire::actingAs($this->admin)->test(AuditHistory::class)
+            ->set('search', 'ABC')
+            ->assertSee('Kursi Cari')->assertDontSee('Unit Lain Dua')
+            ->call('resetFilters')
+            ->assertSet('search', '')
+            ->assertSee('Unit Lain Dua')
+            ->call('sortBy', 'entity_label')
+            ->assertSet('sortField', 'entity_label')->assertSet('sortDirection', 'asc')
+            ->call('sortBy', 'tidak_ada')
+            ->assertSet('sortField', 'entity_label');
+    }
+
+    public function test_history_component_rejects_non_admin_and_ignores_malformed_filters(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        Livewire::actingAs($user)->test(AuditHistory::class)->assertForbidden();
+
+        $this->log();
+        Livewire::actingAs($this->admin)->test(AuditHistory::class)
+            ->set('from', 'bukan-tanggal')->set('userId', 'x')->set('entityType', 'sembarang')
+            ->assertSee('Kebun Tajati — Manajer');
+    }
+
+    public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))->getContent();
+
+        $this->assertMatchesRegularExpression('/aria-label="Breadcrumb".*Core HR.*Master Formasi.*aria-current="page">Riwayat Perubahan</s', $html);
     }
 }

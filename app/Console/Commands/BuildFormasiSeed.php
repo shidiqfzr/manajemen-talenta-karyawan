@@ -96,7 +96,7 @@ class BuildFormasiSeed extends Command
         file_put_contents($out, json_encode($seed, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL);
 
         $this->info(sprintf(
-            'Seed formasi dibuat: %d unit, %d kombinasi jabatan-unit, %d kursi.',
+            'Seed formasi dibuat: %d unit, %d kombinasi jabatan-unit, %d formasi jabatan.',
             count($seed),
             count($result['seats']),
             array_sum(array_column($result['seats'], 'kuota'))

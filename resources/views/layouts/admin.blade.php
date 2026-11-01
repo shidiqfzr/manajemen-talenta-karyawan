@@ -224,7 +224,7 @@
                             </div>
                             <div class="flex-1 min-w-0" x-show="!sidebarCollapsed" x-transition>
                                 <p class="text-sm leading-tight truncate">Master Formasi</p>
-                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Unit, Jabatan &amp; Kursi</p>
+                                <p class="text-[11px] text-surface-500 font-normal leading-tight truncate">Unit, Jabatan &amp; Formasi</p>
                             </div>
                         </a>
                     </div>
