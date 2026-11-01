@@ -1,13 +1,11 @@
 {{--
-    Navigasi seksi modul Master Data: satu entri sidebar, empat bagian (masing-masing halaman dengan URL sendiri).
+    Navigasi seksi modul Master Data: satu entri sidebar, dua bagian (masing-masing halaman dengan URL sendiri).
     Tampilan mengikuti tab bergaris bawah modul Mutasi; karena setiap bagian adalah halaman terpisah, semantiknya
     <nav> + aria-current="page" (bukan role="tab", yang untuk panel dalam satu halaman).
 --}}
 @php
     $sections = [
         ['label' => 'Formasi', 'route' => 'admin.master.formasi.index', 'match' => 'admin.master.formasi.*', 'icon' => 'fa-table-list'],
-        ['label' => 'Unit Kerja', 'route' => 'admin.master.units.index', 'match' => 'admin.master.units.*', 'icon' => 'fa-building-flag'],
-        ['label' => 'Jabatan & Posisi', 'route' => 'admin.master.positions.index', 'match' => 'admin.master.positions.*', 'icon' => 'fa-id-card-clip'],
         ['label' => 'Riwayat Perubahan', 'route' => 'admin.master.riwayat.index', 'match' => 'admin.master.riwayat.*', 'icon' => 'fa-clock-rotate-left'],
     ];
 @endphp

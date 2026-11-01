@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Master\Concerns;
 
 use App\Exceptions\FormasiRuleViolationException;
+use App\Models\Unit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,5 +20,17 @@ trait RespondsToFormasiViolations
         }
 
         return redirect()->back()->withInput()->with('error', $e->getMessage());
+    }
+
+    /**
+     * Kembali ke modul Formasi: halaman detail unit terkait bila ada, selain itu daftar unit.
+     */
+    protected function toFormasi(Request $request, ?int $unitId = null): RedirectResponse
+    {
+        $unit = $unitId ?? $request->integer('return_unit');
+
+        return $unit && Unit::whereKey($unit)->exists()
+            ? redirect()->route('admin.master.formasi.show', $unit)
+            : redirect()->route('admin.master.formasi.index');
     }
 }

@@ -4,7 +4,6 @@ use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
 use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\JobVacancyController;
-use App\Http\Controllers\Admin\Master\MasterAuditLogController;
 use App\Http\Controllers\Admin\Master\PositionController;
 use App\Http\Controllers\Admin\Master\UnitController;
 use App\Http\Controllers\Admin\MutasiController;
@@ -143,17 +142,26 @@ Route::prefix('admin')
         Route::prefix('master')->name('master.')->group(function () {
             // Units
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
-            Route::resource('units', UnitController::class)->except(['show']);
+            Route::resource('units', UnitController::class)->only(['store', 'update', 'destroy']);
 
             // Riwayat perubahan master (read-only)
-            Route::get('riwayat', [MasterAuditLogController::class, 'index'])->name('riwayat.index');
+            Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');
 
-            // Formasi (kursi per unit)
-            Route::view('formasi', 'admin.master.formasi.index')->name('formasi.index');
+            // Formasi (formasi jabatan per unit)
+            // Daftar unit; tautan lama ?unit= diteruskan ke halaman detail unit.
+            Route::get('formasi', function (Request $request) {
+                $unitId = $request->integer('unit');
+
+                return $unitId && Unit::whereKey($unitId)->exists()
+                    ? redirect()->route('admin.master.formasi.show', $unitId)
+                    : view('admin.master.formasi.index');
+            })->name('formasi.index');
+            // Detail formasi jabatan satu unit (URL sendiri: dapat dibagikan, tombol Kembali peramban berfungsi).
+            Route::get('formasi/{unit}', fn (Unit $unit) => view('admin.master.formasi.show', ['unit' => $unit]))->name('formasi.show');
 
             // Positions
             Route::post('positions/{position}/toggle', [PositionController::class, 'toggleStatus'])->name('positions.toggle');
-            Route::resource('positions', PositionController::class)->except(['show']);
+            Route::resource('positions', PositionController::class)->only(['store', 'update', 'destroy']);
         });
 
         // API for Smart Classification (SSOT via Service)

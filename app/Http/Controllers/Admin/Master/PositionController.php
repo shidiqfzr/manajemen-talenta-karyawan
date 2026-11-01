@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin\Master;
 use App\Exceptions\FormasiRuleViolationException;
 use App\Http\Controllers\Admin\Master\Concerns\RespondsToFormasiViolations;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Services\Formasi\MasterFormasiService;
@@ -16,78 +15,6 @@ use Illuminate\Support\Facades\DB;
 class PositionController extends Controller
 {
     use RespondsToFormasiViolations;
-
-    /**
-     * Display a listing of master positions/jabatans.
-     */
-    public function index(Request $request)
-    {
-        $query = Position::query()->with('units');
-
-        // Search filter
-        if ($search = $request->input('search')) {
-            $query->where('nama', 'like', "%{$search}%");
-        }
-
-        // Bidang filter (bidang melekat pada kursi di unit, bukan pada nama jabatan)
-        if ($bidang = $request->input('bidang')) {
-            $query->whereHas('units', fn ($units) => $units->where('position_unit.bidang', $bidang));
-        }
-
-        // Level filter
-        if ($level = $request->input('level')) {
-            $query->where('level', $level);
-        }
-
-        // RM Level filter
-        if ($rmLevel = $request->input('rm_level')) {
-            $query->where('rm_level', $rmLevel);
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $query->where('is_active', $request->input('status') === '1');
-        }
-
-        // Metrics
-        $totalPositions = Position::count();
-        $karpimCount = Position::where('level', 'Karpim')->count();
-        $karpelCount = Position::where('level', 'Karpel')->count();
-        $activeCount = Position::where('is_active', true)->count();
-
-        // Reference lists
-        $bidangList = Position::BIDANG_LIST;
-        $levelList = Position::LEVEL_LIST;
-        $rmLevelList = Position::RM_LEVEL_LIST;
-
-        $positions = $query->orderBy('level', 'asc')
-            ->orderBy('nama', 'asc')
-            ->paginate(15)
-            ->withQueryString();
-
-        return view('admin.master.positions.index', compact(
-            'positions',
-            'totalPositions',
-            'karpimCount',
-            'karpelCount',
-            'activeCount',
-            'bidangList',
-            'levelList',
-            'rmLevelList'
-        ));
-    }
-
-    /**
-     * Show form to create new position.
-     */
-    public function create()
-    {
-        $bidangList = Position::BIDANG_LIST;
-        $levelList = Position::LEVEL_LIST;
-        $rmLevelList = Position::RM_LEVEL_LIST;
-
-        return view('admin.master.positions.create', compact('bidangList', 'levelList', 'rmLevelList'));
-    }
 
     /**
      * Store new position.
@@ -101,17 +28,21 @@ class PositionController extends Controller
             'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3',
             'is_active' => 'nullable|boolean',
             'unit_nama' => 'nullable|string|exists:units,nama',
+            'kuota' => 'nullable|integer|min:1|max:1000',
         ], [
             'nama.unique' => 'Nama jabatan formasi ini sudah terdaftar dalam sistem.',
         ]);
 
+        $seatUnitId = null;
+
         try {
-            $position = DB::transaction(function () use ($service, $validated, $request): Position {
+            $position = DB::transaction(function () use ($service, $validated, $request, &$seatUnitId): Position {
                 $position = $service->createPosition(Arr::only($validated, ['nama', 'bidang', 'level', 'rm_level']), $request->user());
 
                 if (! empty($validated['unit_nama'])) {
                     $unit = Unit::where('nama', $validated['unit_nama'])->firstOrFail();
-                    $service->addSeat($unit, $position, 1, $validated['bidang'] ?? null, $request->user());
+                    $seatUnitId = $unit->id;
+                    $service->addSeat($unit, $position, (int) ($validated['kuota'] ?? 1), $validated['bidang'] ?? null, $request->user());
                 }
 
                 return $position;
@@ -128,27 +59,8 @@ class PositionController extends Controller
             ], 201);
         }
 
-        return redirect()->route('admin.master.positions.index')
+        return $this->toFormasi($request, $seatUnitId)
             ->with('success', "Jabatan '{$validated['nama']}' berhasil ditambahkan ke Master Data.");
-    }
-
-    /**
-     * Show form to edit existing position.
-     */
-    public function edit(Position $position)
-    {
-        $bidangList = Position::BIDANG_LIST;
-        $levelList = Position::LEVEL_LIST;
-        $rmLevelList = Position::RM_LEVEL_LIST;
-        $employeeCount = Employee::where('jabatan', $position->nama)->count();
-
-        return view('admin.master.positions.edit', compact(
-            'position',
-            'bidangList',
-            'levelList',
-            'rmLevelList',
-            'employeeCount'
-        ));
     }
 
     /**
@@ -178,7 +90,7 @@ class PositionController extends Controller
             return $this->formasiViolation($request, $e);
         }
 
-        return redirect()->route('admin.master.positions.index')
+        return $this->toFormasi($request)
             ->with('success', "Jabatan '{$position->nama}' berhasil diperbarui.");
     }
 
@@ -202,7 +114,7 @@ class PositionController extends Controller
     }
 
     /**
-     * Remove position from database (hanya bila tidak dipakai pegawai, kursi, atau riwayat jabatan).
+     * Remove position from database (hanya bila tidak dipakai pegawai, formasi jabatan, atau riwayat jabatan).
      */
     public function destroy(Request $request, Position $position, MasterFormasiService $service)
     {
@@ -214,7 +126,7 @@ class PositionController extends Controller
             return $this->formasiViolation($request, $e);
         }
 
-        return redirect()->route('admin.master.positions.index')
+        return $this->toFormasi($request)
             ->with('success', "Jabatan '{$nama}' berhasil dihapus dari Master Data.");
     }
 }

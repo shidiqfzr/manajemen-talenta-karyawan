@@ -556,13 +556,7 @@ class Employee extends Model
      */
     public function getRmThemeAttribute(): string
     {
-        return match ($this->rm_level) {
-            'RM-1' => 'bg-orange-50 text-orange-800 border-orange-200',
-            'RM-2' => 'bg-sky-50 text-sky-800 border-sky-200',
-            'RM-3' => 'bg-purple-50 text-purple-800 border-purple-200',
-            'RM-4' => 'bg-surface-100 text-surface-700 border-surface-200',
-            default => 'bg-surface-100 text-surface-700 border-surface-200',
-        };
+        return Position::rmTheme($this->rm_level);
     }
 
     /**

@@ -5,7 +5,7 @@ namespace App\Services\Formasi;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Membaca berkas Excel formasi (satu baris = satu kursi) menjadi daftar kursi
+ * Membaca berkas Excel formasi (satu baris = satu formasi jabatan) menjadi daftar formasi jabatan
  * per (unit, jabatan). Kelas ini tidak mengakses database.
  */
 class FormasiExcelParser

@@ -22,13 +22,20 @@ class MasterDataTest extends TestCase
         $this->admin = User::factory()->create(['role' => 'admin']);
     }
 
-    public function test_admin_can_access_master_units_index(): void
+    public function test_admin_can_open_the_single_master_formasi_screen_with_unit_management(): void
     {
-        $response = $this->actingAs($this->admin)->get(route('admin.master.units.index'));
+        $unit = Unit::create(['nama' => 'Kebun Layar Tunggal', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
 
-        $response->assertOk();
-        $response->assertViewHas(['units', 'totalUnits', 'activeUnits', 'inactiveUnits', 'wilayahList']);
-        $response->assertSee('Master Unit Kerja');
+        $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $unit))
+            ->assertOk()
+            ->assertSee('Tambah Jabatan')
+            ->assertDontSee('Buat Jabatan Baru')
+            ->assertSee('master-action-title', false);
+
+        // Tambah Unit adalah aksi utama pada daftar unit, bukan pada halaman detail.
+        $this->actingAs($this->admin)->get(route('admin.master.formasi.index'))
+            ->assertOk()
+            ->assertSee('Tambah Unit');
     }
 
     public function test_admin_can_create_new_master_unit_and_it_appears_in_employee_form(): void
@@ -46,7 +53,7 @@ class MasterDataTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)->post(route('admin.master.units.store'), $postData);
-        $response->assertRedirect(route('admin.master.units.index'));
+        $response->assertRedirectContains(route('admin.master.formasi.index'));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('units', [
@@ -123,15 +130,6 @@ class MasterDataTest extends TestCase
         $unit->delete();
     }
 
-    public function test_admin_can_access_master_positions_index(): void
-    {
-        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index'));
-
-        $response->assertOk();
-        $response->assertViewHas(['positions', 'totalPositions', 'karpimCount', 'karpelCount', 'activeCount']);
-        $response->assertSee('Master Jabatan &amp; Posisi', false);
-    }
-
     public function test_admin_can_create_and_toggle_position(): void
     {
         $posName = 'Specialist Carbon Offset & ESG';
@@ -146,7 +144,7 @@ class MasterDataTest extends TestCase
             'is_active' => '1',
         ]);
 
-        $response->assertRedirect(route('admin.master.positions.index'));
+        $response->assertRedirectContains(route('admin.master.formasi.index'));
         $response->assertSessionHas('success');
 
         $position = Position::where('nama', $posName)->first();
@@ -198,44 +196,30 @@ class MasterDataTest extends TestCase
             'level' => 'Karpim',
             'rm_level' => 'RM-3',
             'unit_nama' => $unit->nama,
-        ])->assertRedirect(route('admin.master.positions.index'));
+            'kuota' => 3,
+        ])->assertRedirect(route('admin.master.formasi.show', $unit));
 
         $position = Position::where('nama', 'Asisten Uji Kursi')->firstOrFail();
         $this->assertDatabaseHas('position_unit', [
             'position_id' => $position->id,
             'unit_id' => $unit->id,
-            'kuota' => 1,
+            'kuota' => 3,
             'bidang' => 'KEU',
         ]);
-    }
-
-    public function test_position_index_filters_by_seat_bidang(): void
-    {
-        $unit = Unit::create(['nama' => 'Kebun Uji Filter', 'kode' => 'Kebun', 'wilayah' => 'Kalimantan Barat', 'is_active' => true, 'urutan' => 98]);
-        $tan = Position::create(['nama' => 'Asisten Filter Tanaman', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
-        $keu = Position::create(['nama' => 'Asisten Filter Keuangan', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
-        $unit->positions()->attach($tan->id, ['kuota' => 1, 'bidang' => 'TAN']);
-        $unit->positions()->attach($keu->id, ['kuota' => 1, 'bidang' => 'KEU']);
-
-        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index', ['bidang' => 'TAN']));
-
-        $response->assertOk();
-        $response->assertSee('Asisten Filter Tanaman');
-        $response->assertDontSee('Asisten Filter Keuangan');
     }
 
     public function test_unit_crud_writes_audit_rows(): void
     {
         $this->actingAs($this->admin)->post(route('admin.master.units.store'), [
             'nama' => 'Kebun Audit Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'urutan' => 91,
-        ])->assertRedirect(route('admin.master.units.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $unit = Unit::where('nama', 'Kebun Audit Uji')->firstOrFail();
 
         $this->actingAs($this->admin)->put(route('admin.master.units.update', $unit), [
             'nama' => 'Kebun Audit Baru', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'urutan' => 91,
             'is_active' => '1', 'reason' => 'Penyesuaian nama unit resmi',
-        ])->assertRedirect(route('admin.master.units.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $this->actingAs($this->admin)->post(route('admin.master.units.toggle', $unit), ['reason' => 'Unit digabung ke unit lain'])
             ->assertSessionHas('success');
@@ -253,14 +237,14 @@ class MasterDataTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.master.positions.store'), [
             'nama' => 'Asisten Audit Uji', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'bidang' => 'TAN',
-        ])->assertRedirect(route('admin.master.positions.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $position = Position::where('nama', 'Asisten Audit Uji')->firstOrFail();
 
         $this->actingAs($this->admin)->put(route('admin.master.positions.update', $position), [
             'nama' => 'Asisten Audit Baru', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'bidang' => 'TAN',
             'is_active' => '1', 'reason' => 'Penyesuaian nomenklatur jabatan',
-        ])->assertRedirect(route('admin.master.positions.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $this->actingAs($this->admin)->post(route('admin.master.positions.toggle', $position), ['reason' => 'Jabatan tidak dipakai lagi'])
             ->assertSessionHas('success');
@@ -320,7 +304,7 @@ class MasterDataTest extends TestCase
     {
         preg_match_all("/JSON\\.parse\\('(.+?)'\\)/s", $html, $matches);
 
-        return array_map(function (string $literal): array {
+        $payloads = array_map(function (string $literal): array {
             $json = preg_replace_callback(
                 '/\\\\u([0-9a-fA-F]{4})|\\\\(.)/s',
                 fn (array $m) => ($m[1] ?? '') !== '' ? mb_chr(hexdec($m[1])) : $m[2],
@@ -329,50 +313,58 @@ class MasterDataTest extends TestCase
 
             return json_decode(html_entity_decode($json), true, 512, JSON_THROW_ON_ERROR);
         }, $matches[1]);
+
+        // Literal JSON.parse lain (mis. daftar opsi pemilih unit) bukan payload dialog aksi.
+        return array_values(array_filter($payloads, fn (array $payload) => isset($payload['method'])));
     }
 
-    public function test_units_index_offers_management_actions_for_each_unit(): void
+    public function test_formasi_screen_offers_management_actions_for_the_selected_unit(): void
     {
         $active = Unit::create(['nama' => 'Kebun Aksi Aktif', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
         $inactive = Unit::create(['nama' => 'Kebun Aksi Nonaktif', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => false, 'urutan' => 2]);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.master.units.index'));
-        $response->assertOk()->assertSee('Tambah Unit Kerja')->assertSee('master-action-title', false);
+        $response = $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $active));
+        $response->assertOk()->assertSee('master-action-title', false);
 
         $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
 
-        $this->assertTrue($actions->has('POST '.route('admin.master.units.store')));
+        $indexActions = collect($this->dispatchedActions($this->actingAs($this->admin)->get(route('admin.master.formasi.index'))->getContent()));
+        $this->assertTrue($indexActions->contains(fn ($a) => 'POST '.route('admin.master.units.store') === $a['method'].' '.$a['url']));
         $update = $actions->get('PUT '.route('admin.master.units.update', $active));
         $this->assertSame('Ubah Unit Kerja', $update['title']);
         $this->assertContains('reason', array_column($update['fields'], 'name'));
 
         $deactivate = $actions->get('POST '.route('admin.master.units.toggle', $active));
         $this->assertSame('Nonaktifkan Unit Kerja', $deactivate['title']);
-        $reason = collect($deactivate['fields'])->firstWhere('name', 'reason');
-        $this->assertTrue($reason['required']);
-
-        $activate = $actions->get('POST '.route('admin.master.units.toggle', $inactive));
-        $this->assertSame('Aktifkan Unit Kerja', $activate['title']);
-        $this->assertSame([], $activate['fields']);
+        $this->assertTrue(collect($deactivate['fields'])->firstWhere('name', 'reason')['required']);
 
         $delete = $actions->get('DELETE '.route('admin.master.units.destroy', $active));
         $this->assertTrue(collect($delete['fields'])->firstWhere('name', 'reason')['required']);
+
+        // Unit nonaktif tetap dapat dipilih supaya bisa diaktifkan kembali.
+        $inactivePage = $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $inactive));
+        $activate = collect($this->dispatchedActions($inactivePage->getContent()))
+            ->keyBy(fn ($a) => $a['method'].' '.$a['url'])
+            ->get('POST '.route('admin.master.units.toggle', $inactive));
+        $this->assertSame('Aktifkan Unit Kerja', $activate['title']);
+        $this->assertSame([], $activate['fields']);
     }
 
-    public function test_positions_index_offers_management_actions_for_each_position(): void
+    public function test_formasi_screen_offers_position_actions_on_each_seat_and_a_new_position_dialog(): void
     {
+        $unit = Unit::create(['nama' => 'Kebun Aksi Jabatan', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 3]);
         $position = Position::create(['nama' => 'Asisten Aksi Uji', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+        $unit->positions()->attach($position->id, ['kuota' => 1, 'bidang' => 'TAN']);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index'));
-        $response->assertOk()->assertSee('Tambah Jabatan');
+        $response = $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $unit));
+        $response->assertOk()->assertSee('Asisten Aksi Uji');
 
         $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
 
-        $this->assertTrue($actions->has('POST '.route('admin.master.positions.store')));
         $update = $actions->get('PUT '.route('admin.master.positions.update', $position));
         $this->assertContains('rm_level', array_column($update['fields'], 'name'));
+        $this->assertSame((string) $unit->id, collect($update['fields'])->firstWhere('name', 'return_unit')['value']);
         $this->assertTrue($actions->has('POST '.route('admin.master.positions.toggle', $position)));
-        $this->assertTrue(collect($actions->get('DELETE '.route('admin.master.positions.destroy', $position))['fields'])->firstWhere('name', 'reason')['required']);
     }
 
     public function test_master_pages_show_flash_messages_from_blocked_actions(): void
@@ -381,11 +373,11 @@ class MasterDataTest extends TestCase
         Employee::factory()->create(['unit_kerja' => $unit->nama]);
 
         $this->actingAs($this->admin)
-            ->from(route('admin.master.units.index'))
+            ->from(route('admin.master.formasi.show', $unit))
             ->post(route('admin.master.units.toggle', $unit), ['reason' => 'Unit digabung ke unit lain'])
-            ->assertRedirect(route('admin.master.units.index'));
+            ->assertRedirect(route('admin.master.formasi.show', $unit));
 
-        $this->actingAs($this->admin)->get(route('admin.master.units.index'))
+        $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $unit))
             ->assertSee('1 pegawai', false)
             ->assertSee('Mutasi');
     }
@@ -398,12 +390,12 @@ class MasterDataTest extends TestCase
         $this->actingAs($this->admin)->put(route('admin.master.units.update', $unit), [
             'nama' => 'Kebun Tetap Aktif Baru', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'urutan' => 98,
             'reason' => 'Penyesuaian nama unit resmi',
-        ])->assertRedirect(route('admin.master.units.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $this->actingAs($this->admin)->put(route('admin.master.positions.update', $position), [
             'nama' => 'Asisten Tetap Aktif Baru', 'level' => 'Karpim', 'rm_level' => 'RM-3',
             'reason' => 'Penyesuaian nomenklatur jabatan',
-        ])->assertRedirect(route('admin.master.positions.index'));
+        ])->assertRedirectContains(route('admin.master.formasi.index'));
 
         $this->assertTrue($unit->fresh()->is_active);
         $this->assertTrue($position->fresh()->is_active);
@@ -412,9 +404,11 @@ class MasterDataTest extends TestCase
 
     public function test_edit_dialog_for_a_pool_position_keeps_its_current_rm_band(): void
     {
+        $unit = Unit::create(['nama' => 'Kebun Pool Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 96]);
         $pool = Position::create(['nama' => 'Advisor RM-4', 'level' => 'Karpim', 'rm_level' => 'RM-4', 'is_active' => true]);
+        $unit->positions()->attach($pool->id, ['kuota' => 1, 'bidang' => 'UMU']);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.master.positions.index'));
+        $response = $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $unit));
 
         $actions = collect($this->dispatchedActions($response->getContent()))->keyBy(fn ($a) => $a['method'].' '.$a['url']);
         $rm = collect($actions->get('PUT '.route('admin.master.positions.update', $pool))['fields'])->firstWhere('name', 'rm_level');
@@ -427,8 +421,6 @@ class MasterDataTest extends TestCase
     {
         $pages = [
             'admin.master.formasi.index' => 'Formasi',
-            'admin.master.units.index' => 'Unit Kerja',
-            'admin.master.positions.index' => 'Jabatan & Posisi',
             'admin.master.riwayat.index' => 'Riwayat Perubahan',
         ];
 
@@ -440,11 +432,11 @@ class MasterDataTest extends TestCase
             $links = [];
             preg_match_all('/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s', $nav[0], $links, PREG_SET_ORDER);
 
-            $this->assertCount(4, $links, "{$route}: empat bagian harus tersedia.");
+            $this->assertCount(2, $links, "{$route}: dua bagian harus tersedia.");
             $this->assertSame(
                 array_map(fn ($name) => route($name), array_keys($pages)),
                 array_map(fn ($link) => html_entity_decode($link[1]), $links),
-                "{$route}: urutan bagian harus Formasi, Unit Kerja, Jabatan, Riwayat."
+                "{$route}: urutan bagian harus Formasi lalu Riwayat."
             );
 
             $current = array_values(array_filter($links, fn ($link) => str_contains($link[0], 'aria-current="page"')));
@@ -455,7 +447,7 @@ class MasterDataTest extends TestCase
 
     public function test_sidebar_has_a_single_master_data_entry(): void
     {
-        $html = $this->actingAs($this->admin)->get(route('admin.master.units.index'))->assertOk()->getContent();
+        $html = $this->actingAs($this->admin)->get(route('admin.master.formasi.index'))->assertOk()->getContent();
 
         $this->assertStringContainsString('title="Master Formasi"', $html);
         foreach (['Master Unit Kerja', 'Master Jabatan', 'Formasi Unit Kerja', 'Riwayat Perubahan Master'] as $oldTitle) {
