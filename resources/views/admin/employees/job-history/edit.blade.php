@@ -13,7 +13,7 @@
                     <div class="flex items-start justify-between">
                         <div class="flex items-center">
                             <div
-                                class="flex items-center justify-center w-12 h-12 bg-white bg-opacity-20 rounded-xl mr-4 backdrop-blur-sm">
+                                class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-xl mr-4 backdrop-blur-sm">
                                 <i class="fas fa-briefcase text-white text-xl" aria-hidden="true"></i>
                             </div>
                             <div>

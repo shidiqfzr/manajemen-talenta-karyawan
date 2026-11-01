@@ -6,7 +6,10 @@
     <title>Login - Manajemen Talenta</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    @vite(['resources/css/app.css'])
     <style>
         .animate-float {
             animation: float 6s ease-in-out infinite;
@@ -119,8 +122,8 @@
                                 <button type="button" id="togglePassword"
                                     class="absolute inset-y-0 right-0 pr-4 flex items-center text-surface-500 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors duration-200"
                                     aria-label="Toggle password visibility">
-                                    <i id="eye" class="fas fa-eye text-lg" aria-hidden="true"></i>
-                                    <i id="eye-off" class="fas fa-eye-slash text-lg hidden" aria-hidden="true"></i>
+                                    <span id="eye"><i class="fas fa-eye text-lg" aria-hidden="true"></i></span>
+                                    <span id="eye-off" class="hidden"><i class="fas fa-eye-slash text-lg" aria-hidden="true"></i></span>
                                 </button>
                             </div>
                         </div>
@@ -130,7 +133,7 @@
                     <div class="pt-2">
                         <button type="submit" id="submitBtn"
                             class="btn-hover w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent text-white font-semibold rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-300 active:scale-95 shadow-lg">
-                            <i id="btnSpinner" class="fas fa-spinner fa-spin ml-2 hidden" aria-hidden="true"></i>
+                            <span id="btnSpinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
                             <span id="btnText">Masuk</span>
                         </button>
                     </div>
@@ -154,15 +157,15 @@
             </div>
 
             <!-- Animated Decorative Elements -->
-            <div class="absolute top-10 left-10 w-20 h-20 bg-white bg-opacity-10 rounded-full animate-float"></div>
-            <div class="absolute bottom-20 right-20 w-32 h-32 bg-white bg-opacity-5 rounded-full animate-float-delay">
+            <div class="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-full animate-float"></div>
+            <div class="absolute bottom-20 right-20 w-32 h-32 bg-white/5 rounded-full animate-float-delay">
             </div>
-            <div class="absolute top-1/3 right-20 w-16 h-16 bg-white bg-opacity-10 rounded-full animate-float-delay-2">
+            <div class="absolute top-1/3 right-20 w-16 h-16 bg-white/10 rounded-full animate-float-delay-2">
             </div>
 
             <!-- Additional floating elements -->
-            <div class="absolute top-1/4 left-1/4 w-12 h-12 bg-white bg-opacity-5 rounded-full animate-float"></div>
-            <div class="absolute bottom-1/3 left-16 w-24 h-24 bg-white bg-opacity-5 rounded-full animate-float-delay-2">
+            <div class="absolute top-1/4 left-1/4 w-12 h-12 bg-white/5 rounded-full animate-float"></div>
+            <div class="absolute bottom-1/3 left-16 w-24 h-24 bg-white/5 rounded-full animate-float-delay-2">
             </div>
 
             <!-- Content -->
