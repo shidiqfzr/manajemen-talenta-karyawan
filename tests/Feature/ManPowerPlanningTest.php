@@ -183,6 +183,23 @@ class ManPowerPlanningTest extends TestCase
         $this->assertSame('TEK', $service->determineBidang($karpel));
     }
 
+    public function test_classify_position_flags_values_from_master_formasi_versus_estimates(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $service = new ManPowerPlanningService;
+
+        $seat = $service->classifyPosition(new Employee(['jabatan' => 'Manajer', 'unit_kerja' => 'Kebun Tajati']));
+        $this->assertSame('TAN', $seat['bidang']);
+        $this->assertSame(Position::where('nama', 'Manajer')->value('rm_level'), $seat['rm_band']);
+        $this->assertTrue($seat['bidang_from_formasi']);
+        $this->assertTrue($seat['rm_from_formasi']);
+
+        $estimate = $service->classifyPosition(new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan', 'level' => 'Karpel']));
+        $this->assertSame('TEK', $estimate['bidang']);
+        $this->assertFalse($estimate['bidang_from_formasi']);
+        $this->assertFalse($estimate['rm_from_formasi']);
+    }
+
     public function test_mpp_component_can_change_planning_year(): void
     {
         $yearT = Carbon::now()->year;

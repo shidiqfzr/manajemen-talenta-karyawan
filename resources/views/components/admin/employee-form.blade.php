@@ -4,13 +4,14 @@
     'method' => 'POST',
     'prefill' => []
 ])
+{{-- Jalur rekrutmen mengikuti daftar baku Employee::ENTRY_CHANNELS (DOMAIN.md Bab 2.1): CKP, Talent Scouting, RBB, Reguler --}}
 @php
-    $genders = ['L' => 'Laki-laki', 'P' => 'Perempuan'];
+    $genders =['L' => 'Laki-laki', 'P' => 'Perempuan'];
     $religions = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
     $familyStatuses = ['K/0', 'K/1', 'K/2', 'K/3', 'TK/0', 'TK/1', 'TK/2', 'TK/3'];
     $educationLevels = ['SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'];
     $levels = ['Karpim' => 'Karyawan Pimpinan', 'Karpel' => 'Karyawan Pelaksana'];
-    $entryChannels = ['Reguler' => 'Reguler', 'Pro Hire' => 'Pro Hire', 'Lainnya' => 'Lainnya'];
+    $entryChannels = \App\Models\Employee::ENTRY_CHANNELS;
     $activeUnits = \App\Models\Unit::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get();
     if ($activeUnits->isNotEmpty()) {
         $groupedUnits = $activeUnits->groupBy('wilayah')
@@ -50,9 +51,9 @@
         tanggalLahir: '{{ $defaultTanggalLahir }}',
         photoPreview: '{{ $defaultPhoto }}',
         selectedRmLevel: '{{ $defaultRmLevel }}',
-        isRmOverridden: {{ $defaultRmLevel ? 'true' : 'false' }},
         statusKaryawan: '{{ $defaultStatusKaryawan }}',
-        isEdit: {{ $employee ? 'true' : 'false' }}
+        isEdit: {{ $employee ? 'true' : 'false' }},
+        nikCheckUrl: '{{ route('admin.employees.checkNik') }}'
     })"
     @unit-selected.window="unitKerja = $event.detail.unit">
 
@@ -60,6 +61,28 @@
         @csrf
         @if($method === 'PUT')
             @method('PUT')
+        @endif
+
+        @if($errors->any())
+            @php
+                $errorTargets = [
+                    'unit_kerja' => 'unitKerjaLabel', 'level' => 'levelLabel', 'nik' => 'nikInput', 'jabatan' => 'jabatanInput',
+                    'status_karyawan' => 'statusKaryawanInput', 'rm_level' => 'rmLevelInput', 'person_grade' => 'personGradeInput',
+                    'foto' => 'photoTrigger',
+                ];
+            @endphp
+            <div id="errorSummary" tabindex="-1" role="alert" x-init="$nextTick(() => $el.focus())"
+                 class="rounded-xl border border-danger-200 bg-danger-50 p-4 sm:p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                <p class="text-sm font-bold text-danger-700">
+                    <i class="fas fa-circle-exclamation mr-1.5" aria-hidden="true"></i>
+                    {{ $errors->count() }} isian perlu diperbaiki sebelum data dapat disimpan
+                </p>
+                <ul class="mt-2 list-disc pl-5 space-y-1 text-sm text-danger-700">
+                    @foreach($errors->messages() as $field => $messages)
+                        <li><a href="#{{ $errorTargets[$field] ?? $field }}" class="underline font-medium rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{{ $messages[0] }}</a></li>
+                    @endforeach
+                </ul>
+            </div>
         @endif
 
         <!-- SEGMEN 1: IDENTITAS PRIBADI & DEMOGRAFI -->
@@ -70,10 +93,11 @@
                     <h3 class="text-base font-extrabold text-surface-900">Identitas Pribadi &amp; Demografi Pegawai</h3>
                     <p class="text-xs text-surface-500">Foto resmi, Nomor Induk Karyawan, kependudukan, dan kualifikasi pendidikan formal</p>
                 </div>
+                <p class="ml-auto self-start text-[11px] text-surface-500 whitespace-nowrap hidden sm:block">Kolom bertanda <span class="text-danger font-bold" aria-hidden="true">*</span><span class="sr-only">bintang</span> wajib diisi</p>
             </div>
 
             <!-- Inline Modern Avatar Upload Bar -->
-            <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-surface-50 via-primary-50/20 to-surface-50 border border-surface-200/80 flex flex-col sm:flex-row items-center gap-5">
+            <div class="p-4 sm:p-5 rounded-2xl bg-surface-50 border border-surface-200/80 flex flex-col sm:flex-row items-center gap-5">
                 <div class="relative group cursor-pointer shrink-0" @click="$refs.photoInput.click()">
                     <div class="w-24 h-24 rounded-2xl border-2 border-primary-500/30 shadow-sm overflow-hidden bg-white flex items-center justify-center transition group-hover:border-primary-500">
                         <template x-if="photoPreview">
@@ -94,13 +118,12 @@
                 <div class="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
                     <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                         <h4 class="text-xs font-bold text-surface-800">Foto Profil Pegawai</h4>
-                        <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-surface-200/70 text-surface-600">Opsional</span>
                     </div>
                     <p class="text-xs text-surface-500 leading-relaxed max-w-xl">
                         Unggah foto resmi berlatar belakang polos. Format <span class="font-semibold text-surface-700">JPG, PNG, atau WebP</span> (maks. 2 MB).
                     </p>
                     <div class="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <button type="button" 
+                        <button type="button" id="photoTrigger"
                                 @click="$refs.photoInput.click()"
                                 class="px-3.5 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 text-xs font-semibold transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5">
                             <i class="fas fa-upload text-[11px] text-primary-600" aria-hidden="true"></i>
@@ -115,7 +138,7 @@
                             <span>Hapus</span>
                         </button>
                     </div>
-                    @error('foto') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                    @error('foto') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <input type="file" 
@@ -131,7 +154,7 @@
                 <!-- NIK -->
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="block text-xs font-bold text-surface-700">NIK (Nomor Induk Karyawan) @if(!$employee)<span class="text-danger">*</span>@endif</label>
+                        <label @if(!$employee) for="nikInput" @endif class="block text-xs font-bold text-surface-700">NIK (Nomor Induk Karyawan) @if(!$employee)<span class="text-danger">*</span>@endif</label>
                         @if($employee)
                         <span class="text-[10px] text-surface-500"><i class="fas fa-lock text-[10px] mr-1" aria-hidden="true"></i>Terkunci</span>
                         @else
@@ -148,23 +171,37 @@
                         <input type="text" 
                                value="{{ $employee->nik }}" 
                                readonly
-                               class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-mono font-bold text-surface-600 cursor-not-allowed">
+                               class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-lg text-xs sm:text-sm font-mono font-bold text-surface-600 cursor-not-allowed">
                         @else
                         <input type="text" 
                                name="nik" 
+                               id="nikInput"
+                               aria-required="true"
+                               inputmode="numeric"
+                               autocomplete="off"
                                x-model="nik" 
                                value="{{ old('nik') }}" 
                                required 
                                maxlength="8" 
                                pattern="[0-9]{8}" 
                                placeholder="Contoh: 13009988"
-                               class="w-full pl-9 pr-3.5 py-2.5 bg-surface-50/70 border border-surface-200 rounded-xl text-xs sm:text-sm font-mono font-medium text-surface-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition">
+                               :aria-invalid="nikStatus === 'taken' ? 'true' : null"
+                               aria-describedby="nikStatusText"
+                               :class="nikStatus === 'taken' || {{ $errors->has('nik') ? 'true' : 'false' }} ? 'border-danger ring-2 ring-danger/20' : 'border-surface-200'"
+                               class="w-full pl-9 pr-3.5 py-2.5 bg-surface-50/70 border rounded-lg text-xs sm:text-sm font-mono font-medium text-surface-800 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:border-primary-500 transition">
                         @endif
                     </div>
                     @if($employee)
                     <p class="text-[11px] text-surface-500 mt-1">NIK adalah primary key tetap.</p>
                     @endif
-                    @error('nik') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                    @if(!$employee)
+                    <div id="nikStatusText" aria-live="polite">
+                        <p x-show="nikStatus === 'checking'" x-cloak class="text-[11px] text-surface-500 mt-1">Memeriksa NIK...</p>
+                        <p x-show="nikStatus === 'taken'" x-cloak class="text-danger-700 text-sm mt-1">NIK sudah terdaftar. Periksa kembali atau <a :href="nikShowUrl" class="underline font-semibold rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">buka data pegawai tersebut</a>.</p>
+                        <p x-show="nikStatus === 'ok'" x-cloak class="text-[11px] text-primary-700 mt-1"><i class="fas fa-check-circle mr-1" aria-hidden="true"></i>NIK tersedia.</p>
+                    </div>
+                    @endif
+                    @error('nik') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <!-- Nama Lengkap (Spans 2 cols on lg) -->
@@ -236,11 +273,11 @@
                     <!-- Contextual Live Pill Badges for MBT & BUP -->
                     <div x-show="tanggalLahir" x-cloak class="mt-2 flex flex-wrap items-center gap-1.5">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning-50 text-warning-800 border border-warning-200 text-[10px] font-medium">
-                            <span class="font-bold">MBT (55):</span>
+                            <abbr title="Masa Bakti Terakhir: 55 tahun" class="font-bold no-underline cursor-help">MBT (55):</abbr>
                             <span class="font-mono" x-text="calculateMbt()"></span>
                         </span>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-200 text-[10px] font-medium">
-                            <span class="font-bold">BUP (56):</span>
+                            <abbr title="Batas Usia Pensiun: 56 tahun" class="font-bold no-underline cursor-help">BUP (56):</abbr>
                             <span class="font-mono" x-text="calculatePensiun()"></span>
                         </span>
                     </div>
@@ -278,21 +315,19 @@
                 </div>
 
             <div class="space-y-5">
-                <!-- Level Pegawai & Jalur Masuk (DOMAIN.md Bab 2.1) -->
+                {{-- Level Pegawai & Jalur Masuk (DOMAIN.md Bab 2.1) --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <!-- Level Pegawai -->
                     <div>
-                        <div class="flex items-center justify-between min-h-[22px] mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Level Strata Pegawai <span class="text-danger">*</span></label>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label id="levelLabel" class="block text-xs font-bold text-surface-700">Level Strata Pegawai <span class="text-danger">*</span></label>
                             @if($employee)
-                            <span class="text-[10px] font-medium text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                <i class="fas fa-lock text-[10px]" aria-hidden="true"></i> Terkunci
-                            </span>
+                            <span class="text-[10px] text-surface-500"><i class="fas fa-lock text-[10px] mr-1" aria-hidden="true"></i>Terkunci</span>
                             @endif
                         </div>
-                        <div class="grid grid-cols-2 gap-3 @if($employee) opacity-70 pointer-events-none @endif">
+                        <div role="radiogroup" aria-labelledby="levelLabel" aria-required="true" class="grid grid-cols-2 gap-3 @if($employee) opacity-70 pointer-events-none @endif">
                             @foreach($levels as $lvlKey => $lvlName)
-                                <label class="relative flex items-center px-3 py-1.5 rounded-xl border transition"
+                                <label class="relative flex items-center min-h-[42px] px-3 rounded-xl border transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500"
                                        :class="level === '{{ $lvlKey }}' 
                                             ? 'bg-primary-50/80 border-primary-500 ring-2 ring-primary-500/20' 
                                             : 'bg-surface-50/60 border-surface-200 @if(!$employee) hover:bg-surface-100/60 cursor-pointer @endif'">
@@ -317,10 +352,10 @@
                         @if($employee)
                         <p class="text-[11px] text-surface-500 mt-1.5">Gunakan modul Mutasi untuk mengubah strata/promosi.</p>
                         @endif
-                        @error('level') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('level') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <!-- Jalur Masuk / Rekrutmen Pegawai (DOMAIN.md Bab 2.1) -->
+                    {{-- Jalur Masuk / Rekrutmen Pegawai (DOMAIN.md Bab 2.1) --}}
                     <div>
                         <x-admin.form.select 
                             name="jalur_masuk" 
@@ -328,6 +363,7 @@
                             icon="fas fa-route"
                             x-model="jalurMasuk"
                             required
+                            placeholder=""
                             :options="$entryChannels"
                         />
                     </div>
@@ -338,15 +374,7 @@
                     <!-- Unit Kerja -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Unit Kerja Penempatan <span class="text-danger">*</span></label>
-                            @if(!$employee)
-                            <button type="button" @click="$dispatch('open-quick-add-unit')"
-                                class="text-[10px] font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                                title="Tambah Unit Kerja Baru ke Master Data">
-                                <i class="fas fa-plus text-[10px]" aria-hidden="true"></i>
-                                <span>Unit Baru</span>
-                            </button>
-                            @endif
+                            <label id="unitKerjaLabel" class="block text-xs font-bold text-surface-700">Unit Kerja Penempatan <span class="text-danger">*</span></label>
                         </div>
                         @if($employee)
                         <div class="relative">
@@ -356,7 +384,7 @@
                             <input type="text" 
                                    disabled
                                    value="{{ $employee->unit_kerja }}" 
-                                   class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
+                                   class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-lg text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
                             <input type="hidden" name="unit_kerja" value="{{ $employee->unit_kerja }}">
                         </div>
                         @else
@@ -364,26 +392,17 @@
                             :grouped-units="$groupedUnits" 
                             :selected="old('unit_kerja', $prefill['unit_kerja'] ?? '')" 
                             id="unitKerjaInput"
+                            label="Unit Kerja Penempatan"
                             name="unit_kerja" />
-                        <p class="text-[11px] text-surface-500 mt-1">Pilih Unit Kerja terlebih dahulu untuk memunculkan formasi Jabatan.</p>
+                        <p x-show="!unitKerja" class="text-[11px] text-surface-500 mt-1">Pilih Unit Kerja terlebih dahulu untuk memunculkan formasi Jabatan.</p>
                         @endif
-                        @error('unit_kerja') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('unit_kerja') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <!-- Jabatan -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Jabatan Formasi <span class="text-danger">*</span></label>
-                            @if(!$employee)
-                            <button type="button" @click="if(unitKerja) $dispatch('open-quick-add-position', { unitKerja: unitKerja })"
-                                :disabled="!unitKerja"
-                                :class="!unitKerja ? 'bg-surface-100 text-surface-500 border border-surface-200 cursor-not-allowed opacity-60' : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 cursor-pointer'"
-                                class="text-[10px] font-bold px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1 shadow-xs"
-                                title="Pilih Unit Kerja terlebih dahulu untuk menambah formasi">
-                                <i class="fas fa-plus text-[10px]" aria-hidden="true"></i>
-                                <span>Jabatan Baru</span>
-                            </button>
-                            @endif
+                            <label for="jabatanInput" class="block text-xs font-bold text-surface-700">Jabatan Formasi <span class="text-danger">*</span></label>
                         </div>
                         <div class="relative">
                             <span class="absolute left-3.5 inset-y-0 flex items-center text-xs transition-colors duration-300" :class="unitKerja ? 'text-primary-600' : 'text-surface-500'">
@@ -393,16 +412,17 @@
                             <input type="text" 
                                    disabled
                                    value="{{ $employee->jabatan }}" 
-                                   class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
+                                   class="w-full pl-9 pr-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-lg text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
                             <input type="hidden" name="jabatan" value="{{ $employee->jabatan }}">
                             @else
                             <select name="jabatan" 
                                     id="jabatanInput" 
+                                    aria-required="true"
                                     x-model="jabatan"
                                     :disabled="!unitKerja || activePositionsList.length === 0"
                                     required 
-                                    class="w-full pl-9 pr-8 py-2.5 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 transition-all duration-300 appearance-none"
-                                    :class="!unitKerja ? 'bg-surface-100/70 border border-surface-200/60 text-surface-500 cursor-not-allowed' : 'bg-surface-50/70 border border-surface-200 text-surface-800 focus:bg-white focus:ring-primary-500/30 focus:border-primary-500'">
+                                    class="w-full pl-9 pr-8 py-2.5 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus-visible:ring-2 transition-all duration-300 appearance-none"
+                                    :class="!unitKerja ? 'bg-surface-100/70 border border-surface-200/60 text-surface-500 cursor-not-allowed' : '{{ $errors->has('jabatan') ? 'border-danger ring-2 ring-danger/20' : 'border-surface-200' }} bg-surface-50/70 border text-surface-800 focus:bg-white focus-visible:ring-primary-500/30 focus-visible:border-primary-500'">
                                 <option value="" disabled selected x-text="!unitKerja ? '-- Pilih Unit Kerja Terlebih Dahulu --' : (activePositionsList.length === 0 ? '-- Formasi Kosong / Memuat --' : '-- Pilih Formasi Jabatan --')"></option>
                                 <template x-for="pos in activePositionsList" :key="pos">
                                     <option :value="pos" x-text="pos" :selected="jabatan === pos"></option>
@@ -413,7 +433,7 @@
                             </div>
                             @endif
                         </div>
-                        @error('jabatan') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('jabatan') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
@@ -424,15 +444,15 @@
                     
                     <!-- Status Penugasan -->
                     <div>
-                        <div class="flex items-center justify-between min-h-[22px] mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Status Penugasan <span class="text-danger">*</span></label>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="statusPenugasanInput" class="block text-xs font-bold text-surface-700">Status Penugasan <span class="text-danger">*</span></label>
                         </div>
                         <div class="relative">
                             <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-surface-500">
                                 <i class="fas fa-tag" aria-hidden="true"></i>
                             </span>
-                            <input type="text" disabled value="Definitif"
-                                    class="w-full pl-9 pr-8 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
+                            <input type="text" id="statusPenugasanInput" disabled value="Definitif"
+                                    class="w-full pl-9 pr-8 py-2.5 bg-surface-100 border border-surface-200 rounded-lg text-xs sm:text-sm font-medium text-surface-500 cursor-not-allowed">
                             <input type="hidden" name="status_penugasan" value="Definitif">
                         </div>
 
@@ -440,14 +460,14 @@
 
                     <!-- Status Karyawan -->
                     <div>
-                        <div class="flex items-center min-h-[22px] mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Status Kepegawaian <span class="text-danger">*</span></label>
+                        <div class="flex items-center mb-1.5">
+                            <label for="statusKaryawanInput" class="block text-xs font-bold text-surface-700">Status Kepegawaian <span class="text-danger">*</span></label>
                         </div>
                         <div class="relative">
                             <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-surface-500">
                                 <i class="fas fa-id-badge" aria-hidden="true"></i>
                             </span>
-                            <select name="status_karyawan" x-model="statusKaryawan" required class="w-full pl-9 pr-8 py-2.5 bg-surface-50/70 border border-surface-200 text-surface-800 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-300 appearance-none">
+                            <select name="status_karyawan" id="statusKaryawanInput" aria-required="true" x-model="statusKaryawan" required class="w-full pl-9 pr-8 py-2.5 bg-surface-50/70 border border-surface-200 text-surface-800 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:bg-white focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:border-primary-500 transition-all duration-300 appearance-none">
                                 @foreach(\App\Models\Employee::EMPLOYMENT_STATUSES as $val => $label)
                                     <option value="{{ $val }}">{{ $label }}</option>
                                 @endforeach
@@ -456,7 +476,7 @@
                                 <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
                             </div>
                         </div>
-                        @error('status_karyawan') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('status_karyawan') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <!-- Tanggal Berakhir Kontrak (Hanya tampil jika PKWT / Calon) -->
@@ -477,8 +497,11 @@
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <label class="block text-xs font-bold text-surface-700">Bidang Fungsional</label>
-                            <span x-show="bidang" x-transition class="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-primary-100">
-                                <i class="fas fa-magic text-[10px]" aria-hidden="true"></i> Auto-filled
+                            <span x-show="bidang && bidangFromFormasi" x-transition class="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-primary-100">
+                                <i class="fas fa-check-circle text-[10px]" aria-hidden="true"></i> Master Formasi
+                            </span>
+                            <span x-show="bidang && !bidangFromFormasi" x-cloak x-transition class="text-[10px] font-bold text-warning-700 bg-warning-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-warning-200">
+                                <i class="fas fa-info-circle text-[10px]" aria-hidden="true"></i> Perkiraan
                             </span>
                         </div>
                         <div class="relative">
@@ -489,46 +512,44 @@
                                    readonly 
                                    :value="bidangLabel" 
                                    placeholder="Terisi otomatis..."
-                                   class="w-full pl-9 pr-3.5 py-2.5 border rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                   class="w-full pl-9 pr-3.5 py-2.5 border rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                    :class="bidang ? 'bg-primary-50/30 border-primary-200 text-primary-900' : 'bg-surface-50 border-surface-200 text-surface-500'">
                         </div>
-                        <p class="text-[11px] text-surface-500 mt-1">Ditentukan otomatis berdasarkan jabatan.</p>
+                        <p class="text-[11px] mt-1" :class="!jabatan || bidangFromFormasi ? 'text-surface-500' : 'text-warning-700'">
+                            <span x-show="!jabatan">Terisi otomatis setelah Jabatan Formasi dipilih.</span>
+                            <span x-show="jabatan && bidangFromFormasi" x-cloak>Mengikuti formasi jabatan pada unit kerja di Master Formasi.</span>
+                            <span x-show="jabatan && !bidangFromFormasi" x-cloak>Jabatan ini tidak menempati formasi pada unit kerja terpilih; bidang diperkirakan dari nama jabatan dan unit.</span>
+                        </p>
                     </div>
 
                     <!-- Eselon / RM Band (Auto-filled Dropdown) -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-xs font-bold text-surface-700">Eselon / RM Band <span class="text-danger">*</span></label>
-                            <span x-show="!isRmOverridden && computedRmBand" x-transition class="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-primary-100">
-                                <i class="fas fa-magic text-[10px]" aria-hidden="true"></i> Auto-filled
+                            <label for="rmLevelInput" class="block text-xs font-bold text-surface-700">Eselon / <abbr title="Rentang Manajemen: tingkat band jabatan RM-1 sampai RM-4" class="no-underline cursor-help">RM</abbr> Band <span class="text-danger">*</span></label>
+                            <span x-show="computedRmBand && rmFromFormasi" x-transition class="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-primary-100">
+                                <i class="fas fa-check-circle text-[10px]" aria-hidden="true"></i> Master Formasi
                             </span>
-                            <button type="button" x-show="isRmOverridden" x-cloak @click="resetRmToAuto()" class="text-[10px] font-bold text-warning-700 bg-warning-50 hover:bg-warning-100 px-2 py-0.5 rounded-md flex items-center gap-1 border border-warning-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                                <i class="fas fa-undo text-[10px]" aria-hidden="true"></i> Reset ke Auto
-                            </button>
+                            <span x-show="computedRmBand && !rmFromFormasi" x-cloak x-transition class="text-[10px] font-bold text-warning-700 bg-warning-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-warning-200">
+                                <i class="fas fa-info-circle text-[10px]" aria-hidden="true"></i> Perkiraan
+                            </span>
                         </div>
                         <div class="relative">
-                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs z-10 transition-colors duration-300" :class="isRmOverridden ? 'text-warning-700' : (computedRmBand ? 'text-primary-500' : 'text-surface-500')">
+                            <span class="absolute left-3.5 inset-y-0 flex items-center text-xs z-10 transition-colors duration-300" :class="computedRmBand ? 'text-primary-500' : 'text-surface-500'">
                                 <i class="fas fa-layer-group" aria-hidden="true"></i>
                             </span>
-                            <select name="rm_level" 
-                                    id="rmLevelInput"
-                                    x-model="selectedRmLevel"
-                                    @change="onRmChange()"
-                                    class="w-full pl-9 pr-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm font-medium text-surface-800 focus:outline-none focus:ring-2 transition-all duration-300 appearance-none"
-                                    :class="isRmOverridden ? 'border-warning-200 ring-2 ring-warning/20 bg-warning-50/10 focus:border-warning focus:ring-warning/30' : (triggerPulse ? 'border-primary-300 ring-2 ring-primary-500/30 bg-primary-50/30' : 'border-surface-200 focus:border-primary-500 focus:ring-primary-500/30')">
-                                @foreach($rmLevels ?? \App\Models\Employee::RM_LEVELS ?? ['RM-1'=>'RM-1', 'RM-2'=>'RM-2', 'RM-3'=>'RM-3', 'RM-4'=>'RM-4'] as $key => $label)
-                                    <option value="{{ $key }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-surface-500">
-                                <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
-                            </div>
+                            {{-- RM Band melekat pada jabatan di Master Formasi: tampil read-only, nilai dikirim lewat input tersembunyi (DOMAIN.md §3.6, §4) --}}
+                            <input type="hidden" name="rm_level" :value="selectedRmLevel">
+                            <input type="text" id="rmLevelInput" readonly aria-describedby="rmLevelHint" placeholder="Terisi otomatis..."
+                                   :value="selectedRmLevel"
+                                   class="w-full pl-9 pr-3.5 py-2.5 bg-surface-50 border rounded-lg text-xs sm:text-sm font-mono font-semibold text-surface-800 cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                   :class="triggerPulse ? 'border-primary-300 ring-2 ring-primary-500/30 bg-primary-50/30' : 'border-surface-200'">
                         </div>
-                        <p class="text-[11px] mt-1 transition-colors" :class="isRmOverridden ? 'text-warning-700' : 'text-surface-500'">
-                            <span x-show="!isRmOverridden">Standar klasifikasi formasi. Bisa diubah manual.</span>
-                            <span x-show="isRmOverridden" x-cloak><i class="fas fa-info-circle" aria-hidden="true"></i> Diubah manual (Override).</span>
+                        <p id="rmLevelHint" class="text-[11px] mt-1" :class="!jabatan || rmFromFormasi ? 'text-surface-500' : 'text-warning-700'">
+                            <span x-show="!jabatan">Terisi otomatis setelah Jabatan Formasi dipilih.</span>
+                            <span x-show="jabatan && rmFromFormasi" x-cloak>Mengikuti formasi jabatan pada Master Formasi dan tidak dapat diubah manual.</span>
+                            <span x-show="jabatan && !rmFromFormasi" x-cloak>Jabatan ini belum memiliki RM Band pada Master Formasi; nilai diperkirakan dari strata dan golongan.</span>
                         </p>
-                        @error('rm_level') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                        @error('rm_level') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
@@ -552,7 +573,7 @@
                         label="Golongan &amp; Berkala"
                         x-model="golongan"
                         ::placeholder="level === 'Karpim' ? 'Contoh: IIIA/00, IIID/02' : 'Contoh: IA/00, IID/00'"
-                        ::class="isGolonganWarning ? 'bg-warning-50/50 border-warning text-warning-800 focus:ring-warning/30 focus:border-warning' : ''"
+                        ::class="isGolonganWarning ? 'bg-warning-50/50 border-warning text-warning-800 focus-visible:ring-warning/30 focus-visible:border-warning' : ''"
                     >
                         <x-slot name="headerRight">
                             <span class="text-[10px] font-semibold" :class="isGolonganWarning ? 'text-warning-700 font-bold' : 'text-surface-500'" x-text="level === 'Karpim' ? 'Standar: Gol III - IV' : 'Standar: Gol I - II'"></span>
@@ -573,7 +594,7 @@
                         label="Job Grade"
                         x-model="jobGrade"
                         placeholder="Grade jabatan"
-                        ::class="isJobGradeWarning ? 'bg-warning-50/50 border-warning text-warning-800 focus:ring-warning/30 focus:border-warning' : ''"
+                        ::class="isJobGradeWarning ? 'bg-warning-50/50 border-warning text-warning-800 focus-visible:ring-warning/30 focus-visible:border-warning' : ''"
                     >
                         <x-slot name="headerRight">
                             <span class="text-[10px] font-semibold" :class="isJobGradeWarning ? 'text-warning-700 font-bold' : 'text-primary-700'" x-text="level === 'Karpim' ? 'Rentang: 11 - 16' : 'Rentang: 1 - 10'"></span>
@@ -589,23 +610,24 @@
                 <!-- Person Grade -->
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="block text-xs font-bold text-surface-700">Person Grade</label>
+                        <label for="personGradeInput" class="block text-xs font-bold text-surface-700">Person Grade</label>
                         <span class="text-[10px] font-semibold" :class="isPersonGradeWarning ? 'text-warning-700 font-bold' : 'text-primary-700'" x-text="level === 'Karpim' ? 'Rentang: 11 - 16' : 'Rentang: 1 - 10'"></span>
                     </div>
                     <input type="number" 
                            name="person_grade" 
+                           id="personGradeInput"
                            x-model="personGrade"
                            placeholder="Grade individu"
-                           class="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 transition"
+                           class="w-full px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus-visible:ring-2 transition"
                            :class="isPersonGradeWarning 
-                                ? 'bg-warning-50/50 border border-warning text-warning-800 focus:ring-warning/30 focus:border-warning' 
-                                : 'bg-surface-50/70 border border-surface-200 text-surface-800 focus:ring-primary-500/30 focus:border-primary-500'">
+                                ? 'bg-warning-50/50 border border-warning text-warning-800 focus-visible:ring-warning/30 focus-visible:border-warning' 
+                                : 'bg-surface-50/70 border border-surface-200 text-surface-800 focus-visible:ring-primary-500/30 focus-visible:border-primary-500'">
                     <p x-show="!isPersonGradeWarning" class="text-[10px] text-surface-500 mt-1">Kompetensi personal</p>
                     <p x-show="isPersonGradeWarning" x-cloak class="text-[10px] text-warning-700 font-semibold mt-1 flex items-center gap-1">
                         <i class="fas fa-triangle-exclamation text-[10px]" aria-hidden="true"></i>
                         <span>Di luar standar <strong x-text="level"></strong> (<span x-text="level === 'Karpim' ? '11 - 16' : '1 - 10'"></span>).</span>
                     </p>
-                    @error('person_grade') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
+                    @error('person_grade') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <!-- TMT Bekerja Awal -->
@@ -641,13 +663,13 @@
                     />
                 </div>
 
-                <!-- Tanggal Diangkat Staf (Adaptive: Disabled for Karpel per DOMAIN.md Bab 4.1) -->
+                {{-- Tanggal Diangkat Staf (Adaptive: Disabled for Karpel per DOMAIN.md Bab 4.1) --}}
                 <div class="sm:col-span-3">
                     <div class="p-4 rounded-xl border transition"
                          :class="level === 'Karpim' ? 'bg-surface-50/60 border-surface-200' : 'bg-surface-100/70 border-surface-200/60'">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                             <div class="space-y-0.5">
-                                <label class="block text-xs font-bold" :class="level === 'Karpim' ? 'text-surface-700' : 'text-surface-500'">
+                                <label for="tanggalDiangkatStafInput" class="block text-xs font-bold" :class="level === 'Karpim' ? 'text-surface-700' : 'text-surface-500'">
                                     Tanggal Diangkat Staf (Pimpinan)
                                 </label>
                                 <p class="text-[11px]" :class="level === 'Karpim' ? 'text-surface-500' : 'text-surface-500'">
@@ -660,13 +682,14 @@
                                 </p>
                             </div>
                             <div class="w-full sm:w-64">
-                                <input type="date" 
-                                       name="tanggal_diangkat_staf" 
+                                <input type="date"
+                                       id="tanggalDiangkatStafInput"
+                                       name="tanggal_diangkat_staf"
                                        :disabled="level === 'Karpel'"
                                        value="{{ old('tanggal_diangkat_staf') }}"
-                                       class="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium border transition"
+                                       class="w-full px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium border transition"
                                        :class="level === 'Karpim' 
-                                            ? 'bg-white border-surface-200 text-surface-800 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500' 
+                                            ? 'bg-white border-surface-200 text-surface-800 focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:border-primary-500' 
                                             : 'bg-surface-200/60 border-surface-200 text-surface-500 cursor-not-allowed'">
                             </div>
                         </div>
@@ -676,7 +699,7 @@
         </div>
 
         <!-- Sticky / Floating Action Bar -->
-        <div class="bg-white rounded-2xl border border-surface-200/80 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="sticky bottom-4 z-10 bg-white rounded-2xl border border-surface-200/80 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="text-xs text-surface-500 flex items-center gap-1.5">
                 <i class="fas fa-shield-halved text-primary-600" aria-hidden="true"></i>
                 <span>Audit trail penempatan akan otomatis tercatat di riwayat jabatan.</span>
@@ -686,38 +709,14 @@
                 <x-admin.button href="{{ route('admin.employees.index') }}" variant="secondary">
                     Batal
                 </x-admin.button>
-                <x-admin.button type="submit" variant="primary" icon="fas fa-check-circle" class="shadow-primary-600/20 shadow-md">
+                <x-admin.button type="submit" once variant="primary" icon="fas fa-check-circle" class="shadow-primary-600/20 shadow-md">
                     {{ $employee ? 'Simpan Perubahan' : 'Simpan Pegawai Baru' }}
                 </x-admin.button>
             </div>
         </div>
     </form>
 
-    <!-- Quick Add Modals -->
-    <x-admin.quick-add-unit-modal />
-    <x-admin.quick-add-position-modal />
-
-    <!-- Script to dynamically append newly created units and positions -->
     <script>
-        document.addEventListener('position-created', function(e) {
-            const position = e.detail;
-            const input = document.getElementById('jabatanInput');
-            const datalist = document.getElementById('positionOptions');
-            if (input && position) {
-                input.value = position.nama;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            if (datalist && position) {
-                const option = document.createElement('option');
-                option.value = position.nama;
-                datalist.appendChild(option);
-            }
-            const levelRadio = document.querySelector(`input[name="level"][value="${position.level}"]`);
-            if (levelRadio && position && position.level) {
-                levelRadio.click();
-            }
-        });
-
         document.addEventListener('alpine:init', () => {
             Alpine.data('employeeForm', (initialData) => ({
                 nik: initialData.nik,
@@ -732,9 +731,35 @@
                 tanggalLahir: initialData.tanggalLahir,
                 photoPreview: initialData.photoPreview,
                 selectedRmLevel: initialData.selectedRmLevel,
-                isRmOverridden: initialData.isRmOverridden,
                 statusKaryawan: initialData.statusKaryawan,
                 isEdit: initialData.isEdit,
+                nikCheckUrl: initialData.nikCheckUrl,
+                nikStatus: 'idle',
+                nikShowUrl: '#',
+                nikTimer: null,
+
+                checkNik() {
+                    clearTimeout(this.nikTimer);
+                    if (this.isEdit || !/^[0-9]{8}$/.test(this.nik || '')) {
+                        this.nikStatus = 'idle';
+                        return;
+                    }
+                    this.nikStatus = 'checking';
+                    this.nikTimer = setTimeout(async () => {
+                        const nik = this.nik;
+                        try {
+                            const res = await fetch(`${this.nikCheckUrl}?nik=${encodeURIComponent(nik)}`, {
+                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                            });
+                            if (!res.ok || nik !== this.nik) { this.nikStatus = 'idle'; return; }
+                            const data = await res.json();
+                            this.nikShowUrl = data.url || '#';
+                            this.nikStatus = data.exists ? 'taken' : 'ok';
+                        } catch (e) {
+                            this.nikStatus = 'idle';
+                        }
+                    }, 300);
+                },
 
                 handlePhotoChange(event) {
                     const file = event.target.files[0];
@@ -754,8 +779,10 @@
                     }
                 },
 
-                serverBidang: 'UMU',
-                serverRmBand: 'RM-3',
+                serverBidang: '',
+                serverRmBand: '',
+                bidangFromFormasi: false,
+                rmFromFormasi: false,
 
                 get bidang() {
                     return this.serverBidang;
@@ -784,6 +811,16 @@
                 },
 
                 async fetchClassification() {
+                    // Belum ada jabatan: kosongkan hasil agar tidak menampilkan nilai bawaan yang menyesatkan
+                    if (!this.jabatan) {
+                        this.serverBidang = '';
+                        this.serverRmBand = '';
+                        this.bidangFromFormasi = false;
+                        this.rmFromFormasi = false;
+                        this.selectedRmLevel = '';
+                        return;
+                    }
+
                     const params = new URLSearchParams({
                         jabatan: this.jabatan || '',
                         unit_kerja: this.unitKerja || '',
@@ -799,10 +836,10 @@
                         
                         this.serverBidang = data.bidang;
                         this.serverRmBand = data.rm_band;
-                        
-                        if (!this.isRmOverridden) {
-                            this.selectedRmLevel = this.serverRmBand;
-                        }
+                        this.bidangFromFormasi = !!data.bidang_from_formasi;
+                        this.rmFromFormasi = !!data.rm_from_formasi;
+
+                        this.selectedRmLevel = this.serverRmBand;
                         this.animatePulse();
                     } catch (e) {
                         console.error('Gagal mengambil inferensi klasifikasi', e);
@@ -811,6 +848,7 @@
 
                 init() {
                     this.fetchClassification();
+                    this.$watch('nik', () => this.checkNik());
                     
                     let timeout;
                     const debouncedFetch = () => {
@@ -864,15 +902,6 @@
 
                 get activeRmLevel() {
                     return this.selectedRmLevel || this.serverRmBand;
-                },
-
-                resetRmToAuto() {
-                    this.isRmOverridden = false;
-                    this.selectedRmLevel = this.serverRmBand;
-                },
-
-                onRmChange() {
-                    this.isRmOverridden = (this.selectedRmLevel !== this.serverRmBand);
                 },
 
                 calculatePensiun() {

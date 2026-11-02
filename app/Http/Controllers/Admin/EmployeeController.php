@@ -16,6 +16,7 @@ use App\Models\Position;
 use App\Models\Unit;
 use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
+use App\Services\FormasiSeatGuard;
 use App\Services\Import\EmployeeImportDictionary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -211,14 +212,31 @@ class EmployeeController extends Controller
         ));
     }
 
+    /**
+     * Pemeriksaan ketersediaan NIK saat pengisian form. Hanya mengembalikan status dan tautan,
+     * tanpa data pribadi pemilik NIK (UU PDP).
+     */
+    public function checkNik(Request $request)
+    {
+        $nik = (string) $request->query('nik', '');
+
+        if (! preg_match('/^[0-9]{8}$/', $nik)) {
+            return response()->json(['valid' => false, 'exists' => false], 422);
+        }
+
+        $exists = Employee::where('nik', $nik)->exists();
+
+        return response()->json([
+            'valid' => true,
+            'exists' => $exists,
+            'url' => $exists ? route('admin.employees.show', $nik) : null,
+        ]);
+    }
+
     // Store new employee
-    public function store(StoreEmployeeRequest $request)
+    public function store(StoreEmployeeRequest $request, FormasiSeatGuard $seats)
     {
         $validated = $request->validated();
-
-        if ($request->hasFile('foto')) {
-            $validated['foto'] = $request->file('foto')->store('photos', 'public');
-        }
 
         // Standardize data (Uppercase nama & trim unit_kerja)
         $validated['nama'] = strtoupper(trim($validated['nama']));
@@ -226,24 +244,19 @@ class EmployeeController extends Controller
         $validated['jalur_masuk'] = $validated['jalur_masuk'] ?? 'Reguler';
         $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
 
-        // Validasi ketersediaan formasi (Jabatan harus ada di Unit Kerja dengan Level yang sesuai)
-        $unit = Unit::where('nama', $validated['unit_kerja'])->first();
-        if ($unit) {
-            $validPositions = $unit->positions()
-                ->where('positions.is_active', true)
-                ->where('positions.level', $validated['level'])
-                ->pluck('positions.nama')
-                ->toArray();
-
-            // Allow if position list is empty (fallback to master data skip if mapping incomplete)
-            // or if the position is explicitly valid
-            if (count($validPositions) > 0 && ! in_array($validated['jabatan'], $validPositions)) {
-                return back()->withErrors(['jabatan' => 'Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Pegawai yang dipilih.'])->withInput();
-            }
-        }
-
         // Atomic transaction: create employee (EmployeeObserver automatically registers initial job assignment)
-        $employee = DB::transaction(function () use ($validated, $request) {
+        $seatError = null;
+        $employee = DB::transaction(function () use ($validated, $request, $seats, &$seatError) {
+            // Position control: kursi aktif + kuota diperiksa di dalam transaksi yang sama dengan penyimpanan
+            $seatError = $seats->check($validated['unit_kerja'], $validated['jabatan'], $validated['level'], $validated['status_penugasan']);
+            if ($seatError !== null) {
+                return null;
+            }
+
+            if ($request->hasFile('foto')) {
+                $validated['foto'] = $request->file('foto')->store('photos', 'public');
+            }
+
             $emp = Employee::create($validated);
 
             // If an explicit SK number was provided in form, update the initial job history
@@ -258,6 +271,10 @@ class EmployeeController extends Controller
 
             return $emp;
         });
+
+        if ($seatError !== null) {
+            return back()->withErrors(['jabatan' => $seatError])->withInput();
+        }
 
         return redirect()->route('admin.employees.index')->with('success', "Pegawai baru ({$employee->nama}) berhasil ditambahkan dan formasi jabatan telah terisi.");
     }
