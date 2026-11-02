@@ -73,6 +73,27 @@ class ManPowerPlanningService
     }
 
     /**
+     * Klasifikasi RM Band & Bidang untuk pratinjau form, lengkap dengan penanda apakah nilainya
+     * berasal dari Master Formasi (penetapan) atau dari pendeteksian cadangan (perkiraan).
+     *
+     * @return array{bidang: string, rm_band: string, bidang_from_formasi: bool, rm_from_formasi: bool}
+     */
+    public function classifyPosition(Employee $emp): array
+    {
+        $formasiRm = filled($emp->jabatan) ? Position::getAllCached()->get((string) $emp->jabatan)?->rm_level : null;
+        $formasiBidang = filled($emp->jabatan) && filled($emp->unit_kerja)
+            ? $this->catalog()->seatBidang((string) $emp->unit_kerja, (string) $emp->jabatan)
+            : null;
+
+        return [
+            'bidang' => $formasiBidang ?? $this->determineBidang($emp),
+            'rm_band' => $formasiRm ?? $this->determineRmLevel($emp),
+            'bidang_from_formasi' => $formasiBidang !== null,
+            'rm_from_formasi' => $formasiRm !== null,
+        ];
+    }
+
+    /**
      * Map an Employee instance into an RM Level (RM-1, RM-2, RM-3, RM-4)
      * SSOT: DOMAIN.md Bab 4.2 & Master Data Positions
      */
@@ -241,7 +262,7 @@ class ManPowerPlanningService
             if ($emp->tanggal_pensiun) {
                 $pYear = Carbon::parse($emp->tanggal_pensiun)->year;
             } elseif ($emp->tanggal_lahir) {
-                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(56)->year;
+                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN)->year;
             }
 
             if ($pYear !== null && $pYear < $filterYear) {
