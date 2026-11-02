@@ -12,6 +12,7 @@ function employeeImportWizard() {
         fileErrorMessage: '',
         isValidating: false,
         isCommitting: false,
+        errorMessage: '',
         isAsync: false,
         jobProgress: 0,
         jobMessage: '',
@@ -179,12 +180,17 @@ function employeeImportWizard() {
                 : (bytes / (1024 * 1024)).toFixed(2) + ' MB';
         },
 
+        showError(message) {
+            this.errorMessage = message;
+        },
+
         resetToStep1() {
             if (this.pollInterval) {
                 clearInterval(this.pollInterval);
                 this.pollInterval = null;
             }
             this.currentStep = 1;
+            this.errorMessage = '';
             this.clearFile();
             this.importToken = '';
             this.isAsync = false;
@@ -197,7 +203,7 @@ function employeeImportWizard() {
             this.commitTimestamp = '';
             this.showDiffModal = false;
             this.activeDiffRow = null;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
         pollJobStatus(token, type) {
@@ -245,14 +251,14 @@ function employeeImportWizard() {
                                 this.previewSearch = '';
                                 this.currentPage = 1;
                                 this.currentStep = 2;
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                             } else if (type === 'commit') {
                                 this.isCommitting = false;
                                 this.commitSummary = data.summary;
                                 const now = new Date();
                                 this.commitTimestamp = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' \u2022 ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
                                 this.currentStep = 3;
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                             }
                         } else if (data.status === 'failed') {
                             clearInterval(this.pollInterval);
@@ -260,7 +266,7 @@ function employeeImportWizard() {
                             this.isAsync = false;
                             this.isValidating = false;
                             this.isCommitting = false;
-                            alert(data.error || 'Terjadi kendala pada antrean pemrosesan berkas.');
+                            this.showError(data.error || 'Terjadi kendala pada antrean pemrosesan berkas.');
                         }
                     }
                 } catch (err) {
@@ -273,6 +279,7 @@ function employeeImportWizard() {
             if (!this.selectedFile) return;
 
             this.isValidating = true;
+            this.errorMessage = '';
             const formData = new FormData();
             formData.append('import_file', this.selectedFile);
             formData.append('_token', '{{ csrf_token() }}');
@@ -306,13 +313,13 @@ function employeeImportWizard() {
                         this.previewSearch = '';
                         this.currentPage = 1;
                         this.currentStep = 2;
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 } else {
-                    alert(data.message || (data.errors ? Object.values(data.errors).flat().join('\n') : 'Gagal memvalidasi berkas spreadsheet. Pastikan format sesuai template.'));
+                    this.showError(data.message || (data.errors ? Object.values(data.errors).flat().join('\n') : 'Gagal memvalidasi berkas spreadsheet. Pastikan format sesuai template.'));
                 }
             } catch (e) {
-                alert('Terjadi kendala jaringan saat menganalisis berkas.');
+                this.showError('Terjadi kendala jaringan saat menganalisis berkas.');
             } finally {
                 if (!this.isAsync) {
                     this.isValidating = false;
@@ -324,6 +331,7 @@ function employeeImportWizard() {
             if (!this.importToken || this.isCommitting) return;
 
             this.isCommitting = true;
+            this.errorMessage = '';
 
             try {
                 const response = await fetch('{{ route('admin.employees.import.commit') }}', {
@@ -351,13 +359,13 @@ function employeeImportWizard() {
                         const now = new Date();
                         this.commitTimestamp = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' \u2022 ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
                         this.currentStep = 3;
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 } else {
-                    alert(data.message || 'Gagal menyimpan data pegawai.');
+                    this.showError(data.message || 'Gagal menyimpan data pegawai.');
                 }
             } catch (e) {
-                alert('Terjadi kesalahan saat memproses penyimpanan data pegawai.');
+                this.showError('Terjadi kesalahan saat memproses penyimpanan data pegawai.');
             } finally {
                 if (!this.isAsync) {
                     this.isCommitting = false;
@@ -380,13 +388,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, function() {
-                dropZone.classList.add('border-emerald-500', 'bg-emerald-50/60');
+                dropZone.classList.add('border-primary-500', 'bg-primary-50/60');
             }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, function() {
-                dropZone.classList.remove('border-emerald-500', 'bg-emerald-50/60');
+                dropZone.classList.remove('border-primary-500', 'bg-primary-50/60');
             }, false);
         });
 

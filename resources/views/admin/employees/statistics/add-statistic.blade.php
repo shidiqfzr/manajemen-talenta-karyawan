@@ -9,31 +9,31 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label for="periode" class="block text-sm font-medium text-gray-700">Periode</label>
+                    <label for="periode" class="block text-sm font-medium text-surface-700">Periode</label>
                     <input type="date" name="periode" id="periode" class="w-full border p-2 rounded" required>
                 </div>
 
                 <div>
-                    <label for="jumlah_karpim" class="block text-sm font-medium text-gray-700">Jumlah Karpim</label>
+                    <label for="jumlah_karpim" class="block text-sm font-medium text-surface-700">Jumlah Karpim</label>
                     <input type="number" name="jumlah_karpim" id="jumlah_karpim" class="w-full border p-2 rounded" required>
                 </div>
 
                 <div>
-                    <label for="jumlah_karpel" class="block text-sm font-medium text-gray-700">Jumlah Karpel</label>
+                    <label for="jumlah_karpel" class="block text-sm font-medium text-surface-700">Jumlah Karpel</label>
                     <input type="number" name="jumlah_karpel" id="jumlah_karpel" class="w-full border p-2 rounded" required>
                 </div>
 
                 <div>
-                    <label for="total_karyawan" class="block text-sm font-medium text-gray-700">Total Karyawan</label>
-                    <input type="number" name="total_karyawan" id="total_karyawan" class="w-full border p-2 rounded shadow-sm bg-gray-100 cursor-not-allowed" readonly>
+                    <label for="total_karyawan" class="block text-sm font-medium text-surface-700">Total Karyawan</label>
+                    <input type="number" name="total_karyawan" id="total_karyawan" class="w-full border p-2 rounded shadow-sm bg-surface-100 cursor-not-allowed" readonly>
                 </div>
             </div>
 
             <div class="flex justify-end space-x-3">
                 <a href="{{ route('admin.employees.statistics.index') }}"
-                class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Batal</a>
+                class="bg-surface-500 text-white px-4 py-2 rounded hover:bg-surface-600">Batal</a>
                 <button type="submit"
-                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Simpan</button>
+                class="bg-info text-white px-4 py-2 rounded hover:bg-info-700">Simpan</button>
             </div>
         </form>
     </div>

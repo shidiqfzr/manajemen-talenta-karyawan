@@ -4,21 +4,26 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\Position;
+use App\Services\Formasi\FormasiCatalog;
 use Carbon\Carbon;
 
 class ManPowerPlanningService
 {
+    public function __construct(private ?FormasiCatalog $catalog = null) {}
+
+    private function catalog(): FormasiCatalog
+    {
+        return $this->catalog ??= app(FormasiCatalog::class);
+    }
+
     /**
      * Standard Baseline Matrix data from Corporate MPP Document (PTPN Reference).
      */
     public function getBaselineData(): array
     {
         return [
-            'standar_formasi' => [
-                'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
-                'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
-                'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
-            ],
+            // Standar Formasi diturunkan dari kursi master formasi (Excel Karpim), bukan angka tetap.
+            'standar_formasi' => $this->catalog()->standarFormasi(),
             'realisasi_baseline' => [
                 'RM-1' => ['KEU' => 2, 'TAN' => 24, 'TEK' => 6, 'UMU' => 4],
                 'RM-2' => ['KEU' => 5, 'TAN' => 30, 'TEK' => 9, 'UMU' => 14],
@@ -64,6 +69,27 @@ class ManPowerPlanningService
                 'RM-2' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
                 'RM-3' => ['KEU' => 0, 'TAN' => 0, 'TEK' => 0, 'UMU' => 0],
             ],
+        ];
+    }
+
+    /**
+     * Klasifikasi RM Band & Bidang untuk pratinjau form, lengkap dengan penanda apakah nilainya
+     * berasal dari Master Formasi (penetapan) atau dari pendeteksian cadangan (perkiraan).
+     *
+     * @return array{bidang: string, rm_band: string, bidang_from_formasi: bool, rm_from_formasi: bool}
+     */
+    public function classifyPosition(Employee $emp): array
+    {
+        $formasiRm = filled($emp->jabatan) ? Position::getAllCached()->get((string) $emp->jabatan)?->rm_level : null;
+        $formasiBidang = filled($emp->jabatan) && filled($emp->unit_kerja)
+            ? $this->catalog()->seatBidang((string) $emp->unit_kerja, (string) $emp->jabatan)
+            : null;
+
+        return [
+            'bidang' => $formasiBidang ?? $this->determineBidang($emp),
+            'rm_band' => $formasiRm ?? $this->determineRmLevel($emp),
+            'bidang_from_formasi' => $formasiBidang !== null,
+            'rm_from_formasi' => $formasiRm !== null,
         ];
     }
 
@@ -155,6 +181,15 @@ class ManPowerPlanningService
      */
     public function determineBidang(Employee $emp): string
     {
+        // Kursi pada master formasi menentukan bidang; heuristik teks hanya cadangan
+        // untuk pegawai tanpa kursi (jabatan pool, Karpel, atau data lama).
+        if (filled($emp->jabatan) && filled($emp->unit_kerja)) {
+            $seatBidang = $this->catalog()->seatBidang((string) $emp->unit_kerja, (string) $emp->jabatan);
+            if ($seatBidang !== null) {
+                return $seatBidang;
+            }
+        }
+
         $text = strtolower($emp->jabatan.' '.$emp->unit_kerja);
 
         if (str_contains($text, 'keu') || str_contains($text, 'akuntan') || str_contains($text, 'anggaran') || str_contains($text, 'pajak') || str_contains($text, 'kas') || str_contains($text, 'perbendaharaan')) {
@@ -227,7 +262,7 @@ class ManPowerPlanningService
             if ($emp->tanggal_pensiun) {
                 $pYear = Carbon::parse($emp->tanggal_pensiun)->year;
             } elseif ($emp->tanggal_lahir) {
-                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(56)->year;
+                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN)->year;
             }
 
             if ($pYear !== null && $pYear < $filterYear) {

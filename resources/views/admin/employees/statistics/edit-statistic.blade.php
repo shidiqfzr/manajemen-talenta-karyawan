@@ -10,29 +10,29 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label for="periode" class="block text-sm font-medium text-gray-700">Periode</label>
+                <label for="periode" class="block text-sm font-medium text-surface-700">Periode</label>
                 <input type="date" name="periode" id="periode" value="{{ old('periode', $statistic->periode) }}" class="w-full border p-2 rounded" required>
             </div>
 
             <div>
-                <label for="jumlah_karpim" class="block text-sm font-medium text-gray-700">Jumlah Karpim</label>
+                <label for="jumlah_karpim" class="block text-sm font-medium text-surface-700">Jumlah Karpim</label>
                 <input type="number" name="jumlah_karpim" id="jumlah_karpim" value="{{ old('jumlah_karpim', $statistic->jumlah_karpim) }}" class="w-full border p-2 rounded" required>
             </div>
 
             <div>
-                <label for="jumlah_karpel" class="block text-sm font-medium text-gray-700">Jumlah Karpel</label>
+                <label for="jumlah_karpel" class="block text-sm font-medium text-surface-700">Jumlah Karpel</label>
                 <input type="number" name="jumlah_karpel" id="jumlah_karpel" value="{{ old('jumlah_karpel', $statistic->jumlah_karpel) }}" class="w-full border p-2 rounded" required>
             </div>
 
             <div>
-                <label for="total_karyawan" class="block text-sm font-medium text-gray-700">Total Karyawan</label>
-                <input type="number" name="total_karyawan" id="total_karyawan" value="{{ old('total_karyawan', $statistic->total_karyawan ?? ($statistic->jumlah_karpim + $statistic->jumlah_karpel)) }}" class="w-full border p-2 rounded shadow-sm bg-gray-100 cursor-not-allowed" readonly>
+                <label for="total_karyawan" class="block text-sm font-medium text-surface-700">Total Karyawan</label>
+                <input type="number" name="total_karyawan" id="total_karyawan" value="{{ old('total_karyawan', $statistic->total_karyawan ?? ($statistic->jumlah_karpim + $statistic->jumlah_karpel)) }}" class="w-full border p-2 rounded shadow-sm bg-surface-100 cursor-not-allowed" readonly>
             </div>
         </div>
 
         <div class="flex justify-end space-x-3">
-            <a href="{{ route('admin.employees.statistics.index') }}" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Batal</a>
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Update</button>
+            <a href="{{ route('admin.employees.statistics.index') }}" class="bg-surface-500 text-white px-4 py-2 rounded hover:bg-surface-600">Batal</a>
+            <button type="submit" class="bg-info text-white px-4 py-2 rounded hover:bg-info-700">Update</button>
         </div>
     </form>
 </div>

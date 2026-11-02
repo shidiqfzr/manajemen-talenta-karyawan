@@ -16,44 +16,44 @@
     </x-slot>
 
     @forelse ($histories as $history)
-        <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-4 py-3 whitespace-nowrap text-gray-900 font-medium">
+        <tr class="hover:bg-surface-50 transition-colors">
+            <td class="px-4 py-3 whitespace-nowrap text-surface-900 font-medium">
                 {{ $history->tmt_awal?->format('d M Y') ?? '-' }} &ndash;
-                <span class="{{ is_null($history->tmt_akhir) ? 'text-emerald-600 font-semibold' : 'text-gray-600' }}">
+                <span class="{{ is_null($history->tmt_akhir) ? 'text-primary-600 font-semibold' : 'text-surface-600' }}">
                     {{ $history->tmt_akhir?->format('d M Y') ?? 'Sekarang' }}
                 </span>
             </td>
-            <td class="px-4 py-3 text-gray-900 font-semibold">
+            <td class="px-4 py-3 text-surface-900 font-semibold">
                 {{ $history->jabatan }}
             </td>
-            <td class="px-4 py-3 text-gray-700">
+            <td class="px-4 py-3 text-surface-700">
                 {{ $history->unit_kerja }}
             </td>
-            <td class="px-4 py-3 text-gray-600">
+            <td class="px-4 py-3 text-surface-600">
                 {{ $history->level ?? '-' }} / {{ $history->golongan ?? '-' }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
                 @if ($history->jenis_mutasi)
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info-50 text-info-700 border border-info-200">
                         {{ $history->jenis_mutasi_label }}
                     </span>
                 @else
-                    <span class="text-gray-400">&mdash;</span>
+                    <span class="text-surface-500">&mdash;</span>
                 @endif
             </td>
-            <td class="px-4 py-3 text-gray-600">
+            <td class="px-4 py-3 text-surface-600">
                 @if ($history->nomor_sk || $history->tanggal_sk)
                     <div class="flex items-center gap-1.5">
                         <span>{{ $history->nomor_sk ?? '&mdash;' }}</span>
                         @if ($history->file_sk)
-                            <a href="{{ route('admin.mutasi.downloadSk', $history->id) }}" target="_blank" class="text-danger hover:text-red-700 transition" title="Unduh Berkas SK PDF (Aman)">
-                                <i class="fas fa-file-pdf text-xs"></i>
+                            <a href="{{ route('admin.mutasi.downloadSk', $history->id) }}" target="_blank" class="text-danger hover:text-danger-700 transition" title="Unduh Berkas SK PDF (Aman)">
+                                <i class="fas fa-file-pdf text-xs" aria-hidden="true"></i>
                             </a>
                         @endif
                     </div>
-                    <div class="text-[11px] text-gray-400">{{ $history->tanggal_sk?->format('d M Y') ?? '' }}</div>
+                    <div class="text-[11px] text-surface-500">{{ $history->tanggal_sk?->format('d M Y') ?? '' }}</div>
                 @else
-                    <span class="text-gray-400">&mdash;</span>
+                    <span class="text-surface-500">&mdash;</span>
                 @endif
             </td>
             <td class="px-4 py-3 text-center whitespace-nowrap">

@@ -27,7 +27,7 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
     public function headings(): array
     {
         return [
-            '43 UNIT KERJA RESMI',
+            'UNIT KERJA RESMI',
             'JABATAN FORMASI AKTIF',
             'STRATA PEGAWAI',
             'RM LEVEL',
@@ -43,11 +43,8 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
 
     public function array(): array
     {
-        // 1. Ambil 43 Unit Kerja resmi
+        // 1. Ambil Unit Kerja resmi
         $activeUnits = Unit::active()->orderBy('urutan')->orderBy('nama')->pluck('nama')->toArray();
-        if (empty($activeUnits)) {
-            $activeUnits = Employee::OFFICIAL_UNITS;
-        }
 
         // 2. Ambil Jabatan aktif
         $activePositions = Position::active()->orderBy('level')->orderBy('nama')->pluck('nama')->toArray();

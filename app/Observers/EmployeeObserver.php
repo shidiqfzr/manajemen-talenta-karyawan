@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Services\KepegawaianPolicy;
 use App\Services\ManPowerPlanningService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,7 @@ class EmployeeObserver
                 : (string) $employee->tanggal_lahir;
 
             if (empty($employee->tanggal_pensiun)) {
-                $employee->tanggal_pensiun = Employee::calculateTanggalPensiun($tglLahirStr);
+                $employee->tanggal_pensiun = KepegawaianPolicy::tanggalPensiun($tglLahirStr);
             }
 
             if (empty($employee->tanggal_mbt) && ! empty($employee->tanggal_pensiun)) {
@@ -41,7 +42,7 @@ class EmployeeObserver
                     ? $employee->tanggal_pensiun->toDateString()
                     : (string) $employee->tanggal_pensiun;
 
-                $employee->tanggal_mbt = Employee::calculateTanggalMbt($tglPensiunStr);
+                $employee->tanggal_mbt = KepegawaianPolicy::tanggalMbt($tglPensiunStr);
             }
         }
     }
@@ -139,6 +140,7 @@ class EmployeeObserver
                 'tmt_awal' => $newStart->toDateString(),
                 'tmt_akhir' => null,
                 'jenis_mutasi' => null,
+                'catatan' => $employee->historyNote,
             ]);
         });
     }

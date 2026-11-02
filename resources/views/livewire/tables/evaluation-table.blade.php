@@ -15,37 +15,37 @@
     </x-slot>
 
     @forelse ($evaluations as $evaluation)
-        <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-4 py-3 whitespace-nowrap text-gray-900 font-medium">
+        <tr class="hover:bg-surface-50 transition-colors">
+            <td class="px-4 py-3 whitespace-nowrap text-surface-900 font-medium">
                 {{ $evaluation->tanggal_pelaksanaan_asesmen ? \Carbon\Carbon::parse($evaluation->tanggal_pelaksanaan_asesmen)->format('d M Y') : '-' }}
                 @if ($evaluation->expired_asesmen)
-                    <div class="text-[11px] text-gray-400">s/d {{ \Carbon\Carbon::parse($evaluation->expired_asesmen)->format('d M Y') }}</div>
+                    <div class="text-[11px] text-surface-500">s/d {{ \Carbon\Carbon::parse($evaluation->expired_asesmen)->format('d M Y') }}</div>
                 @endif
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-primary-50 text-primary-700 border border-primary-200">
                     {{ is_null($evaluation->nilai_tertimbang) ? '-' : number_format($evaluation->nilai_tertimbang, 2) }}
                 </span>
             </td>
             <td class="px-4 py-3">
                 <div class="space-y-0.5">
-                    <div class="text-gray-700">
-                        SMKBK: <span class="font-medium text-gray-900">{{ number_format($evaluation->skor_smkbk_9box ?? 0, 1) }}</span> /
-                        CLI: <span class="font-medium text-gray-900">{{ number_format($evaluation->skor_cli_9box ?? 0, 1) }}</span>
+                    <div class="text-surface-700">
+                        SMKBK: <span class="font-medium text-surface-900">{{ number_format($evaluation->skor_smkbk_9box ?? 0, 1) }}</span> /
+                        CLI: <span class="font-medium text-surface-900">{{ number_format($evaluation->skor_cli_9box ?? 0, 1) }}</span>
                     </div>
                     @if ($evaluation->kategori_9box)
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-600 text-white">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-info text-white">
                             {{ $evaluation->kategori_9box }}
                         </span>
                     @endif
                 </div>
             </td>
-            <td class="px-4 py-3 text-gray-700">
+            <td class="px-4 py-3 text-surface-700">
                 {{ $evaluation->bidang_tugas ?? '-' }}
             </td>
-            <td class="px-4 py-3 text-gray-600">
+            <td class="px-4 py-3 text-surface-600">
                 <div>{{ $evaluation->lembaga_asesmen ?? '-' }}</div>
-                <div class="text-[11px] text-gray-400">{{ $evaluation->kategori_asesmen ?? '' }}</div>
+                <div class="text-[11px] text-surface-500">{{ $evaluation->kategori_asesmen ?? '' }}</div>
             </td>
             <td class="px-4 py-3 text-center whitespace-nowrap">
                 @include('admin.employees.partials.evaluation-actions', ['row' => $evaluation])

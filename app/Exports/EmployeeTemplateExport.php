@@ -11,7 +11,7 @@ class EmployeeTemplateExport implements WithMultipleSheets
     /**
      * Mengembalikan multi-sheet workbook:
      * 1. Sheet 'Data Karyawan' dengan in-cell dropdown data validations.
-     * 2. Sheet 'Referensi Master Data' memuat 43 Unit, Posisi, Golongan, dan kamus kategori.
+     * 2. Sheet 'Referensi Master Data' memuat Unit Kerja, Posisi, Golongan, dan kamus kategori.
      */
     public function sheets(): array
     {

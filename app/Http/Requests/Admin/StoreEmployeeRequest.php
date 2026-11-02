@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Position;
+use App\Services\KepegawaianPolicy;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,8 +42,8 @@ class StoreEmployeeRequest extends FormRequest
             'tmt_bekerja' => ['nullable', 'date'],
             'tanggal_diangkat_staf' => ['nullable', 'date'],
             'susunan_keluarga' => ['nullable', 'string', 'max:255'],
-            'job_grade' => ['nullable', 'integer', 'between:1,16'],
-            'person_grade' => ['nullable', 'integer', 'between:1,16'],
+            'job_grade' => ['nullable', 'integer', 'between:'.KepegawaianPolicy::GRADE_MIN.','.KepegawaianPolicy::GRADE_MAX],
+            'person_grade' => ['nullable', 'integer', 'between:'.KepegawaianPolicy::GRADE_MIN.','.KepegawaianPolicy::GRADE_MAX],
             'jalur_masuk' => ['nullable', 'string', Rule::in(['CKP', 'Talent Scouting', 'RBB', 'Reguler'])],
             'tanggal_mbt' => ['nullable', 'date'],
             'tanggal_pensiun' => ['nullable', 'date'],
@@ -50,6 +53,35 @@ class StoreEmployeeRequest extends FormRequest
             'foto' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'nomor_sk' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * RM Band melekat pada jabatan di Master Formasi: nilai yang dikirim hanya dikonfirmasi, tidak menentukan.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $masterRm = Position::getAllCached()->get($this->input('jabatan'))?->rm_level;
+
+            if ($masterRm !== null && $this->filled('rm_level') && $this->input('rm_level') !== $masterRm) {
+                $validator->errors()->add('rm_level', "RM Band tidak sesuai dengan formasi jabatan (seharusnya {$masterRm}).");
+            }
+        });
+    }
+
+    /**
+     * Pastikan RM Band yang tersimpan selalu mengikuti formasi jabatan.
+     */
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated();
+        $masterRm = Position::getAllCached()->get($validated['jabatan'])?->rm_level;
+
+        if ($masterRm !== null) {
+            $validated['rm_level'] = $masterRm;
+        }
+
+        return $key === null ? $validated : data_get($validated, $key, $default);
     }
 
     /**
@@ -68,8 +100,8 @@ class StoreEmployeeRequest extends FormRequest
             'rm_level.in' => 'RM Band harus bernilai RM-1, RM-2, RM-3, atau RM-4.',
             'unit_kerja.required' => 'Unit kerja penempatan wajib dipilih.',
             'status_karyawan.required' => 'Status kepegawaian wajib dipilih.',
-            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
-            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
+            'job_grade.between' => 'Job Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',
+            'person_grade.between' => 'Person Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',
         ];
     }
 }

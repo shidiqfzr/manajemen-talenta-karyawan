@@ -8,19 +8,14 @@ use Illuminate\Database\Seeder;
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Data awal minimum: akun admin/pengguna dan master unit + formasi jabatan (database/data/master_formasi.json).
+     * Data pegawai tidak di-seed; masuk lewat impor Excel agar nama unit/jabatan mengikuti Master Unit.
      */
     public function run(): void
     {
         $this->call([
             UserSeeder::class,
-            PositionUnitSeeder::class, // <-- Added this
-            EmployeeSeeder::class,
-            TrainingSeeder::class,
-            EmployeeTrainingSeeder::class,
-            EvaluationSeeder::class,
-            EmployeeStatisticSeeder::class,
-            RealisticMutationSeeder::class,
+            PositionUnitSeeder::class,
         ]);
     }
 }

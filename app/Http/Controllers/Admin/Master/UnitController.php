@@ -2,75 +2,23 @@
 
 namespace App\Http\Controllers\Admin\Master;
 
+use App\Exceptions\FormasiRuleViolationException;
+use App\Http\Controllers\Admin\Master\Concerns\RespondsToFormasiViolations;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\Unit;
+use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class UnitController extends Controller
 {
-    /**
-     * Display a listing of master units.
-     */
-    public function index(Request $request)
-    {
-        $query = Unit::query();
-
-        // Search filter
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('kode', 'like', "%{$search}%");
-            });
-        }
-
-        // Wilayah filter
-        if ($wilayah = $request->input('wilayah')) {
-            $query->where('wilayah', $wilayah);
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $query->where('is_active', $request->input('status') === '1');
-        }
-
-        // Metrics
-        $totalUnits = Unit::count();
-        $activeUnits = Unit::where('is_active', true)->count();
-        $inactiveUnits = Unit::where('is_active', false)->count();
-
-        // Distinct wilayah options
-        $wilayahList = Unit::WILAYAH_LIST;
-
-        $units = $query->orderBy('wilayah')
-            ->orderBy('urutan')
-            ->orderBy('nama')
-            ->paginate(15)
-            ->withQueryString();
-
-        return view('admin.master.units.index', compact(
-            'units',
-            'totalUnits',
-            'activeUnits',
-            'inactiveUnits',
-            'wilayahList'
-        ));
-    }
-
-    /**
-     * Show form to create new unit.
-     */
-    public function create()
-    {
-        $wilayahList = Unit::WILAYAH_LIST;
-
-        return view('admin.master.units.create', compact('wilayahList'));
-    }
+    use RespondsToFormasiViolations;
 
     /**
      * Store new unit.
      */
-    public function store(Request $request)
+    public function store(Request $request, MasterFormasiService $service)
     {
         $validated = $request->validate([
             'nama' => 'required|string|max:255|unique:units,nama',
@@ -82,10 +30,11 @@ class UnitController extends Controller
             'nama.unique' => 'Nama unit kerja ini sudah terdaftar dalam sistem.',
         ]);
 
-        $validated['is_active'] = $request->has('is_active') ? (bool) $request->input('is_active') : true;
-        $validated['urutan'] = $validated['urutan'] ?? (Unit::max('urutan') + 1);
-
-        $unit = Unit::create($validated);
+        try {
+            $unit = $service->createUnit(Arr::only($validated, ['nama', 'kode', 'wilayah', 'urutan']), $request->user());
+        } catch (FormasiRuleViolationException $e) {
+            return $this->formasiViolation($request, $e);
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -95,25 +44,14 @@ class UnitController extends Controller
             ], 201);
         }
 
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, $unit->id)
             ->with('success', "Unit Kerja '{$validated['nama']}' berhasil ditambahkan ke Master Data.");
-    }
-
-    /**
-     * Show form to edit existing unit.
-     */
-    public function edit(Unit $unit)
-    {
-        $wilayahList = Unit::WILAYAH_LIST;
-        $employeeCount = Employee::where('unit_kerja', $unit->nama)->count();
-
-        return view('admin.master.units.edit', compact('unit', 'wilayahList', 'employeeCount'));
     }
 
     /**
      * Update existing unit.
      */
-    public function update(Request $request, Unit $unit)
+    public function update(Request $request, Unit $unit, MasterFormasiService $service)
     {
         $validated = $request->validate([
             'nama' => 'required|string|max:255|unique:units,nama,'.$unit->id,
@@ -121,54 +59,59 @@ class UnitController extends Controller
             'wilayah' => 'required|string|max:255',
             'urutan' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
+            'reason' => 'nullable|string|max:1000',
         ], [
             'nama.unique' => 'Nama unit kerja ini sudah digunakan oleh unit lain.',
         ]);
 
-        $oldName = $unit->nama;
-        $validated['is_active'] = $request->has('is_active') ? (bool) $request->input('is_active') : false;
+        $active = $request->has('is_active') ? $request->boolean('is_active') : $unit->is_active;
 
-        $unit->update($validated);
-
-        // If name changed, optionally update linked employees to keep denormalized consistency
-        if ($oldName !== $validated['nama']) {
-            Employee::where('unit_kerja', $oldName)->update(['unit_kerja' => $validated['nama']]);
+        try {
+            DB::transaction(function () use ($service, $unit, $validated, $active, $request): void {
+                $service->updateUnit($unit, Arr::only($validated, ['nama', 'kode', 'wilayah', 'urutan']), $validated['reason'] ?? null, $request->user());
+                $service->setUnitActive($unit->refresh(), $active, $validated['reason'] ?? null, $request->user());
+            });
+        } catch (FormasiRuleViolationException $e) {
+            return $this->formasiViolation($request, $e);
         }
 
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, $unit->id)
             ->with('success', "Unit Kerja '{$unit->nama}' berhasil diperbarui.");
     }
 
     /**
      * Toggle active/inactive status.
      */
-    public function toggleStatus(Unit $unit)
+    public function toggleStatus(Request $request, Unit $unit, MasterFormasiService $service)
     {
-        $unit->is_active = ! $unit->is_active;
-        $unit->save();
+        $activate = ! $unit->is_active;
 
-        $statusText = $unit->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        try {
+            $service->setUnitActive($unit, $activate, $request->input('reason'), $request->user());
+        } catch (FormasiRuleViolationException $e) {
+            return $this->formasiViolation($request, $e);
+        }
+
+        $statusText = $activate ? 'diaktifkan' : 'dinonaktifkan';
 
         return redirect()->back()
             ->with('success', "Status Unit Kerja '{$unit->nama}' berhasil {$statusText}.");
     }
 
     /**
-     * Remove unit from database (Protected if referenced by employees).
+     * Remove unit from database (hanya bila tidak dipakai pegawai, formasi jabatan, atau riwayat jabatan).
      */
-    public function destroy(Unit $unit)
+    public function destroy(Request $request, Unit $unit, MasterFormasiService $service)
     {
-        $employeeCount = Employee::where('unit_kerja', $unit->nama)->count();
+        $nama = $unit->nama;
 
-        if ($employeeCount > 0) {
-            return redirect()->back()
-                ->with('error', "Unit Kerja '{$unit->nama}' tidak dapat dihapus karena masih tercatat pada {$employeeCount} pegawai. Silakan gunakan fitur Nonaktifkan.");
+        try {
+            $service->deleteUnit($unit, $request->input('reason'), $request->user());
+        } catch (FormasiRuleViolationException $e) {
+            return $this->formasiViolation($request, $e);
         }
 
-        $nama = $unit->nama;
-        $unit->delete();
-
-        return redirect()->route('admin.master.units.index')
+        return $this->toFormasi($request, 0)
             ->with('success', "Unit Kerja '{$nama}' berhasil dihapus dari Master Data.");
     }
 }

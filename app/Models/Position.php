@@ -81,6 +81,22 @@ class Position extends Model
         'RM-4' => 'RM-4 (Pelaksana / Operational Staff)',
     ];
 
+    /** RM Band yang dapat dipilih untuk jabatan Karpim baru (RM-4 khusus Karpel/pool). */
+    public const KARPIM_RM_LEVELS = ['RM-1', 'RM-2', 'RM-3'];
+
+    /**
+     * Token CSS chip RM Band (DESIGN.md §5.2). Satu-satunya sumber warna RM Band di seluruh tampilan.
+     */
+    public static function rmTheme(?string $rmLevel): string
+    {
+        return match ($rmLevel) {
+            'RM-1' => 'bg-orange-50 text-orange-800 border-orange-200',
+            'RM-2' => 'bg-sky-50 text-sky-800 border-sky-200',
+            'RM-3' => 'bg-purple-50 text-purple-800 border-purple-200',
+            default => 'bg-surface-100 text-surface-700 border-surface-200',
+        };
+    }
+
     /**
      * Scope to only active positions.
      */
@@ -103,7 +119,7 @@ class Position extends Model
     public function units(): BelongsToMany
     {
         return $this->belongsToMany(Unit::class, 'position_unit')
-            ->withPivot('kuota')
+            ->withPivot('kuota', 'bidang')
             ->withTimestamps();
     }
 

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\MutasiProcess;
 use App\Models\Employee;
+use App\Models\Evaluation;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
@@ -12,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MutasiProcessTest extends TestCase
@@ -109,6 +111,50 @@ class MutasiProcessTest extends TestCase
             ->set('form.tanggalSk', now()->toDateString())
             ->set('form.catatan', 'Catatan test')
             // Missing swapConfirmed
+            ->call('submitMutasi')
+            ->assertHasErrors(['swapConfirmed']);
+    }
+
+    public function test_temporary_assignment_into_occupied_position_fails_validation()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+
+        Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()->attach(Position::where('nama', 'Posisi B')->pluck('id')->toArray());
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'PENUGASAN')
+            ->set('form.statusJabatan', 'Plt')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi B')
+            ->set('form.swapConfirmed', true)
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/123')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Plt ke formasi terisi harus gagal')
+            ->call('submitMutasi')
+            ->assertHasErrors(['statusJabatan']);
+
+        $this->assertEquals('Posisi A', $empA->refresh()->jabatan);
+    }
+
+    public function test_tampered_analysis_state_cannot_bypass_swap_confirmation()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi B')
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/123')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Catatan test')
+            ->set('targetAnalysis', null) // client-side tampering
             ->call('submitMutasi')
             ->assertHasErrors(['swapConfirmed']);
     }
@@ -274,6 +320,7 @@ class MutasiProcessTest extends TestCase
         $emp = Employee::factory()->create([
             'jabatan' => 'Asisten Kebun A',
             'unit_kerja' => 'Kebun Sawit A',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
         ]);
         Position::factory()->create(['nama' => 'Manajer Kebun B', 'rm_level' => 'RM-1']);
         Unit::factory()->create(['nama' => 'Kebun Sawit B']);
@@ -303,6 +350,7 @@ class MutasiProcessTest extends TestCase
         $emp = Employee::factory()->create([
             'jabatan' => 'Asisten Kebun A',
             'unit_kerja' => 'Kebun Sawit A',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
         ]);
         Position::factory()->create(['nama' => 'Manajer Kebun B', 'rm_level' => 'RM-1']);
         Unit::factory()->create(['nama' => 'Kebun Sawit B']);
@@ -504,5 +552,556 @@ class MutasiProcessTest extends TestCase
             ->set('form.catatan', 'Mencoba memutasi pegawai pensiun')
             ->call('submitMutasi')
             ->assertHasErrors(['employeeNik']);
+    }
+
+    public function test_employee_first_flow_locks_target_card_until_employee_is_selected()
+    {
+        $emp = Employee::factory()->create([
+            'nama' => 'Budi Santoso',
+            'jabatan' => 'Asisten SDM',
+            'unit_kerja' => 'Bagian SDM',
+        ]);
+
+        Livewire::test(MutasiProcess::class)
+            // 1. Without employee selected: Card 2 shows locked banner
+            ->assertSee('Formulir Penugasan Terkunci')
+            ->assertSee('Pilih karyawan aktif terlebih dahulu pada panel kiri')
+            ->assertDontSeeHtml('name="unit_kerja"')
+            // 2. Once employee is selected: Card 2 unlocks and renders input controls
+            ->set('form.employeeNik', $emp->nik)
+            ->assertDontSee('Formulir Penugasan Terkunci')
+            ->assertSee('Penugasan & Posisi Tujuan')
+            ->assertSeeHtml('name="unit_kerja"');
+    }
+
+    public function test_reserved_position_blocks_submission_with_validation_error()
+    {
+        $empA = Employee::factory()->create([
+            'nama' => 'Ahmad R',
+            'jabatan' => 'Asisten A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'rm_level' => 'RM-3',
+        ]);
+
+        $empB = Employee::factory()->create([
+            'nama' => 'Bambang S',
+            'jabatan' => 'Asisten B',
+            'unit_kerja' => 'Kebun Sawit B',
+            'rm_level' => 'RM-3',
+        ]);
+
+        Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+        $unitA = Unit::where('nama', 'Kebun Sawit A')->first();
+        $unitB = Unit::where('nama', 'Kebun Sawit B')->first();
+        if ($unitB) {
+            $unitB->positions()->syncWithoutDetaching(Position::where('nama', 'Asisten Afdeling 1')->pluck('id'));
+        }
+
+        // empB has a future-dated scheduled mutation reserving 'Asisten Afdeling 1' at 'Kebun Sawit B'
+        JobHistory::create([
+            'employee_id' => $empB->id,
+            'employee_nik' => $empB->nik,
+            'jabatan' => 'Asisten Afdeling 1',
+            'unit_kerja' => 'Kebun Sawit B',
+            'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+            'sk_nomor' => 'SK/FUTURE/001',
+            'sk_tanggal' => now()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        // empA tries to target the reserved position
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Afdeling 1')
+            ->call('openSummaryModal')
+            ->assertHasErrors(['targetJabatan'])
+            ->assertSet('showSummaryModal', false);
+    }
+
+    private function blockedPromotion(array $candidate = [], bool $withGoodEvaluation = false)
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-3'] + $candidate);
+        if ($withGoodEvaluation) {
+            Evaluation::create([
+                'employee_nik' => $empA->nik,
+                'kategori_9box' => 'Box 9: Star',
+                'skor_smkbk_9box' => 95.5,
+                'skor_cli_9box' => 90.0,
+                'lembaga_asesmen' => 'Holding Assessment Center',
+                'tanggal_pelaksanaan_asesmen' => now()->subMonths(6)->toDateString(),
+                'expired_asesmen' => now()->addYears(2)->toDateString(),
+            ]);
+        }
+        Employee::factory()->create(['jabatan' => 'Kasubag B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag B', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag Kosong', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()
+            ->attach(Position::whereIn('nama', ['Kasubag B', 'Kasubag Kosong'])->pluck('id')->toArray());
+
+        return Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Kasubag B');
+    }
+
+    public function test_occupied_cross_rm_target_blocks_sk_section_and_primary_action()
+    {
+        $c = $this->blockedPromotion();
+
+        $this->assertStringContainsString('Mutasi Berantai', $c->instance()->blockingReason);
+        $c->assertSeeHtml('data-blocked="true"');
+        $this->assertMatchesRegularExpression('/<fieldset\s+disabled/', $c->html());
+        $this->assertDoesNotMatchRegularExpression('/<button[^>]*wire:click="openSummaryModal"/', $c->html());
+    }
+
+    public function test_occupied_block_shows_chain_link_instead_of_review_button()
+    {
+        $c = $this->blockedPromotion();
+
+        $this->assertTrue($c->instance()->resolvableByChain);
+        $c->assertSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSee('Pejabat petahana perlu dipindahkan lebih dulu.')
+            ->assertDontSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertSeeHtml('data-blocked="true"');
+
+        // card + action bar
+        $this->assertGreaterThanOrEqual(2, substr_count($c->html(), 'href="'.route('admin.mutasi.chain').'"'));
+    }
+
+    #[DataProvider('nonChainBlocks')]
+    public function test_non_chain_blocks_keep_disabled_review_button(string $case)
+    {
+        if ($case === 'retired') {
+            $emp = Employee::factory()->create([
+                'jabatan' => 'Asisten SDM', 'unit_kerja' => 'Bagian SDM',
+                'tanggal_pensiun' => now()->subMonth()->toDateString(),
+            ]);
+            $c = Livewire::test(MutasiProcess::class)->set('form.employeeNik', $emp->nik);
+        } elseif ($case === 'same') {
+            $emp = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+            $c = Livewire::test(MutasiProcess::class)
+                ->set('form.employeeNik', $emp->nik)
+                ->set('form.jenisMutasi', 'ROTASI')
+                ->set('form.targetUnitKerja', 'Bagian SDM')
+                ->set('form.targetJabatan', 'Posisi A');
+        } else {
+            $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+            Employee::factory()->create(['jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+            $successor = Employee::factory()->create(['jabatan' => 'Asisten C', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+            Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+            JobHistory::create([
+                'employee_id' => $successor->id,
+                'employee_nik' => $successor->nik,
+                'jabatan' => 'Asisten Afdeling 1',
+                'unit_kerja' => 'Kebun Sawit A',
+                'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+                'sk_nomor' => 'SK/FUTURE/003',
+                'sk_tanggal' => now()->toDateString(),
+                'is_applied' => false,
+            ]);
+            $c = Livewire::test(MutasiProcess::class)
+                ->set('form.employeeNik', $empA->nik)
+                ->set('form.jenisMutasi', 'ROTASI')
+                ->set('form.targetUnitKerja', 'Kebun Sawit A')
+                ->set('form.targetJabatan', 'Asisten Afdeling 1');
+        }
+
+        $this->assertFalse($c->instance()->resolvableByChain);
+        $c->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertDontSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSeeHtml('data-blocked="true"');
+        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
+    }
+
+    public static function nonChainBlocks(): array
+    {
+        return ['retired' => ['retired'], 'same position' => ['same'], 'reserved' => ['reserved']];
+    }
+
+    public function test_unblocked_target_keeps_enabled_review_button()
+    {
+        $c = $this->blockedPromotion()->set('form.targetJabatan', 'Kasubag Kosong');
+
+        $this->assertFalse($c->instance()->resolvableByChain);
+        $c->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertDontSee('Selesaikan melalui Mutasi Berantai')
+            ->assertSeeHtml('data-blocked="false"');
+    }
+
+    public function test_switching_to_blocked_target_clears_stale_validation_errors()
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-3']);
+        Employee::factory()->create(['jabatan' => 'Kasubag B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag B', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Kasubag Kosong', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()
+            ->attach(Position::whereIn('nama', ['Kasubag B', 'Kasubag Kosong'])->pluck('id')->toArray());
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Kasubag Kosong')
+            ->call('openSummaryModal') // SK fields blank → validation errors
+            ->assertHasErrors()
+            ->set('form.targetJabatan', 'Kasubag B') // occupied, other RM → blocked
+            ->assertHasNoErrors();
+    }
+
+    public function test_switching_to_vacant_target_clears_blocking_state()
+    {
+        $c = $this->blockedPromotion()->set('form.targetJabatan', 'Kasubag Kosong');
+
+        $this->assertNull($c->instance()->blockingReason);
+        $c->assertDontSeeHtml('data-blocked="true"');
+    }
+
+    public function test_equal_rm_swap_is_not_blocked()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()->attach(Position::where('nama', 'Posisi B')->pluck('id')->toArray());
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi B');
+
+        $this->assertNull($c->instance()->blockingReason);
+    }
+
+    public function test_same_position_target_is_blocked()
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi A');
+
+        $this->assertStringContainsString('formasi dan unit kerja yang sama', $c->instance()->blockingReason);
+    }
+
+    public function test_reserved_target_is_blocked()
+    {
+        $empA = Employee::factory()->create(['nama' => 'Ahmad R', 'jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+        $empB = Employee::factory()->create(['nama' => 'Bambang S', 'jabatan' => 'Asisten B', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+        Unit::where('nama', 'Kebun Sawit B')->first()?->positions()->syncWithoutDetaching(Position::where('nama', 'Asisten Afdeling 1')->pluck('id'));
+
+        JobHistory::create([
+            'employee_id' => $empB->id,
+            'employee_nik' => $empB->nik,
+            'jabatan' => 'Asisten Afdeling 1',
+            'unit_kerja' => 'Kebun Sawit B',
+            'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+            'sk_nomor' => 'SK/FUTURE/001',
+            'sk_tanggal' => now()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Afdeling 1');
+
+        $this->assertStringContainsString('dipesan', $c->instance()->blockingReason);
+    }
+
+    public function test_blocked_target_shows_single_blocking_status()
+    {
+        $this->blockedPromotion()
+            ->assertSee('Tidak Dapat Diproses Tunggal')
+            ->assertSee('Perlu Mutasi Berantai')
+            ->assertDontSee('Swap Ditolak')
+            ->assertDontSee('Konflik Okupansi')
+            ->assertDontSee('Memerlukan Perhatian / Dispensasi');
+    }
+
+    public function test_waivable_promotion_shows_dispensation_status_not_blocking()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertSee('Perlu Dispensasi')
+            ->assertDontSee('Memerlukan Perhatian / Dispensasi')
+            ->assertDontSee('Tidak Dapat Diproses Tunggal');
+    }
+
+    private function occupiedRm1Promotion(array $incumbent = [])
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Kasubag Madya', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2',
+            'golongan' => 'IIID',
+            'tanggal_dalam_jabatan' => now()->subMonths(19)->toDateString(),
+        ]);
+        Employee::factory()->create(['jabatan' => 'Kabag Penuh', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-1'] + $incumbent);
+        Position::factory()->create(['nama' => 'Kabag Penuh', 'rm_level' => 'RM-1']);
+        Position::factory()->create(['nama' => 'Kabag Kosong', 'rm_level' => 'RM-1']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()
+            ->attach(Position::whereIn('nama', ['Kabag Penuh', 'Kabag Kosong'])->pluck('id')->toArray());
+
+        return Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Kabag Penuh');
+    }
+
+    public function test_promotion_dispensation_uses_warning_palette()
+    {
+        $c = $this->blockedPromotion();
+
+        $c->assertSee('Perlu Dispensasi')->assertDontSee('indigo-');
+    }
+
+    public function test_incumbent_uses_profile_card_without_status_badges()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $c->assertSee('Profil Pejabat Petahana Saat Ini')
+            ->assertDontSee('incumbent-status-pill')
+            ->assertDontSee('Occupied');
+    }
+
+    public function test_candidate_and_incumbent_tenure_are_separate_values()
+    {
+        $c = $this->occupiedRm1Promotion(['tmt_unit_kerja' => now()->subYears(3)->toDateString()]);
+
+        $html = $c->html();
+        $this->assertMatchesRegularExpression('/Masa Dinas Jabatan Madya.*?1 th 7 bln/s', $html);
+        $this->assertMatchesRegularExpression('/Masa Dinas Unit:.*?3 th 0 bln/s', $html);
+        $this->assertDoesNotMatchRegularExpression('/Masa Dinas Unit:\s*<\/span>\s*<span[^>]*>\s*1 th 7 bln/s', $html);
+        $this->assertSame(1, substr_count($html, '3 th 0 bln'));
+    }
+
+    public function test_dispensation_is_locked_while_formasi_is_occupied()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $this->assertNotNull($c->instance()->blockingReason);
+        $c->assertSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
+            $c->html()
+        );
+    }
+
+    public function test_blocked_promotion_with_failed_criteria_lists_all_outstanding_issues()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        $issues = $c->instance()->outstandingIssues;
+        $this->assertCount(2, $issues);
+        $this->assertSame($c->instance()->blockingReason, $issues[0]);
+        $c->assertSee('2 hal perlu diselesaikan');
+    }
+
+    public function test_single_issue_does_not_show_summary()
+    {
+        $c = $this->blockedPromotion([
+            'golongan' => 'IIIC',
+            'tmt_unit_kerja' => now()->subYears(5)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYears(5)->toDateString(),
+        ], withGoodEvaluation: true);
+
+        $this->assertCount(1, $c->instance()->outstandingIssues);
+        $c->assertDontSee('hal perlu diselesaikan');
+    }
+
+    public function test_promotion_block_message_is_short()
+    {
+        $c = $this->blockedPromotion();
+
+        $this->assertSame(
+            'Formasi target saat ini diduduki oleh '.Employee::where('jabatan', 'Kasubag B')->value('nama').' (RM-2). Pejabat petahana perlu dipindahkan lebih dulu melalui Mutasi Berantai.',
+            $c->instance()->swapIncompatibilityMessage
+        );
+        $c->assertDontSee('Swap Bilateral');
+    }
+
+    public function test_dispensation_unlocks_when_target_becomes_valid()
+    {
+        $this->occupiedRm1Promotion()
+            ->set('form.targetJabatan', 'Kabag Kosong')
+            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
+    }
+
+    public function test_dispensation_stays_interactive_for_waivable_promotion()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertSee('Perlu Dispensasi')
+            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
+        $this->assertDoesNotMatchRegularExpression(
+            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
+            $c->html()
+        );
+    }
+
+    public function test_same_unit_promotion_does_not_claim_unit_tenure_compliance()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertDontSee('Masa Dinas Unit Memenuhi Syarat')
+            ->assertSee('Masa Dinas: 1 th 0 bln')
+            ->assertDontSee('1.0 thn');
+    }
+
+    public function test_mutasi_form_has_no_decorative_tags_or_developer_copy()
+    {
+        $this->blockedPromotion()
+            ->assertDontSee('Asal Posisi')
+            ->assertDontSee('Tujuan Penempatan')
+            ->assertDontSee('SK Penugasan Individual')
+            ->assertDontSee('Klausul SK Direksi')
+            ->assertSee('Lihat 9-Box')
+            ->assertDontSee('9-Box Lengkap')
+            // unblocked state shows the action-bar subline, which must not use developer wording either
+            ->set('form.targetJabatan', 'Kasubag Kosong')
+            ->assertDontSee('atomik')
+            ->assertSee('disimpan sekaligus');
+    }
+
+    public function test_retired_employee_is_blocked()
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten SDM',
+            'unit_kerja' => 'Bagian SDM',
+            'tanggal_pensiun' => now()->subMonth()->toDateString(),
+        ]);
+
+        $c = Livewire::test(MutasiProcess::class)->set('form.employeeNik', $emp->nik);
+
+        $this->assertStringContainsString('batas usia pensiun', $c->instance()->blockingReason);
+    }
+
+    public function test_occupied_and_reserved_target_is_treated_as_reserved()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+        Employee::factory()->create(['jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+        $successor = Employee::factory()->create(['jabatan' => 'Asisten C', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+
+        // the occupied formasi is already promised to someone else by a scheduled mutation
+        JobHistory::create([
+            'employee_id' => $successor->id,
+            'employee_nik' => $successor->nik,
+            'jabatan' => 'Asisten Afdeling 1',
+            'unit_kerja' => 'Kebun Sawit A',
+            'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+            'sk_nomor' => 'SK/FUTURE/002',
+            'sk_tanggal' => now()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Asisten Afdeling 1');
+
+        $this->assertSame('reserved', $c->instance()->targetAnalysis['type']);
+        $this->assertStringContainsString('dipesan', $c->instance()->blockingReason);
+        $c->assertSee('Telah Dipesan')
+            ->assertDontSee('Target Terisi: Tukar Jabatan 2-Arah');
+    }
+
+    public function test_non_occupancy_blocks_do_not_claim_chain_mutation_label()
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi A')
+            ->assertSee('Tidak Dapat Diproses')
+            ->assertDontSee('Tidak Dapat Diproses Tunggal');
+    }
+
+    public function test_occupied_block_card_is_announced()
+    {
+        $this->blockedPromotion()
+            ->assertSee('role="alert"', false)
+            ->assertSeeHtmlInOrder(['role="alert"', 'Formasi Masih Terisi Pejabat Definitif']);
+    }
+
+    public function test_disabled_review_button_references_its_reason()
+    {
+        $empA = Employee::factory()->create(['nama' => 'Ahmad R', 'jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Sawit A', 'rm_level' => 'RM-3']);
+        $empB = Employee::factory()->create(['nama' => 'Bambang S', 'jabatan' => 'Asisten B', 'unit_kerja' => 'Kebun Sawit B', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
+        Unit::where('nama', 'Kebun Sawit B')->first()?->positions()->syncWithoutDetaching(Position::where('nama', 'Asisten Afdeling 1')->pluck('id'));
+
+        JobHistory::create([
+            'employee_id' => $empB->id,
+            'employee_nik' => $empB->nik,
+            'jabatan' => 'Asisten Afdeling 1',
+            'unit_kerja' => 'Kebun Sawit B',
+            'tmt_awal' => now()->addMonth()->startOfMonth()->toDateString(),
+            'sk_nomor' => 'SK/FUTURE/001',
+            'sk_tanggal' => now()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Afdeling 1')
+            ->assertSee('aria-describedby="blocking-reason"', false)
+            ->assertSee('id="blocking-reason"', false)
+            ->assertSeeHtml('min-h-11 px-5');
+    }
+
+    public function test_action_controls_meet_touch_target()
+    {
+        $html = $this->blockedPromotion()->html();
+
+        // Kartu formasi terisi (CTA), tautan bar, dan Batal: masing-masing min-h-11 (44px).
+        $this->assertGreaterThanOrEqual(3, substr_count($html, 'min-h-11'));
     }
 }

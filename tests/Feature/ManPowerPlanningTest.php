@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Livewire\Admin\ManPowerPlanning;
 use App\Models\Employee;
 use App\Models\Position;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
+use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -86,6 +89,9 @@ class ManPowerPlanningTest extends TestCase
 
     public function test_mpp_service_returns_accurate_matrix_dimensions(): void
     {
+        // Standar Formasi kini berasal dari kursi master formasi, sehingga master harus dimuat.
+        $this->seed(PositionUnitSeeder::class);
+
         $service = new ManPowerPlanningService;
         $baseline = $service->getMppMatrix('baseline', 2026);
 
@@ -134,6 +140,64 @@ class ManPowerPlanningTest extends TestCase
         $this->assertEquals(1, array_sum($liveStats['realisasi']['RM-1']));
         $this->assertEquals(1, array_sum($liveStats['advisor']['RM-1']));
         $this->assertEquals(0, array_sum($liveStats['diperban']['RM-1']));
+    }
+
+    public function test_baseline_standar_formasi_is_derived_from_seats(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        // Menambah kuota satu kursi Manajer (RM-1/TAN) harus langsung tampak pada matriks.
+        DB::table('position_unit')
+            ->where('unit_id', Unit::where('nama', 'Kebun Tajati')->value('id'))
+            ->where('position_id', Position::where('nama', 'Manajer')->value('id'))
+            ->increment('kuota', 3);
+
+        $this->assertSame([
+            'RM-1' => ['KEU' => 2, 'TAN' => 30, 'TEK' => 11, 'UMU' => 5],
+            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
+            'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
+        ], (new ManPowerPlanningService)->getBaselineData()['standar_formasi']);
+    }
+
+    public function test_determine_bidang_prefers_the_seat(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $employee = new Employee([
+            'jabatan' => 'Asisten Penggajian',
+            'unit_kerja' => 'Bagian Sumber Daya Manusia & Sistem Manajemen',
+        ]);
+
+        $this->assertSame('KEU', (new ManPowerPlanningService)->determineBidang($employee));
+    }
+
+    public function test_determine_bidang_falls_back_to_heuristic_without_a_seat(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $service = new ManPowerPlanningService;
+
+        $pool = new Employee(['jabatan' => 'Advisor RM-1', 'unit_kerja' => 'Kebun Tajati']);
+        $karpel = new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan']);
+
+        $this->assertSame('TAN', $service->determineBidang($pool));
+        $this->assertSame('TEK', $service->determineBidang($karpel));
+    }
+
+    public function test_classify_position_flags_values_from_master_formasi_versus_estimates(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $service = new ManPowerPlanningService;
+
+        $seat = $service->classifyPosition(new Employee(['jabatan' => 'Manajer', 'unit_kerja' => 'Kebun Tajati']));
+        $this->assertSame('TAN', $seat['bidang']);
+        $this->assertSame(Position::where('nama', 'Manajer')->value('rm_level'), $seat['rm_band']);
+        $this->assertTrue($seat['bidang_from_formasi']);
+        $this->assertTrue($seat['rm_from_formasi']);
+
+        $estimate = $service->classifyPosition(new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan', 'level' => 'Karpel']));
+        $this->assertSame('TEK', $estimate['bidang']);
+        $this->assertFalse($estimate['bidang_from_formasi']);
+        $this->assertFalse($estimate['rm_from_formasi']);
     }
 
     public function test_mpp_component_can_change_planning_year(): void

@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+/test-results
+/playwright-report
+/tests/e2e/.tmp

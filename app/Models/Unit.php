@@ -43,6 +43,16 @@ class Unit extends Model
     }
 
     /**
+     * Nama seluruh unit kerja aktif pada master formasi (sumber: database).
+     *
+     * @return list<string>
+     */
+    public static function officialNames(): array
+    {
+        return static::active()->orderBy('urutan')->orderBy('nama')->pluck('nama')->all();
+    }
+
+    /**
      * Relasi ke Employee via string nama unit kerja (non-breaking legacy compatibility).
      */
     public function employees(): HasMany
@@ -56,7 +66,7 @@ class Unit extends Model
     public function positions(): BelongsToMany
     {
         return $this->belongsToMany(Position::class, 'position_unit')
-            ->withPivot('kuota')
+            ->withPivot('kuota', 'bidang')
             ->withTimestamps();
     }
 
