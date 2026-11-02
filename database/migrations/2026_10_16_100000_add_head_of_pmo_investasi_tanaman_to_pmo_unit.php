@@ -12,6 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Dinonaktifkan: unit dan jabatan formasi kini bersumber dari Excel formasi
+        // (database/data/master_formasi.json). Migrasi data ini sebelumnya membuat ulang
+        // unit PMO lama pada setiap instalasi baru. Database yang sudah menjalankannya tidak terpengaruh.
+        return;
+
         // 1. Pastikan posisi formasi terdaftar dengan RM-1 (Eselon Karpim Pimpinan)
         $position = Position::firstOrCreate(
             ['nama' => 'Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng'],

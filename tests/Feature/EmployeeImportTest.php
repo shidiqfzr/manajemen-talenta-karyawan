@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesExport;
+use App\Exports\FailedEmployeesWorkbook;
 use App\Exports\ImportSummaryExport;
 use App\Exports\Sheets\EmployeeTemplateDataSheet;
 use App\Exports\Sheets\EmployeeTemplateReferenceSheet;
 use App\Models\Employee;
+use App\Models\EmployeeImportLog;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
@@ -554,7 +556,7 @@ class EmployeeImportTest extends TestCase
 
         $refSheet = $sheets[1];
         $this->assertEquals('Referensi Master Data', $refSheet->title());
-        $this->assertContains('43 UNIT KERJA RESMI', $refSheet->headings());
+        $this->assertContains('UNIT KERJA RESMI', $refSheet->headings());
         $this->assertContains('JABATAN FORMASI AKTIF', $refSheet->headings());
         $refData = $refSheet->array();
         $this->assertNotEmpty($refData);
@@ -700,6 +702,131 @@ class EmployeeImportTest extends TestCase
                         && isset($context['timestamp']);
                 })
             );
+    }
+
+    public function test_import_persists_audit_log_without_personal_data(): void
+    {
+        $valid = $this->karpimImportRow('88005001', 'Asisten Afdeling', 'Kebun Inti Gunung Meliau');
+        $invalid = $this->karpimImportRow('88005002', 'Jabatan Tidak Ada', 'Kebun Inti Gunung Meliau');
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$valid, $invalid])]);
+
+        $log = EmployeeImportLog::sole();
+        $this->assertSame(1, $log->created_count);
+        $this->assertSame(1, $log->skipped_count);
+        $this->assertArrayNotHasKey('sample_rows', $log->metadata['summary']);
+        $this->assertSame(['row', 'errors'], array_keys($log->metadata['summary']['errors'][0]));
+        $this->assertStringNotContainsString('PEGAWAI UJI FORMASI', json_encode($log->metadata));
+    }
+
+    public function test_import_session_is_only_accessible_by_the_admin_who_uploaded_it(): void
+    {
+        $token = $this->actingAs($this->admin)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88006001', 'Asisten Afdeling', 'Kebun Inti Gunung Meliau')])])
+            ->json('token');
+
+        $other = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($other)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertForbidden();
+        $this->actingAs($other)->getJson(route('admin.employees.import.status', $token))->assertForbidden();
+        $this->actingAs($other)->post(route('admin.employees.import.downloadFailed'), ['token' => $token])->assertForbidden();
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+    }
+
+    public function test_import_upload_endpoints_are_rate_limited(): void
+    {
+        $this->actingAs($this->admin);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->post(route('admin.employees.import'), []);
+        }
+
+        $this->post(route('admin.employees.import'), [])->assertStatus(429);
+    }
+
+    public function test_import_update_of_core_fields_is_attributed_to_the_acting_admin_in_job_history(): void
+    {
+        $first = $this->karpimImportRow('88007001', 'Asisten Afdeling', 'Kebun Inti Gunung Meliau');
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$first])]);
+
+        $second = $first;
+        $second[11] = 'IVA/00';
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$second])]);
+
+        $this->assertDatabaseHas('job_histories', [
+            'employee_nik' => '88007001',
+            'golongan' => 'IVA/00',
+            'catatan' => 'Perubahan data melalui impor Excel oleh '.$this->admin->name,
+        ]);
+    }
+
+    public function test_import_keeps_row_numbers_and_duplicate_detection_across_chunks(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Besar', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 50]);
+        $position = Position::firstOrCreate(['nama' => 'Manajer Besar', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        $unit->positions()->attach($position->id, ['kuota' => 2000, 'bidang' => 'TAN']);
+
+        $rows = [];
+        for ($i = 1; $i <= 600; $i++) {
+            $rows[] = $this->karpimImportRow(sprintf('77%06d', $i), 'Manajer Besar', 'Kebun Besar');
+        }
+        $rows[] = $this->karpimImportRow('77000001', 'Manajer Besar', 'Kebun Besar'); // duplikat NIK di chunk berikutnya
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile($rows)]);
+
+        $summary = session('import_summary');
+        $this->assertSame(600, $summary['created']);
+        $this->assertSame(1, $summary['skipped']);
+        $this->assertSame(602, $summary['errors'][0]['row']);
+        $this->assertStringContainsString('duplikat dari baris 2', $summary['errors'][0]['errors'][0]);
+    }
+
+    public function test_preview_diff_does_not_reveal_family_data_values(): void
+    {
+        $first = $this->karpimImportRow('88008001', 'Asisten Afdeling', 'Kebun Inti Gunung Meliau');
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$first])]);
+
+        $second = $first;
+        $second[6] = 'K/3';
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$second])]);
+
+        $diff = collect($response->json('summary.sample_rows.0.diff'))->firstWhere('field', 'susunan_keluarga');
+        $this->assertNotNull($diff, 'Perubahan data keluarga tetap harus ditandai.');
+        $this->assertStringNotContainsString('K/', $diff['old'].$diff['new']);
+    }
+
+    public function test_failed_rows_are_cached_encrypted_and_downloads_are_audited(): void
+    {
+        Log::spy();
+        $invalid = $this->karpimImportRow('88009001', 'Jabatan Tidak Ada', 'Kebun Inti Gunung Meliau');
+
+        $token = $this->actingAs($this->admin)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$invalid])])
+            ->json('token');
+
+        $cached = Cache::get("import_failed_rows_{$token}");
+        $this->assertIsString($cached);
+        $this->assertStringNotContainsString('88009001', $cached);
+        $this->assertStringNotContainsString('PEGAWAI UJI FORMASI', $cached);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.downloadFailed'), ['token' => $token])->assertOk();
+
+        Log::shouldHaveReceived('info')->with('HRIS Unduh Berkas Impor Pegawai', \Mockery::on(
+            fn (array $context) => $context['kind'] === 'baris_gagal'
+                && $context['user_id'] === $this->admin->id
+                && $context['record_count'] === 1
+                && ! str_contains(json_encode($context), '88009001')
+        ));
+    }
+
+    public function test_import_summary_report_neutralises_formula_injection(): void
+    {
+        $export = new ImportSummaryExport(['rows' => [['action' => 'CREATE', 'nik' => '88009002', 'nama' => '=HYPERLINK("http://x")', 'jabatan' => '+cmd']]]);
+
+        $cells = collect($export->sheets())->flatMap(fn ($sheet) => $sheet->array())->flatten()->all();
+
+        $this->assertContains("'=HYPERLINK(\"http://x\")", $cells);
+        $this->assertContains("'+cmd", $cells);
     }
 
     public function test_export_output_file_can_be_roundtrip_imported_cleanly(): void
@@ -910,7 +1037,8 @@ class EmployeeImportTest extends TestCase
                 'token' => $token,
             ]);
 
-            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesExport $export) {
+            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesWorkbook $workbook) {
+                $export = $workbook->sheets()[0];
                 $array = $export->array();
                 $headings = $export->headings();
 
@@ -938,8 +1066,8 @@ class EmployeeImportTest extends TestCase
             ]);
 
             $downloadPostCommit->assertOk();
-            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesExport $export) {
-                return count($export->array()) === 1;
+            Excel::assertDownloaded('baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx', function (FailedEmployeesWorkbook $workbook) {
+                return count($workbook->sheets()[0]->array()) === 1;
             });
         } finally {
             Carbon::setTestNow();
@@ -980,7 +1108,7 @@ class EmployeeImportTest extends TestCase
         $sheet2 = $spreadsheet->createSheet();
         $sheet2->setTitle('Referensi Master Data');
         $sheet2->fromArray([
-            ['43 UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA PEGAWAI'],
+            ['UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA PEGAWAI'],
             ['Kebun Inti Gunung Meliau', 'Asisten Afdeling', 'Karpim'],
             ['Kebun Gunung Emas', 'Mandor Panen', 'Karpel'],
             ['PKS Longpinang', 'Asisten Pengolahan', 'Karpim'],
@@ -1144,11 +1272,176 @@ class EmployeeImportTest extends TestCase
         $this->assertStringContainsString('Plt. Manajer PKS', $concurrentJob->catatan);
     }
 
+    /**
+     * Baris import Karpim lengkap (25 kolom) untuk skenario validasi unit kerja.
+     */
+    private function karpimImportRow(string $nik, string $jabatan, string $unit): array
+    {
+        return [
+            $nik, 'PEGAWAI UJI FORMASI', 'L', 'Pontianak', '1985-03-10',
+            'Islam', 'K/1', 'Tetap (PKWTT)', $jabatan, 'Karpim', $unit,
+            'IIID/05', 'RM-1', 'Definitif',
+            '2008-03-01', '2010-01-01', '2022-01-01', '2022-01-01',
+            'Reguler', 13, 13, 'S1', 'Universitas',
+            '', '',
+        ];
+    }
+
+    public function test_import_accepts_a_unit_that_is_new_in_the_excel(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Kumai', 'kode' => 'Kebun', 'wilayah' => 'Kalimantan Selatan & Tengah', 'is_active' => true, 'urutan' => 30]);
+        $manajer = Position::firstOrCreate(['nama' => 'Manajer', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        $unit->positions()->attach($manajer->id, ['kuota' => 1, 'bidang' => 'TAN']);
+
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88001001', 'Manajer', 'KEBUN KUMAI')]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? [], 'Baris import seharusnya valid.');
+        $this->assertDatabaseHas('employees', ['nik' => '88001001', 'unit_kerja' => 'Kebun Kumai', 'jabatan' => 'Manajer']);
+    }
+
+    private function formasiUnit(string $nama, string $jabatan, string $rm, int $kuota): Unit
+    {
+        $unit = Unit::create(['nama' => $nama, 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 40]);
+        $position = Position::firstOrCreate(['nama' => $jabatan, 'level' => 'Karpim'], ['rm_level' => $rm, 'is_active' => true]);
+        $unit->positions()->attach($position->id, ['kuota' => $kuota, 'bidang' => 'TAN']);
+
+        return $unit;
+    }
+
+    public function test_import_rejects_a_level_for_which_the_unit_has_no_formasi(): void
+    {
+        $this->formasiUnit('Kebun Sandai', 'Manajer Sandai', 'RM-1', 1);
+        $row = $this->karpimImportRow('88002001', 'Mandor Apa Saja', 'Kebun Sandai');
+        $row[9] = 'Karpel';
+        $row[19] = 5;
+        $row[20] = 5;
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$row])]);
+
+        $this->assertStringContainsString('belum memiliki formasi jabatan', session('import_summary')['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88002001']);
+    }
+
+    public function test_import_rejects_rows_beyond_the_formasi_quota(): void
+    {
+        $this->formasiUnit('Kebun Kuota', 'Manajer Kuota', 'RM-1', 1);
+
+        $file = $this->createExcelUploadFile([
+            $this->karpimImportRow('88003001', 'Manajer Kuota', 'Kebun Kuota'),
+            $this->karpimImportRow('88003002', 'Manajer Kuota', 'Kebun Kuota'),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertStringContainsString('Kuota formasi jabatan', session('import_summary')['errors'][0]['errors'][0]);
+        $this->assertDatabaseHas('employees', ['nik' => '88003001']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88003002']);
+    }
+
+    public function test_import_rejects_rm_level_that_differs_from_the_formasi_and_derives_it_when_blank(): void
+    {
+        $this->formasiUnit('Kebun Band', 'Manajer Band', 'RM-2', 2);
+        $mismatch = $this->karpimImportRow('88004001', 'Manajer Band', 'Kebun Band');
+        $blank = $this->karpimImportRow('88004002', 'Manajer Band', 'Kebun Band');
+        $blank[12] = '';
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$mismatch, $blank])]);
+
+        $this->assertStringContainsString('tidak sesuai dengan formasi jabatan', session('import_summary')['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88004001']);
+        $this->assertDatabaseHas('employees', ['nik' => '88004002', 'rm_level' => 'RM-2']);
+    }
+
+    public function test_import_rejects_rm_level_that_differs_from_the_formasi_for_an_existing_employee(): void
+    {
+        $this->formasiUnit('Kebun Band Lama', 'Manajer Band Lama', 'RM-2', 2);
+        Employee::factory()->create([
+            'nik' => '88005001',
+            'jabatan' => 'Manajer Band Lama',
+            'unit_kerja' => 'Kebun Band Lama',
+            'level' => 'Karpim',
+            'rm_level' => 'RM-2',
+        ]);
+        $mismatch = $this->karpimImportRow('88005001', 'Manajer Band Lama', 'Kebun Band Lama');
+        $mismatch[12] = 'RM-1';
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$mismatch])]);
+
+        $this->assertStringContainsString('tidak sesuai dengan formasi jabatan', session('import_summary')['errors'][0]['errors'][0]);
+        $this->assertDatabaseHas('employees', ['nik' => '88005001', 'rm_level' => 'RM-2']);
+    }
+
+    public function test_import_matches_unit_names_ignoring_ampersand_versus_dan(): void
+    {
+        $unit = Unit::create(['nama' => 'Bagian Akuntansi & Keuangan', 'kode' => 'Bagian', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true, 'urutan' => 5]);
+        $kepala = Position::firstOrCreate(['nama' => 'Kepala Bagian', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        $unit->positions()->attach($kepala->id, ['kuota' => 1, 'bidang' => 'KEU']);
+
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88001005', 'Kepala Bagian', 'Bagian Akuntansi dan Keuangan')]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? [], 'Baris import seharusnya valid.');
+        $this->assertDatabaseHas('employees', ['nik' => '88001005', 'unit_kerja' => 'Bagian Akuntansi & Keuangan']);
+    }
+
+    public function test_import_rejects_a_deactivated_unit_including_via_alias(): void
+    {
+        $kepala = Position::firstOrCreate(['nama' => 'Kepala Bagian', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        foreach (['Kebun Nonaktif', 'PMO Batu Bara & Bisnis Lainnya'] as $i => $name) {
+            $unit = Unit::create(['nama' => $name, 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => false, 'urutan' => 90 + $i]);
+            $unit->positions()->attach($kepala->id, ['kuota' => 1, 'bidang' => 'UMU']);
+        }
+
+        $file = $this->createExcelUploadFile([
+            $this->karpimImportRow('88001006', 'Kepala Bagian', 'Kebun Nonaktif'),
+            $this->karpimImportRow('88001007', 'Kepala Bagian', 'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA'),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $summary = session('import_summary');
+        $this->assertEquals(2, $summary['skipped']);
+        $this->assertStringContainsString('tidak terdaftar di Master Unit', $summary['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001006']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001007']);
+    }
+
+    public function test_import_rejects_unit_names_that_were_retired(): void
+    {
+        $file = $this->createExcelUploadFile([
+            $this->karpimImportRow('88001002', 'Asisten Auditor VA', 'Satuan Pengawasan Internal (SPI)'),
+            $this->karpimImportRow('88001003', 'Group Manager', 'Unit Group Kalimantan Barat'),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $summary = session('import_summary');
+        $this->assertEquals(2, $summary['skipped']);
+        $this->assertStringContainsString('tidak terdaftar di Master Unit', $summary['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001002']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001003']);
+    }
+
+    public function test_retired_unit_alias_does_not_resolve(): void
+    {
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88001004', 'Head of PMO', 'PMO')]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $summary = session('import_summary');
+        $this->assertEquals(1, $summary['skipped']);
+        $this->assertStringContainsString('tidak terdaftar di Master Unit', $summary['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('employees', ['nik' => '88001004']);
+    }
+
     public function test_import_with_pmo_unit_alias_and_head_of_pmo_investasi_tanaman(): void
     {
         $pmoUnit = Unit::firstOrCreate(
-            ['nama' => 'Project Management Office (PMO)'],
-            ['kode' => 'Project', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true]
+            ['nama' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng'],
+            ['kode' => 'PMO', 'wilayah' => 'Regional Office (Pontianak)', 'is_active' => true]
         );
 
         $pos = Position::firstOrCreate(
@@ -1193,7 +1486,7 @@ class EmployeeImportTest extends TestCase
         $commitResponse->assertOk()->assertJsonPath('success', true);
 
         $employee = Employee::where('nik', '13001428')->firstOrFail();
-        $this->assertEquals('Project Management Office (PMO)', $employee->unit_kerja);
+        $this->assertEquals('PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng', $employee->unit_kerja);
         $this->assertEquals('Head of PMO Investasi Tanamanan Wilayah Kaltim & Kalsel-Teng', $employee->jabatan);
         $this->assertEquals('Karpim', $employee->level);
         $this->assertEquals('RM-1', $employee->rm_level);

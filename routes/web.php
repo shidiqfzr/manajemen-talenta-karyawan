@@ -58,12 +58,13 @@ Route::prefix('admin')
             Route::get('/create', [AdminEmployeeController::class, 'create'])->name('create');
             Route::post('/', [AdminEmployeeController::class, 'store'])->name('store');
             Route::get('/import', [AdminEmployeeController::class, 'importPage'])->name('import.page');
-            Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import');
-            Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview');
-            Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit');
+            Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import')->middleware('throttle:10,1');
+            Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview')->middleware('throttle:10,1');
+            Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit')->middleware('throttle:10,1');
             Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
             Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
             Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
+            Route::get('/check-nik', [AdminEmployeeController::class, 'checkNik'])->name('checkNik')->middleware('throttle:60,1');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
             Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
@@ -133,6 +134,7 @@ Route::prefix('admin')
         Route::prefix('mutasi')->name('mutasi.')->group(function () {
             Route::get('/', [MutasiController::class, 'index'])->name('index');
             Route::get('/create', [MutasiController::class, 'create'])->name('create');
+            Route::get('/chain', [MutasiController::class, 'chain'])->name('chain');
             Route::get('/history', [MutasiController::class, 'history'])->name('history');
             Route::get('/job-history/{jobHistory}/download-sk', [MutasiController::class, 'downloadSk'])->name('downloadSk');
         });
@@ -141,11 +143,26 @@ Route::prefix('admin')
         Route::prefix('master')->name('master.')->group(function () {
             // Units
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
-            Route::resource('units', UnitController::class)->except(['show']);
+            Route::resource('units', UnitController::class)->only(['store', 'update', 'destroy']);
+
+            // Riwayat perubahan master (read-only)
+            Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');
+
+            // Formasi (formasi jabatan per unit)
+            // Daftar unit; tautan lama ?unit= diteruskan ke halaman detail unit.
+            Route::get('formasi', function (Request $request) {
+                $unitId = $request->integer('unit');
+
+                return $unitId && Unit::whereKey($unitId)->exists()
+                    ? redirect()->route('admin.master.formasi.show', $unitId)
+                    : view('admin.master.formasi.index');
+            })->name('formasi.index');
+            // Detail formasi jabatan satu unit (URL sendiri: dapat dibagikan, tombol Kembali peramban berfungsi).
+            Route::get('formasi/{unit}', fn (Unit $unit) => view('admin.master.formasi.show', ['unit' => $unit]))->name('formasi.show');
 
             // Positions
             Route::post('positions/{position}/toggle', [PositionController::class, 'toggleStatus'])->name('positions.toggle');
-            Route::resource('positions', PositionController::class)->except(['show']);
+            Route::resource('positions', PositionController::class)->only(['store', 'update', 'destroy']);
         });
 
         // API for Smart Classification (SSOT via Service)
@@ -157,10 +174,7 @@ Route::prefix('admin')
             $emp->golongan = $request->query('golongan', '');
             $emp->job_grade = $request->query('job_grade', '');
 
-            return response()->json([
-                'bidang' => $service->determineBidang($emp),
-                'rm_band' => $service->determineRmLevel($emp),
-            ]);
+            return response()->json($service->classifyPosition($emp));
         })->name('api.classify-position');
         // API for Dynamic Cascading Position List
         Route::get('/api/unit-positions', function (Request $request) {

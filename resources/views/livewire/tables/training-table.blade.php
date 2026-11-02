@@ -19,36 +19,36 @@
             $empPivot = $training->employees->first();
             $sertifikat = $empPivot?->pivot?->sertifikat;
         @endphp
-        <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-4 py-3 text-gray-900 font-semibold">
+        <tr class="hover:bg-surface-50 transition-colors">
+            <td class="px-4 py-3 text-surface-900 font-semibold">
                 {{ $training->judul }}
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-gray-700">
+            <td class="px-4 py-3 whitespace-nowrap text-surface-700">
                 {{ $training->tanggal_mulai?->format('d M Y') ?? '-' }}
                 @if ($training->tanggal_akhir)
                     &ndash; {{ $training->tanggal_akhir->format('d M Y') }}
                 @endif
             </td>
-            <td class="px-4 py-3 text-gray-700">
+            <td class="px-4 py-3 text-surface-700">
                 {{ $training->penyelenggara ?? '-' }}
             </td>
-            <td class="px-4 py-3 text-gray-600">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            <td class="px-4 py-3 text-surface-600">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-700">
                     {{ $training->jenis ?? '-' }}
                 </span>
                 @if ($training->metode)
-                    <span class="text-xs text-gray-400 ml-1">({{ $training->metode }})</span>
+                    <span class="text-xs text-surface-500 ml-1">({{ $training->metode }})</span>
                 @endif
             </td>
             <td class="px-4 py-3 text-center whitespace-nowrap">
                 @if ($sertifikat)
                     <a href="{{ asset('storage/' . $sertifikat) }}" target="_blank"
-                       class="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full hover:bg-green-200 transition">
-                        <i class="fas fa-download mr-1"></i>Unduh
+                       class="inline-flex items-center px-2.5 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-full hover:bg-primary-200 transition">
+                        <i class="fas fa-download mr-1" aria-hidden="true"></i>Unduh
                     </a>
                 @else
-                    <span class="inline-flex items-center px-2.5 py-1 bg-amber-50 text-amber-600 text-xs font-medium rounded-full border border-amber-200">
-                        <i class="fas fa-minus-circle mr-1"></i>Tidak Ada
+                    <span class="inline-flex items-center px-2.5 py-1 bg-warning-50 text-warning-700 text-xs font-medium rounded-full border border-warning-200">
+                        <i class="fas fa-minus-circle mr-1" aria-hidden="true"></i>Tidak Ada
                     </span>
                 @endif
             </td>

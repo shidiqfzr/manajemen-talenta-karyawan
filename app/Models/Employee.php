@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Traits\Searchable;
+use App\Services\KepegawaianPolicy;
 use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,12 @@ use Illuminate\Database\Eloquent\Model;
 class Employee extends Model
 {
     use HasFactory, Searchable;
+
+    /**
+     * Catatan transien (tidak disimpan di kolom employees) untuk baris riwayat jabatan yang dibuat
+     * EmployeeObserver pada simpanan ini, mis. asal perubahan melalui impor Excel.
+     */
+    public ?string $historyNote = null;
 
     /**
      * Columns that are searchable via scopeSearch().
@@ -29,82 +36,34 @@ class Employee extends Model
     protected $keyType = 'string';
 
     /**
-     * Master 43 Unit Kerja resmi PTPN IV Regional V (Sesuai DOMAIN.md Bab 3).
-     */
-    public const OFFICIAL_UNITS = [
-        'Bagian Sekretariat dan Hukum',
-        'Bagian Sumber Daya Manusia dan Sistem Manajemen',
-        'Bagian Tanaman',
-        'Bagian Teknik dan Pengolahan',
-        'Bagian Akuntansi dan Keuangan',
-        'Tim Penguatan ERP SAP',
-        'Bagian Pengadaan dan Teknologi Informasi',
-        'Divisi Sistem Manajemen & Sustainability',
-        'Project Management Office (PMO)',
-        'Satuan Pengawasan Internal (SPI)',
-        'Distrik Petani Mitra',
-        'Kebun Kemitraan Area Kalbar',
-        'Kebun Kemitraan Area Kaltim-Sel',
-        'Unit Group Kalimantan Barat',
-        'Kebun Inti Gunung Meliau',
-        'PKS Gunung Meliau',
-        'Kebun Gunung Emas',
-        'Kebun Inti Sungai Dekan',
-        'Kebun Rimba Belian',
-        'PKS Rimba Belian',
-        'Kebun PKR Sintang',
-        'Kebun Ngabang',
-        'PKS Ngabang',
-        'Kebun Parindu',
-        'PKS Parindu',
-        'Kebun Kembayan',
-        'PKS Kembayan',
-        'Unit Group Kalimantan Selatan/Tengah',
-        'Kebun Danau Salak',
-        'Kebun Pamukan',
-        'PKS Pamukan',
-        'Kebun Batulicin',
-        'Kebun Pelaihari',
-        'PKS Pelaihari',
-        'Proyek Batubara Danau Salak & Buntok',
-        'Kebun Raren Batuah',
-        'Unit Group Wilayah Kalimantan Timur',
-        'Kebun Tabara',
-        'Kebun Tajati',
-        'Kebun Inti Pandawa',
-        'PKS Longpinang',
-        'PKS Samuntai',
-        'Kebun-PKS Longkali',
-    ];
-
-    /**
-     * Master 43 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
+     * Master 45 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
+     * Hanya cadangan saat tabel `units` kosong; sumber utama adalah database (diisi dari Excel formasi).
      */
     public const GROUPED_UNITS = [
         'Regional Office (Kantor Direksi Pontianak)' => [
-            'Bagian Sekretariat dan Hukum',
-            'Bagian Sumber Daya Manusia dan Sistem Manajemen',
+            'Bagian Sekretariat & Hukum',
+            'Bagian Sumber Daya Manusia & Sistem Manajemen',
             'Bagian Tanaman',
-            'Bagian Teknik dan Pengolahan',
-            'Bagian Akuntansi dan Keuangan',
+            'Bagian Teknik & Pengolahan',
+            'Bagian Akuntansi & Keuangan',
             'Tim Penguatan ERP SAP',
-            'Bagian Pengadaan dan Teknologi Informasi',
-            'Divisi Sistem Manajemen & Sustainability',
-            'Project Management Office (PMO)',
-            'Satuan Pengawasan Internal (SPI)',
+            'Bagian Pengadaan & Teknologi Informasi',
             'Distrik Petani Mitra',
             'Kebun Kemitraan Area Kalbar',
+            'PMO Investasi Tanaman Wilayah Kalbar',
+            'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+            'PMO Batu Bara & Bisnis Lainnya',
             'Kebun Kemitraan Area Kaltim-Sel',
         ],
         'Wilayah Kalimantan Barat' => [
-            'Unit Group Kalimantan Barat',
+            'Group Manager Kalbar',
             'Kebun Inti Gunung Meliau',
             'PKS Gunung Meliau',
             'Kebun Gunung Emas',
             'Kebun Inti Sungai Dekan',
             'Kebun Rimba Belian',
             'PKS Rimba Belian',
-            'Kebun PKR Sintang',
+            'Kebun Sintang',
             'Kebun Ngabang',
             'PKS Ngabang',
             'Kebun Parindu',
@@ -112,19 +71,21 @@ class Employee extends Model
             'Kebun Kembayan',
             'PKS Kembayan',
         ],
-        'Wilayah Kalimantan Selatan & Tengah' => [
-            'Unit Group Kalimantan Selatan/Tengah',
+        'Wilayah Kalimantan Selatan/Tengah' => [
+            'Group Manager Kalselteng',
             'Kebun Danau Salak',
             'Kebun Pamukan',
             'PKS Pamukan',
             'Kebun Batulicin',
             'Kebun Pelaihari',
             'PKS Pelaihari',
-            'Proyek Batubara Danau Salak & Buntok',
+            'Kebun Kumai',
+            'PKR Tambarangan',
+            'Proyek Batubara Danau Salak',
             'Kebun Raren Batuah',
         ],
         'Wilayah Kalimantan Timur' => [
-            'Unit Group Wilayah Kalimantan Timur',
+            'Group Manager Kaltim',
             'Kebun Tabara',
             'Kebun Tajati',
             'Kebun Inti Pandawa',
@@ -217,38 +178,6 @@ class Employee extends Model
         'Calon Pegawai' => 'Calon Pegawai / Masa Percobaan',
     ];
 
-    /**
-     * Hitung Batas Usia Pensiun (56 tahun, awal bulan kelahiran).
-     */
-    public static function calculateTanggalPensiun(?string $tanggalLahir): ?string
-    {
-        if (empty($tanggalLahir)) {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($tanggalLahir)->addYears(56)->startOfMonth()->toDateString();
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Hitung Masa Bebas Tugas (MBT: T-1 tahun sebelum pensiun / 55 tahun).
-     */
-    public static function calculateTanggalMbt(?string $tanggalPensiun): ?string
-    {
-        if (empty($tanggalPensiun)) {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($tanggalPensiun)->subYear()->toDateString();
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
     protected $fillable = [
         'nik',
         'nama',
@@ -312,14 +241,18 @@ class Employee extends Model
     public function currentJob()
     {
         return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
-            ->whereNull('tmt_akhir')
-            ->where('status_penugasan', 'Definitif')
-            ->latestOfMany('tmt_awal');
+            ->ofMany(
+                ['tmt_awal' => 'max'],
+                fn ($query) => $query->where('is_applied', true)
+                    ->whereNull('tmt_akhir')
+                    ->where('status_penugasan', 'Definitif')
+            );
     }
 
     public function activeJobs()
     {
         return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', true)
             ->whereNull('tmt_akhir')
             ->orderByDesc('tmt_awal');
     }
@@ -327,9 +260,31 @@ class Employee extends Model
     public function concurrentJobs()
     {
         return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', true)
             ->whereNull('tmt_akhir')
             ->where('status_penugasan', '!=', 'Definitif')
             ->orderByDesc('tmt_awal');
+    }
+
+    public function scheduledJobs()
+    {
+        return $this->hasMany(JobHistory::class, 'employee_nik', 'nik')
+            ->where('is_applied', false)
+            ->orderBy('tmt_awal');
+    }
+
+    public function latestScheduledJob()
+    {
+        return $this->hasOne(JobHistory::class, 'employee_nik', 'nik')
+            ->ofMany(
+                ['tmt_awal' => 'max'],
+                fn ($query) => $query->where('is_applied', false)
+            );
+    }
+
+    public function hasScheduledMutation(): bool
+    {
+        return $this->scheduledJobs()->exists();
     }
 
     public function hasConcurrentJobs(): bool
@@ -363,7 +318,7 @@ class Employee extends Model
         }
 
         if ($this->tanggal_lahir) {
-            return Carbon::parse($this->tanggal_lahir)->addYears(56)->startOfMonth();
+            return KepegawaianPolicy::pensiunCarbon((string) $this->tanggal_lahir);
         }
 
         return null;
@@ -379,7 +334,7 @@ class Employee extends Model
         }
 
         if ($pensiun = $this->effective_tanggal_pensiun) {
-            return (clone $pensiun)->subYear();
+            return (clone $pensiun)->subYears(KepegawaianPolicy::MBT_TAHUN_SEBELUM_PENSIUN);
         }
 
         return null;
@@ -568,7 +523,7 @@ class Employee extends Model
      */
     public function getBidangThemeAttribute(): string
     {
-        return 'bg-slate-100 text-slate-600 border-slate-200';
+        return 'bg-surface-100 text-surface-600 border-surface-200';
     }
 
     /**
@@ -576,13 +531,7 @@ class Employee extends Model
      */
     public function getRmThemeAttribute(): string
     {
-        return match ($this->rm_level) {
-            'RM-1' => 'bg-orange-50 text-orange-800 border-orange-200',
-            'RM-2' => 'bg-sky-50 text-sky-800 border-sky-200',
-            'RM-3' => 'bg-purple-50 text-purple-800 border-purple-200',
-            'RM-4' => 'bg-slate-100 text-slate-700 border-slate-200',
-            default => 'bg-slate-100 text-slate-700 border-slate-200',
-        };
+        return Position::rmTheme($this->rm_level);
     }
 
     /**
@@ -592,6 +541,6 @@ class Employee extends Model
     {
         return $this->is_karpim
             ? 'bg-primary-50 text-primary-800 border-primary-200'
-            : 'bg-slate-100 text-slate-700 border-slate-200';
+            : 'bg-surface-100 text-surface-700 border-surface-200';
     }
 }

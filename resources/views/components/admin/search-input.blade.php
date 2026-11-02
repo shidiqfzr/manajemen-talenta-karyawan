@@ -47,8 +47,8 @@
     }">
 
     <!-- Search Icon -->
-    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-        <i class="fas fa-search text-xs"></i>
+    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-500">
+        <i class="fas fa-search text-xs" aria-hidden="true"></i>
     </div>
 
     <!-- Input Field -->
@@ -63,7 +63,7 @@
             @input="hasValue = !!$event.target.value"
         @endif
         placeholder="{{ $placeholder }}"
-        class="w-full pl-10 pr-16 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition shadow-2xs">
+        class="w-full pl-10 pr-16 py-2.5 bg-white border border-surface-300 rounded-xl text-xs sm:text-sm text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 transition shadow-2xs">
 
     <!-- Right-side Actions: Clear Button / Keyboard Shortcut Hint -->
     <div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
@@ -72,16 +72,16 @@
             x-show="hasValue"
             x-cloak
             @click="clear()"
-            class="text-slate-400 hover:text-red-500 transition p-1 cursor-pointer"
+            class="text-surface-500 hover:text-danger transition p-1 cursor-pointer"
             title="Hapus pencarian">
-            <i class="fas fa-times-circle text-sm"></i>
+            <i class="fas fa-times-circle text-sm" aria-hidden="true"></i>
         </button>
 
         @if($shortcut)
             <!-- Shortcut Badge (Visible when empty) -->
             <span x-show="!hasValue"
                 @click="$refs.searchInput.focus()"
-                class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-slate-100 border border-slate-200 rounded shadow-2xs cursor-pointer select-none"
+                class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium text-surface-500 bg-surface-100 border border-surface-200 rounded shadow-2xs cursor-pointer select-none"
                 title="Tekan tombol '{{ $shortcut }}' untuk mencari">
                 {{ $shortcut }}
             </span>

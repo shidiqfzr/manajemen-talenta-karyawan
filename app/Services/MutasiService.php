@@ -2,346 +2,51 @@
 
 namespace App\Services;
 
+use App\Exceptions\MutasiIntegrityException;
+use App\Exceptions\MutasiRuleViolationException;
 use App\Models\Employee;
 use App\Models\JobHistory;
-use App\Models\Position;
 use App\Models\Unit;
+use App\Services\Data\MutasiRequest;
+use App\Services\Mutasi\ChainTopologyAnalyzer;
+use App\Services\Mutasi\FormationService;
+use App\Services\Mutasi\MutasiGovernanceGuard;
+use App\Services\Mutasi\MutasiHistoryReader;
+use App\Services\Mutasi\MutasiLookup;
+use App\Services\Mutasi\PlacementWriter;
+use App\Services\Mutasi\ScheduledMutationService;
+use App\Services\Mutasi\TalentProfileBuilder;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
+/**
+ * Entry point of the mutation module (DOMAIN.md §5.2 & §9.2).
+ *
+ * Orchestrates the three transaction modes — straight transfer, swap and collective chain —
+ * and delegates analysis, governance, scheduling, history and lookups to the collaborators
+ * in App\Services\Mutasi. Callers keep using this class; the delegating methods below are its public API.
+ */
 class MutasiService
 {
-    // -------------------------------------------------------------------------
-    // Analysis
-    // -------------------------------------------------------------------------
-
-    /**
-     * Analyse what will happen if an employee is moved to the given target position.
-     * Returns a structured result that drives the live impact panel in the UI.
-     */
-    public function analyzeTarget(string $jabatan, string $unitKerja): array
-    {
-        // Check if the position is an overflow/advisor or diperban (pool) position
-        $position = Position::getAllCached()->get($jabatan);
-        $isPool = $position ? ($position->is_overflow || $position->is_diperban) : false;
-
-        if ($isPool) {
-            // Pools are infinitely vacant and should never trigger a Swap
-            return [
-                'type' => 'pool',
-                'vacant' => true,
-                'occupant' => null,
-                'occupant_job' => null,
-            ];
-        }
-
-        $occupant = Employee::with('currentJob')
-            ->where('jabatan', $jabatan)
-            ->where('unit_kerja', $unitKerja)
-            ->first();
-
-        return [
-            'type' => $occupant === null ? 'vacant' : 'occupied',
-            'vacant' => $occupant === null,
-            'occupant' => $occupant,
-            'occupant_job' => $occupant?->currentJob,
-        ];
-    }
-
-    /**
-     * Check tenure compliance in the current unit kerja based on DOMAIN.md §5.2.1
-     * (Pegawai minimal menjabat 2-3 tahun di unit kerja sebelum diperbolehkan rotasi unit).
-     */
-    public function checkTenureCompliance(Employee $emp, string $targetUnitKerja): array
-    {
-        $isDifferentUnit = $emp->unit_kerja !== $targetUnitKerja;
-        if (! $isDifferentUnit) {
-            return [
-                'is_applicable' => false,
-                'is_compliant' => true,
-                'months' => 0,
-                'years' => 0.0,
-                'tmt_unit_kerja' => $emp->tmt_unit_kerja?->toDateString(),
-                'message' => 'Rotasi internal dalam unit kerja yang sama (tidak pindah lokasi/unit).',
-            ];
-        }
-
-        $tmtDate = $emp->tmt_unit_kerja ?? $emp->tanggal_dalam_jabatan;
-        if (! $tmtDate) {
-            return [
-                'is_applicable' => true,
-                'is_compliant' => false,
-                'months' => 0,
-                'years' => 0.0,
-                'tmt_unit_kerja' => null,
-                'message' => 'Data TMT Unit Kerja belum tercatat. Standar minimal masa dinas adalah 2 tahun (24 bulan) sesuai DOMAIN.md §5.2.1.',
-            ];
-        }
-
-        $carbonTmt = Carbon::parse($tmtDate);
-        $months = (int) $carbonTmt->diffInMonths(now());
-        $years = round($months / 12, 1);
-        $isCompliant = $months >= 24;
-
-        return [
-            'is_applicable' => true,
-            'is_compliant' => $isCompliant,
-            'months' => $months,
-            'years' => $years,
-            'tmt_unit_kerja' => $carbonTmt->toDateString(),
-            'message' => $isCompliant
-                ? "Masa dinas di unit saat ini ({$years} tahun / {$months} bulan) telah memenuhi standar minimal 2 tahun."
-                : "Pegawai baru bertugas {$years} tahun ({$months} bulan) di {$emp->unit_kerja} (standar minimal 2-3 tahun sesuai DOMAIN.md §5.2.1). Memerlukan Dispensasi Khusus Direksi.",
-        ];
-    }
-
-    /**
-     * Check employee promotion readiness and eligibility based on DOMAIN.md §5.2.3 and §6.
-     */
-    public function checkPromotionEligibility(Employee $emp, string $targetJabatan): array
-    {
-        $currentRm = app(ManPowerPlanningService::class)->determineRmLevel($emp);
-        $currentRmNum = $this->parseRmNumber($currentRm);
-
-        $positions = Position::getAllCached();
-        $targetRm = isset($positions[$targetJabatan]) && $positions[$targetJabatan]->rm_level
-            ? $positions[$targetJabatan]->rm_level
-            : app(ManPowerPlanningService::class)->determineRmLevelByJobTitle($targetJabatan);
-        $targetRmNum = $this->parseRmNumber($targetRm);
-
-        // If not a promotion (or target rank not higher), return not applicable
-        if ($targetRmNum === null || $currentRmNum === null || $targetRmNum >= $currentRmNum) {
-            return [
-                'is_applicable' => false,
-                'is_eligible' => true,
-                'current_rm' => $currentRm,
-                'target_rm' => $targetRm,
-                'criteria' => [],
-                'summary' => 'Bukan kenaikan eselon (promosi struktural).',
-            ];
-        }
-
-        $criteria = [];
-        $isEligible = true;
-
-        // 1. Calculate job tenure (masa dinas jabatan saat ini)
-        $tmtJabatan = $emp->tanggal_dalam_jabatan ?? $emp->tmt_bekerja;
-        $jobTenureMonths = $tmtJabatan ? (int) Carbon::parse($tmtJabatan)->diffInMonths(now()) : 0;
-        $jobTenureYears = round($jobTenureMonths / 12, 1);
-
-        // 2. Fetch latest evaluation / assessment
-        $latestEvaluation = $emp->evaluations()->latest('id')->first();
-
-        // 3. Normalize employee golongan
-        $gol = strtoupper(trim(explode('/', $emp->golongan ?? '')[0])); // e.g. 'IIIC', 'IVA'
-
-        if ($currentRmNum === 3 && $targetRmNum === 2) {
-            // RM-3 -> RM-2: Syarat minimal Golongan IIIC atau masa dinas Asisten >= 4 tahun, dan evaluasi kinerja minimal "Baik"
-            $hasMinGol = in_array($gol, ['IIIC', 'IIID', 'IVA', 'IVB', 'IVC', 'IVD']);
-            $hasMinTenure = $jobTenureYears >= 4.0;
-            $golOrTenureMet = $hasMinGol || $hasMinTenure;
-
-            $criteria[] = [
-                'label' => 'Golongan Minimal IIIC atau Masa Dinas Asisten ≥ 4 Tahun',
-                'met' => $golOrTenureMet,
-                'value' => "Gol: {$emp->golongan} | Masa Dinas: {$jobTenureYears} thn",
-                'requirement' => 'Min. Gol IIIC atau Masa Dinas ≥ 4 tahun',
-            ];
-
-            // Kinerja check
-            $hasGoodEval = false;
-            $evalText = 'Belum ada data evaluasi SMKBK / 9-Box';
-            if ($latestEvaluation) {
-                $score = $latestEvaluation->skor_smkbk_9box ?? 0;
-                $box = $latestEvaluation->kategori_9box ?? '';
-                $hasGoodEval = $score >= 75 || str_contains($box, 'Box 5') || str_contains($box, 'Box 6') || str_contains($box, 'Box 8') || str_contains($box, 'Box 9');
-                $evalText = 'SMKBK: '.($score ?: '—').' ('.($box ?: 'Tercatat').')';
-            }
-
-            $criteria[] = [
-                'label' => 'Evaluasi Kinerja Minimal Kategori "Baik"',
-                'met' => $hasGoodEval,
-                'value' => $evalText,
-                'requirement' => 'Kategori Baik / Box 5, 6, 8, atau 9',
-            ];
-
-            $isEligible = $golOrTenureMet && $hasGoodEval;
-        } elseif ($currentRmNum === 2 && $targetRmNum === 1) {
-            // RM-2 -> RM-1: Syarat minimal Golongan IIID/IVA, menjabat Askep min 3 tahun, sertifikat asesmen kompetensi holding
-            $hasMinGol = in_array($gol, ['IIID', 'IVA', 'IVB', 'IVC', 'IVD']);
-            $criteria[] = [
-                'label' => 'Standar Golongan Minimal IIID / IVA',
-                'met' => $hasMinGol,
-                'value' => "Gol: {$emp->golongan}",
-                'requirement' => 'Golongan IIID s.d. IV',
-            ];
-
-            $hasAskepTenure = $jobTenureYears >= 3.0;
-            $criteria[] = [
-                'label' => 'Masa Dinas Jabatan Madya (Askep/Kasubag) ≥ 3 Tahun',
-                'met' => $hasAskepTenure,
-                'value' => "{$jobTenureYears} tahun ({$jobTenureMonths} bulan)",
-                'requirement' => 'Minimal 3 tahun menjabat',
-            ];
-
-            $hasValidAssessment = false;
-            $asesmenText = 'Belum memiliki sertifikasi asesmen holding';
-            if ($latestEvaluation && $latestEvaluation->expired_asesmen) {
-                $hasValidAssessment = Carbon::parse($latestEvaluation->expired_asesmen)->gte(Carbon::today());
-                $asesmenText = 'Kedaluwarsa: '.Carbon::parse($latestEvaluation->expired_asesmen)->format('d/m/Y');
-            } elseif ($latestEvaluation && $latestEvaluation->hasil_skor_asesmen) {
-                $hasValidAssessment = true;
-                $asesmenText = "Skor: {$latestEvaluation->hasil_skor_asesmen}";
-            }
-
-            $criteria[] = [
-                'label' => 'Sertifikat Asesmen Kompetensi Holding Aktif',
-                'met' => $hasValidAssessment,
-                'value' => $asesmenText,
-                'requirement' => 'Asesmen holding valid/aktif',
-            ];
-
-            $isEligible = $hasMinGol && $hasAskepTenure && $hasValidAssessment;
-        } elseif ($currentRmNum === 4 && $targetRmNum <= 3) {
-            // Pelaksana ke Staf via CKP
-            $criteria[] = [
-                'label' => 'Jalur Karir CKP (Calon Karyawan Pimpinan)',
-                'met' => true,
-                'value' => 'Promosi Karpel ke Karpim',
-                'requirement' => 'Lulus seleksi CKP internal',
-            ];
-            $isEligible = true;
-        }
-
-        return [
-            'is_applicable' => true,
-            'is_eligible' => $isEligible,
-            'current_rm' => $currentRm,
-            'target_rm' => $targetRm,
-            'criteria' => $criteria,
-            'summary' => $isEligible
-                ? "Seluruh kriteria formal promosi ke {$targetRm} telah terpenuhi."
-                : "Terdapat kriteria formal promosi ke {$targetRm} yang belum terpenuhi. Memerlukan dispensasi promosi khusus.",
-        ];
-    }
-
-    /**
-     * Retrieve and filter available target positions for a specific employee and unit.
-     */
-    public function getAvailableTargetPositions(Employee $emp, string $targetUnitKerja, string $jenisMutasi): array
-    {
-        $unit = Unit::where('nama', $targetUnitKerja)->first();
-        $allJabatan = [];
-
-        if ($unit) {
-            $allJabatan = $unit->positions()->active()->pluck('nama')->toArray();
-        } else {
-            $historicalJobs = JobHistory::where('unit_kerja', $targetUnitKerja)
-                ->pluck('jabatan')->unique()->toArray();
-            $activeJobs = Employee::where('unit_kerja', $targetUnitKerja)
-                ->pluck('jabatan')->unique()->toArray();
-
-            $allJabatan = array_unique(array_merge($historicalJobs, $activeJobs));
-            if (empty($allJabatan)) {
-                $allJabatan = app(ManPowerPlanningService::class)->getKnownJabatan()->toArray();
-            }
-        }
-
-        $empRmLevel = app(ManPowerPlanningService::class)->determineRmLevel($emp);
-        $empRmNumber = $this->parseRmNumber($empRmLevel);
-
-        $filtered = collect();
-        $positions = Position::getAllCached();
-        $isTargetOperational = $unit ? $unit->isOperationalUnit() : false; // Fallback to false if unit is not found (though it should be)
-
-        foreach ($allJabatan as $j) {
-            $jRmNumber = null;
-            if (isset($positions[$j]) && $positions[$j]->rm_level) {
-                $jRmNumber = $this->parseRmNumber($positions[$j]->rm_level);
-            } else {
-                $jRmNumber = app(ManPowerPlanningService::class)->determineRmLevelByJobTitle($j);
-            }
-
-            if ($jenisMutasi === 'PROMOSI') {
-                if ($jRmNumber < $empRmNumber) {
-                    $filtered->push($j);
-                }
-            } elseif ($jenisMutasi === 'DEMOSI') {
-                if ($jRmNumber > $empRmNumber) {
-                    $filtered->push($j);
-                }
-            } elseif (in_array($jenisMutasi, ['ROTASI', 'MUTASI_UNIT'])) {
-                if ($jRmNumber === $empRmNumber) {
-                    $filtered->push($j);
-                }
-            } elseif ($jenisMutasi === 'SANKSI_INDISIPLINER') {
-                if (isset($positions[$j]) && $positions[$j]->is_diperban && $jRmNumber === $empRmNumber) {
-                    $filtered->push($j);
-                }
-            } elseif ($jenisMutasi === 'PENUGASAN_KHUSUS') {
-                if (isset($positions[$j]) && $positions[$j]->is_overflow && ! $positions[$j]->is_diperban && $jRmNumber === $empRmNumber) {
-                    $filtered->push($j);
-                }
-            } elseif ($jenisMutasi === 'PENUGASAN') {
-                $filtered->push($j);
-            }
-        }
-
-        // SMART OVERRIDE FOR POOLS (in-memory filtering from cached master)
-        if (in_array($jenisMutasi, ['SANKSI_INDISIPLINER', 'PENUGASAN_KHUSUS'])) {
-            $isSanction = $jenisMutasi === 'SANKSI_INDISIPLINER';
-            $poolPositions = $positions->filter(
-                fn ($pos) => $isSanction ? $pos->is_diperban : $pos->is_overflow
-            );
-
-            foreach ($poolPositions as $pos) {
-                if (! $isSanction && $pos->is_diperban) {
-                    continue;
-                }
-
-                $posRm = $this->parseRmNumber($pos->rm_level);
-                if ($posRm === $empRmNumber) {
-                    $posNameLower = strtolower($pos->nama);
-
-                    // Domain rules
-                    $isTanamanPos = str_contains($posNameLower, 'tanaman');
-                    $isTanamanUnit = str_contains(strtolower($targetUnitKerja), 'tanaman') || str_contains(strtolower($targetUnitKerja), 'kebun') || str_contains(strtolower($targetUnitKerja), 'group');
-                    if ($isTanamanPos && ! $isTanamanUnit) {
-                        continue;
-                    }
-
-                    $isTeknikPos = str_contains($posNameLower, 'teknik') || str_contains($posNameLower, 'pabrik');
-                    $isTeknikUnit = str_contains(strtolower($targetUnitKerja), 'teknik') || str_contains(strtolower($targetUnitKerja), 'pabrik') || str_contains(strtolower($targetUnitKerja), 'group');
-                    if ($isTeknikPos && ! $isTeknikUnit) {
-                        continue;
-                    }
-
-                    // Nomenclature rules
-                    if ($pos->is_diperban && $posRm < 4) {
-                        if ($isTargetOperational && ! $pos->isOperationalTitle()) {
-                            continue;
-                        }
-                        if (! $isTargetOperational && ! $pos->isKantorTitle()) {
-                            continue;
-                        }
-                    }
-
-                    if (! $filtered->contains($pos->nama)) {
-                        $filtered->push($pos->nama);
-                    }
-                }
-            }
-        }
-
-        return $filtered->sort()->values()->toArray();
-    }
+    public function __construct(
+        private readonly FormationService $formations,
+        private readonly MutasiGovernanceGuard $guard,
+        private readonly ChainTopologyAnalyzer $chains,
+        private readonly PlacementWriter $placement,
+        private readonly ScheduledMutationService $scheduled,
+        private readonly MutasiHistoryReader $history,
+        private readonly TalentProfileBuilder $profiles,
+        private readonly MutasiLookup $lookup,
+    ) {}
 
     // -------------------------------------------------------------------------
-    // Core Mutasi — single entry point for ALL transfer types
+    // Core Mutasi — straight transfer, swap & collective chain
     // -------------------------------------------------------------------------
-
     /**
      * Process any position change atomically.
      *
@@ -351,427 +56,519 @@ class MutasiService
      *
      * Returns an array describing the result for the success flash message.
      *
-     * @throws \InvalidArgumentException if employee is already at the target position
-     * @throws \RuntimeException if target occupant has no active job (edge-case guard)
+     * @throws MutasiRuleViolationException if a governance rule is violated or the employee is already at the target
+     * @throws MutasiIntegrityException if target occupant has no active job (edge-case guard)
      */
-    public function processMutasi(
-        string $employeeNik,
-        string $targetJabatan,
-        string $targetUnitKerja,
-        string $tmtAwal,
-        string $jenisMutasi = 'MUTASI_UNIT',
-        ?string $nomorSk = null,
-        ?string $tanggalSk = null,
-        ?string $catatan = null,
-        ?string $tanggalBerakhirSanksi = null,
-        string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null,
-        ?string $fileSk = null,
-        ?int $createdBy = null,
-        bool $isDispensasi = false,
-        ?string $alasanDispensasi = null,
-        ?string $newGolongan = null,
-        ?string $newJobGrade = null
-    ): array {
-        return DB::transaction(function () use (
-            $employeeNik, $targetJabatan, $targetUnitKerja,
-            $tmtAwal, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
-            $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
-        ) {
+    public function processMutasi(MutasiRequest $request): array
+    {
+        return DB::transaction(function () use ($request) {
+            // Serialize concurrent mutations into the same target unit (prevents double-filling a vacancy)
+            Unit::where('nama', $request->targetUnitKerja)->lockForUpdate()->first();
+
             $employee = Employee::with('currentJob')
-                ->where('nik', $employeeNik)
+                ->where('nik', $request->employeeNik)
+                ->lockForUpdate()
                 ->firstOrFail();
 
             // Guard: same position
-            if (
-                $employee->jabatan === $targetJabatan &&
-                $employee->unit_kerja === $targetUnitKerja
-            ) {
-                throw new \InvalidArgumentException(
-                    "Karyawan {$employee->nama} sudah berada di posisi {$targetJabatan} di {$targetUnitKerja}."
+            if ($employee->jabatan === $request->targetJabatan && $employee->unit_kerja === $request->targetUnitKerja) {
+                throw new MutasiRuleViolationException(
+                    "Karyawan {$employee->nama} sudah berada di posisi {$request->targetJabatan} di {$request->targetUnitKerja}."
                 );
             }
 
-            $tmtAkhir = Carbon::parse($tmtAwal)->subDay()->toDateString();
-            $analysis = $this->analyzeTarget($targetJabatan, $targetUnitKerja);
+            $this->guard->assertAllowed($employee, $request);
 
-            if ($analysis['vacant']) {
+            $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja);
+            $this->assertTargetNotReservedByOthers($analysis, $request);
+
+            if ($analysis['vacant'] || $analysis['type'] === 'pool') {
                 // ── Straight transfer ─────────────────────────────────────
-                $this->doTransfer(
-                    $employee, $targetJabatan, $targetUnitKerja,
-                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
-                    $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
-                );
+                $this->doTransfer($employee, $request);
 
-                return [
-                    'type' => 'transfer',
-                    'employee' => $employee->nama,
-                    'to_jabatan' => $targetJabatan,
-                    'to_unit' => $targetUnitKerja,
-                    'displaced' => null,
-                ];
-            } else {
-                // ── Swap (target occupied) ────────────────────────────────
-                $occupant = $analysis['occupant'];
-
-                if (! $occupant->currentJob) {
-                    throw new \RuntimeException(
-                        "Karyawan {$occupant->nama} yang menempati posisi tersebut tidak memiliki riwayat jabatan aktif."
-                    );
-                }
-
-                // Guard: Lateral Swap Only (DOMAIN.md §5.2.2 & Enterprise Governance)
-                $empARm = $employee->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($employee);
-                $empBRm = $occupant->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($occupant);
-
-                if ($empARm !== $empBRm) {
-                    throw new \InvalidArgumentException(
-                        "Tukar jabatan (Swap) hanya diperbolehkan untuk tingkat eselon/RM yang setara (Lateral Swap). Pegawai {$employee->nama} ({$empARm}) tidak setara dengan {$occupant->nama} ({$empBRm}). Gunakan alur mutasi ke formasi kosong."
-                    );
-                }
-
-                $this->doSwap(
-                    $employee, $occupant, $targetJabatan, $targetUnitKerja,
-                    $tmtAwal, $tmtAkhir, $jenisMutasi, $nomorSk, $tanggalSk, $catatan, $tanggalBerakhirSanksi, $statusJabatan, $tmtAkhirEstimasi,
-                    $fileSk, $createdBy, $isDispensasi, $alasanDispensasi, $newGolongan, $newJobGrade
-                );
-
-                return [
-                    'type' => 'swap',
-                    'employee' => $employee->nama,
-                    'to_jabatan' => $targetJabatan,
-                    'to_unit' => $targetUnitKerja,
-                    'displaced' => $occupant->nama,
-                ];
+                return $this->mutasiResult('transfer', $employee, $request);
             }
+
+            // ── Swap (target occupied) ────────────────────────────────
+            $occupant = $this->resolveSwapOccupant($employee, $analysis, $request);
+            $this->doSwap($employee, $occupant, $request);
+
+            return $this->mutasiResult('swap', $employee, $request, $occupant->nama);
         });
     }
 
-    // -------------------------------------------------------------------------
-    // Internal helpers
-    // -------------------------------------------------------------------------
+    /**
+     * Guard: the target formation may be reserved by a scheduled mutation of someone else.
+     *
+     * @throws MutasiRuleViolationException
+     */
+    private function assertTargetNotReservedByOthers(array $analysis, MutasiRequest $request): void
+    {
+        if (! $analysis['is_reserved'] || ($analysis['reserved_job']->employee_nik ?? null) === $request->employeeNik) {
+            return;
+        }
+
+        $resName = $analysis['reserved_occupant']->nama ?? $analysis['reserved_job']->employee_nik;
+        $resTmt = $analysis['reserved_job']->tmt_awal ? Carbon::parse($analysis['reserved_job']->tmt_awal)->translatedFormat('d F Y') : 'mendatang';
+
+        throw new MutasiRuleViolationException(
+            "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} telah dipesan (Reserved) oleh mutasi terjadwal atas nama {$resName} (TMT aktif: {$resTmt}). Pilih formasi lain atau batalkan jadwal mutasi tersebut."
+        );
+    }
+
+    /**
+     * Lock and validate the occupant that employee A will swap with (DOMAIN.md §5.2.2).
+     *
+     * @throws MutasiRuleViolationException|MutasiIntegrityException
+     */
+    private function resolveSwapOccupant(Employee $employee, array $analysis, MutasiRequest $request): Employee
+    {
+        // A Pj/Plt assignee keeps their definitive seat, so the occupant would have nowhere to go.
+        if (! $request->isDefinitif()) {
+            throw new MutasiRuleViolationException(
+                "Penugasan sementara ({$request->statusJabatan}) hanya dapat ditempatkan pada formasi kosong. Formasi {$request->targetJabatan} di {$request->targetUnitKerja} saat ini diduduki oleh {$analysis['occupant']->nama}."
+            );
+        }
+
+        $occupant = Employee::with('currentJob')
+            ->whereKey($analysis['occupant']->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if (! $occupant->currentJob) {
+            throw new MutasiIntegrityException(
+                "Karyawan {$occupant->nama} yang menempati posisi tersebut tidak memiliki riwayat jabatan aktif."
+            );
+        }
+
+        // Guard: Lateral Swap Only (DOMAIN.md §5.2.2 & Enterprise Governance)
+        $empARm = $this->formations->resolveEmployeeRm($employee);
+        $empBRm = $this->formations->resolveEmployeeRm($occupant);
+
+        if ($empARm !== $empBRm) {
+            throw new MutasiRuleViolationException(
+                "Tukar jabatan (Swap) hanya diperbolehkan untuk tingkat eselon/RM yang setara (Lateral Swap). Pegawai {$employee->nama} ({$empARm}) tidak setara dengan {$occupant->nama} ({$empBRm}). Gunakan alur mutasi ke formasi kosong."
+            );
+        }
+
+        return $occupant;
+    }
+
+    private function mutasiResult(string $type, Employee $employee, MutasiRequest $request, ?string $displaced = null): array
+    {
+        return [
+            'type' => $type,
+            'employee' => $employee->nama,
+            'to_jabatan' => $request->targetJabatan,
+            'to_unit' => $request->targetUnitKerja,
+            'displaced' => $displaced,
+            'is_scheduled' => $request->isFuture(),
+            'tmt_awal' => $request->tmtAwal,
+        ];
+    }
+
+    /**
+     * Atomically process an entire chain / batch of transfers in a single database transaction.
+     * All movements share the same batch_id, collective SK metadata, and effective TMT.
+     *
+     * @throws MutasiRuleViolationException if validation fails
+     */
+    public function processChainMutasi(array $headerData, array $nodes): array
+    {
+        $nodes = $this->chains->prepareNodes($nodes);
+
+        return DB::transaction(function () use ($headerData, $nodes) {
+            // Serialize concurrent mutations into the same target units before re-validating occupancy
+            Unit::whereIn('nama', array_unique(array_column($nodes, 'target_unit_kerja')))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $validation = $this->chains->validateChainTopology($nodes);
+
+            if (! $validation['is_valid']) {
+                throw new MutasiRuleViolationException(
+                    'Validasi rantai mutasi gagal: '.implode('; ', $validation['errors'])
+                );
+            }
+
+            $batchId = Str::uuid()->toString();
+
+            /** @var list<MutasiRequest> $requests */
+            $requests = array_map(
+                fn (array $node) => MutasiRequest::fromChainNode($headerData, $node),
+                array_values($nodes)
+            );
+
+            // All participants share one SK, hence one TMT and one applied/staged state
+            $isFutureTmt = $requests[0]->isFuture();
+
+            // 1. Lock all participants and close their active definitive jobs when the TMT has arrived
+            $lockedEmployees = [];
+            foreach ($requests as $request) {
+                $emp = Employee::with('currentJob')->where('nik', $request->employeeNik)->lockForUpdate()->firstOrFail();
+                if (! $isFutureTmt && $request->isDefinitif() && $emp->currentJob) {
+                    $emp->currentJob->update(['tmt_akhir' => $request->tmtAkhir()]);
+                }
+                $lockedEmployees[$request->employeeNik] = $emp;
+            }
+
+            // 2. Update employee records and insert new job histories
+            $processed = [];
+
+            foreach ($requests as $order => $request) {
+                $emp = $lockedEmployees[$request->employeeNik];
+                $profile = $this->resolvePlacementProfile($emp, $request);
+
+                if (! $isFutureTmt && $request->isDefinitif()) {
+                    $this->placement->apply(
+                        $emp, $request->targetJabatan, $request->targetUnitKerja, $request->tmtAwal,
+                        $profile + ['status_penugasan' => $request->statusJabatan]
+                    );
+                }
+
+                $this->placement->recordHistory($emp, $request->targetJabatan, $request->targetUnitKerja, $request, $profile, [
+                    'batch_id' => $batchId,
+                    'chain_order' => $order + 1,
+                ]);
+
+                $processed[] = [
+                    'employee_nik' => $emp->nik,
+                    'nama' => $emp->nama,
+                    'target_jabatan' => $request->targetJabatan,
+                    'target_unit_kerja' => $request->targetUnitKerja,
+                    'jenis_mutasi' => $request->jenisMutasi,
+                ];
+            }
+
+            return [
+                'type' => 'chain',
+                'batch_id' => $batchId,
+                'nomor_sk' => $requests[0]->nomorSk,
+                'topology' => $validation['topology'],
+                'topology_label' => $validation['topology_label'],
+                'total_transfers' => count($processed),
+                'items' => $processed,
+                'unfilled_vacancies' => $validation['unfilled_vacancies'],
+                'closed_vacancies' => $validation['closed_vacancies'],
+                'is_scheduled' => $isFutureTmt,
+                'tmt_awal' => $requests[0]->tmtAwal,
+            ];
+        });
+    }
+
+    /**
+     * Profile attributes an employee takes over when placed into the target position:
+     * RM band & Karpim/Karpel classification (DOMAIN.md §4.1) plus golongan / job grade.
+     */
+    private function resolvePlacementProfile(Employee $employee, MutasiRequest $request): array
+    {
+        $rmLevel = $this->formations->resolvePositionRm($request->targetJabatan);
+
+        return [
+            'rm_level' => $rmLevel,
+            'level' => $this->formations->deriveLevelForRm($rmLevel, $employee->level),
+            'golongan' => $request->newGolongan ?: $employee->golongan,
+            'job_grade' => $request->newJobGrade ?: $employee->job_grade,
+        ];
+    }
 
     /** Move one employee to a (currently vacant) target position. */
-    private function doTransfer(
-        Employee $employee,
-        string $targetJabatan,
-        string $targetUnitKerja,
-        string $tmtAwal,
-        string $tmtAkhir,
-        string $jenisMutasi,
-        ?string $nomorSk,
-        ?string $tanggalSk,
-        ?string $catatan,
-        ?string $tanggalBerakhirSanksi = null,
-        string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null,
-        ?string $fileSk = null,
-        ?int $createdBy = null,
-        bool $isDispensasi = false,
-        ?string $alasanDispensasi = null,
-        ?string $newGolongan = null,
-        ?string $newJobGrade = null
-    ): void {
-        $isDefinitif = $statusJabatan === 'Definitif';
+    private function doTransfer(Employee $employee, MutasiRequest $request): void
+    {
+        $profile = $this->resolvePlacementProfile($employee, $request);
 
-        // Derive target RM Level
-        $positions = Position::getAllCached();
-        $targetRm = isset($positions[$targetJabatan]) && $positions[$targetJabatan]->rm_level
-            ? $positions[$targetJabatan]->rm_level
-            : app(ManPowerPlanningService::class)->determineRmLevelByJobTitle($targetJabatan);
-
-        // Derive Level (Karpim vs Karpel) according to DOMAIN.md §4.1
-        $newLevel = $employee->level;
-        if ($targetRm === 'RM-4') {
-            $newLevel = 'Karpel';
-        } elseif (in_array($targetRm, ['RM-1', 'RM-2', 'RM-3'])) {
-            $newLevel = 'Karpim';
-        }
-
-        $effectiveGolongan = $newGolongan ?: $employee->golongan;
-        $effectiveJobGrade = $newJobGrade ?: $employee->job_grade;
-
-        if ($isDefinitif) {
+        if (! $request->isFuture() && $request->isDefinitif()) {
             // 1. Close current definitive job history
-            $employee->currentJob?->update(['tmt_akhir' => $tmtAkhir]);
+            $employee->currentJob?->update(['tmt_akhir' => $request->tmtAkhir()]);
 
-            // 2. Update employee profile (bypass observer to avoid double history row)
-            Employee::withoutEvents(function () use (
-                $employee, $targetJabatan, $targetUnitKerja, $tmtAwal,
-                $tanggalBerakhirSanksi, $targetRm, $newLevel, $statusJabatan,
-                $effectiveGolongan, $effectiveJobGrade
-            ) {
-                $payload = [
-                    'jabatan' => $targetJabatan,
-                    'unit_kerja' => $targetUnitKerja,
-                    'tanggal_dalam_jabatan' => $tmtAwal,
-                    'tmt_unit_kerja' => $tmtAwal,
-                    'tanggal_berakhir_sanksi' => $tanggalBerakhirSanksi,
-                    'rm_level' => $targetRm,
-                    'level' => $newLevel,
-                    'status_penugasan' => $statusJabatan,
-                    'golongan' => $effectiveGolongan,
-                ];
-                if ($effectiveJobGrade) {
-                    $payload['job_grade'] = $effectiveJobGrade;
-                }
-                $employee->update($payload);
-            });
+            // 2. Update employee profile
+            $this->placement->apply(
+                $employee, $request->targetJabatan, $request->targetUnitKerja, $request->tmtAwal,
+                $profile + [
+                    'status_penugasan' => $request->statusJabatan,
+                    'tanggal_berakhir_sanksi' => $request->tanggalBerakhirSanksi,
+                ]
+            );
         }
 
-        // 3. Create new active job history
-        $this->recordJobHistory(
-            employee: $employee,
-            jabatan: $targetJabatan,
-            unitKerja: $targetUnitKerja,
-            tmtAwal: $tmtAwal,
-            jenisMutasi: $jenisMutasi,
-            nomorSk: $nomorSk,
-            tanggalSk: $tanggalSk,
-            catatan: $catatan ?? "Mutasi ke {$targetJabatan} di {$targetUnitKerja}",
-            statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi,
-            fileSk: $fileSk,
-            createdBy: $createdBy,
-            isDispensasi: $isDispensasi,
-            alasanDispensasi: $alasanDispensasi,
-            level: $newLevel,
-            golongan: $effectiveGolongan
-        );
+        // 3. Create new job history (applied immediately or staged for future TMT)
+        $this->placement->recordHistory($employee, $request->targetJabatan, $request->targetUnitKerja, $request, $profile);
     }
 
     /**
-     * Atomically swap two employees' positions.
+     * Atomically swap two employees' positions (always Definitif — see resolveSwapOccupant).
      * Creates ZERO net vacancies — both old histories close and two new ones open simultaneously.
+     * Both legs share one batch_id so scheduled activation & cancellation always act on the pair.
      */
-    private function doSwap(
-        Employee $empA,
-        Employee $empB,
-        string $targetJabatan,  // empA's target (= empB's current position)
-        string $targetUnitKerja,
-        string $tmtAwal,
-        string $tmtAkhir,
-        string $jenisMutasi,
-        ?string $nomorSk,
-        ?string $tanggalSk,
-        ?string $catatan,
-        ?string $tanggalBerakhirSanksi = null,
-        string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null,
-        ?string $fileSk = null,
-        ?int $createdBy = null,
-        bool $isDispensasi = false,
-        ?string $alasanDispensasi = null,
-        ?string $newGolongan = null,
-        ?string $newJobGrade = null
-    ): void {
+    private function doSwap(Employee $empA, Employee $empB, MutasiRequest $request): void
+    {
         // Snapshot both positions BEFORE touching anything
-        $posA = [
-            'jabatan' => $empA->jabatan,
-            'unit_kerja' => $empA->unit_kerja,
-            'level' => $empA->level,
-            'rm_level' => $empA->rm_level,
-            'golongan' => $empA->golongan,
-            'job_grade' => $empA->job_grade,
+        $posA = $this->snapshotPosition($empA);
+        $posB = $this->snapshotPosition($empB);
+
+        $profileA = [
+            'rm_level' => $posB['rm_level'] ?? $empA->rm_level,
+            'level' => $posB['level'] ?? $empA->level,
+            'golongan' => $request->newGolongan ?: $empA->golongan,
+            'job_grade' => $request->newJobGrade ?: $empA->job_grade,
         ];
-        $posB = [
-            'jabatan' => $empB->jabatan,
-            'unit_kerja' => $empB->unit_kerja,
-            'level' => $empB->level,
-            'rm_level' => $empB->rm_level,
-            'golongan' => $empB->golongan,
-            'job_grade' => $empB->job_grade,
+        $profileB = [
+            'rm_level' => $posA['rm_level'] ?? $empB->rm_level,
+            'level' => $posA['level'] ?? $empB->level,
+            'golongan' => $posA['golongan'] ?? $empB->golongan,
+            'job_grade' => $posA['job_grade'],
         ];
 
-        $isDefinitif = $statusJabatan === 'Definitif';
-        $effectiveGolonganA = $newGolongan ?: $empA->golongan;
-        $effectiveJobGradeA = $newJobGrade ?: $empA->job_grade;
+        if (! $request->isFuture()) {
+            // 1. Close active job histories of both employees
+            $empA->currentJob?->update(['tmt_akhir' => $request->tmtAkhir()]);
+            $empB->currentJob?->update(['tmt_akhir' => $request->tmtAkhir()]);
 
-        // 1. Close active job histories (if Definitif, close empA's definitive job)
-        if ($isDefinitif) {
-            $empA->currentJob?->update(['tmt_akhir' => $tmtAkhir]);
+            // 2. Swap employee profiles (employee B keeps own golongan / job grade)
+            $this->placement->apply(
+                $empA, $posB['jabatan'], $posB['unit_kerja'], $request->tmtAwal,
+                $profileA + ['tanggal_berakhir_sanksi' => $request->tanggalBerakhirSanksi]
+            );
+            $this->placement->apply(
+                $empB, $posA['jabatan'], $posA['unit_kerja'], $request->tmtAwal,
+                Arr::only($profileB, ['rm_level', 'level'])
+            );
         }
-        $empB->currentJob?->update(['tmt_akhir' => $tmtAkhir]);
 
-        // 2. Swap employee profiles atomically (bypass observer)
-        Employee::withoutEvents(function () use (
-            $empA, $empB, $posA, $posB, $tmtAwal, $tanggalBerakhirSanksi, $isDefinitif,
-            $effectiveGolonganA, $effectiveJobGradeA
-        ) {
-            if ($isDefinitif) {
-                $payloadA = [
-                    'jabatan' => $posB['jabatan'],
-                    'unit_kerja' => $posB['unit_kerja'],
-                    'tanggal_dalam_jabatan' => $tmtAwal,
-                    'tmt_unit_kerja' => $tmtAwal,
-                    'tanggal_berakhir_sanksi' => $tanggalBerakhirSanksi,
-                    'rm_level' => $posB['rm_level'] ?? $empA->rm_level,
-                    'level' => $posB['level'] ?? $empA->level,
-                    'golongan' => $effectiveGolonganA,
-                ];
-                if ($effectiveJobGradeA) {
-                    $payloadA['job_grade'] = $effectiveJobGradeA;
-                }
-                $empA->update($payloadA);
-            }
-            $empB->update([
-                'jabatan' => $posA['jabatan'],
-                'unit_kerja' => $posA['unit_kerja'],
-                'tanggal_dalam_jabatan' => $tmtAwal,
-                'tmt_unit_kerja' => $tmtAwal,
-                'rm_level' => $posA['rm_level'] ?? $empB->rm_level,
-                'level' => $posA['level'] ?? $empB->level,
-            ]);
-        });
+        // 3. Create two new job history rows (applied immediately or staged for future TMT)
+        $baseNote = $request->catatan ?? 'Tukar jabatan / rotasi bersilang';
+        $batchId = Str::uuid()->toString();
 
-        // 3. Create two new active job history rows (cross-swapped)
-        $baseNote = $catatan ?? 'Tukar jabatan / rotasi bersilang';
-        $this->recordJobHistory(
-            employee: $empA,
-            jabatan: $posB['jabatan'],
-            unitKerja: $posB['unit_kerja'],
-            tmtAwal: $tmtAwal,
-            jenisMutasi: $jenisMutasi,
-            nomorSk: $nomorSk,
-            tanggalSk: $tanggalSk,
-            catatan: "{$baseNote} — bertukar dengan {$empB->nama}",
-            statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi,
-            fileSk: $fileSk,
-            createdBy: $createdBy,
-            isDispensasi: $isDispensasi,
-            alasanDispensasi: $alasanDispensasi,
-            level: $posB['level'] ?? $empA->level,
-            golongan: $effectiveGolonganA
-        );
-        $this->recordJobHistory(
-            employee: $empB,
-            jabatan: $posA['jabatan'],
-            unitKerja: $posA['unit_kerja'],
-            tmtAwal: $tmtAwal,
-            jenisMutasi: $jenisMutasi,
-            nomorSk: $nomorSk,
-            tanggalSk: $tanggalSk,
-            catatan: "{$baseNote} — bertukar dengan {$empA->nama}",
-            statusJabatan: $statusJabatan,
-            tmtAkhirEstimasi: $tmtAkhirEstimasi,
-            fileSk: $fileSk,
-            createdBy: $createdBy,
-            isDispensasi: false,
-            alasanDispensasi: null,
-            level: $posA['level'] ?? $empB->level,
-            golongan: $posA['golongan'] ?? $empB->golongan
-        );
-    }
-
-    /**
-     * Record a new job history entry.
-     */
-    private function recordJobHistory(
-        Employee $employee,
-        string $jabatan,
-        string $unitKerja,
-        string $tmtAwal,
-        string $jenisMutasi,
-        ?string $nomorSk,
-        ?string $tanggalSk,
-        string $catatan,
-        string $statusJabatan = 'Definitif',
-        ?string $tmtAkhirEstimasi = null,
-        ?string $fileSk = null,
-        ?int $createdBy = null,
-        bool $isDispensasi = false,
-        ?string $alasanDispensasi = null,
-        ?string $level = null,
-        ?string $golongan = null
-    ): JobHistory {
-        return JobHistory::create([
-            'employee_nik' => $employee->nik,
-            'created_by' => $createdBy,
-            'jabatan' => $jabatan,
-            'unit_kerja' => $unitKerja,
-            'level' => $level ?? $employee->level,
-            'golongan' => $golongan ?? $employee->golongan,
-            'tmt_awal' => $tmtAwal,
-            'tmt_akhir' => null,
-            'tmt_akhir_estimasi' => $tmtAkhirEstimasi,
-            'status_penugasan' => $statusJabatan,
-            'jenis_mutasi' => $jenisMutasi,
-            'nomor_sk' => $nomorSk,
-            'tanggal_sk' => $tanggalSk,
-            'file_sk' => $fileSk,
-            'catatan' => $catatan,
-            'is_dispensasi' => $isDispensasi,
-            'alasan_dispensasi' => $alasanDispensasi,
+        $this->placement->recordHistory($empA, $posB['jabatan'], $posB['unit_kerja'], $request, $profileA, [
+            'catatan' => "{$baseNote} — bertukar dengan {$empB->nama}",
+            'batch_id' => $batchId,
+            'chain_order' => 1,
+        ]);
+        $this->placement->recordHistory($empB, $posA['jabatan'], $posA['unit_kerja'], $request, $profileB, [
+            'catatan' => "{$baseNote} — bertukar dengan {$empA->nama}",
+            'is_dispensasi' => false,
+            'alasan_dispensasi' => null,
+            'tanggal_berakhir_sanksi' => null,
+            'batch_id' => $batchId,
+            'chain_order' => 2,
         ]);
     }
 
-    /**
-     * Parse numeric rank from an RM string (e.g. 'RM-3' -> 3).
-     */
-    private function parseRmNumber(?string $rmLevel): ?int
+    private function snapshotPosition(Employee $employee): array
     {
-        if (! $rmLevel) {
-            return null;
-        }
-
-        return (int) str_replace('RM-', '', $rmLevel);
+        return [
+            'jabatan' => $employee->jabatan,
+            'unit_kerja' => $employee->unit_kerja,
+            'level' => $employee->level,
+            'rm_level' => $employee->rm_level,
+            'golongan' => $employee->golongan,
+            'job_grade' => $employee->job_grade,
+        ];
     }
 
     // -------------------------------------------------------------------------
-    // History / Reporting
+    // Public API (DOMAIN.md §9.2) — delegates to the focused collaborators
     // -------------------------------------------------------------------------
 
-    /**
-     * Paginated system-wide mutation history (all job_histories, newest first).
-     */
+    /** @see FormationService::analyzeTarget() */
+    public function analyzeTarget(string $jabatan, string $unitKerja): array
+    {
+        return $this->formations->analyzeTarget($jabatan, $unitKerja);
+    }
+
+    /** @see FormationService::getAvailableTargetPositions() */
+    public function getAvailableTargetPositions(Employee $emp, string $targetUnitKerja, string $jenisMutasi): array
+    {
+        return $this->formations->getAvailableTargetPositions($emp, $targetUnitKerja, $jenisMutasi);
+    }
+
+    /** @see FormationService::resolvePositionRm() */
+    public function resolvePositionRm(string $jabatan): string
+    {
+        return $this->formations->resolvePositionRm($jabatan);
+    }
+
+    /** @see FormationService::deriveLevelForRm() */
+    public function deriveLevelForRm(string $rmLevel, ?string $fallback = null): ?string
+    {
+        return $this->formations->deriveLevelForRm($rmLevel, $fallback);
+    }
+
+    /** @see FormationService::resolveEmployeeRm() */
+    public function resolveEmployeeRm(Employee $employee): string
+    {
+        return $this->formations->resolveEmployeeRm($employee);
+    }
+
+    /** @see FormationService::getPositionFlags() */
+    public function getPositionFlags(string $jabatan): array
+    {
+        return $this->formations->getPositionFlags($jabatan);
+    }
+
+    /** @see MutasiGovernanceGuard::checkTenureCompliance() */
+    public function checkTenureCompliance(Employee $emp, string $targetUnitKerja): array
+    {
+        return $this->guard->checkTenureCompliance($emp, $targetUnitKerja);
+    }
+
+    /** @see MutasiGovernanceGuard::checkPromotionEligibility() */
+    public function checkPromotionEligibility(Employee $emp, string $targetJabatan): array
+    {
+        return $this->guard->checkPromotionEligibility($emp, $targetJabatan);
+    }
+
+    /** @see ChainTopologyAnalyzer::validateChainTopology() */
+    public function validateChainTopology(array $nodes): array
+    {
+        return $this->chains->validateChainTopology($nodes);
+    }
+
+    /** @see ChainTopologyAnalyzer::prepareNodes() */
+    public function prepareChainNodes(array $nodes): array
+    {
+        return $this->chains->prepareNodes($nodes);
+    }
+
+    /** @see ChainTopologyAnalyzer::orderNodesByFlow() */
+    public function orderChainNodesByFlow(array $nodes): array
+    {
+        return $this->chains->orderNodesByFlow($nodes);
+    }
+
+    /** @see PlacementWriter::apply() */
+    public function applyPlacementToEmployee(Employee $employee, string $jabatan, string $unitKerja, string $tmt, array $attributes = []): void
+    {
+        $this->placement->apply($employee, $jabatan, $unitKerja, $tmt, $attributes);
+    }
+
+    /** @see ScheduledMutationService::applyEffectiveMutations() */
+    public function applyEffectiveMutations(?string $targetDate = null): array
+    {
+        return $this->scheduled->applyEffectiveMutations($targetDate);
+    }
+
+    /** @see ScheduledMutationService::applyScheduledMutation() */
+    public function applyScheduledMutation(int $jobHistoryId): array
+    {
+        return $this->scheduled->applyScheduledMutation($jobHistoryId);
+    }
+
+    /** @see ScheduledMutationService::cancelScheduledMutation() */
+    public function cancelScheduledMutation(int|string $identifier, ?string $reason = null, ?int $cancelledBy = null): array
+    {
+        return $this->scheduled->cancelScheduledMutation($identifier, $reason, $cancelledBy);
+    }
+
+    /** @see MutasiHistoryReader::getMutasiBatch() */
+    public function getMutasiBatch(string $batchId): Collection
+    {
+        return $this->history->getMutasiBatch($batchId);
+    }
+
+    /** @see MutasiHistoryReader::getMutasiHistoryQuery() */
+    public function getMutasiHistoryQuery(
+        ?string $search = null,
+        ?string $unitKerja = null,
+        ?string $jenisMutasi = null,
+        ?bool $isApplied = null,
+        bool $onlyDue = false,
+        string $sortBy = 'tmt_awal',
+        string $sortDirection = 'desc',
+    ): Builder {
+        return $this->history->getMutasiHistoryQuery($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $sortBy, $sortDirection);
+    }
+
+    /** @see MutasiHistoryReader::getMutasiHistory() */
     public function getMutasiHistory(
         ?string $search = null,
         ?string $unitKerja = null,
         ?string $jenisMutasi = null,
+        ?bool $isApplied = null,
+        bool $onlyDue = false,
         int $perPage = 15,
+        string $sortBy = 'tmt_awal',
+        string $sortDirection = 'desc',
     ): LengthAwarePaginator {
-        return JobHistory::with(['employee', 'creator'])
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('jabatan', 'like', "%{$search}%")
-                        ->orWhere('unit_kerja', 'like', "%{$search}%")
-                        ->orWhereHas('employee', fn ($q3) => $q3->where('nama', 'like', "%{$search}%")
-                            ->orWhere('nik', 'like', "%{$search}%")
-                        );
-                });
-            })
-            ->when($unitKerja, fn ($q) => $q->where('unit_kerja', $unitKerja))
-            ->when($jenisMutasi, fn ($q) => $q->where('jenis_mutasi', $jenisMutasi))
-            ->orderByDesc('tmt_awal')
-            ->orderByDesc('id')
-            ->paginate($perPage);
+        return $this->history->getMutasiHistory($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $perPage, $sortBy, $sortDirection);
     }
 
-    /**
-     * All distinct jabatan values known in the system (for dropdowns).
-     */
+    /** @see MutasiHistoryReader::getMutasiHistoryKpis() */
+    public function getMutasiHistoryKpis(): array
+    {
+        return $this->history->getMutasiHistoryKpis();
+    }
+
+    /** @see MutasiHistoryReader::getScheduledMutationsCount() */
+    public function getScheduledMutationsCount(): int
+    {
+        return $this->history->getScheduledMutationsCount();
+    }
+
+    /** @see MutasiHistoryReader::getMutasiDetail() */
+    public function getMutasiDetail(int $id): JobHistory
+    {
+        return $this->history->getMutasiDetail($id);
+    }
+
+    /** @see TalentProfileBuilder::build() */
+    public function getTalentProfile(string $nik): ?array
+    {
+        return $this->profiles->build($nik);
+    }
+
+    /** @see MutasiLookup::getSelectableEmployees() */
+    public function getSelectableEmployees(?string $unitKerja = null): Collection
+    {
+        return $this->lookup->getSelectableEmployees($unitKerja);
+    }
+
+    /** @see MutasiLookup::getGroupedUnits() */
+    public function getGroupedUnits(): array
+    {
+        return $this->lookup->getGroupedUnits();
+    }
+
+    /** @see MutasiLookup::findEmployee() */
+    public function findEmployee(string $nik): ?Employee
+    {
+        return $this->lookup->findEmployee($nik);
+    }
+
+    /** @see MutasiLookup::listTargetPositions() */
+    public function listTargetPositions(string $nik, string $targetUnitKerja, string $jenisMutasi): array
+    {
+        return $this->lookup->listTargetPositions($nik, $targetUnitKerja, $jenisMutasi);
+    }
+
+    /** @see MutasiLookup::tenureComplianceFor() */
+    public function tenureComplianceFor(string $nik, string $targetUnitKerja): ?array
+    {
+        return $this->lookup->tenureComplianceFor($nik, $targetUnitKerja);
+    }
+
+    /** @see MutasiLookup::promotionEligibilityFor() */
+    public function promotionEligibilityFor(string $nik, string $targetJabatan): ?array
+    {
+        return $this->lookup->promotionEligibilityFor($nik, $targetJabatan);
+    }
+
+    /** @see MutasiLookup::getEmployeeSnapshot() */
+    public function getEmployeeSnapshot(string $nik): ?array
+    {
+        return $this->lookup->getEmployeeSnapshot($nik);
+    }
+
+    /** @see MutasiLookup::getKnownJabatan() */
     public function getKnownJabatan(): Collection
     {
-        $histories = DB::table('job_histories')
-            ->select('jabatan')->distinct()
-            ->orderBy('jabatan')->pluck('jabatan')->toArray();
-        $master = Position::pluck('nama')->toArray();
-
-        return collect(array_unique(array_merge($histories, $master)))->sort()->values();
+        return $this->lookup->getKnownJabatan();
     }
 
-    /**
-     * All distinct unit_kerja values known in the system (for dropdowns).
-     */
+    /** @see MutasiLookup::getKnownUnits() */
     public function getKnownUnits(): Collection
     {
-        $histories = DB::table('job_histories')
-            ->select('unit_kerja')->distinct()
-            ->orderBy('unit_kerja')->pluck('unit_kerja')->toArray();
-
-        $master = array_unique(array_merge(...\array_values(Employee::GROUPED_UNITS)));
-
-        return collect(array_unique(array_merge($histories, $master)))->sort()->values();
+        return $this->lookup->getKnownUnits();
     }
 }

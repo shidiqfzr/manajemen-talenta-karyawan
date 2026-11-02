@@ -2,16 +2,17 @@
 
 namespace App\Livewire\Admin;
 
+use App\Exceptions\MutasiIntegrityException;
+use App\Exceptions\MutasiRuleViolationException;
 use App\Livewire\Forms\MutasiForm;
-use App\Models\Employee;
 use App\Models\JobHistory;
-use App\Models\Position;
-use App\Models\Unit;
-use App\Services\ManPowerPlanningService;
+use App\Services\Data\MutasiRequest;
+use App\Services\Mutasi\TalentProfileBuilder;
 use App\Services\MutasiService;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -42,34 +43,12 @@ class MutasiProcess extends Component
 
     public ?string $swapIncompatibilityMessage = null;
 
-    /**
-     * Magic property delegation to MutasiForm for clean access & backwards compatibility.
-     */
-    public function __get($name)
-    {
-        if (isset($this->form) && property_exists($this->form, $name)) {
-            return $this->form->$name;
-        }
+    // ── Talent Intelligence Slide-Over Drawer ───────────────────────────────
+    public ?string $selectedTalentNik = null;
 
-        return null;
-    }
+    public ?array $selectedTalentData = null;
 
-    public function __set($name, $value)
-    {
-        if (isset($this->form) && property_exists($this->form, $name)) {
-            $this->form->$name = $value;
-            $this->updated($name, $value);
-
-            return;
-        }
-
-        $this->$name = $value;
-    }
-
-    public function __isset($name)
-    {
-        return isset($this->form) && isset($this->form->$name);
-    }
+    public bool $showTalentDrawer = false;
 
     public function mount(?string $jabatan = null, ?string $unit = null, ?string $nik = null): void
     {
@@ -135,6 +114,12 @@ class MutasiProcess extends Component
         if ($this->employeeDetails) {
             $this->form->newGolongan = $this->employeeDetails['golongan'] ?? '';
             $this->form->newJobGrade = (string) ($this->employeeDetails['job_grade'] ?? '');
+
+            // Contextual default jenisMutasi: if RM-1, PROMOSI is impossible -> fallback to MUTASI_UNIT
+            if (($this->employeeDetails['rm_level'] ?? '') === 'RM-1' && $this->form->jenisMutasi === 'PROMOSI') {
+                $this->form->jenisMutasi = 'MUTASI_UNIT';
+            }
+
             if ($this->form->jenisMutasi === 'ROTASI') {
                 $this->form->targetUnitKerja = $this->employeeDetails['unit_kerja'];
             }
@@ -152,6 +137,7 @@ class MutasiProcess extends Component
 
     public function updatedTargetJabatan(): void
     {
+        $this->resetErrorBag(); // a new formasi invalidates errors raised for the previous one
         $this->form->swapConfirmed = false;
         $this->runAnalysis();
     }
@@ -164,6 +150,7 @@ class MutasiProcess extends Component
 
     private function resetTarget(bool $resetUnit = true): void
     {
+        $this->resetErrorBag();
         $this->form->resetTarget($resetUnit);
         if ($resetUnit) {
             $this->tenureAnalysis = null;
@@ -183,6 +170,11 @@ class MutasiProcess extends Component
      */
     public function validateFormData(): bool
     {
+        // Re-derive analysis state server-side; public component properties are client-mutable
+        $this->employeeDetails = $this->form->employeeNik ? $this->resolveEmployee($this->form->employeeNik) : null;
+        $this->runAnalysis();
+        $this->runTenureAnalysis();
+
         try {
             return $this->form->validateForm(
                 tenureAnalysis: $this->tenureAnalysis,
@@ -197,11 +189,67 @@ class MutasiProcess extends Component
                 $cleanField = str_starts_with((string) $field, 'form.') ? substr((string) $field, 5) : (string) $field;
                 foreach ((array) $messages as $msg) {
                     $this->addError($cleanField, $msg);
+                    $this->addError('form.'.$cleanField, $msg);
                 }
             }
 
             throw $e;
         }
+    }
+
+    /**
+     * Why this placement cannot proceed as a single SK, or null when it can.
+     * Drives the disabled state of the SK section and primary action; the real guard stays in MutasiForm::validateForm().
+     */
+    #[Computed]
+    public function blockingReason(): ?string
+    {
+        return match (true) {
+            (bool) ($this->employeeDetails['is_retired'] ?? false) => 'Karyawan telah melewati batas usia pensiun dan tidak dapat dimutasi.',
+            ($this->targetAnalysis['type'] ?? null) === 'same' => 'Karyawan sudah menjabat pada formasi dan unit kerja yang sama.',
+            ($this->targetAnalysis['type'] ?? null) === 'reserved',
+            (bool) ($this->targetAnalysis['is_reserved'] ?? false) => 'Formasi telah dipesan oleh mutasi terjadwal. Pilih formasi lain.',
+            ($this->targetAnalysis['type'] ?? null) === 'occupied' && ! $this->isSwapAllowed => 'Formasi masih terisi pejabat definitif. Selesaikan melalui Mutasi Berantai.',
+            default => null,
+        };
+    }
+
+    /**
+     * Everything still outstanding before this placement can be processed, blocker first.
+     * Applicability mirrors x-admin.mutasi.compliance-guard so the header summary and the cards agree.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function outstandingIssues(): array
+    {
+        $issues = [];
+
+        if ($reason = $this->blockingReason()) {
+            $issues[] = $reason;
+        }
+
+        if ($this->tenureAnalysis && ! ($this->tenureAnalysis['is_compliant'] ?? true) && ($this->tenureAnalysis['is_applicable'] ?? true)) {
+            $issues[] = 'Masa dinas unit kerja belum memenuhi, perlu dispensasi.';
+        }
+
+        if ($this->promotionAnalysis && ! ($this->promotionAnalysis['is_eligible'] ?? true) && ($this->promotionAnalysis['is_applicable'] ?? false)) {
+            $issues[] = 'Kualifikasi promosi belum memenuhi, perlu dispensasi.';
+        }
+
+        return $issues;
+    }
+
+    /**
+     * True when the only obstacle is an occupied formasi that a chain mutation can resolve.
+     * Mirrors the occupied arm of blockingReason(); retired employees cannot be chained.
+     */
+    #[Computed]
+    public function resolvableByChain(): bool
+    {
+        return ($this->targetAnalysis['type'] ?? null) === 'occupied'
+            && ! $this->isSwapAllowed
+            && ! ($this->employeeDetails['is_retired'] ?? false);
     }
 
     public function openSummaryModal(): void
@@ -214,6 +262,23 @@ class MutasiProcess extends Component
     public function closeSummaryModal(): void
     {
         $this->showSummaryModal = false;
+    }
+
+    /**
+     * Open Slide-Over Talent Intelligence Drawer for a specific participant.
+     */
+    public function openTalentDrawer(string $nik, MutasiService $service): void
+    {
+        $this->selectedTalentNik = $nik;
+        $this->selectedTalentData = $service->getTalentProfile($nik);
+        $this->showTalentDrawer = true;
+    }
+
+    public function closeTalentDrawer(): void
+    {
+        $this->showTalentDrawer = false;
+        $this->selectedTalentNik = null;
+        $this->selectedTalentData = null;
     }
 
     public function submitMutasi(MutasiService $service): void
@@ -250,27 +315,29 @@ class MutasiProcess extends Component
         }
         $alasanDispensasi = ! empty($alasanList) ? implode(' | ', $alasanList) : null;
 
+        $request = new MutasiRequest(
+            employeeNik: $this->form->employeeNik,
+            targetJabatan: $this->form->targetJabatan,
+            targetUnitKerja: $this->form->targetUnitKerja,
+            tmtAwal: $this->form->tmtAwal,
+            jenisMutasi: $this->form->jenisMutasi,
+            nomorSk: $this->form->nomorSk,
+            tanggalSk: $this->form->tanggalSk,
+            catatan: $this->form->catatan,
+            tanggalBerakhirSanksi: $this->form->isTargetDiperban ? $this->form->tanggalBerakhirSanksi : null,
+            statusJabatan: $this->form->statusJabatan,
+            tmtAkhirEstimasi: in_array($this->form->statusJabatan, ['Pj', 'Plt']) ? $this->form->tmtAkhirEstimasi : null,
+            fileSk: $fileSkPath,
+            createdBy: auth()->id(),
+            isDispensasi: $isDispensasi,
+            alasanDispensasi: $alasanDispensasi,
+            newGolongan: $this->form->newGolongan,
+            newJobGrade: $this->form->newJobGrade,
+        );
+
         try {
-            $result = $service->processMutasi(
-                employeeNik: $this->form->employeeNik,
-                targetJabatan: $this->form->targetJabatan,
-                targetUnitKerja: $this->form->targetUnitKerja,
-                tmtAwal: $this->form->tmtAwal,
-                jenisMutasi: $this->form->jenisMutasi,
-                nomorSk: $this->form->nomorSk ?: null,
-                tanggalSk: $this->form->tanggalSk ?: null,
-                catatan: $this->form->catatan ?: null,
-                tanggalBerakhirSanksi: $this->form->isTargetDiperban ? $this->form->tanggalBerakhirSanksi : null,
-                statusJabatan: $this->form->statusJabatan,
-                tmtAkhirEstimasi: in_array($this->form->statusJabatan, ['Pj', 'Plt']) && ! empty($this->form->tmtAkhirEstimasi) ? $this->form->tmtAkhirEstimasi : null,
-                fileSk: $fileSkPath,
-                createdBy: auth()->id(),
-                isDispensasi: $isDispensasi,
-                alasanDispensasi: $alasanDispensasi,
-                newGolongan: ! empty($this->form->newGolongan) ? $this->form->newGolongan : null,
-                newJobGrade: ! empty($this->form->newJobGrade) ? $this->form->newJobGrade : null
-            );
-        } catch (\InvalidArgumentException|\RuntimeException $e) {
+            $result = $service->processMutasi($request);
+        } catch (MutasiRuleViolationException|MutasiIntegrityException $e) {
             $this->showSummaryModal = false;
             $this->addError('form.employeeNik', $e->getMessage());
             $this->addError('employeeNik', $e->getMessage());
@@ -296,38 +363,21 @@ class MutasiProcess extends Component
 
     public function render(MutasiService $service)
     {
-        $empQuery = Employee::query()
-            ->where(function ($q) {
-                $q->whereNull('tanggal_pensiun')
-                    ->orWhere('tanggal_pensiun', '>=', now()->startOfMonth());
-            })
-            ->orderBy('nama');
-
-        if (! empty($this->form->sourceUnitFilter)) {
-            $empQuery->where('unit_kerja', $this->form->sourceUnitFilter);
-        }
-        $employees = $empQuery->get(['nik', 'nama', 'jabatan', 'unit_kerja']);
-
-        $jabatanList = $this->getFilteredJabatanList($service);
-        $unitList = $service->getKnownUnits();
-        $mutasiTypes = JobHistory::MUTASI_TYPES;
-
-        $activeUnits = Unit::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get();
-        if ($activeUnits->isNotEmpty()) {
-            $groupedUnits = $activeUnits->groupBy('wilayah')
-                ->map(fn ($units) => $units->pluck('nama')->toArray())
-                ->toArray();
-        } else {
-            $groupedUnits = Employee::GROUPED_UNITS;
-        }
-
-        return view('livewire.admin.mutasi-process', array_merge(
-            $this->form->all(),
-            compact('employees', 'jabatanList', 'unitList', 'groupedUnits', 'mutasiTypes')
-        ));
+        return view('livewire.admin.mutasi-process', [
+            'employees' => $service->getSelectableEmployees($this->form->sourceUnitFilter ?: null),
+            'jabatanList' => $this->getFilteredJabatanList($service),
+            'unitList' => $service->getKnownUnits(),
+            'groupedUnits' => $service->getGroupedUnits(),
+            'mutasiTypes' => JobHistory::MUTASI_TYPES,
+        ]);
     }
 
     // ── Private helpers ────────────────────────────────────────────────────
+
+    private function service(): MutasiService
+    {
+        return app(MutasiService::class);
+    }
 
     private function getFilteredJabatanList(MutasiService $service)
     {
@@ -335,15 +385,11 @@ class MutasiProcess extends Component
             return collect(); // Return empty if no employee or unit selected
         }
 
-        $emp = Employee::where('nik', $this->form->employeeNik)->first();
-        if (! $emp) {
-            return collect();
-        }
-
-        $positionsArray = app(MutasiService::class)
-            ->getAvailableTargetPositions($emp, $this->form->targetUnitKerja, $this->form->jenisMutasi);
-
-        return collect($positionsArray);
+        return collect($service->listTargetPositions(
+            $this->form->employeeNik,
+            $this->form->targetUnitKerja,
+            $this->form->jenisMutasi
+        ));
     }
 
     private function resolveEmployee(string $nik): ?array
@@ -352,28 +398,7 @@ class MutasiProcess extends Component
             return null;
         }
 
-        $emp = Employee::with('currentJob')->where('nik', $nik)->first();
-        if (! $emp) {
-            return null;
-        }
-
-        // Get RM Level
-        $rmLevel = app(ManPowerPlanningService::class)->determineRmLevel($emp);
-
-        return [
-            'nik' => $emp->nik,
-            'nama' => $emp->nama,
-            'jabatan' => $emp->currentJob?->jabatan ?? $emp->jabatan,
-            'unit_kerja' => $emp->currentJob?->unit_kerja ?? $emp->unit_kerja,
-            'level' => $emp->currentJob?->level ?? $emp->level,
-            'golongan' => $emp->golongan,
-            'job_grade' => $emp->job_grade,
-            'person_grade' => $emp->person_grade,
-            'has_job' => (bool) $emp->currentJob,
-            'rm_level' => $rmLevel,
-            'tmt_unit_kerja' => $emp->tmt_unit_kerja?->toDateString(),
-            'tanggal_dalam_jabatan' => $emp->tanggal_dalam_jabatan?->toDateString(),
-        ];
+        return $this->service()->getTalentProfile($nik);
     }
 
     private function runAnalysis(): void
@@ -403,49 +428,69 @@ class MutasiProcess extends Component
             return;
         }
 
-        $analysis = app(MutasiService::class)->analyzeTarget(
-            $this->form->targetJabatan,
-            $this->form->targetUnitKerja
-        );
+        $service = $this->service();
+        $analysis = $service->analyzeTarget($this->form->targetJabatan, $this->form->targetUnitKerja);
 
         $occupant = $analysis['occupant'];
+        $occupantRm = $occupant ? $service->resolveEmployeeRm($occupant) : null;
         $this->isSwapAllowed = true;
         $this->swapIncompatibilityMessage = null;
         $this->occupantTenureAnalysis = null;
 
         if ($occupant) {
             $empARm = $this->employeeDetails['rm_level'] ?? null;
-            $empBRm = $occupant->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($occupant);
+            $empBRm = $occupantRm;
 
             if ($empARm && $empBRm && $empARm !== $empBRm) {
                 $this->isSwapAllowed = false;
-                $this->swapIncompatibilityMessage = "Tukar jabatan (Swap) tidak diizinkan antar eselon yang berbeda. Karyawan asal berada pada tingkat {$empARm}, sedangkan pejabat saat ini berada pada tingkat {$empBRm}. Sesuai tata kelola HRIS Enterprise, gunakan mutasi ke formasi kosong.";
+                if ($this->form->jenisMutasi === 'PROMOSI') {
+                    $this->swapIncompatibilityMessage = "Formasi target saat ini diduduki oleh {$occupant->nama} ({$empBRm}). Pejabat petahana perlu dipindahkan lebih dulu melalui Mutasi Berantai.";
+                } elseif ($this->form->jenisMutasi === 'DEMOSI') {
+                    $this->swapIncompatibilityMessage = "Formasi target saat ini diduduki oleh {$occupant->nama} ({$empBRm}). Penempatan Demosi pada formasi yang masih terisi tidak dapat diproses melalui Mutasi Tunggal.";
+                } else {
+                    $this->swapIncompatibilityMessage = "Tukar jabatan (Swap) tidak diizinkan antar eselon yang berbeda. Karyawan asal berada pada tingkat {$empARm}, sedangkan pejabat saat ini berada pada tingkat {$empBRm}.";
+                }
             }
 
             // Check Employee B's tenure in their current unit
             if ($this->employeeDetails) {
-                $this->occupantTenureAnalysis = app(MutasiService::class)->checkTenureCompliance(
+                $this->occupantTenureAnalysis = $service->checkTenureCompliance(
                     $occupant,
                     $this->employeeDetails['unit_kerja']
                 );
             }
         }
 
+        $occupantTenureText = null;
+        if ($occupant?->tmt_unit_kerja) {
+            $occupantTenureText = TalentProfileBuilder::formatMonths((int) Carbon::parse($occupant->tmt_unit_kerja)->diffInMonths(now()));
+        }
+
         $this->targetAnalysis = [
-            'type' => $analysis['type'],
+            // a formasi promised by a scheduled mutation is reserved even while its incumbent still sits in it
+            'type' => ($analysis['is_reserved'] ?? false) ? 'reserved' : $analysis['type'],
+            'is_reserved' => $analysis['is_reserved'] ?? false,
+            'reserved_occupant' => ! empty($analysis['reserved_occupant']) ? [
+                'nik' => $analysis['reserved_occupant']->nik,
+                'nama' => $analysis['reserved_occupant']->nama,
+                'tmt_awal' => $analysis['reserved_job']?->tmt_awal ? Carbon::parse($analysis['reserved_job']->tmt_awal)->format('d/m/Y') : null,
+                'sk_nomor' => $analysis['reserved_job']?->nomor_sk,
+            ] : null,
             'occupant' => $occupant ? [
                 'nik' => $occupant->nik,
                 'nama' => $occupant->nama,
                 'jabatan' => $occupant->jabatan,
                 'unit_kerja' => $occupant->unit_kerja,
                 'golongan' => $occupant->golongan,
-                'rm_level' => $occupant->rm_level ?? app(ManPowerPlanningService::class)->determineRmLevel($occupant),
+                'rm_level' => $occupantRm,
+                'tmt_unit_kerja' => $occupant->tmt_unit_kerja ? Carbon::parse($occupant->tmt_unit_kerja)->format('d/m/Y') : null,
+                'tenure_text' => $occupantTenureText,
             ] : null,
         ];
 
-        $targetPos = Position::getAllCached()->get($this->form->targetJabatan);
-        $this->form->isTargetDiperban = $targetPos ? (bool) $targetPos->is_diperban : false;
-        $this->form->isTargetOverflow = $targetPos ? (bool) $targetPos->is_overflow : false;
+        $positionFlags = $service->getPositionFlags($this->form->targetJabatan);
+        $this->form->isTargetDiperban = $positionFlags['is_diperban'];
+        $this->form->isTargetOverflow = $positionFlags['is_overflow'];
 
         $this->runTenureAnalysis();
         $this->runPromotionAnalysis();
@@ -459,10 +504,10 @@ class MutasiProcess extends Component
             return;
         }
 
-        $emp = Employee::where('nik', $this->form->employeeNik)->first();
-        if ($emp) {
-            $this->tenureAnalysis = app(MutasiService::class)->checkTenureCompliance($emp, $this->form->targetUnitKerja);
-        }
+        $this->tenureAnalysis = $this->service()->tenureComplianceFor(
+            $this->form->employeeNik,
+            $this->form->targetUnitKerja
+        );
     }
 
     private function runPromotionAnalysis(): void
@@ -473,9 +518,9 @@ class MutasiProcess extends Component
             return;
         }
 
-        $emp = Employee::where('nik', $this->form->employeeNik)->first();
-        if ($emp) {
-            $this->promotionAnalysis = app(MutasiService::class)->checkPromotionEligibility($emp, $this->form->targetJabatan);
-        }
+        $this->promotionAnalysis = $this->service()->promotionEligibilityFor(
+            $this->form->employeeNik,
+            $this->form->targetJabatan
+        );
     }
 }

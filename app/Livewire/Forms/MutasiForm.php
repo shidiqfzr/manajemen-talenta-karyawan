@@ -2,15 +2,14 @@
 
 namespace App\Livewire\Forms;
 
-use App\Models\Employee;
-use Carbon\Carbon;
+use App\Models\JobHistory;
 use Illuminate\Validation\ValidationException;
 use Livewire\Form;
 
 class MutasiForm extends Form
 {
     // ── Mutation Type & Legal ──────────────────────────────────────────────
-    public string $jenisMutasi = 'PROMOSI';
+    public string $jenisMutasi = 'MUTASI_UNIT';
 
     public string $statusJabatan = 'Definitif';
 
@@ -90,7 +89,7 @@ class MutasiForm extends Form
     }
 
     /**
-     * Validate the mutasi form.
+     * Validate the complete mutasi form.
      */
     public function validateForm(
         ?array $tenureAnalysis,
@@ -100,9 +99,71 @@ class MutasiForm extends Form
         bool $isSwapAllowed,
         ?string $swapIncompatibilityMessage
     ): bool {
+        // 1. Domain Rule: Cek Formasi Dipesan (Reserved Position Guard)
+        if ($targetAnalysis && ($targetAnalysis['is_reserved'] ?? false)) {
+            $reservedName = $targetAnalysis['reserved_occupant']['nama'] ?? 'pegawai lain';
+            $reservedTmt = $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-';
+            $msg = "Formasi ini telah dipesan oleh mutasi terjadwal atas nama {$reservedName} (TMT Efektif: {$reservedTmt}). Pilih formasi lain yang tersedia.";
+            $this->addFormAndComponentError('targetJabatan', $msg);
+
+            throw ValidationException::withMessages(['targetJabatan' => [$msg]]);
+        }
+
+        // 2. Domain Rule: Cek Batas Usia Pensiun (flag derived server-side by MutasiService::getTalentProfile)
+        if ($employeeDetails['is_retired'] ?? false) {
+            $msg = 'Karyawan telah melewati batas usia pensiun dan tidak dapat dimutasi.';
+            $this->addFormAndComponentError('employeeNik', $msg);
+
+            throw ValidationException::withMessages(['employeeNik' => [$msg]]);
+        }
+
+        // 3. Domain Validation: Rotasi vs Mutasi Unit (DOMAIN.md §5.4)
+        if ($employeeDetails) {
+            if ($this->jenisMutasi === 'ROTASI' && $this->targetUnitKerja !== $employeeDetails['unit_kerja']) {
+                $msg = 'Rotasi & Alih Tugas hanya berlaku di dalam unit kerja yang sama ('.$employeeDetails['unit_kerja'].').';
+                $this->addFormAndComponentError('targetUnitKerja', $msg);
+
+                throw ValidationException::withMessages(['targetUnitKerja' => [$msg]]);
+            }
+            if ($this->jenisMutasi === 'MUTASI_UNIT' && $this->targetUnitKerja === $employeeDetails['unit_kerja']) {
+                $msg = 'Mutasi Unit wajib menuju unit kerja yang berbeda (gunakan jenis Rotasi jika tetap di unit yang sama).';
+                $this->addFormAndComponentError('targetUnitKerja', $msg);
+
+                throw ValidationException::withMessages(['targetUnitKerja' => [$msg]]);
+            }
+        }
+
+        // 4. Lateral Swap Validation (DOMAIN.md §5.2.2 & Enterprise Governance)
+        if (
+            isset($targetAnalysis['type']) &&
+            $targetAnalysis['type'] === 'occupied'
+        ) {
+            if ($this->statusJabatan !== 'Definitif') {
+                $msg = "Penugasan sementara ({$this->statusJabatan}) hanya dapat ditempatkan pada formasi kosong. Pilih status Definitif untuk tukar jabatan atau pilih formasi lain.";
+                $this->addFormAndComponentError('statusJabatan', $msg);
+
+                throw ValidationException::withMessages(['statusJabatan' => [$msg]]);
+            }
+
+            if (! $isSwapAllowed) {
+                $msg = $swapIncompatibilityMessage ?? 'Tukar jabatan tidak diperbolehkan antar eselon yang berbeda.';
+                $this->addFormAndComponentError('swapConfirmed', $msg);
+
+                throw ValidationException::withMessages(['swapConfirmed' => [$msg]]);
+            }
+
+            if (! $this->swapConfirmed) {
+                $msg = 'Konfirmasi tukar jabatan harus dicentang.';
+                $this->addFormAndComponentError('swapConfirmed', $msg);
+
+                throw ValidationException::withMessages(['swapConfirmed' => [$msg]]);
+            }
+        }
+
+        // 5. Standard Form Field Rules
         $rules = [
-            'jenisMutasi' => 'required|string',
-            'statusJabatan' => 'required|in:Definitif,Pj,Plt',
+            'jenisMutasi' => 'required|string|in:'.implode(',', JobHistory::MUTASI_TYPES),
+            'statusJabatan' => 'required|in:'.implode(',', JobHistory::STATUS_JABATAN),
             'employeeNik' => 'required|exists:employees,nik',
             'targetJabatan' => 'required|string',
             'targetUnitKerja' => 'required|string',
@@ -118,6 +179,7 @@ class MutasiForm extends Form
         ];
 
         $messages = [
+            'jenisMutasi.in' => 'Jenis mutasi tidak dikenal dalam Pedoman Tata Kelola SDM.',
             'employeeNik.required' => 'Pilih karyawan yang akan dimutasi.',
             'targetJabatan.required' => 'Jabatan tujuan wajib diisi.',
             'targetUnitKerja.required' => 'Unit kerja tujuan wajib diisi.',
@@ -150,81 +212,40 @@ class MutasiForm extends Form
         try {
             $this->validate($rules, $messages);
         } catch (ValidationException $e) {
-            if (isset($this->component)) {
-                foreach ($e->errors() as $field => $errorMessages) {
-                    $cleanField = str_starts_with($field, $this->propertyName.'.')
-                        ? substr($field, strlen($this->propertyName) + 1)
-                        : $field;
-                    foreach ($errorMessages as $msg) {
-                        $this->component->addError($cleanField, $msg);
-                    }
-                }
-            }
+            $this->syncComponentErrors($e);
             throw $e;
         }
 
-        // Domain Rule: Cek Batas Usia Pensiun
-        if ($this->employeeNik) {
-            $emp = Employee::where('nik', $this->employeeNik)->first();
-            if ($emp && $emp->tanggal_pensiun && Carbon::parse($emp->tanggal_pensiun)->lt(now()->startOfMonth())) {
-                $msg = 'Karyawan telah melewati batas usia pensiun dan tidak dapat dimutasi.';
-                $this->addError('employeeNik', $msg);
-                if (isset($this->component)) {
-                    $this->component->addError('employeeNik', $msg);
-                }
-
-                return false;
-            }
-        }
-
-        // Domain Validation: Rotasi vs Mutasi Unit (DOMAIN.md §5.4)
-        if ($employeeDetails) {
-            if ($this->jenisMutasi === 'ROTASI' && $this->targetUnitKerja !== $employeeDetails['unit_kerja']) {
-                $msg = 'Rotasi & Alih Tugas hanya berlaku di dalam unit kerja yang sama ('.$employeeDetails['unit_kerja'].').';
-                $this->addError('targetUnitKerja', $msg);
-                if (isset($this->component)) {
-                    $this->component->addError('targetUnitKerja', $msg);
-                }
-
-                return false;
-            }
-            if ($this->jenisMutasi === 'MUTASI_UNIT' && $this->targetUnitKerja === $employeeDetails['unit_kerja']) {
-                $msg = 'Mutasi Unit wajib menuju unit kerja yang berbeda (gunakan jenis Rotasi jika tetap di unit yang sama).';
-                $this->addError('targetUnitKerja', $msg);
-                if (isset($this->component)) {
-                    $this->component->addError('targetUnitKerja', $msg);
-                }
-
-                return false;
-            }
-        }
-
-        // Lateral Swap Validation (DOMAIN.md §5.2.2 & Enterprise Governance)
-        if (
-            isset($targetAnalysis['type']) &&
-            $targetAnalysis['type'] === 'occupied'
-        ) {
-            if (! $isSwapAllowed) {
-                $msg = $swapIncompatibilityMessage ?? 'Tukar jabatan tidak diperbolehkan antar eselon yang berbeda.';
-                $this->addError('swapConfirmed', $msg);
-                if (isset($this->component)) {
-                    $this->component->addError('swapConfirmed', $msg);
-                }
-
-                return false;
-            }
-
-            if (! $this->swapConfirmed) {
-                $msg = 'Konfirmasi tukar jabatan harus dicentang.';
-                $this->addError('swapConfirmed', $msg);
-                if (isset($this->component)) {
-                    $this->component->addError('swapConfirmed', $msg);
-                }
-
-                return false;
-            }
-        }
-
         return true;
+    }
+
+    /**
+     * Synchronize ValidationException error messages to both Form and Component.
+     */
+    private function syncComponentErrors(ValidationException $e): void
+    {
+        if (isset($this->component)) {
+            foreach ($e->errors() as $field => $errorMessages) {
+                $cleanField = str_starts_with($field, $this->propertyName.'.')
+                    ? substr($field, strlen($this->propertyName) + 1)
+                    : $field;
+                foreach ($errorMessages as $msg) {
+                    $this->component->addError($cleanField, $msg);
+                    $this->component->addError($this->propertyName.'.'.$cleanField, $msg);
+                }
+            }
+        }
+    }
+
+    /**
+     * Add error to both Form object and host Component.
+     */
+    private function addFormAndComponentError(string $field, string $message): void
+    {
+        $this->addError($field, $message);
+        if (isset($this->component)) {
+            $this->component->addError($field, $message);
+            $this->component->addError($this->propertyName.'.'.$field, $message);
+        }
     }
 }

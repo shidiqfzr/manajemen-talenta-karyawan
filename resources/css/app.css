@@ -17,23 +17,53 @@
   --color-primary-900: #123A22;
   --color-primary-950: #0B2416;
 
+  --color-earth-50: #FAF8F2;
   --color-earth-100: #F2ECDD;
+  --color-earth-200: #E5DBC5;
   --color-earth-300: #D8C9A8;
+  --color-earth-400: #C2AD84;
   --color-earth-500: #A8916A;
   --color-earth-600: #8A7550;
   --color-earth-700: #6B5B3A;
+  --color-earth-800: #4D4129;
+  --color-earth-900: #332B1B;
 
+  /* Skala netral lengkap 11 langkah. Kontras terhadap putih (DESIGN.md §3.4):
+     400 = 3.4:1 (ikon/border/placeholder saja), 500 = 5.0:1 (teks sekunder minimum). */
   --color-surface-50: #F8F9F6;
   --color-surface-100: #F1F3EE;
   --color-surface-200: #DEE3D8;
   --color-surface-300: #C3C9BE;
-  --color-surface-500: #737A70;
+  --color-surface-400: #878E84;
+  --color-surface-500: #6B7268;
+  --color-surface-600: #555C53;
   --color-surface-700: #40473F;
+  --color-surface-800: #2D332E;
   --color-surface-900: #1B1F1D;
+  --color-surface-950: #111412;
 
+  /* Warna semantik: DEFAULT untuk isian/ikon, -700/-800 untuk teks, -50..-200 untuk latar badge. */
   --color-danger: #C0392B;
+  --color-danger-50: #FDF1EF;
+  --color-danger-100: #FCE4E1;
+  --color-danger-200: #F8D2CC;
+  --color-danger-700: #A02F23;
+  --color-danger-800: #8A2A1E;
+
+  /* warning DEFAULT hanya 3.3:1 terhadap putih: jangan dipakai untuk teks atau latar teks putih. */
   --color-warning: #B8860B;
+  --color-warning-50: #FDF8EC;
+  --color-warning-100: #FBEFD2;
+  --color-warning-200: #F3DDA4;
+  --color-warning-700: #8A6508;
+  --color-warning-800: #6B4E05;
+
   --color-info: #2E6E9E;
+  --color-info-50: #EFF5FA;
+  --color-info-100: #DCEAF4;
+  --color-info-200: #B9D4E8;
+  --color-info-700: #255A82;
+  --color-info-800: #1D4766;
 
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }

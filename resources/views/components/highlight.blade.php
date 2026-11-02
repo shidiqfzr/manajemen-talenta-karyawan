@@ -1,7 +1,7 @@
 @props([
     'text' => '',
     'term' => null,
-    'class' => 'bg-amber-100 text-amber-900 font-semibold px-0.5 rounded',
+    'class' => 'bg-warning-100 text-warning-800 font-semibold px-0.5 rounded',
 ])
 
 @php

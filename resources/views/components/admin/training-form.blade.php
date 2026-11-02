@@ -49,15 +49,15 @@
         </div>
         
         <div class="md:col-span-2">
-            <label class="block text-xs font-bold text-slate-700 mb-1.5">Keterangan</label>
-            <textarea name="keterangan" class="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" rows="3">{{ old('keterangan', $training->keterangan ?? '') }}</textarea>
-            @error('keterangan') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+            <label class="block text-xs font-bold text-surface-700 mb-1.5">Keterangan</label>
+            <textarea name="keterangan" class="w-full px-3.5 py-2.5 bg-surface-50/70 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition" rows="3">{{ old('keterangan', $training->keterangan ?? '') }}</textarea>
+            @error('keterangan') <p class="text-danger text-xs mt-1">{{ $message }}</p> @enderror
         </div>
     </div>
 
     <!-- Tombol Aksi -->
     <div class="flex justify-end space-x-3 mt-6">
-        <a href="{{ route('admin.trainings.index') }}" class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold transition">Batal</a>
-        <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-semibold transition shadow-md">Simpan</button>
+        <x-admin.button href="{{ route('admin.trainings.index') }}" variant="secondary">Batal</x-admin.button>
+        <x-admin.button type="submit" once>Simpan</x-admin.button>
     </div>
 </form>

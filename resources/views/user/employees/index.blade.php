@@ -1,7 +1,7 @@
 @extends('layouts.user')
 
 @section('content')
-    <h1 class="text-4xl font-bold mb-10 text-center text-blue-600">
+    <h1 class="text-4xl font-bold mb-10 text-center text-info">
         MANAJEMEN TALENTA KARYAWAN
     </h1>
 
@@ -18,14 +18,14 @@
                         <h2 class="text-lg font-semibold mb-1 truncate" title="{{ $employee->nama }}">
                             {{ $employee->nama }}
                         </h2>
-                        <p class="text-gray-600 text-sm truncate" title="{{ $employee->jabatan }}">
+                        <p class="text-surface-600 text-sm truncate" title="{{ $employee->jabatan }}">
                             {{ $employee->jabatan }}
                         </p>
-                        <p class="text-xs text-gray-400 mt-1 truncate" title="{{ $employee->email }}">
+                        <p class="text-xs text-surface-500 mt-1 truncate" title="{{ $employee->email }}">
                             {{ $employee->email }}
                         </p>
                     </div>
-                    <span class="inline-block mt-4 text-sm text-blue-500 hover:underline">
+                    <span class="inline-block mt-4 text-sm text-info hover:underline">
                         View Details →
                     </span>
                 </div>

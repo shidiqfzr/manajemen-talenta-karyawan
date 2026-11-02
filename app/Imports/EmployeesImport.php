@@ -3,18 +3,21 @@
 namespace App\Imports;
 
 use App\Models\Employee;
+use App\Models\Unit;
 use App\Services\Import\ConcurrentJobTextParser;
 use App\Services\Import\EmployeeImportRowValidator;
+use App\Services\KepegawaianPolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
-class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheets
+class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow, WithMultipleSheets
 {
     public int $created = 0;
 
@@ -39,7 +42,8 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     public function __construct(
         public bool $dryRun = false,
         ?EmployeeImportRowValidator $validator = null,
-        ?ConcurrentJobTextParser $jobParser = null
+        ?ConcurrentJobTextParser $jobParser = null,
+        public ?string $actorName = null
     ) {
         $this->validator = $validator ?? new EmployeeImportRowValidator;
         $this->jobParser = $jobParser ?? new ConcurrentJobTextParser;
@@ -62,9 +66,29 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     private array $existingEmployeesCache = [];
 
     /**
+     * Cache nama unit master (dimuat sekali per proses import).
+     *
+     * @var list<string>|null
+     */
+    private ?array $officialUnits = null;
+
+    /**
      * Cache penampung NIK yang sudah diproses dalam batch berkas yang sama: [nik => rowNumber]
      */
     private array $seenNiksInFile = [];
+
+    /**
+     * Nomor baris terakhir yang diproses; berlanjut antar potongan (chunk) berkas.
+     */
+    private int $rowCursor = 1; // Header adalah baris 1
+
+    /**
+     * Berkas dibaca per potongan agar memori tidak membengkak pada berkas besar.
+     */
+    public function chunkSize(): int
+    {
+        return 500;
+    }
 
     private const DATE_FIELDS = [
         'tanggal_dalam_jabatan',
@@ -76,13 +100,22 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         'tanggal_pensiun',
     ];
 
+    /**
+     * Variasi penulisan unit pada berkas pegawai yang dipetakan ke unit master saat ini.
+     * Hanya pemetaan yang tidak ambigu; nama unit yang sudah tidak ada pada formasi tidak dipetakan.
+     */
+    /**
+     * Data keluarga hanya tampil di halaman detail pegawai (DESIGN.md §11, UU PDP): pratinjau impor
+     * hanya menandai bahwa nilainya berubah tanpa menampilkan isi lama maupun baru.
+     */
+    private const HIDDEN_DIFF_FIELDS = ['susunan_keluarga'];
+
+    private const HIDDEN_VALUE = 'Diperbarui (data pribadi, tidak ditampilkan)';
+
     public const UNIT_ALIASES = [
-        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'Project Management Office (PMO)',
-        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE (PMO)' => 'Project Management Office (PMO)',
-        'PROJECT MANAGEMENT OFFICE' => 'Project Management Office (PMO)',
-        'PMO' => 'Project Management Office (PMO)',
+        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
+        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'PMO Batu Bara & Bisnis Lainnya',
     ];
 
     public function collection(Collection $rows): void
@@ -105,9 +138,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
                 ->all();
         }
 
-        $rowNumber = 1; // Header adalah baris 1
-
-        $this->seenNiksInFile = [];
+        $rowNumber = $this->rowCursor;
 
         foreach ($rows as $row) {
             $rowNumber++;
@@ -151,6 +182,8 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
                 $this->handleProcessingError($rowNumber, $data['nik'] ?? 'Unknown', $e, $row->toArray());
             }
         }
+
+        $this->rowCursor = $rowNumber;
     }
 
     private function recordDryRunRow(array $data, array $rawRow): void
@@ -231,10 +264,10 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
         // 3. Auto-calculate Pensiun (56 thn) & MBT (55 thn) jika tanggal_lahir tersedia (DOMAIN.md Bab 5.1)
         if (! empty($data['tanggal_lahir'])) {
             if (empty($data['tanggal_pensiun'])) {
-                $data['tanggal_pensiun'] = Employee::calculateTanggalPensiun($data['tanggal_lahir']);
+                $data['tanggal_pensiun'] = KepegawaianPolicy::tanggalPensiun($data['tanggal_lahir']);
             }
             if (empty($data['tanggal_mbt']) && ! empty($data['tanggal_pensiun'])) {
-                $data['tanggal_mbt'] = Employee::calculateTanggalMbt($data['tanggal_pensiun']);
+                $data['tanggal_mbt'] = KepegawaianPolicy::tanggalMbt($data['tanggal_pensiun']);
             }
         }
 
@@ -310,15 +343,16 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
             if ($existingEmployee instanceof Employee && $this->isEmployeeIdentical($existingEmployee, $data)) {
                 $this->unchanged++;
                 $this->validRows[] = $this->formatRowSummary($data, 'UNCHANGED', 'TETAP');
-                Log::info("Employee unchanged via Excel import: NIK {$data['nik']}");
+                Log::info('Employee unchanged via Excel import: NIK '.$this->maskNik($data['nik']));
 
                 return;
             }
 
-            $employee = Employee::updateOrCreate(
-                ['nik' => $data['nik']],
-                $data
-            );
+            $employee = Employee::firstOrNew(['nik' => $data['nik']]);
+            if ($employee->exists && $this->actorName) {
+                $employee->historyNote = "Perubahan data melalui impor Excel oleh {$this->actorName}";
+            }
+            $employee->fill($data)->save();
 
             // Jika terdapat data tugas rangkap / penugasan sementara (Kolom O), otomatis daftarkan ke job_histories
             if (! empty($data['tugas_rangkap_penugasan_sementara'])) {
@@ -334,10 +368,10 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
             if ($employee->wasRecentlyCreated) {
                 $this->created++;
-                Log::info("Created new employee via Excel import: NIK {$data['nik']}");
+                Log::info('Created new employee via Excel import: NIK '.$this->maskNik($data['nik']));
             } else {
                 $this->updated++;
-                Log::info("Updated employee via Excel import: NIK {$data['nik']}");
+                Log::info('Updated employee via Excel import: NIK '.$this->maskNik($data['nik']));
             }
         });
     }
@@ -399,11 +433,12 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
             }
 
             if (strcasecmp($oldVal, $newVal) !== 0) {
+                $hidden = in_array($field, self::HIDDEN_DIFF_FIELDS, true);
                 $diff[] = [
                     'field' => $field,
                     'label' => $label,
-                    'old' => $oldVal ?: '-',
-                    'new' => $newVal ?: '-',
+                    'old' => $hidden ? self::HIDDEN_VALUE : ($oldVal ?: '-'),
+                    'new' => $hidden ? self::HIDDEN_VALUE : ($newVal ?: '-'),
                 ];
             }
         }
@@ -520,7 +555,7 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
     }
 
     /**
-     * Menormalisasi nama Unit Kerja dari data import Excel ke 43 Unit Kerja resmi.
+     * Menormalisasi nama Unit Kerja dari data import Excel ke Unit Kerja resmi pada master formasi.
      */
     public function normalizeUnitKerja(?string $rawUnit): string
     {
@@ -530,30 +565,43 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
 
         $trimmed = trim($rawUnit);
 
+        $this->officialUnits ??= Unit::officialNames();
+
         // 1. Direct match dengan unit resmi
-        if (in_array($trimmed, Employee::OFFICIAL_UNITS, true)) {
+        if (in_array($trimmed, $this->officialUnits, true)) {
             return $trimmed;
         }
 
         // 2. Case-insensitive match dengan unit resmi
-        foreach (Employee::OFFICIAL_UNITS as $official) {
+        foreach ($this->officialUnits as $official) {
             if (strcasecmp($trimmed, $official) === 0) {
+                return $official;
+            }
+        }
+
+        // 2b. Abaikan perbedaan penulisan '&' dan 'dan' serta spasi ganda
+        $canonical = fn (string $name): string => strtolower(preg_replace('/\s+/', ' ', str_replace('&', ' dan ', $name)));
+        foreach ($this->officialUnits as $official) {
+            if ($canonical($trimmed) === $canonical($official)) {
                 return $official;
             }
         }
 
         // 3. Match dari daftar alias
         $upper = strtoupper($trimmed);
-        if (isset(self::UNIT_ALIASES[$upper])) {
+        if (isset(self::UNIT_ALIASES[$upper]) && in_array(self::UNIT_ALIASES[$upper], $this->officialUnits, true)) {
             return self::UNIT_ALIASES[$upper];
         }
 
-        // 4. Pattern regex untuk unit PMO (Project Management Office)
-        if (preg_match('/^(PROJECT\s+MANAGEMENT\s+OFFICE|PMO)\b/i', $trimmed)) {
-            return 'Project Management Office (PMO)';
-        }
-
         return $trimmed;
+    }
+
+    /**
+     * Menyamarkan NIK (8 digit) pada teks log agar data pribadi tidak tercatat utuh (UU PDP No. 27/2022).
+     */
+    private function maskNik(string $text): string
+    {
+        return preg_replace_callback('/\b[0-9]{8}\b/', fn (array $m) => substr($m[0], 0, 2).'****'.substr($m[0], -2), $text);
     }
 
     private function recordValidationError(int $rowNumber, array $errors, ?string $nik = null, array $rawRow = [], ?string $nama = null): void
@@ -595,9 +643,9 @@ class EmployeesImport implements ToCollection, WithHeadingRow, WithMultipleSheet
             'raw_data' => $rawRow,
         ];
 
-        $logMsg = $logLevel === 'error'
+        $logMsg = $this->maskNik($logLevel === 'error'
             ? "Failed to save NIK {$nik} on row {$rowNumber}: ".implode(', ', $errors)
-            : "Row {$rowNumber} [NIK: ".($nik ?? 'N/A').'] skipped during import: '.implode(', ', $errors);
+            : "Row {$rowNumber} [NIK: ".($nik ?? 'N/A').'] skipped during import: '.implode(', ', $errors));
 
         if ($logLevel === 'error') {
             Log::error($logMsg);

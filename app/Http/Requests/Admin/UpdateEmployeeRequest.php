@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Services\KepegawaianPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,8 +35,8 @@ class UpdateEmployeeRequest extends FormRequest
             'tmt_bekerja' => ['nullable', 'date'],
             'tanggal_diangkat_staf' => ['nullable', 'date'],
             'susunan_keluarga' => ['nullable', 'string', 'max:255'],
-            'job_grade' => ['nullable', 'integer', 'between:1,16'],
-            'person_grade' => ['nullable', 'integer', 'between:1,16'],
+            'job_grade' => ['nullable', 'integer', 'between:'.KepegawaianPolicy::GRADE_MIN.','.KepegawaianPolicy::GRADE_MAX],
+            'person_grade' => ['nullable', 'integer', 'between:'.KepegawaianPolicy::GRADE_MIN.','.KepegawaianPolicy::GRADE_MAX],
             'jalur_masuk' => ['nullable', 'string', Rule::in(['CKP', 'Talent Scouting', 'RBB', 'Reguler'])],
             'tanggal_mbt' => ['nullable', 'date'],
             'tanggal_pensiun' => ['nullable', 'date'],
@@ -56,8 +57,8 @@ class UpdateEmployeeRequest extends FormRequest
             'level.in' => 'Level strata harus bernilai Karpim atau Karpel.',
             'rm_level.in' => 'RM Band harus bernilai RM-1, RM-2, RM-3, atau RM-4.',
             'status_karyawan.required' => 'Status kepegawaian wajib dipilih.',
-            'job_grade.between' => 'Job Grade harus berada dalam rentang 1 sampai 16.',
-            'person_grade.between' => 'Person Grade harus berada dalam rentang 1 sampai 16.',
+            'job_grade.between' => 'Job Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',
+            'person_grade.between' => 'Person Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',
         ];
     }
 }

@@ -15,15 +15,15 @@
     {{-- Pilih Karyawan --}}
     @if ($employee)
         <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1.5">Karyawan</label>
-            <input type="text" value="{{ $employee->nik }} - {{ $employee->nama }}" class="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-600 cursor-not-allowed" readonly>
+            <label class="block text-xs font-bold text-surface-700 mb-1.5">Karyawan</label>
+            <input type="text" value="{{ $employee->nik }} - {{ $employee->nama }}" class="w-full px-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-600 cursor-not-allowed" readonly>
             <input type="hidden" name="employee_nik" value="{{ $employee->nik }}">
         </div>
     @elseif ($evaluation)
         {{-- When editing, employee is fixed --}}
         <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1.5">Karyawan</label>
-            <input type="text" value="{{ $evaluation->employee->nik }} - {{ $evaluation->employee->nama }}" class="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-600 cursor-not-allowed" readonly>
+            <label class="block text-xs font-bold text-surface-700 mb-1.5">Karyawan</label>
+            <input type="text" value="{{ $evaluation->employee->nik }} - {{ $evaluation->employee->nama }}" class="w-full px-3.5 py-2.5 bg-surface-100 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-600 cursor-not-allowed" readonly>
         </div>
     @else
         <div>
@@ -47,7 +47,7 @@
 
     {{-- Nilai Per Kriteria --}}
     <div>
-        <h3 class="text-sm font-bold mb-3 border-b border-slate-200 pb-2 text-slate-800">Nilai Per Kriteria</h3>
+        <h3 class="text-sm font-bold mb-3 border-b border-surface-200 pb-2 text-surface-800">Nilai Per Kriteria</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div><x-admin.form.input type="number" step="0.01" min="0" max="10" name="nilai_kepemimpinan" label="Nilai Kepemimpinan" :value="old('nilai_kepemimpinan', $evaluation->nilai_kepemimpinan ?? '')" /></div>
             <div><x-admin.form.input type="number" step="0.01" min="0" max="10" name="nilai_perilaku_budaya" label="Nilai Perilaku Budaya" :value="old('nilai_perilaku_budaya', $evaluation->nilai_perilaku_budaya ?? '')" /></div>
@@ -59,7 +59,7 @@
 
     {{-- Skor 9 Box --}}
     <div>
-        <h3 class="text-sm font-bold mb-3 border-b border-slate-200 pb-2 text-slate-800">Skor 9 Box</h3>
+        <h3 class="text-sm font-bold mb-3 border-b border-surface-200 pb-2 text-surface-800">Skor 9 Box</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div><x-admin.form.input type="number" step="0.01" min="0" max="100" name="skor_smkbk_9box" label="Skor SMK-BK" :value="old('skor_smkbk_9box', $evaluation->skor_smkbk_9box ?? '')" /></div>
             <div><x-admin.form.input type="number" step="0.01" min="0" max="100" name="skor_cli_9box" label="Skor CLI" :value="old('skor_cli_9box', $evaluation->skor_cli_9box ?? '')" /></div>
@@ -69,7 +69,7 @@
 
     {{-- Asesmen --}}
     <div>
-        <h3 class="text-sm font-bold mb-3 border-b border-slate-200 pb-2 text-slate-800">Asesmen</h3>
+        <h3 class="text-sm font-bold mb-3 border-b border-surface-200 pb-2 text-surface-800">Asesmen</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div><x-admin.form.input name="lembaga_asesmen" label="Lembaga Asesmen" :value="old('lembaga_asesmen', $evaluation->lembaga_asesmen ?? '')" /></div>
             <div><x-admin.form.input type="date" name="tanggal_pelaksanaan_asesmen" label="Tanggal Pelaksanaan" :value="old('tanggal_pelaksanaan_asesmen', $evaluation ? \Carbon\Carbon::parse($evaluation->tanggal_pelaksanaan_asesmen)->format('Y-m-d') : '')" /></div>
@@ -81,8 +81,8 @@
     </div>
 
     <!-- Actions -->
-    <div class="flex justify-end space-x-3 mt-8 pt-4 border-t border-slate-100">
-        <a href="{{ route('admin.evaluations.index') }}" class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold transition">Batal</a>
-        <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-semibold transition shadow-md">Simpan</button>
+    <div class="flex justify-end space-x-3 mt-8 pt-4 border-t border-surface-100">
+        <x-admin.button href="{{ route('admin.evaluations.index') }}" variant="secondary">Batal</x-admin.button>
+        <x-admin.button type="submit" once>Simpan</x-admin.button>
     </div>
 </form>

@@ -65,8 +65,14 @@ class JobVacancyService
 
         $results = $query->get();
 
-        // Enhance each record with Carbon duration helpers
-        return $results->map(function ($item) {
+        // Fetch all pending scheduled mutations (is_applied = false)
+        $scheduledByPosition = JobHistory::with('employee')
+            ->where('is_applied', false)
+            ->get()
+            ->keyBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
+
+        // Enhance each record with Carbon duration helpers and reservation status
+        return $results->map(function ($item) use ($scheduledByPosition) {
             $vacantDate = $item->vacant_since ? Carbon::parse($item->vacant_since) : null;
             $daysVacant = $vacantDate ? (int) $vacantDate->diffInDays(now()) : 0;
 
@@ -79,10 +85,18 @@ class JobVacancyService
                 $severity = 'yellow';
             }
 
+            $key = "{$item->jabatan}|{$item->unit_kerja}";
+            $scheduled = $scheduledByPosition->get($key);
+
             $item->days_vacant = $daysVacant;
             $item->duration_human = $vacantDate ? $vacantDate->diffForHumans(now(), ['parts' => 2, 'syntax' => Carbon::DIFF_RELATIVE_TO_NOW]) : 'Tidak diketahui';
             $item->vacant_since_formatted = $vacantDate ? $vacantDate->translatedFormat('d M Y') : '—';
             $item->severity = $severity;
+            $item->is_reserved = $scheduled !== null;
+            $item->reserved_occupant_name = $scheduled?->employee?->nama;
+            $item->reserved_occupant_nik = $scheduled?->employee_nik;
+            $item->reserved_tmt = $scheduled?->tmt_awal ? Carbon::parse($scheduled->tmt_awal)->translatedFormat('d M Y') : null;
+            $item->reserved_sk = $scheduled?->nomor_sk;
 
             return $item;
         });
