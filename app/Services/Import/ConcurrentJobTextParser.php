@@ -181,36 +181,10 @@ class ConcurrentJobTextParser
     }
 
     /**
-     * Pencocokan posisi toleran terhadap tanda baca dan spasi.
+     * Pencocokan posisi toleran terhadap tanda baca dan spasi (delegasi ke PositionNameMatcher).
      */
     private function matchPosition(string $input, array $validPositions): ?string
     {
-        if (in_array($input, $validPositions, true)) {
-            return $input;
-        }
-
-        foreach ($validPositions as $pos) {
-            if (strcasecmp($input, $pos) === 0) {
-                return $pos;
-            }
-        }
-
-        $clean = function (string $str) {
-            $str = str_ireplace(['&', 'dan'], ' ', $str);
-            $str = preg_replace('/\btanamanan\b/iu', 'tanaman', $str);
-            $str = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $str);
-            $str = preg_replace('/\s+/', ' ', trim($str));
-
-            return mb_strtolower($str);
-        };
-
-        $cleanedInput = $clean($input);
-        foreach ($validPositions as $pos) {
-            if ($clean($pos) === $cleanedInput) {
-                return $pos;
-            }
-        }
-
-        return null;
+        return PositionNameMatcher::match($input, $validPositions);
     }
 }

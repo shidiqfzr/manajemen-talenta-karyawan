@@ -4,6 +4,7 @@
     'name' => 'unit_kerja',
     'id' => 'unitKerjaInput',
     'required' => true,
+    'label' => 'Unit Kerja',
 ])
 
 @php
@@ -123,32 +124,12 @@
             this.$watch('selectedUnit', (val) => {
                 this.search = val || '';
             });
-        },
-
-        handleQuickAddPrompt() {
-            $dispatch('open-quick-add-unit', { nama: this.search });
-            this.isOpen = false;
         }
     }"
     @unit-set.window="
         if ($event.detail.id === '{{ $id }}' || !$event.detail.id) {
             selectedUnit = $event.detail.unit || '';
             search = $event.detail.unit || '';
-        }
-    "
-    @unit-created.window="
-        const newUnit = $event.detail;
-        if (newUnit && newUnit.nama) {
-            if (!units.some(u => u.nama.toLowerCase() === newUnit.nama.toLowerCase())) {
-                units.unshift({
-                    nama: newUnit.nama,
-                    wilayah: newUnit.wilayah || 'Unit Baru'
-                });
-            }
-            selectedUnit = newUnit.nama;
-            search = newUnit.nama;
-            isOpen = false;
-            $dispatch('unit-selected', { unit: newUnit.nama });
         }
     "
     @click.outside="isOpen = false"
@@ -177,6 +158,8 @@
                    @click="openDropdown()"
                    @input="isOpen = true; $dispatch('unit-selected', { unit: search })"
                    @keydown.arrow-down.prevent="isOpen = true"
+                   aria-label="{{ $label }}"
+                   @if($required) aria-required="true" @endif
                    placeholder="Cari atau pilih unit kerja..."
                    autocomplete="off"
                    class="w-full pl-8 pr-20 py-2.5 bg-surface-50/70 border border-surface-200 rounded-xl text-xs sm:text-sm font-medium text-surface-800 placeholder-surface-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition truncate">
@@ -286,7 +269,7 @@
             </div>
             <p class="text-xs font-bold text-surface-800">Unit Kerja Tidak Ditemukan</p>
             <p class="text-[11px] text-surface-500 mt-0.5 max-w-xs mx-auto">
-                "<span x-text="search" class="font-semibold text-surface-700"></span>" belum terdaftar di filter wilayah yang dipilih.
+                "<span x-text="search" class="font-semibold text-surface-700"></span>" belum terdaftar di filter wilayah yang dipilih. Unit baru ditambahkan oleh pengelola Master Formasi.
             </p>
             <div class="mt-3 flex items-center justify-center gap-2">
                 <button type="button"
@@ -295,12 +278,6 @@
                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-surface-200 hover:bg-surface-300 text-surface-700 rounded-lg text-xs font-semibold transition cursor-pointer">
                     <i class="fas fa-globe text-[10px]" aria-hidden="true"></i>
                     <span>Cari di Semua Wilayah</span>
-                </button>
-                <button type="button"
-                        @click="handleQuickAddPrompt()"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer">
-                    <i class="fas fa-plus text-[10px]" aria-hidden="true"></i>
-                    <span>Tambah Unit Baru</span>
                 </button>
             </div>
         </div>

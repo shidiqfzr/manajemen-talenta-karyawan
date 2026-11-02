@@ -80,7 +80,8 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - `App\Services\JobVacancyService`: Deteksi formasi kosong manajerial aktif.
   - `App\Services\TrainingExportService`: Ekspor laporan dan surat tugas.
   - `App\Services\EmployeeExportService`: Orkestrasi ekspor data kepegawaian berstandar UU PDP No. 27/2022, sanitasi parameter filter, penyematan metadata/print footer rahasia, dan pencatatan audit trail.
-  - `App\Services\EmployeeImportService`: Validasi pra-impor, kalkulasi pensiun/MBT otomatis, dan preview dry-run.
+  - `App\Services\EmployeeImportService`: Validasi pra-impor, preview dry-run, dan jejak audit impor tanpa data pribadi.
+  - `App\Services\KepegawaianPolicy`: Satu-satunya sumber Batas Usia Pensiun (56), MBT (T-1), dan rentang grade per strata Karpim/Karpel. Dilarang menulis ulang angka-angka ini di model, validator, atau layar.
 
 ### 2.2 Eloquent Models & Database Practices
 1. **Format NIK**:
@@ -189,6 +190,23 @@ Sebelum mengajukan pull request atau menggabungkan kode:
 
 ### 3.5 SUT Testing Principle
 Patuhi prinsip **One Test Class per System Under Test (SUT)**. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan yang sangat kuat. Semua skenario uji (termasuk edge-cases dan integrasi) untuk satu fitur/komponen wajib disatukan dalam satu file uji utama miliknya (contoh: seluruh pengujian komponen `MutasiProcess` harus berada utuh di dalam `MutasiProcessTest.php`).
+
+### 3.6 Evaluasi UI/UX di Browser (Playwright E2E)
+Perubahan pada form atau layar yang dilihat pengguna wajib diperiksa di browser nyata, bukan hanya lewat uji PHP. Uji PHP membaca HTML, sedangkan perilaku Alpine/Livewire, penjajaran, fokus keyboard, dan aksesibilitas hanya terlihat di browser.
+
+```bash
+npm install
+npm run e2e:install   # sekali: mengunduh Chromium
+npm run build         # aset yang diuji adalah hasil build
+npm run e2e           # menjalankan seluruh pengujian E2E
+```
+
+- **Basis data terisolasi**: `tests/e2e/support/serve.mjs` membuat SQLite sementara (`tests/e2e/.tmp/`), menjalankan `migrate:fresh --seed`, lalu menyalakan server pada port 8765. Basis data pengembangan tidak tersentuh.
+- **Sesi**: `tests/e2e/auth.setup.js` login satu kali; seluruh pengujian memakai sesi tersebut.
+- **Cakupan minimum per fitur** (mengacu DESIGN.md §16): kosakata dan nilai baku dari SSOT, penjajaran/hierarki, nilai turunan dari Master Formasi, state error, tidak ada scroll horizontal pada 375px, 1366px, dan 1920px, serta pindai aksesibilitas WCAG 2.1 A/AA (axe-core) tanpa pelanggaran `serious`/`critical`.
+- **Prinsip SUT (§3.5)** berlaku: satu berkas `*.spec.js` per layar/fitur, misalnya `employee-create.spec.js`.
+- **Jangan** memakai `waitForLoadState('networkidle')`; tunggu elemen atau kondisi yang relevan.
+- Server pengembangan PHP bersifat satu-utas sehingga suite berjalan beberapa menit; hasil, tangkapan layar, dan trace kegagalan ada di `test-results/` dan `playwright-report/` (tidak di-commit).
 
 ---
 

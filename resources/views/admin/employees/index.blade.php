@@ -763,7 +763,7 @@
         </div>
     </div>
 
-    <!-- MODAL: Delete Confirmation Modal (Destructive Action - DESIGN.md 6.5) -->
+    {{-- MODAL: Delete Confirmation Modal (Destructive Action - DESIGN.md 6.5) --}}
     <div x-show="deleteModalOpen"
         x-cloak
         class="fixed inset-0 z-50 overflow-y-auto"
