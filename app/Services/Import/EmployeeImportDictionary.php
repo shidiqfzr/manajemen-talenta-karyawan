@@ -177,7 +177,7 @@ class EmployeeImportDictionary
                         'type_label' => 'Dropdown',
                         'type_sub' => 'RM-1 s.d. RM-4',
                         'is_dropdown' => true,
-                        'description' => 'Tingkat RM Band: RM-1 (Puncak), RM-2 (Madya), RM-3 (Pratama), RM-4 (Pelaksana). Jika kosong, diturunkan otomatis dari formasi jabatan.',
+                        'description' => 'Tingkat RM Band: RM-1 (Puncak), RM-2 (Madya), RM-3 (Pratama), RM-4 (Pelaksana). Opsional dan hanya untuk konfirmasi: nilai harus sama dengan RM Band formasi jabatan pada Master Formasi, jika kosong diturunkan otomatis.',
                         'example' => 'RM-3',
                         'search_tags' => 'rm level band rm1 rm2 rm3 rm4 karpel karpim dropdown',
                     ],
