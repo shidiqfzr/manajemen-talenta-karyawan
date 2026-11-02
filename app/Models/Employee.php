@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Traits\Searchable;
+use App\Services\KepegawaianPolicy;
 use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,12 @@ use Illuminate\Database\Eloquent\Model;
 class Employee extends Model
 {
     use HasFactory, Searchable;
+
+    /**
+     * Catatan transien (tidak disimpan di kolom employees) untuk baris riwayat jabatan yang dibuat
+     * EmployeeObserver pada simpanan ini, mis. asal perubahan melalui impor Excel.
+     */
+    public ?string $historyNote = null;
 
     /**
      * Columns that are searchable via scopeSearch().
@@ -171,38 +178,6 @@ class Employee extends Model
         'Calon Pegawai' => 'Calon Pegawai / Masa Percobaan',
     ];
 
-    /**
-     * Hitung Batas Usia Pensiun (56 tahun, awal bulan kelahiran).
-     */
-    public static function calculateTanggalPensiun(?string $tanggalLahir): ?string
-    {
-        if (empty($tanggalLahir)) {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($tanggalLahir)->addYears(56)->startOfMonth()->toDateString();
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Hitung Masa Bebas Tugas (MBT: T-1 tahun sebelum pensiun / 55 tahun).
-     */
-    public static function calculateTanggalMbt(?string $tanggalPensiun): ?string
-    {
-        if (empty($tanggalPensiun)) {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($tanggalPensiun)->subYear()->toDateString();
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
     protected $fillable = [
         'nik',
         'nama',
@@ -343,7 +318,7 @@ class Employee extends Model
         }
 
         if ($this->tanggal_lahir) {
-            return Carbon::parse($this->tanggal_lahir)->addYears(56)->startOfMonth();
+            return KepegawaianPolicy::pensiunCarbon((string) $this->tanggal_lahir);
         }
 
         return null;
@@ -359,7 +334,7 @@ class Employee extends Model
         }
 
         if ($pensiun = $this->effective_tanggal_pensiun) {
-            return (clone $pensiun)->subYear();
+            return (clone $pensiun)->subYears(KepegawaianPolicy::MBT_TAHUN_SEBELUM_PENSIUN);
         }
 
         return null;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\EmployeeTemplateExport;
-use App\Exports\FailedEmployeesExport;
+use App\Exports\FailedEmployeesWorkbook;
 use App\Exports\ImportSummaryExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CommitEmployeeImportRequest;
@@ -302,7 +302,7 @@ class EmployeeController extends Controller
 
     public function previewImport(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
     {
-        $previewData = $importService->preview($request->file('import_file'));
+        $previewData = $importService->preview($request->file('import_file'), auth()->user());
 
         return response()->json([
             'success' => true,
@@ -312,6 +312,8 @@ class EmployeeController extends Controller
 
     public function commitImport(CommitEmployeeImportRequest $request, EmployeeImportService $importService)
     {
+        $this->authorizeImportToken($request->token, $importService);
+
         try {
             $summary = $importService->commit(
                 $request->token,
@@ -346,8 +348,18 @@ class EmployeeController extends Controller
         }
     }
 
+    /**
+     * Sesi impor (pratinjau, status, laporan, baris gagal) hanya dapat diakses pengunggahnya.
+     */
+    private function authorizeImportToken(string $token, EmployeeImportService $importService): void
+    {
+        abort_unless($importService->isTokenOwnedBy($token, auth()->user()), 403, 'Sesi impor ini dimulai oleh administrator lain.');
+    }
+
     public function importStatus(Request $request, string $token, EmployeeImportService $importService)
     {
+        $this->authorizeImportToken($token, $importService);
+
         // Fail-Safe SLA: Auto-fallback ke eksekusi sinkron jika worker antrean tidak merespons dalam 5 detik
         if ($request->boolean('fallback_sync')) {
             try {
@@ -399,6 +411,8 @@ class EmployeeController extends Controller
 
     public function downloadFailedRows(ImportTokenRequest $request, EmployeeImportService $importService)
     {
+        $this->authorizeImportToken($request->token, $importService);
+
         $failedRows = $importService->getFailedRows($request->token);
         if (empty($failedRows)) {
             return redirect()->back()->with('error', 'Tidak ada data baris gagal yang dapat diunduh atau sesi telah berakhir.');
@@ -406,17 +420,23 @@ class EmployeeController extends Controller
 
         $filename = 'baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx';
 
-        return Excel::download(new FailedEmployeesExport($failedRows), $filename);
+        $importService->recordDownloadAudit('baris_gagal', $request->token, auth()->user(), $request->ip(), count($failedRows));
+
+        return Excel::download(new FailedEmployeesWorkbook($failedRows, auth()->user()?->name ?? 'Administrator', now()->translatedFormat('d F Y H:i:s')), $filename);
     }
 
     public function downloadImportReport(ImportTokenRequest $request, EmployeeImportService $importService)
     {
+        $this->authorizeImportToken($request->token, $importService);
+
         $reportData = $importService->getImportReport($request->token);
         if (empty($reportData)) {
             return redirect()->back()->with('error', 'Data rekapitulasi impor tidak ditemukan atau sesi telah berakhir.');
         }
 
         $filename = 'rekap_laporan_impor_karyawan_'.now()->format('Ymd_His').'.xlsx';
+
+        $importService->recordDownloadAudit('rekap_impor', $request->token, auth()->user(), $request->ip(), count($reportData['rows'] ?? []) + count($reportData['failed_rows'] ?? []));
 
         return Excel::download(new ImportSummaryExport($reportData), $filename);
     }

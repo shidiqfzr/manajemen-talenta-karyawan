@@ -104,7 +104,7 @@
                 </button>
             </div>
 
-            <!-- Sidebar Navigation Menu (DESIGN.md §14: satu entri per modul) -->
+            {{-- Sidebar Navigation Menu (DESIGN.md §14: satu entri per modul) --}}
             <nav aria-label="Navigasi utama" class="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
                 <!-- Group 1: CORE HR -->
                 <div>
