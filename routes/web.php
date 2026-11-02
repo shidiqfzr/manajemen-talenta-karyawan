@@ -58,12 +58,13 @@ Route::prefix('admin')
             Route::get('/create', [AdminEmployeeController::class, 'create'])->name('create');
             Route::post('/', [AdminEmployeeController::class, 'store'])->name('store');
             Route::get('/import', [AdminEmployeeController::class, 'importPage'])->name('import.page');
-            Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import');
-            Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview');
-            Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit');
+            Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import')->middleware('throttle:10,1');
+            Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview')->middleware('throttle:10,1');
+            Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit')->middleware('throttle:10,1');
             Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
             Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
             Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
+            Route::get('/check-nik', [AdminEmployeeController::class, 'checkNik'])->name('checkNik')->middleware('throttle:60,1');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
             Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
@@ -173,10 +174,7 @@ Route::prefix('admin')
             $emp->golongan = $request->query('golongan', '');
             $emp->job_grade = $request->query('job_grade', '');
 
-            return response()->json([
-                'bidang' => $service->determineBidang($emp),
-                'rm_band' => $service->determineRmLevel($emp),
-            ]);
+            return response()->json($service->classifyPosition($emp));
         })->name('api.classify-position');
         // API for Dynamic Cascading Position List
         Route::get('/api/unit-positions', function (Request $request) {

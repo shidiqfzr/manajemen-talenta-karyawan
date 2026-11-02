@@ -591,7 +591,7 @@ Hal yang belum dapat diperiksa otomatis:
 - [ ] Tabel: empty state, skeleton, pagination, `<th scope>`, muat di 1366px.
 - [ ] Form: label, tanda wajib, error inline, validasi server-side.
 - [ ] Keyboard: semua bisa dicapai, fokus terlihat, modal mengunci & mengembalikan fokus.
-- [ ] Diuji di 375px, 1366px, 1920px.
+- [ ] Diuji di 375px, 1366px, 1920px (otomatis lewat Playwright, lihat ENGINEERING.md §3.6) dan tanpa pelanggaran aksesibilitas `serious`/`critical` pada pindai axe-core.
 - [ ] Microcopy sesuai §13, tanpa istilah internal pengembang.
 
 ---

@@ -7,9 +7,9 @@ use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
-use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class EmployeeCrudTest extends TestCase
@@ -241,59 +241,176 @@ class EmployeeCrudTest extends TestCase
         $employee->delete();
     }
 
-    public function test_admin_can_create_and_update_employee_with_rm_level_override(): void
+    public function test_employee_rm_level_follows_the_formasi_jabatan_and_cannot_be_overridden(): void
     {
         $nik = '88990055';
         Employee::where('nik', $nik)->delete();
 
-        // Ensure the unit and position exist and are linked to satisfy validation
         $unit = Unit::firstOrCreate(['nama' => 'Kebun Inti Gunung Meliau'], ['kode' => 'KIGM', 'wilayah' => 'Lainnya', 'is_active' => true]);
         $pos = Position::firstOrCreate(['nama' => 'Asisten Afdeling', 'level' => 'Karpim'], ['is_active' => true]);
+        $pos->update(['rm_level' => 'RM-3']);
         $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1]]);
 
-        // 1. Buat pegawai dengan rm_level eksplisit (misal penugasan khusus RM-2 untuk Asisten)
         $postData = [
             'nik' => $nik,
-            'nama' => 'TESTING RM OVERRIDE',
+            'nama' => 'TESTING RM FORMASI',
             'jabatan' => 'Asisten Afdeling',
             'unit_kerja' => 'Kebun Inti Gunung Meliau',
             'level' => 'Karpim',
-            'rm_level' => 'RM-2', // Override manual SK
+            'rm_level' => 'RM-2',
             'golongan' => 'IIIA/00',
             'job_grade' => 11,
             'person_grade' => 11,
             'status_karyawan' => 'Tetap (PKWTT)',
         ];
 
-        $response = $this->actingAs($this->admin)->post(route('admin.employees.store'), $postData);
-        $response->assertRedirect(route('admin.employees.index'));
+        // 1. RM Band yang berbeda dari formasi jabatan ditolak
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $postData)->assertSessionHasErrors('rm_level');
+        $this->assertNull(Employee::where('nik', $nik)->first());
 
-        $employee = Employee::where('nik', $nik)->first();
-        $this->assertNotNull($employee);
-        $this->assertEquals('RM-2', $employee->rm_level);
+        // 2. RM Band kosong diturunkan dari formasi jabatan
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), array_merge($postData, ['rm_level' => '']))
+            ->assertRedirect(route('admin.employees.index'));
 
-        // Pastikan ManPowerPlanningService memprioritaskan rm_level override ini
-        $mppService = app(ManPowerPlanningService::class);
-        $this->assertEquals('RM-2', $mppService->determineRmLevel($employee));
+        $employee = Employee::where('nik', $nik)->firstOrFail();
+        $this->assertEquals('RM-3', $employee->rm_level);
 
-        // 2. Akses form edit dan pastikan field rm_level & daftar rmLevels ada
-        $editResponse = $this->actingAs($this->admin)->get(route('admin.employees.edit', $nik));
-        $editResponse->assertOk();
-        $editResponse->assertViewHas('rmLevels');
-        $editResponse->assertSee('name="rm_level"', false);
-        $editResponse->assertSee('RM-2');
+        // 3. Form edit menampilkan RM Band hanya-baca
+        $this->actingAs($this->admin)->get(route('admin.employees.edit', $nik))
+            ->assertOk()
+            ->assertViewHas('rmLevels')
+            ->assertSee('name="rm_level"', false);
 
-        // 3. Update rm_level ke RM-1
-        $updateResponse = $this->actingAs($this->admin)->put(route('admin.employees.update', $nik), array_merge($postData, [
-            'rm_level' => 'RM-1',
-        ]));
-        $updateResponse->assertRedirect(route('admin.employees.index'));
+        // 4. Pembaruan tidak dapat mengubah RM Band
+        $this->actingAs($this->admin)->put(route('admin.employees.update', $nik), array_merge($postData, ['rm_level' => 'RM-1']))
+            ->assertRedirect(route('admin.employees.index'));
 
-        $employee->refresh();
-        $this->assertEquals('RM-2', $employee->rm_level);
-        $this->assertEquals('RM-2', $mppService->determineRmLevel($employee));
+        $this->assertEquals('RM-3', $employee->refresh()->rm_level);
 
         $employee->delete();
+    }
+
+    public function test_store_rejects_employee_beyond_the_formasi_quota_and_unseated_positions(): void
+    {
+        $unit = Unit::firstOrCreate(['nama' => 'Kebun Kuota Form'], ['kode' => 'KKF', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Manajer Kuota Form', 'level' => 'Karpim'], ['rm_level' => 'RM-1', 'is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1, 'bidang' => 'TAN']]);
+
+        $payload = fn (string $nik, string $jabatan = 'Manajer Kuota Form') => [
+            'nik' => $nik,
+            'nama' => 'PEGAWAI KUOTA',
+            'jabatan' => $jabatan,
+            'unit_kerja' => 'Kebun Kuota Form',
+            'level' => 'Karpim',
+            'golongan' => 'IVA/00',
+            'job_grade' => 15,
+            'person_grade' => 15,
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ];
+
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88770001'))
+            ->assertRedirect(route('admin.employees.index'));
+
+        // Kursi kedua melebihi kuota
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88770002'))
+            ->assertSessionHasErrors('jabatan');
+        $this->assertDatabaseMissing('employees', ['nik' => '88770002']);
+
+        // Jabatan di luar formasi unit ditolak walaupun unit sudah memiliki formasi lain
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88770003', 'Jabatan Tanpa Kursi'))
+            ->assertSessionHasErrors('jabatan');
+        $this->assertDatabaseMissing('employees', ['nik' => '88770003']);
+    }
+
+    public function test_create_form_follows_position_control_and_form_accessibility_rules(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.employees.create'))->assertOk()->getContent();
+
+        // Master formasi hanya diubah melalui Master Data, tidak dari form pegawai
+        $this->assertStringNotContainsString('Unit Baru', $html);
+        $this->assertStringNotContainsString('Jabatan Baru', $html);
+        $this->assertStringNotContainsString('Tambah Unit Baru', $html);
+
+        // Label terhubung ke kontrol, tanda wajib, dan perlindungan klik ganda
+        $this->assertStringContainsString('for="nikInput"', $html);
+        $this->assertStringContainsString('id="nikInput"', $html);
+        $this->assertStringContainsString('for="jabatanInput"', $html);
+        $this->assertStringContainsString('role="radiogroup"', $html);
+        $this->assertStringContainsString('wajib diisi', $html);
+        $this->assertStringContainsString("addEventListener('submit'", $html);
+        $this->assertMatchesRegularExpression('/<input[^>]*id="rmLevelInput"[^>]*readonly/', $html);
+
+        // Jalur masuk hanya berisi jalur baku, tanpa pilihan di luar pedoman
+        foreach (['value="CKP"', 'value="Talent Scouting"', 'value="RBB"', 'value="Reguler"'] as $option) {
+            $this->assertStringContainsString($option, $html);
+        }
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*id="jalur_masuk".*?<option value="">/s', $html, 'Jalur masuk wajib diisi dan tidak boleh punya opsi kosong.');
+        $this->assertStringNotContainsString('Pro Hire', $html);
+        $this->assertStringNotContainsString('value="Lainnya"', $html);
+
+        // Foto bersifat opsional tanpa label tambahan
+        $this->assertStringNotContainsString('>Opsional<', $html);
+    }
+
+    public function test_check_nik_reports_availability_without_exposing_personal_data(): void
+    {
+        Employee::factory()->create(['nik' => '88550001', 'nama' => 'RAHASIA PEGAWAI']);
+
+        $taken = $this->actingAs($this->admin)->getJson(route('admin.employees.checkNik', ['nik' => '88550001']));
+        $taken->assertOk()->assertJson(['valid' => true, 'exists' => true]);
+        $this->assertStringNotContainsString('RAHASIA', $taken->getContent());
+
+        $this->actingAs($this->admin)->getJson(route('admin.employees.checkNik', ['nik' => '88550002']))
+            ->assertOk()->assertJson(['valid' => true, 'exists' => false, 'url' => null]);
+
+        $this->actingAs($this->admin)->getJson(route('admin.employees.checkNik', ['nik' => '123']))
+            ->assertStatus(422)->assertJson(['valid' => false]);
+
+        Auth::guard('web')->logout();
+        $this->getJson(route('admin.employees.checkNik', ['nik' => '88550001']))->assertUnauthorized();
+    }
+
+    public function test_failed_submission_shows_error_summary_and_inline_error_state(): void
+    {
+        $html = $this->actingAs($this->admin)->from(route('admin.employees.create'))
+            ->followingRedirects()
+            ->post(route('admin.employees.store'), ['nik' => '12', 'nama' => ''])
+            ->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="errorSummary"', $html);
+        $this->assertStringContainsString('isian perlu diperbaiki', $html);
+        $this->assertStringContainsString('aria-invalid="true"', $html);
+        $this->assertStringContainsString('border-danger', $html);
+        $this->assertStringContainsString('href="#nikInput"', $html);
+    }
+
+    public function test_store_accepts_each_standard_entry_channel_and_rejects_others(): void
+    {
+        $unit = Unit::firstOrCreate(['nama' => 'Kebun Jalur Form'], ['kode' => 'KJF', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Asisten Jalur Form', 'level' => 'Karpim'], ['rm_level' => 'RM-3', 'is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 5, 'bidang' => 'TAN']]);
+
+        $payload = fn (string $nik, string $jalur) => [
+            'nik' => $nik,
+            'nama' => 'PEGAWAI JALUR',
+            'jabatan' => 'Asisten Jalur Form',
+            'unit_kerja' => 'Kebun Jalur Form',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'job_grade' => 12,
+            'person_grade' => 12,
+            'status_karyawan' => 'Tetap (PKWTT)',
+            'jalur_masuk' => $jalur,
+        ];
+
+        foreach (['CKP' => '88660001', 'Talent Scouting' => '88660002', 'RBB' => '88660003', 'Reguler' => '88660004'] as $jalur => $nik) {
+            $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload($nik, $jalur))
+                ->assertRedirect(route('admin.employees.index'));
+            $this->assertDatabaseHas('employees', ['nik' => $nik, 'jalur_masuk' => $jalur]);
+        }
+
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88660005', 'Pro Hire'))
+            ->assertSessionHasErrors('jalur_masuk');
     }
 
     public function test_api_unit_positions_returns_filtered_positions_by_level(): void

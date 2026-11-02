@@ -146,13 +146,13 @@ class ImportSummaryExport implements WithMultipleSheets
                             $no++,
                             $actionLabel,
                             ' '.(string) ($row['nik'] ?? ''), // leading space keeps string
-                            (string) ($row['nama'] ?? ''),
-                            (string) ($row['jabatan'] ?? ''),
-                            (string) ($row['unit_kerja'] ?? ''),
-                            (string) ($row['level'] ?? ''),
-                            (string) ($row['golongan'] ?? '-'),
-                            (string) ($row['rm_level'] ?? '-'),
-                            (string) ($row['status_karyawan'] ?? '-'),
+                            FailedEmployeesExport::sanitizeCellValue($row['nama'] ?? ''),
+                            FailedEmployeesExport::sanitizeCellValue($row['jabatan'] ?? ''),
+                            FailedEmployeesExport::sanitizeCellValue($row['unit_kerja'] ?? ''),
+                            FailedEmployeesExport::sanitizeCellValue($row['level'] ?? ''),
+                            FailedEmployeesExport::sanitizeCellValue($row['golongan'] ?? '-'),
+                            FailedEmployeesExport::sanitizeCellValue($row['rm_level'] ?? '-'),
+                            FailedEmployeesExport::sanitizeCellValue($row['status_karyawan'] ?? '-'),
                         ];
                     }
 

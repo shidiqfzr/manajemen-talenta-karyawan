@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Employee;
+use App\Services\KepegawaianPolicy;
 use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Livewire\Component;
@@ -112,7 +113,7 @@ class ManPowerPlanning extends Component
             if ($emp->tanggal_pensiun) {
                 $pYear = Carbon::parse($emp->tanggal_pensiun)->year;
             } elseif ($emp->tanggal_lahir) {
-                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(56)->year;
+                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN)->year;
             }
 
             if ($pYear !== null && $pYear < $filterYear) {
@@ -128,7 +129,7 @@ class ManPowerPlanning extends Component
 
             $pensiunDate = $emp->tanggal_pensiun
                 ? Carbon::parse($emp->tanggal_pensiun)
-                : ($emp->tanggal_lahir ? Carbon::parse($emp->tanggal_lahir)->addYears(56) : null);
+                : ($emp->tanggal_lahir ? Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN) : null);
 
             $matched[] = [
                 'id' => $emp->id,

@@ -9,6 +9,7 @@ use App\Models\EmployeeImportLog;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -49,7 +50,7 @@ class EmployeeImportService
      * Menggunakan strategi Hybrid Execution: sinkron untuk berkas <= 500 baris,
      * dan otomatis beralih ke Background Queue Job untuk berkas > 500 baris.
      */
-    public function preview(UploadedFile $file): array
+    public function preview(UploadedFile $file, ?User $user = null): array
     {
         // 1. Pembersihan berkas sementara yang kedaluwarsa (> 2 jam)
         $this->purgeExpiredFiles(2);
@@ -58,6 +59,7 @@ class EmployeeImportService
         $token = (string) Str::uuid();
         $storedPath = $file->storeAs('imports', "import_{$token}.xlsx", self::DISK);
         $fullPath = Storage::disk(self::DISK)->path($storedPath);
+        Cache::put("import_owner_{$token}", $user?->id ?? 0, now()->addHours(2));
 
         // 3. Deteksi volume data
         $dataRows = $this->getSpreadsheetRowCount($fullPath);
@@ -107,6 +109,17 @@ class EmployeeImportService
     }
 
     /**
+     * Sesi impor hanya boleh diakses admin yang mengunggah berkasnya. Token tanpa pemilik
+     * (kedaluwarsa) dianggap boleh diteruskan agar pesan "sesi berakhir" tetap tampil.
+     */
+    public function isTokenOwnedBy(string $token, ?User $user): bool
+    {
+        $owner = Cache::get("import_owner_{$token}");
+
+        return $owner === null || $owner === ($user?->id ?? 0);
+    }
+
+    /**
      * Eksekusi inti Dry-Run analisis pratinjau.
      */
     public function executeDryRun(string $fullPath, string $storedPath, string $originalName, int $fileSize, string $token): array
@@ -122,11 +135,11 @@ class EmployeeImportService
             'original_name' => $originalName,
             'file_size' => $fileSize,
             'summary' => $summary,
-            'failed_rows' => $import->failedRows,
+            'failed_rows' => $this->sealRows($import->failedRows),
         ], now()->addMinutes(self::CACHE_TTL_MINUTES));
 
         // Simpan baris gagal di cache terpisah dengan retensi 2 jam untuk unduhan berkas koreksi
-        Cache::put("import_failed_rows_{$token}", $import->failedRows, now()->addHours(2));
+        Cache::put("import_failed_rows_{$token}", $this->sealRows($import->failedRows), now()->addHours(2));
 
         // Update status job ke completed untuk sinkronisasi hybrid
         Cache::put("import_job_{$token}", [
@@ -233,37 +246,13 @@ class EmployeeImportService
         ?string $userAgent = null
     ): array {
         $fullPath = Storage::disk(self::DISK)->path($cached['file_path']);
-        $import = new EmployeesImport(dryRun: false);
+        $import = new EmployeesImport(dryRun: false, actorName: $user?->name);
 
         Excel::import($import, $fullPath);
 
         $summary = $import->getImportSummary();
 
-        // Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN)
-        try {
-            EmployeeImportLog::create([
-                'user_id' => $user?->id,
-                'user_name' => $user?->name ?? 'System Administrator',
-                'user_email' => $user?->email,
-                'ip_address' => $ip,
-                'user_agent' => $userAgent,
-                'file_name' => $cached['original_name'] ?? 'unknown.xlsx',
-                'file_size' => $cached['file_size'] ?? 0,
-                'total_rows' => $summary['total_processed'] ?? 0,
-                'created_count' => $summary['created'] ?? 0,
-                'updated_count' => $summary['updated'] ?? 0,
-                'unchanged_count' => $summary['unchanged'] ?? 0,
-                'skipped_count' => $summary['skipped'] ?? 0,
-                'has_errors' => $summary['has_errors'] ?? false,
-                'status' => 'completed',
-                'token' => $token,
-                'metadata' => [
-                    'summary' => $summary,
-                ],
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Gagal mencatat audit log persisten ke database: '.$e->getMessage());
-        }
+        $this->recordAuditLog($summary, $user, $ip, $userAgent, $cached['original_name'] ?? 'unknown.xlsx', $cached['file_size'] ?? 0, $token);
 
         Log::info('HRIS Import Data Pegawai dieksekusi (via Dry-Run Commit)', [
             'user_id' => $user?->id,
@@ -280,11 +269,11 @@ class EmployeeImportService
             'timestamp' => now()->toIso8601String(),
         ]);
 
-        $failedRows = ! empty($import->failedRows) ? $import->failedRows : ($cached['failed_rows'] ?? []);
+        $failedRows = ! empty($import->failedRows) ? $import->failedRows : $this->openRows($cached['failed_rows'] ?? []);
 
         // Pertahankan baris gagal di cache terpisah untuk unduhan Tahap 3 (retensi 2 jam)
         if (! empty($failedRows)) {
-            Cache::put("import_failed_rows_{$token}", $failedRows, now()->addHours(2));
+            Cache::put("import_failed_rows_{$token}", $this->sealRows($failedRows), now()->addHours(2));
         }
 
         // Bersihkan berkas sementara & cache pratinjau
@@ -300,8 +289,8 @@ class EmployeeImportService
             'file_name' => $cached['original_name'],
             'file_size' => $cached['file_size'],
             'summary' => $summary,
-            'rows' => $import->validRows,
-            'failed_rows' => $failedRows,
+            'rows' => $this->sealRows($import->validRows),
+            'failed_rows' => $this->sealRows($failedRows),
         ], now()->addHours(2));
 
         // Update commit job status ke completed
@@ -312,6 +301,52 @@ class EmployeeImportService
             'token' => $token,
             'type' => 'commit',
         ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        return $summary;
+    }
+
+    /**
+     * Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
+     */
+    private function recordAuditLog(array $summary, ?User $user, ?string $ip, ?string $userAgent, string $fileName, int $fileSize, ?string $token): void
+    {
+        try {
+            EmployeeImportLog::create([
+                'user_id' => $user?->id,
+                'user_name' => $user?->name ?? 'System Administrator',
+                'user_email' => $user?->email,
+                'ip_address' => $ip,
+                'user_agent' => $userAgent,
+                'file_name' => $fileName,
+                'file_size' => $fileSize,
+                'total_rows' => $summary['total_processed'] ?? 0,
+                'created_count' => $summary['created'] ?? 0,
+                'updated_count' => $summary['updated'] ?? 0,
+                'unchanged_count' => $summary['unchanged'] ?? 0,
+                'skipped_count' => $summary['skipped'] ?? 0,
+                'has_errors' => $summary['has_errors'] ?? false,
+                'status' => 'completed',
+                'token' => $token,
+                'metadata' => [
+                    'summary' => $this->redactSummary($summary),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Gagal mencatat audit log persisten ke database: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Ringkasan untuk jejak audit persisten tanpa data pribadi (NIK, nama, baris contoh): hanya
+     * hitungan dan pesan galat per nomor baris (UU PDP No. 27/2022).
+     */
+    private function redactSummary(array $summary): array
+    {
+        unset($summary['sample_rows']);
+        $summary['errors'] = array_map(
+            fn (array $error) => ['row' => $error['row'] ?? null, 'errors' => $error['errors'] ?? []],
+            $summary['errors'] ?? []
+        );
 
         return $summary;
     }
@@ -363,10 +398,12 @@ class EmployeeImportService
         ?string $ip = null,
         ?string $userAgent = null
     ): array {
-        $import = new EmployeesImport(dryRun: false);
+        $import = new EmployeesImport(dryRun: false, actorName: $user?->name);
         Excel::import($import, $file);
 
         $summary = $import->getImportSummary();
+
+        $this->recordAuditLog($summary, $user, $ip, $userAgent, $file->getClientOriginalName(), (int) $file->getSize(), null);
 
         Log::info('HRIS Import Data Pegawai dieksekusi', [
             'channel' => 'direct_import',
@@ -401,10 +438,12 @@ class EmployeeImportService
      */
     public function getFailedRows(string $token): ?array
     {
-        return Cache::get("import_failed_rows_{$token}")
+        $sealed = Cache::get("import_failed_rows_{$token}")
             ?? Cache::get("import_report_{$token}")['failed_rows']
             ?? Cache::get("import_preview_{$token}")['failed_rows']
             ?? null;
+
+        return $sealed === null ? null : $this->openRows($sealed);
     }
 
     /**
@@ -412,7 +451,48 @@ class EmployeeImportService
      */
     public function getImportReport(string $token): ?array
     {
-        return Cache::get("import_report_{$token}");
+        $report = Cache::get("import_report_{$token}");
+
+        if ($report === null) {
+            return null;
+        }
+
+        $report['rows'] = $this->openRows($report['rows'] ?? []);
+        $report['failed_rows'] = $this->openRows($report['failed_rows'] ?? []);
+
+        return $report;
+    }
+
+    /**
+     * Jejak audit unduhan berkas yang memuat data pribadi (laporan impor / baris gagal), tanpa NIK atau nama.
+     */
+    public function recordDownloadAudit(string $kind, string $token, ?User $user, ?string $ip, int $recordCount): void
+    {
+        Log::info('HRIS Unduh Berkas Impor Pegawai', [
+            'kind' => $kind,
+            'token' => $token,
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'System',
+            'ip_address' => $ip,
+            'record_count' => $recordCount,
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Baris impor memuat data pribadi: di cache disimpan terenkripsi (UU PDP No. 27/2022).
+     */
+    private function sealRows(array $rows): string
+    {
+        return Crypt::encrypt($rows);
+    }
+
+    /**
+     * Membuka baris dari cache; nilai larik polos (cache lama) diteruskan apa adanya.
+     */
+    private function openRows(mixed $rows): array
+    {
+        return is_string($rows) ? Crypt::decrypt($rows) : (array) $rows;
     }
 
     /**

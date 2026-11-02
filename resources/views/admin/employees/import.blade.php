@@ -20,8 +20,17 @@
         back-label="Kembali ke Direktori"
     />
 
+    {{-- Umpan balik gagal: tidak menutup otomatis agar pesan dapat dibaca lengkap (DESIGN.md §7.7) --}}
+    <div x-show="errorMessage" x-cloak role="alert" class="flex items-start gap-3 rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+        <i class="fas fa-exclamation-circle mt-0.5" aria-hidden="true"></i>
+        <p class="flex-1 whitespace-pre-line" x-text="errorMessage"></p>
+        <button type="button" @click="errorMessage = ''" aria-label="Tutup pesan galat" class="text-danger-700 hover:text-danger-800 focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
+            <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+    </div>
+
     <!-- ============================================================ -->
-    <!-- ENTERPRISE STEPPER PROGRESS BAR (DESIGN.md Bab 6.6)          -->
+    {{-- ENTERPRISE STEPPER PROGRESS BAR (DESIGN.md Bab 6.6)          --}}
     <!-- ============================================================ -->
     <div class="bg-white rounded-2xl border border-surface-200/80 p-4 sm:p-5 shadow-xs">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative">
