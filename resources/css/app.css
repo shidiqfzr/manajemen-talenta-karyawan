@@ -4,6 +4,9 @@
 @source "../../app";
 @source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views";
 
+/* Very short viewports only, so normal laptop windows keep the same look as full screen */
+@custom-variant short (@media (max-height: 650px));
+
 @theme {
   --color-primary-50: #F3FAF6;
   --color-primary-100: #E7F5EC;
