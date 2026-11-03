@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class LoginPageTest extends TestCase
@@ -63,5 +65,78 @@ class LoginPageTest extends TestCase
             ->assertSee('value="tidak.ada"', false)
             ->assertSee('aria-invalid="true"', false)
             ->assertSee('Username/Email atau password salah.');
+    }
+
+    public function test_the_sixth_attempt_within_a_minute_is_blocked_even_with_the_correct_password(): void
+    {
+        $user = $this->staffUser();
+        $this->failLogin(5);
+
+        $this->from(route('login'))
+            ->post(route('login.submit'), ['username' => $user->username, 'password' => 'rahasia123'])
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('username');
+
+        $this->assertGuest();
+        $this->get(route('login'))
+            ->assertSee('Terlalu banyak percobaan masuk.')
+            ->assertSee('value="'.$user->username.'"', false);
+    }
+
+    public function test_the_fifth_attempt_still_reaches_the_credential_check(): void
+    {
+        $user = $this->staffUser();
+        $this->failLogin(4);
+
+        $this->post(route('login.submit'), ['username' => $user->username, 'password' => 'rahasia123']);
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_the_block_lifts_after_a_minute(): void
+    {
+        $user = $this->staffUser();
+        $this->failLogin(5);
+
+        $this->travel(61)->seconds();
+        $this->post(route('login.submit'), ['username' => $user->username, 'password' => 'rahasia123']);
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_successful_logins_do_not_count_towards_the_limit(): void
+    {
+        $user = $this->staffUser();
+
+        // Staff sharing one office IP must not lock each other out by signing in normally.
+        foreach (range(1, 7) as $attempt) {
+            $this->post(route('login.submit'), ['username' => $user->username, 'password' => 'rahasia123']);
+            $this->assertAuthenticatedAs($user);
+            $this->post(route('logout'));
+        }
+    }
+
+    public function test_the_block_applies_per_ip_address(): void
+    {
+        $user = $this->staffUser();
+        $this->failLogin(5);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.2'])
+            ->post(route('login.submit'), ['username' => $user->username, 'password' => 'rahasia123']);
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    private function staffUser(): User
+    {
+        return User::factory()->create(['password' => Hash::make('rahasia123')]);
+    }
+
+    private function failLogin(int $times): void
+    {
+        foreach (range(1, $times) as $attempt) {
+            $this->from(route('login'))
+                ->post(route('login.submit'), ['username' => 'tidak.ada', 'password' => 'salah']);
+        }
     }
 }
