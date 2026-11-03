@@ -29,7 +29,7 @@
 <body class="bg-surface-50 text-surface-900 font-sans antialiased min-h-screen flex flex-col">
 
     <header class="px-4 sm:px-6 py-4 flex items-center gap-3">
-        <img src="{{ asset('images/logo-ptpn4.png') }}" alt="" class="h-8 w-auto object-contain shrink-0">
+        <img src="{{ asset('images/logo-PTPN4.png') }}" alt="" class="h-8 w-auto object-contain shrink-0">
         <div class="leading-tight">
             <p class="text-sm font-bold text-surface-900">Talenta Hub</p>
             <p class="text-xs text-surface-500">PTPN IV Regional V</p>
