@@ -40,9 +40,9 @@ Merujuk pada **Undang-Undang No. 27 Tahun 2022 tentang Perlindungan Data Pribadi
 2. **Pencegahan Brute-Force Login**:
    - Rute otentikasi login wajib dilindungi oleh rate-limiter:
    ```php
-   // Maksimal 5 percobaan gagal per menit
+   // Maksimal 5 percobaan gagal per menit; login berhasil tidak dihitung
    RateLimiter::for('login', function (Request $request) {
-       return Limit::perMinute(5)->by($request->ip());
+       return Limit::perMinute(5)->by($request->ip())->after(fn () => Auth::guest());
    });
    ```
 3. **Penyimpanan Kredensial**:
