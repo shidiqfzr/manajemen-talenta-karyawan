@@ -90,7 +90,7 @@
             <!-- Sidebar Header / Branding -->
             <div class="h-16 flex items-center justify-between px-4 border-b border-surface-200 shrink-0">
                 <a wire:navigate href="{{ route('admin.employees.index') }}" class="flex items-center gap-3 overflow-hidden">
-                    <img src="{{ asset('images/logo-ptpn4.png') }}" alt="PTPN IV Logo" class="h-8 w-auto object-contain shrink-0">
+                    <img src="{{ asset('images/logo-PTPN4.png') }}" alt="PTPN IV Logo" class="h-8 w-auto object-contain shrink-0">
                     <div class="flex flex-col min-w-0" x-show="!sidebarCollapsed" x-transition>
                         <span class="text-base font-bold text-surface-900 tracking-tight leading-tight truncate">Talenta Hub</span>
                         <span class="text-[10px] font-semibold text-primary-700 tracking-wider uppercase leading-tight truncate">PTPN IV Regional V</span>
