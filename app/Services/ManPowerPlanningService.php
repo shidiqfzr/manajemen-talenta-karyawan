@@ -422,7 +422,6 @@ class ManPowerPlanningService
     public function getDrilldownEmployees(string $rm, string $bidang, string $scope, int $year, int $month): array
     {
         $asOf = $this->asOfDate($year, $month);
-        $yearEnd = $asOf->copy()->endOfYear();
         $matched = [];
 
         foreach ($this->presentEmployees($asOf) as $row) {
@@ -430,16 +429,7 @@ class ManPowerPlanningService
                 continue;
             }
 
-            $vacancy = $row['vacancy'];
-            $include = match ($scope) {
-                'realisasi' => ! $row['overflow'],
-                'advisor' => $row['overflow'] && $this->isAdvisor($row),
-                'diperban' => $row['overflow'] && ! $this->isAdvisor($row),
-                'pensiun_t' => $vacancy !== null && $vacancy->lte($yearEnd),
-                'pensiun_t1' => $vacancy !== null && $vacancy->year === $year + 1,
-                default => str_starts_with($scope, 'supply_') && $row['hired_source'] === substr($scope, strlen('supply_')),
-            };
-            if (! $include) {
+            if (! in_array($scope, $this->scopesFor($row, $year), true)) {
                 continue;
             }
 
@@ -461,12 +451,76 @@ class ManPowerPlanningService
         return $matched;
     }
 
+    /**
+     * Seluruh personil di balik sel personil matriks pada posisi akhir bulan $month tahun $year, satu entri per
+     * scope drilldown yang diikuti pegawai. Memakai aturan scope yang sama dengan getDrilldownEmployees(),
+     * sehingga jumlah anggota selalu sama dengan angka sel.
+     *
+     * @return list<array{scope: string, rm_level: string, bidang: string, employee_nik: string, jabatan: ?string, unit_kerja: ?string, tanggal_penempatan: ?string, tanggal_mbt: ?string}>
+     */
+    public function getPositionMembers(int $year, int $month): array
+    {
+        $members = [];
+
+        foreach ($this->presentEmployees($this->asOfDate($year, $month)) as $row) {
+            $emp = $row['employee'];
+            foreach ($this->scopesFor($row, $year) as $scope) {
+                $members[] = [
+                    'scope' => $scope,
+                    'rm_level' => $row['rm'],
+                    'bidang' => $row['bidang'],
+                    'employee_nik' => (string) $emp->nik,
+                    'jabatan' => $emp->jabatan,
+                    'unit_kerja' => $emp->unit_kerja,
+                    'tanggal_penempatan' => $row['realised_on']?->toDateString(),
+                    'tanggal_mbt' => $emp->effective_tanggal_mbt?->toDateString(),
+                ];
+            }
+        }
+
+        return $members;
+    }
+
+    /**
+     * Scope drilldown yang diikuti satu pegawai: realisasi/advisor/diperban, pensiun_t atau pensiun_t1, dan
+     * supply_{sumber}. Hanya RM-1 s.d. RM-3 yang dihitung pada MPP.
+     *
+     * @param  array{employee: Employee, rm: string, bidang: string, vacancy: ?Carbon, overflow: bool, hired_source: ?string, realised_on: ?Carbon}  $row
+     * @return list<string>
+     */
+    private function scopesFor(array $row, int $year): array
+    {
+        if (! in_array($row['rm'], MppSupplyPlan::LEVELS, true) || ! in_array($row['bidang'], MppSupplyPlan::BIDANG, true)) {
+            return [];
+        }
+
+        $scopes = [];
+        if (! $row['overflow']) {
+            $scopes[] = 'realisasi';
+        } else {
+            $scopes[] = $this->isAdvisor($row) ? 'advisor' : 'diperban';
+        }
+
+        $vacancy = $row['vacancy'];
+        if ($vacancy !== null && $vacancy->lte(Carbon::create($year, 12, 31)->endOfDay())) {
+            $scopes[] = 'pensiun_t';
+        } elseif ($vacancy !== null && $vacancy->year === $year + 1) {
+            $scopes[] = 'pensiun_t1';
+        }
+
+        if ($row['hired_source'] !== null) {
+            $scopes[] = 'supply_'.$row['hired_source'];
+        }
+
+        return $scopes;
+    }
+
     private function isAdvisor(array $row): bool
     {
         return str_contains(strtolower((string) $row['employee']->jabatan), 'advisor');
     }
 
-    private function dateLabel(?Carbon $date): string
+    public function dateLabel(?Carbon $date): string
     {
         return $date ? $date->format('d').' '.self::MONTHS_SHORT[$date->month].' '.$date->year : '—';
     }
@@ -526,6 +580,7 @@ class ManPowerPlanningService
         // Pasokan T+1 bersifat kumulatif: pasokan T ditambah pasokan T+1.
         $kebutuhanT = [];
         $kebutuhanT1 = [];
+        $supplyT1Plan = [];
 
         foreach ($levels as $rm) {
             $kebutuhanT[$rm] = [];
@@ -537,6 +592,7 @@ class ManPowerPlanningService
                 $penT1Val = $pensiunT1[$rm][$field] ?? 0;
                 $supplyT = $ckp[$rm][$field] + $talentScouting[$rm][$field] + $rbb[$rm][$field];
                 $supplyT1 = $planT1['ckp'][$rm][$field] + $planT1['talent_scouting'][$rm][$field] + $planT1['rbb'][$rm][$field];
+                $supplyT1Plan[$rm][$field] = $supplyT1;
 
                 // Standard enterprise MPP formula:
                 $kebutuhanT[$rm][$field] = ($formasiVal - $realisasiVal + $penTVal) - $supplyT;
@@ -651,6 +707,8 @@ class ManPowerPlanningService
             'matrix' => $matrix,
             // Rencana vs realisasi per sel pasokan: sisa = max(0, rencana - terealisasi).
             'supply_breakdown' => $supplyBreakdown,
+            // Pasokan rencana T+1 (CKP + Talent Scouting + RBB) per sel, dipakai rumus Kebutuhan T+1.
+            'supply_t1' => $supplyT1Plan,
             'stats' => [
                 'total_formasi' => $totalFormasi,
                 'total_realisasi' => $totalRealisasi,

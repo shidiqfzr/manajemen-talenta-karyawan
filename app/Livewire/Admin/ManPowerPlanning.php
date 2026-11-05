@@ -162,7 +162,7 @@ class ManPowerPlanning extends Component
             $s = $cell(6) + $cell(7) + $cell(8);
             if (! $isT) {
                 // Pasokan T+1 kumulatif, sama dengan rumus sel Kebutuhan T+1.
-                $s += $service->supplyFor($this->planningYear + 1, $rm, $bidang);
+                $s += $mpp['supply_t1'][$rm][$bidang];
             }
             $k = $cell($row);
 
