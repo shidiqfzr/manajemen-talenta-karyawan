@@ -52,6 +52,9 @@ class MasterAuditLog extends Model
         'position.deleted' => 'Jabatan dihapus',
         'mpp_supply.created' => 'Rencana pasokan MPP dibuat',
         'mpp_supply.updated' => 'Rencana pasokan MPP diubah',
+        'mpp_period.captured' => 'Draf periode MPP direkam',
+        'mpp_period.closed' => 'Periode MPP ditutup',
+        'mpp_period.reopened' => 'Periode MPP dibuka kembali',
     ];
 
     public const ENTITY_LABELS = [
@@ -59,6 +62,7 @@ class MasterAuditLog extends Model
         'position' => 'Jabatan',
         'seat' => 'Formasi Jabatan',
         'mpp_supply' => 'Rencana Pasokan MPP',
+        'mpp_period' => 'Periode MPP',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
@@ -74,6 +78,8 @@ class MasterAuditLog extends Model
         'kuota' => 'Kuota',
         'filled' => 'Terisi',
         'jumlah' => 'Jumlah',
+        'status' => 'Status Periode',
+        'revision' => 'Revisi',
     ];
 
     public static function actionLabel(string $action): string
@@ -121,7 +127,7 @@ class MasterAuditLog extends Model
     }
 
     public static function record(
-        User $user,
+        ?User $user,
         string $action,
         string $entityType,
         ?int $entityId,
@@ -131,8 +137,8 @@ class MasterAuditLog extends Model
         ?string $reason = null,
     ): self {
         return static::create([
-            'user_id' => $user->id,
-            'user_name' => $user->name,
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'Sistem',
             'action' => $action,
             'entity_type' => $entityType,
             'entity_id' => $entityId,
