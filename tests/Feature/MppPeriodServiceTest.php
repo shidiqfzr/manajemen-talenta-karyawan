@@ -125,6 +125,33 @@ class MppPeriodServiceTest extends TestCase
         $this->assertEquals($snapshot, $this->service->find(2026, 10)->snapshot);
     }
 
+    public function test_is_closable_only_for_months_before_the_current_one(): void
+    {
+        $this->assertTrue($this->service->isClosable(2026, 10));
+        $this->assertTrue($this->service->isClosable(2025, 12));
+        $this->assertFalse($this->service->isClosable(2026, 11));
+        $this->assertFalse($this->service->isClosable(2026, 12));
+        $this->assertFalse($this->service->isClosable(2027, 1));
+        $this->assertFalse($this->service->isClosable(2026, 13));
+        $this->assertFalse($this->service->isClosable(2026, 0));
+    }
+
+    public function test_state_for_reports_closed_draft_unclosed_and_live(): void
+    {
+        $this->assertSame('unclosed', $this->service->stateFor(2026, 10));
+        $this->assertSame('live', $this->service->stateFor(2026, 11));
+        $this->assertSame('live', $this->service->stateFor(2027, 3));
+
+        $this->service->capture(2026, 10, $this->admin);
+        $this->assertSame('draft', $this->service->stateFor(2026, 10));
+
+        $this->service->close(2026, 10, null, $this->admin);
+        $this->assertSame('closed', $this->service->stateFor(2026, 10));
+
+        $this->service->reopen(2026, 10, 'Koreksi mutasi susulan', $this->admin);
+        $this->assertSame('draft', $this->service->stateFor(2026, 10));
+    }
+
     public function test_year_must_be_within_planning_range(): void
     {
         $this->assertRefused(

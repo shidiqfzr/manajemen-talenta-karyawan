@@ -414,14 +414,7 @@ class ManPowerPlanning extends Component
     /** closed | draft (ada salinan), unclosed (bulan lampau belum pernah direkam), live (bulan berjalan atau mendatang). */
     private function periodState(): string
     {
-        $period = $this->period();
-        if ($period) {
-            return $period->status === MppPeriod::STATUS_CLOSED ? 'closed' : 'draft';
-        }
-
-        return Carbon::create($this->planningYear, $this->asOfMonth, 1)->startOfMonth()->lt(Carbon::now()->startOfMonth())
-            ? 'unclosed'
-            : 'live';
+        return app(MppPeriodService::class)->stateFor($this->planningYear, $this->asOfMonth);
     }
 
     /** Akhiran nama berkas ekspor untuk bulan berisi snapshot, mis. "_ditutup_rev1". */

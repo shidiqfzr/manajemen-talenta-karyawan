@@ -32,6 +32,29 @@ class MppPeriodService
         return MppPeriod::where('year', $year)->where('month', $month)->first();
     }
 
+    /** Hanya bulan sebelum bulan berjalan yang dapat direkam atau ditutup. */
+    public function isClosable(int $year, int $month): bool
+    {
+        return $month >= 1 && $month <= 12
+            && Carbon::create($year, $month, 1)->startOfMonth()->lt(now()->startOfMonth());
+    }
+
+    /**
+     * Status bulan pada layar MPP: closed/draft (ada salinan tersimpan), unclosed (bulan lampau belum pernah
+     * direkam), atau live (bulan berjalan/mendatang, dihitung dari data pegawai).
+     *
+     * @return 'closed'|'draft'|'unclosed'|'live'
+     */
+    public function stateFor(int $year, int $month): string
+    {
+        $period = $this->find($year, $month);
+        if ($period) {
+            return $period->status === MppPeriod::STATUS_CLOSED ? 'closed' : 'draft';
+        }
+
+        return $this->isClosable($year, $month) ? 'unclosed' : 'live';
+    }
+
     /**
      * Rekam atau perbarui draf periode: salinan matriks dan personil di balik tiap sel. $user null berarti
      * penjadwal; riwayat tetap dicatat atas nama "Sistem".
@@ -188,7 +211,7 @@ class MppPeriodService
     {
         $this->assertWithinPlanningYears($year);
 
-        if ($month < 1 || $month > 12 || Carbon::create($year, $month, 1)->startOfMonth()->gte(now()->startOfMonth())) {
+        if (! $this->isClosable($year, $month)) {
             throw new MppPeriodRuleViolationException('Periode berjalan atau mendatang belum dapat direkam atau ditutup.');
         }
     }
