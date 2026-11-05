@@ -258,6 +258,13 @@ Satu-satunya acuan warna status. Status baru **wajib** ditambahkan di sini lebih
 | Memenuhi syarat (compliance) | Memenuhi Syarat | `primary-50` | `primary-800` | `primary-200` | `fa-check` | 3 |
 | Butuh dispensasi | Perlu Dispensasi | `warning-50` | `warning-800` | `warning-200` | `fa-triangle-exclamation` | 1 |
 | Terblokir (aturan keras) | Tidak Dapat Diproses | `danger-50` | `danger-800` | `danger-200` | `fa-lock` | 1 |
+| Impor pegawai menunggu persetujuan | Menunggu Persetujuan | `warning-100` | `warning-800` | — | `fa-clock` | 3 |
+| Impor pegawai disetujui, sedang disimpan | Menyimpan | `info-50` | `info-800` | `info-200` | `fa-rotate` | 3 |
+| Impor pegawai tersimpan | Tersimpan | `primary-100` | `primary-800` | — | `fa-check` | 3 |
+| Impor tersimpan, sebagian baris dilewati | Tersimpan Sebagian | `warning-50` | `warning-800` | `warning-200` | `fa-triangle-exclamation` | 1 |
+| Impor pegawai ditolak atau ditarik | Ditolak | `surface-100` | `surface-600` | `surface-300` | `fa-ban` | 3 |
+| Impor pegawai dibatalkan (undo) | Dibatalkan | `surface-100` | `surface-600` | `surface-300` | `fa-rotate-left` | 3 |
+| Pengajuan impor kedaluwarsa | Kedaluwarsa | `surface-100` | `surface-600` | `surface-300` | `fa-hourglass-end` | 3 |
 
 ### 5.2 Kategori (bukan status)
 
@@ -266,7 +273,7 @@ Satu-satunya acuan warna status. Status baru **wajib** ditambahkan di sini lebih
 | RM-1 | `bg-orange-50 text-orange-800 border-orange-200` |
 | RM-2 | `bg-sky-50 text-sky-800 border-sky-200` |
 | RM-3 | `bg-purple-50 text-purple-800 border-purple-200` |
-| RM-4 (Karpel) | `bg-surface-100 text-surface-700 border-surface-200` |
+| RM-4 s.d. RM-7 (Karpel) | `bg-surface-100 text-surface-700 border-surface-200` |
 | Karpim / Karpel | Teks saja (Tier 3) |
 | Bidang KEU/TAN/TEK/UMU | Micro-chip netral (Tier 4) |
 
@@ -309,9 +316,10 @@ Semua UI admin **wajib** dibangun dari komponen di bawah. Membuat markup sendiri
 |---|---|---|
 | `x-admin.button` | `variant` primary·secondary·ghost·danger, `size` sm·md·lg, `type`, `icon`, `href`, `target`, `once` | Satu `primary` per area aksi. Aksi Livewire **wajib** `target="namaAction"` (disabled + spinner). Form biasa yang mengubah data **wajib** `once`. `danger` **wajib** didahului modal konfirmasi |
 | `x-admin.kpi-card` | `title`, `value`, `icon`, `theme`, `subtitle`, `badge`, `href`, `tabKey`, `active`, `coloredValue` | Lihat §5.3. Nilai `surface-900` kecuali kartu berfungsi sebagai tab filter. Kartu statis tanpa efek hover |
-| `x-admin.page-header` | `title`, `subtitle`, `icon`, `backUrl`, `breadcrumbs` | Wajib di setiap halaman admin; satu `<h1>` per halaman |
+| `x-admin.page-header` | `title`, `subtitle`, `icon`, `backUrl`, `breadcrumbs`, slot aksi opsional (di sebelah tombol kembali) | Wajib di setiap halaman admin; satu `<h1>` per halaman |
 | `x-admin.module-header` | `title`, `subtitle`, `breadcrumbs` (daftar label; terakhir = halaman aktif), slot aksi | Kepala halaman modul Pegawai, Mutasi, dan Master Formasi; satu `<h1>` per halaman. Dilarang menyalin markup header ke halaman modul |
 | `x-admin.flash` | — | Umpan balik `session('success')`/`session('error')` seragam |
+| `x-admin.import-status` | `status`, `skipped` | Lencana status impor pegawai dari Tabel Status Induk (§5.1): label, warna, dan ikon. Impor tersimpan dengan baris dilewati tampil "Tersimpan Sebagian". Teks `text-xs`, tanpa huruf kapital |
 | `x-admin.row-menu` | `label`, `text` | Menu kebab per baris (target 32×32px); `text` mengubahnya menjadi tombol berlabel untuk menu tingkat halaman. Pola ARIA menu button: Enter/Spasi/Panah membuka dan memfokuskan butir, Panah/Home/End berpindah, Esc menutup dan mengembalikan fokus, Tab menutup; butir menu `role="menuitem" tabindex="-1"`. Panel `fixed` (membuka ke atas bila ruang kurang, tidak terpotong tabel); isi memakai butir menu modul |
 | `x-admin.filter-select` | `id`, `model`, `label`, `all-label`, `options`, `icon` | Dropdown filter pada strip toolbar tabel Livewire |
 | `x-admin.table.pagination` | `paginator`, `noun`, `per-page-options` | Footer tabel Livewire: baris per halaman, rentang, penomoran. Komponen Livewire memakai `WithPagination` dan properti `$perPage` (diklem ke pilihan yang diizinkan). **Dilarang** area gulir di dalam tabel (`max-h` + `overflow-y`): halaman yang panjang diselesaikan dengan paginasi, bukan gulir bersarang |
@@ -438,11 +446,17 @@ Rincian kelas per piksel tinggal di view masing-masing. Bagian ini hanya memuat 
 
 ### 8.1 Man Power Planning
 
-- Horizon dinamis **T** dan **T+1** dari filter tahun; label baris ikut tahun (`Pensiun sd Des {T}`, `Kebutuhan {T+1}`), termasuk KPI dan nama berkas export (`mpp_perencanaan_formasi_{T}_{T+1}`).
-- Mode sumber data **Baseline** (formasi baku) vs **Live** (agregasi pegawai aktif) sebagai segmented control.
+- Satu sumber data: seluruh angka aktual berasal dari data pegawai; tidak ada sakelar "angka acuan korporat" vs "data pegawai".
+- Strip filter memuat **Tahun** (horizon T dan T+1) dan **Posisi per** (bulan; Realisasi dihitung pada akhir bulan itu). Bawaan bulan: bulan berjalan untuk tahun berjalan, Desember untuk tahun lalu, Januari untuk tahun mendatang; berganti tahun mengembalikan bulan ke bawaan. Indikator "Menghitung…" tampil selama perubahan filter diproses.
+- Label baris ikut tahun dan posisi (`Realisasi per {Bln T}`, `Pensiun sd Des {T}`, `Sisa RBB {T}`, `Kebutuhan {T+1}`), termasuk KPI dan nama berkas export (`mpp_perencanaan_formasi_{T}_{T+1}_posisi_{YYYY-MM}`). Nama bulan memakai singkatan Indonesia (Jan…Des) tanpa bergantung pada locale. Kartu personil drilldown menampilkan tanggal MBT dan tanggal pensiun.
+- Toolbar tingkat 1 memuat tombol **Kelola Rencana Pasokan** yang membuka laci editor rencana pasokan tahun terpilih: grid per sumber (RM Band x bidang, input angka tanpa `.live`; untuk CKP Internal, Talent Scouting, dan RBB hanya baris RM-3 yang berupa isian, RM-1/RM-2 tampil "–" dengan keterangan "Hanya formasi RM-3; RM-1 dan RM-2 diisi lewat promosi"), editor dibuka pada tahun dan posisi yang sama dengan matriks dan menampilkan "terealisasi N" di bawah setiap isian RM-3 jalur rekrutmen (pegawai jalur itu yang sudah ditempatkan sebagai Karpim tahun ini s.d. posisi), dengan pemberitahuan "{sumber}: terealisasi melebihi rencana pada …" bila realisasi melebihi angka yang diketik; langkah **Tinjau Perubahan** yang menampilkan jumlah sel berubah dan total per sumber lama → baru, alasan wajib, serta state loading eksplisit pada tombol tinjau dan simpan.
+- Bila rencana pasokan T atau T+1 belum ada, pemberitahuan nada warning di atas tabel: "Rencana pasokan {tahun} belum diisi. Angka pasokan dihitung 0." dengan tautan pembuka editor.
+- Baris Kebutuhan: sel JUMLAH dan TOTAL menampilkan angka bersih tebal (warning bila positif, primary bila negatif); baris kecil "kurang X · surplus Y" hanya muncul bila keduanya ada. Tidak pernah menampilkan "−0". KPI "Kekurangan Formasi {T}" bernilai total kekurangan dengan subjudul surplus dan kebutuhan bersih.
+- Baris KPI memakai `x-admin.kpi-card` statis seperti modul lain (tanpa `bottom-bar`): Standar Formasi `info`, Realisasi `primary`, Proyeksi Pensiun `warning` dengan subjudul jendela proyeksi ("Kursi kosong sejak MBT · {bulan setelah posisi} – Des {T+1}"), Kekurangan Formasi `danger` bila > 0. Di bawah judul matriks tampil asal-usul rencana pasokan yang sudah diisi: "Rencana pasokan {tahun} diperbarui oleh {nama} · {tanggal jam}". Tahun tanpa rencana hanya memunculkan pemberitahuan "belum diisi".
+- Label RM Band pada header matriks dan legenda berasal dari satu definisi (`ManPowerPlanningService::RM_BANDS`, sesuai DOMAIN.md Bab 4.2); dilarang menulis label RM langsung di view. Lencana jumlah formasi pada tab MPP dihitung dari kursi master, bukan angka tetap.
 - Toolbar terintegrasi dua tingkat dalam kartu tabel: tingkat 1 judul + Export/Cetak, tingkat 2 strip filter. **Dilarang** kartu toolbar terpisah di atas tabel.
 - Header grup RM tidak boleh patah baris (`whitespace-nowrap`).
-- Sel angka >0 bisa diklik (`cursor-pointer`, garis bawah titik-titik) dan membuka drawer drilldown: rumus `Formasi − Realisasi + Pensiun − Pasokan = Kebutuhan Bersih`, pencarian lokal, kartu personel, export subset. Sel 0 statis.
+- Sel angka bukan 0 hanya bisa diklik (`cursor-pointer`, garis bawah titik-titik) bila barisnya punya rincian (kunci `drill` dari service): baris berbasis data pegawai (Realisasi, Pensiun, Advisor, Diperban) membuka drawer berisi **persis** personil yang dihitung sel itu, dengan pencarian lokal, kartu personel, dan export subset; kartu rincian perhitungan pada drawer (rumus Kebutuhan maupun rencana vs realisasi pasokan) **wajib** memakai satu partial `livewire.admin.partials.mpp-breakdown-card` agar tampilannya seragam; operator matematika (−, +, =) berdiri sebagai kolom sendiri yang rata tengah di antara suku, bukan awalan pada label; baris Sisa CKP / Talent Scouting / RBB membuka rincian **Rencana − Terealisasi = Sisa** beserta daftar pegawai yang merealisasikannya (tanggal penempatan Karpim), dengan catatan "Terealisasi melebihi rencana: N" bila berlebih; sel pasokan bernilai 0 tetap dapat dibuka bila ada rencana atau realisasi; baris Kebutuhan membuka rincian rumus `Formasi − Realisasi + Pensiun − Pasokan = Kebutuhan Bersih` tanpa daftar personil. Sel standar formasi dan Jabatan Prioritas Diisi statis. Sel 0 lainnya statis.
 - Kolom JUMLAH/TOTAL tebal `font-mono`, termasuk nilai 0. Teks indikator rata kiri tanpa ikon.
 
 ### 8.2 Monitoring Formasi Kosong
@@ -480,6 +494,15 @@ Satu modul, satu entri sidebar ("Master Formasi"), dua bagian pada navigasi seks
 11. **Tabel kursi**: kolom Jabatan, RM Band, Bidang, Kuota, Terisi dapat diurutkan; chip RM Band mengikuti §5.2 (`Position::rmTheme`); status kursi mengikuti §5.1. Angka Terisi >0 dapat diklik dan membuka daftar pemegang kursi (nama dan golongan; NIK tidak ditampilkan sebagai teks, tautan menuju profil). Ubah Kuota & Bidang berupa dialog dengan pratinjau dampak, bukan sunting sebaris. Konfigurasi dialog aksi disusun oleh `FormasiDialogs`, bukan di Blade.
 
 ---
+
+### 8.6 Riwayat & Persetujuan Impor Pegawai
+
+Layar server-render di bawah modul Pegawai (`/admin/employees/import/batches`), memakai `x-admin.module-header`.
+
+1. **Daftar**: tab status (Semua, Perlu Tindakan, Tersimpan, Ditutup) berisi jumlah, pencarian berkas atau pengaju, dan maksimal 5 kolom (Berkas, Pengaju, Hasil, Status, menu kebab). Hasil ditulis berlabel ("319 baru, 0 diperbarui, 65 dilewati"), bukan angka bergaris miring; baris dilewati memakai `danger-700`. Status memakai `x-admin.import-status`.
+2. **Detail**: ringkasan KPI, lalu panel **Baris yang Dilewati** (alasan dikelompokkan, nomor baris, daftar lengkap yang dapat dibuka, tanpa data pribadi). Kolom kanan berisi linimasa keputusan (diajukan, disetujui/ditolak, disimpan, dibatalkan beserta pelaku, waktu, alasan) dan kode verifikasi berkas dengan tombol salin.
+3. **Tindakan berisiko**: pembatalan impor berada pada kartu berbingkai `danger` terpisah dari ringkasan, dengan **pemeriksaan kesiapan** ("Siap dibatalkan: 319 dari 319 pegawai belum berubah" atau daftar NIK tersamar yang sudah berubah, tombol dinonaktifkan). Pembatalan yang menyentuh banyak pegawai (ambang `hris.import.typed_confirmation_threshold`) wajib mengetik kata `BATALKAN` pada dialog. Dialog konfirmasi mengikuti §7.6 (Batal menjadi fokus awal, tombol `danger` di kanan).
+4. **Keputusan pengajuan**: tombol `primary` "Setujui & Simpan Data" hanya untuk penyetuju (bukan pengaju); menolak/menarik memakai tombol netral yang membuka dialog beralasan.
 
 ## 9. Visualisasi Data
 
@@ -657,5 +680,6 @@ Gagasan untuk fase berikutnya. Tidak boleh dijadikan dasar implementasi sebelum 
 | v3.9 | 01/11/2026 | Tabel Master Formasi (daftar unit, formasi jabatan) dan Riwayat Perubahan memakai paginasi dengan pilihan baris per halaman (`x-admin.table.pagination`); area gulir dalam tabel dan header sticky dicabut karena menimbulkan gulir bersarang. |
 | v3.10 | 01/11/2026 | Master Formasi: Ekspor Excel pada kedua tabel (mengikuti filter, nama pengakses pada properti berkas, netralisasi rumus); menu aksi mengikuti pola ARIA menu button (fokus, panah, Home/End, Esc, Tab) dengan target 32px; subjudul header diringkas agar tabel tampil lebih tinggi; status formasi memakai satu sumber label untuk filter, tabel, dan ekspor. |
 | v3.11 | 03/11/2026 | Halaman login: kartu putih mengambang di atas foto perkebunan yang digelapkan (hijau polos di bawah `lg`); panel foto di kiri dan form di kanan mengikuti §6.3 dan §7.1. Logo PTPN IV (48–64px mengikuti tinggi layar) di tengah, tepat di atas judul dan subjudul yang juga rata tengah; label field tetap rata kiri. Panel foto hanya memuat judul dan satu deskripsi. Logo Perkebunan Nusantara belum dipakai untuk sementara. Tanda `*` tidak dipakai karena kedua field login selalu wajib. Dijaga `tests/e2e/login.spec.js` pada 375px, 1366px, dan 1920px. |
+| v3.12 | 04/11/2026 | Riwayat & Persetujuan Impor Pegawai (§8.6): status impor didaftarkan di §5.1, komponen `x-admin.import-status`, slot aksi opsional pada `x-admin.page-header`, tab status dan pencarian, panel baris dilewati, pemeriksaan kesiapan dan konfirmasi ketik kata untuk pembatalan impor besar, linimasa keputusan |
 | v3.7 | 31/10/2026 | Master Formasi digabung menjadi satu layar berpusat pada unit (§8.5): halaman Unit Kerja dan Jabatan & Posisi dihapus; unit dikelola dari pemilih unit, jabatan dari tabel kursi; Tambah Kursi dan Buat Jabatan Baru berupa dialog. Navigasi seksi menjadi Formasi dan Riwayat Perubahan. |
 | v3.8 | 01/11/2026 | Master Formasi diselaraskan dengan modul Pegawai dan Mutasi: `x-admin.module-header`, `x-admin.flash`, `x-admin.row-menu` menjadi komponen bersama (dipakai juga oleh Pegawai dan Mutasi); Riwayat Perubahan menjadi komponen Livewire dengan toolbar pencarian/filter/chip dan kolom terurut; pemilih unit searchable dengan ringkasan unit; tabel kursi terurut dengan chip RM Band §5.2, status kursi pada §5.1, drill-down pemegang kursi, dan dialog Ubah Kuota & Bidang; label kolom riwayat memakai istilah bisnis. Istilah antarmuka "kursi" diganti "Formasi Jabatan" agar sejalan dengan modul Mutasi. Layar awal Formasi memakai baris KPI lintas unit (Unit Kerja, Formasi Jabatan, Total Kuota, Terisi) dan kolom Terisi per unit, sama seperti modul Pegawai dan Mutasi. Formasi dipecah menjadi halaman daftar unit dan halaman detail per unit (pola daftar → detail seperti modul Pegawai); breadcrumb mendukung tautan. Dropdown pemilih unit dihapus; daftar unit memakai toolbar pencarian, filter wilayah/status, dan kolom terurut. Tombol Buat Jabatan Baru dan Tambah Formasi Jabatan digabung menjadi satu tombol Tambah Jabatan dengan satu formulir: nama ketik dengan saran muncul setelah dua huruf, dibatasi pada unit sejenis (tanpa jabatan penampungan); nama terdaftar dipakai ulang, nama baru dibuat pada master. |
