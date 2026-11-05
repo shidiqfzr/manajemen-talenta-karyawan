@@ -435,6 +435,7 @@ AI dan pengembang harus memanfaatkan Service Layer yang ada:
 Satu-satunya jalur baca/tulis rencana pasokan.
 - `matrixFor(int $year): array` $\rightarrow$ sumber => RM => bidang => jumlah, terisi nol.
 - `hasPlan(int $year): bool`
+- `validateCells(array $cells): array` $\rightarrow$ Validasi isian tanpa menyimpan (bentuk, bilangan bulat 0..999, RM-3 untuk jalur rekrutmen); dipakai editor saat meninjau dan oleh `save()`.
 - `save(int $year, array $cells, array $expected, ?string $reason, User $user): int` $\rightarrow$ validasi (rentang tahun `ManPowerPlanningService::PLANNING_YEAR_MIN/MAX`, 48 sel lengkap, bilangan bulat 0..999, alasan minimal 10 karakter), tolak simpanan yang menimpa perubahan admin lain (`$expected` berbeda dari yang tersimpan), lalu dalam satu `DB::transaction()` simpan sel dan catat satu baris `master_audit_logs` per sel yang berubah. Pelanggaran dilempar sebagai `MppPlanRuleViolationException` (pesan aman untuk admin).
 
 ### 9.2 `MutasiService`

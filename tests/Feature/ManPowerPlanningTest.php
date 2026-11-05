@@ -558,6 +558,24 @@ class ManPowerPlanningTest extends TestCase
             ->assertDontSee('= Kebutuhan');
     }
 
+    public function test_opening_a_drawer_reads_the_employee_table_once(): void
+    {
+        $this->makeKarpim('77770061', '1990-01-10');
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $component->call('openDrilldown', 'RM-1', 'TAN', 2);
+        $employeeScans = collect(DB::getQueryLog())->pluck('query')
+            ->filter(fn (string $q) => preg_match('/from\s+"?employees"?\s*(where\s+"?employees"?\."?deleted_at"?\s+is\s+null)?\s*$/i', trim($q)))
+            ->count();
+        DB::disableQueryLog();
+
+        // Matriks drawer, daftar personil, dan render ulang memakai satu pembacaan data pegawai.
+        $this->assertSame(1, $employeeScans);
+        $component->assertCount('drilldownEmployees', 1);
+    }
+
     public function test_plan_cells_do_not_open_a_drawer_and_kebutuhan_opens_the_formula(): void
     {
         $this->seed(PositionUnitSeeder::class);

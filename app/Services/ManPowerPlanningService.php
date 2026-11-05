@@ -55,6 +55,14 @@ class ManPowerPlanningService
         ],
     ];
 
+    /**
+     * Hasil pembacaan pegawai per tanggal posisi, untuk satu instance (satu permintaan). Matriks, drilldown,
+     * dan render ulang pada permintaan yang sama memakai satu pembacaan tabel pegawai.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $presentCache = [];
+
     public function __construct(
         private ?FormasiCatalog $catalog = null,
         private ?MppSupplyPlanService $supplyPlan = null,
@@ -275,6 +283,14 @@ class ManPowerPlanningService
      * @return list<array{employee: Employee, rm: string, bidang: string, vacancy: ?Carbon, overflow: bool, hired_source: ?string, realised_on: ?Carbon}>
      */
     private function presentEmployees(Carbon $asOf): array
+    {
+        return $this->presentCache[$asOf->toDateString()] ??= $this->loadPresentEmployees($asOf);
+    }
+
+    /**
+     * @return list<array{employee: Employee, rm: string, bidang: string, vacancy: ?Carbon, overflow: bool, hired_source: ?string, realised_on: ?Carbon}>
+     */
+    private function loadPresentEmployees(Carbon $asOf): array
     {
         $overflowPositions = Position::getAllCached()->where('is_overflow', true)->pluck('nama')->all();
         $yearStart = $asOf->copy()->startOfYear();

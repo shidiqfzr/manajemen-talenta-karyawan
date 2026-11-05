@@ -6,6 +6,7 @@ use App\Exceptions\MppPlanRuleViolationException;
 use App\Models\MppSupplyPlan;
 use App\Services\ManPowerPlanningService;
 use App\Services\Mpp\MppSupplyPlanService;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -17,21 +18,28 @@ class MppSupplyPlanEditor extends Component
 {
     public bool $open = false;
 
+    #[Locked]
     public int $year = 0;
 
     /** Nilai yang sedang diedit (sumber => RM => bidang => nilai ketikan). */
     public array $cells = [];
 
     /** Nilai saat editor dibuka; dipakai service untuk menolak simpanan yang menimpa admin lain. */
+    #[Locked]
     public array $expected = [];
 
     public bool $confirming = false;
 
     /** Bulan posisi untuk angka "terealisasi" (mengikuti matriks MPP). */
+    #[Locked]
     public int $asOfMonth = 0;
 
     /** Pasokan yang sudah terealisasi tahun ini s.d. posisi (sumber => RM => bidang => jumlah). */
+    #[Locked]
     public array $realised = [];
+
+    /** Meminta konfirmasi sebelum membuang isian yang belum disimpan. */
+    public bool $confirmingDiscard = false;
 
     public string $reason = '';
 
@@ -64,6 +72,15 @@ class MppSupplyPlanEditor extends Component
     {
         $this->authorizeAdmin();
         $this->resetErrorBag();
+
+        // Aturan isian yang sama dengan saat menyimpan, agar kesalahan terlihat sebelum langkah konfirmasi.
+        try {
+            app(MppSupplyPlanService::class)->validateCells($this->cells);
+        } catch (MppPlanRuleViolationException $e) {
+            $this->addError('plan', $e->getMessage());
+
+            return;
+        }
         $changed = 0;
         $totals = [];
 
@@ -123,9 +140,47 @@ class MppSupplyPlanEditor extends Component
         $this->close();
     }
 
+    /** Tutup laci; bila ada isian yang belum disimpan, minta konfirmasi terlebih dulu. */
+    public function requestClose(): void
+    {
+        if ($this->open && $this->isDirty()) {
+            $this->confirmingDiscard = true;
+
+            return;
+        }
+
+        $this->close();
+    }
+
+    public function keepEditing(): void
+    {
+        $this->confirmingDiscard = false;
+    }
+
+    public function discardChanges(): void
+    {
+        $this->close();
+    }
+
+    private function isDirty(): bool
+    {
+        foreach ($this->expected as $source => $levels) {
+            foreach ($levels as $rm => $fields) {
+                foreach ($fields as $bidang => $value) {
+                    if ((string) ($this->cells[$source][$rm][$bidang] ?? '') !== (string) $value) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public function close(): void
     {
         $this->open = false;
+        $this->confirmingDiscard = false;
         $this->confirming = false;
         $this->reason = '';
         $this->summary = [];
