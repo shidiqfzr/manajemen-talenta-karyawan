@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\JobHistory;
 use App\Services\JobVacancyService;
+use App\Services\ManPowerPlanningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,9 +14,11 @@ class MutasiController extends Controller
     /**
      * Display the unified Mutasi & Penempatan Hub.
      */
-    public function index(Request $request, JobVacancyService $service)
+    public function index(Request $request, JobVacancyService $service, ManPowerPlanningService $mpp)
     {
         $stats = $service->getStatistics();
+        // Lencana tab MPP mengikuti kursi master formasi, bukan angka tetap.
+        $mppFormasiTotal = $mpp->totalStandarFormasi();
         $totalHistories = JobHistory::count();
 
         // Determine active tab: default to 'vacancies'
@@ -27,7 +30,7 @@ class MutasiController extends Controller
             $activeTab = 'vacancies';
         }
 
-        return view('admin.mutasi.index', compact('stats', 'totalHistories', 'activeTab'));
+        return view('admin.mutasi.index', compact('stats', 'totalHistories', 'activeTab', 'mppFormasiTotal'));
     }
 
     /**

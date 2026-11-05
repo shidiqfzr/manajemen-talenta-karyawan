@@ -120,7 +120,7 @@
                 <span>Perencanaan Formasi (MPP)</span>
                 <span :class="activeTab === 'mpp' ? 'bg-primary-100 text-primary-800' : 'bg-surface-100 text-surface-600 group-hover:bg-surface-200'"
                     class="px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums transition">
-                    444
+                    {{ $mppFormasiTotal }}
                 </span>
             </button>
 

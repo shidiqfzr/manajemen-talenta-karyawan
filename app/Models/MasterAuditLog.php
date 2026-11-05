@@ -50,12 +50,15 @@ class MasterAuditLog extends Model
         'position.activated' => 'Jabatan diaktifkan',
         'position.deactivated' => 'Jabatan dinonaktifkan',
         'position.deleted' => 'Jabatan dihapus',
+        'mpp_supply.created' => 'Rencana pasokan MPP dibuat',
+        'mpp_supply.updated' => 'Rencana pasokan MPP diubah',
     ];
 
     public const ENTITY_LABELS = [
         'unit' => 'Unit Kerja',
         'position' => 'Jabatan',
         'seat' => 'Formasi Jabatan',
+        'mpp_supply' => 'Rencana Pasokan MPP',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
@@ -70,6 +73,7 @@ class MasterAuditLog extends Model
         'bidang' => 'Bidang',
         'kuota' => 'Kuota',
         'filled' => 'Terisi',
+        'jumlah' => 'Jumlah',
     ];
 
     public static function actionLabel(string $action): string
