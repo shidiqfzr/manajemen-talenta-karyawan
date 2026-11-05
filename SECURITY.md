@@ -82,6 +82,9 @@ Sistem menerapkan proteksi berlapis sesuai standar keamanan OWASP:
   ```
 - File yang diunggah disimpan di disk privat (`storage/app/private/`) dan hanya dapat diunduh melalui stream controller berotorisasi, bukan direktori publik langsung.
 
+Impor pegawai tambahan: komit bersifat atomik (data dan jejak audit dalam satu transaksi), berkas yang dikomit wajib identik dengan berkas yang dipratinjau (SHA-256), satu token hanya dapat dikomit sekali, dan galat internal tidak diteruskan ke peramban. Berkas yang tidak dapat dibaca ditolak dengan pesan validasi dan dihapus dari disk privat.
+Tata kelola impor: bila kebijakan persetujuan empat mata aktif, penyimpanan data pegawai memerlukan persetujuan admin lain (bukan pengaju) dan seluruh jalur simpan lain ditolak; pembatalan impor wajib beralasan dan tidak pernah menghapus `job_histories`. Rekaman untuk pembatalan (`employee_import_changes`: NIK, kondisi sebelum impor, tugas rangkap) berisi data pribadi sehingga seluruhnya terenkripsi, hanya dapat dibaca oleh proses pembatalan, dan dihapus setelah masa pembatalan berakhir (minimisasi data, UU PDP No. 27/2022). Berkas pengajuan tersimpan di disk privat dan dihapus saat keputusan, kedaluwarsa, atau penyimpanan. Pesan galat per baris pada ringkasan impor yang tersimpan permanen disamarkan (NIK menjadi `12****78`) sehingga riwayat impor tidak membocorkan NIK.
+
 ### 4.5 Mass-Assignment Protection
 - Seluruh Model Eloquent wajib mendefinisikan array `$fillable` secara eksplisit guna mencegah penulisan kolom tidak sah melalui manipulasi request body.
 
@@ -92,7 +95,9 @@ Sistem menerapkan proteksi berlapis sesuai standar keamanan OWASP:
 Untuk menjamin akuntabilitas tata kelola BUMN:
 1. **Pencatatan Riwayat Mutasi**: Setiap perpindahan jabatan, promosi, atau demosi wajib mencatat histori di tabel `job_histories` dengan atribut `nomor_sk`, `tanggal_sk`, `tmt_awal`, dan user pelaksana.
 2. **Riwayat Perubahan Master Formasi**: Setiap perubahan pada unit kerja, jabatan, dan kursi formasi dicatat pada tabel `master_audit_logs` (siapa, kapan, aksi, nama entitas saat itu, nilai lama dan baru, serta alasan). Pencatatan dilakukan dalam transaksi yang sama dengan perubahannya, bersifat *append-only* (model menolak ubah dan hapus), dan hanya menyimpan jumlah pegawai terdampak, bukan NIK atau nama pegawai (UU PDP). Riwayat dapat dibaca admin pada `/admin/master/riwayat`.
-3. **Log Kesalahan & Exception**:
+3. **Riwayat Rencana Pasokan MPP**: Setiap perubahan angka rencana pasokan (CKP Internal, Talent Scouting, RBB, Jabatan Prioritas Diisi) dicatat per sel pada `master_audit_logs` (aksi `mpp_supply.created`/`mpp_supply.updated`, nilai lama dan baru, alasan wajib) dalam transaksi yang sama dengan perubahannya, dan dapat dibaca pada layar riwayat master. Simpanan yang akan menimpa perubahan admin lain ditolak.
+4. **Log Ekspor Data MPP**: Setiap unduhan CSV matriks MPP dan rincian personil (memuat NIK dan nama) dicatat di log aplikasi dengan ID pengguna, RM Band, bidang, indikator, tahun, dan jumlah baris. Isi berkas (NIK, nama) tidak ikut dicatat (UU PDP).
+5. **Log Kesalahan & Exception**:
    - Konfigurasi `APP_DEBUG=false` wajib aktif di lingkungan staging dan production agar detail stack trace tidak terekspos ke publik.
    - Seluruh kegagalan transaksi dan anomali sistem dicatat dalam rotasi file log di `storage/logs/laravel.log`.
 
