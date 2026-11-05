@@ -5,16 +5,19 @@ namespace Tests\Feature;
 use App\Livewire\Admin\ManPowerPlanning;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\MppPeriod;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use App\Services\Mpp\MppPeriodService;
 use App\Services\Mpp\MppSupplyPlanService;
 use Carbon\Carbon;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesMppEmployees;
 use Tests\TestCase;
@@ -862,6 +865,219 @@ class ManPowerPlanningTest extends TestCase
             ->assertSet('planningYear', 2026)
             ->call('openDrilldown', 'RM-9', 'KEU', 2)
             ->assertSet('showDrilldown', false);
+    }
+
+    // ───────────────────────── Periode bulanan (rekam, tutup, buka kembali) ─────────────────────────
+
+    private function periods(): MppPeriodService
+    {
+        return app(MppPeriodService::class);
+    }
+
+    private function realisasiCell(Testable $component): int
+    {
+        return $component->viewData('matrix')[2]['levels']['RM-3']['fields']['KEU'];
+    }
+
+    public function test_month_state_banner_and_source(): void
+    {
+        $october = fn () => Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+
+        $october()
+            ->assertViewHas('periodState', 'unclosed')
+            ->assertSee('Periode Okt 2026 belum pernah ditutup: angka dihitung dari data pegawai saat ini.')
+            ->assertSee('Rekam Draf')
+            ->assertDontSee('Tutup Periode');
+
+        $this->periods()->capture(2026, 10, null);
+        $october()
+            ->assertViewHas('periodState', 'draft')
+            ->assertSee('Draf periode Okt 2026 direkam oleh sistem · 05 Nov 2026 09:00. Belum ditutup.')
+            ->assertSee('Tutup Periode')
+            ->assertSee('Perbarui Draf')
+            ->assertDontSee('Buka Kembali');
+
+        $this->periods()->close(2026, 10, null, $this->user);
+        $october()
+            ->assertViewHas('periodState', 'closed')
+            ->assertSee('Periode Okt 2026 ditutup oleh '.$this->user->name.' · 05 Nov 2026 09:00 · Revisi 1')
+            ->assertSee('Buka Kembali')
+            ->assertDontSee('Tutup Periode');
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)
+            ->assertViewHas('periodState', 'live')
+            ->assertDontSee('Rekam Draf')
+            ->assertDontSee('belum pernah ditutup')
+            ->assertDontSee('Buka Kembali');
+    }
+
+    public function test_draft_banner_names_the_user_who_captured_it(): void
+    {
+        $this->periods()->capture(2026, 10, $this->user);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->assertSee('direkam oleh '.$this->user->name.' · 05 Nov 2026 09:00');
+    }
+
+    public function test_closed_month_renders_the_snapshot_after_data_changes(): void
+    {
+        $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $this->makeAsistenKeuangan('90000002');
+
+        $october = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+        $this->assertSame(1, $this->realisasiCell($october));
+        $this->assertSame(1, $october->viewData('stats')['total_realisasi']);
+
+        // Bulan tanpa snapshot tetap dihitung dari data terkini.
+        $this->assertSame(2, $this->realisasiCell($october->set('asOfMonth', 9)));
+    }
+
+    public function test_closed_month_shows_historical_jabatan(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $emp->update(['jabatan' => 'Jabatan Pindahan Baru']);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSet('showDrilldown', true)
+            ->assertSee('Asisten Keuangan Uji')
+            ->assertDontSee('Jabatan Pindahan Baru')
+            ->assertSee('Asisten 90000001');
+    }
+
+    public function test_closed_month_drawer_survives_deleted_employees(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $emp->delete();
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSet('showDrilldown', true)
+            ->assertSee('tidak lagi terdaftar');
+
+        $this->assertCount(1, $component->get('drilldownEmployees'));
+        $this->assertSame('90000001', $component->get('drilldownEmployees')[0]['nik']);
+    }
+
+    public function test_snapshot_drawers_use_the_stored_supply_and_formula(): void
+    {
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 9]);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 6);
+        $this->assertSame(5, $component->get('drilldownSupply')['rencana']);
+
+        $component->call('closeDrilldown')->call('openDrilldown', 'RM-3', 'KEU', 9);
+        $this->assertSame('formula', $component->get('drilldownMode'));
+    }
+
+    public function test_close_and_reopen_from_the_screen(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close')
+            ->assertSet('periodAction', 'close')
+            ->set('periodNote', 'Disetujui rapat SDM')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', '')
+            ->assertViewHas('periodState', 'closed');
+        $this->assertSame('closed', $this->periods()->find(2026, 10)->status);
+        $this->assertSame('Disetujui rapat SDM', $this->periods()->find(2026, 10)->close_note);
+
+        $component->call('requestPeriodAction', 'reopen')
+            ->set('periodReason', 'pendek')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', 'reopen')
+            ->assertSee('Alasan membuka kembali wajib diisi minimal 10 karakter.')
+            ->assertViewHas('periodState', 'closed');
+
+        $component->set('periodReason', 'Koreksi mutasi susulan')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', '')
+            ->assertViewHas('periodState', 'draft');
+        $this->assertSame(2, $this->periods()->find(2026, 10)->revision);
+    }
+
+    public function test_capture_from_the_screen_records_a_draft(): void
+    {
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('capturePeriod')
+            ->assertViewHas('periodState', 'draft');
+
+        $this->assertSame($this->user->id, $this->periods()->find(2026, 10)->captured_by);
+    }
+
+    public function test_period_actions_are_refused_for_the_current_month(): void
+    {
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)
+            ->call('capturePeriod')
+            ->assertSee('Periode berjalan atau mendatang belum dapat direkam atau ditutup.');
+
+        $this->assertNull($this->periods()->find(2026, 11));
+    }
+
+    public function test_period_panel_is_dismissed_when_the_month_changes(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close')
+            ->set('asOfMonth', 9)
+            ->assertSet('periodAction', '')
+            ->call('requestPeriodAction', 'bogus')
+            ->assertSet('periodAction', '');
+    }
+
+    public function test_snapshot_months_hide_the_plan_editor(): void
+    {
+        $this->periods()->capture(2026, 10, $this->user);
+
+        $october = fn () => Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+
+        $october()->assertDontSee('Kelola Rencana Pasokan')->assertDontSee('belum diisi. Angka pasokan dihitung 0.');
+        $this->periods()->close(2026, 10, null, $this->user);
+        $october()->assertDontSee('Kelola Rencana Pasokan')->assertDontSee('belum diisi. Angka pasokan dihitung 0.');
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->assertSee('Kelola Rencana Pasokan');
+    }
+
+    public function test_snapshot_export_is_labelled(): void
+    {
+        $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        Log::spy();
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('exportCsv')
+            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-10_ditutup_rev1_'.Carbon::now()->format('Ymd_His').'.csv');
+
+        Log::shouldHaveReceived('info')
+            ->withArgs(fn ($msg, $ctx = []) => $msg === 'Ekspor matriks MPP'
+                && ($ctx['periode'] ?? null) === 'ditutup'
+                && ($ctx['revisi'] ?? null) === 1)
+            ->once();
+    }
+
+    public function test_non_admin_cannot_change_periods(): void
+    {
+        $staff = User::factory()->create(['role' => 'user']);
+
+        foreach (['capturePeriod', 'confirmPeriodAction', 'cancelPeriodAction'] as $action) {
+            Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call($action)->assertForbidden();
+        }
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('requestPeriodAction', 'close')->assertForbidden();
+        $this->assertSame(0, MppPeriod::count());
     }
 
     // ───────────────────────── Klasifikasi RM & bidang ─────────────────────────

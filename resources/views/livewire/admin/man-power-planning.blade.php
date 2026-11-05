@@ -52,7 +52,7 @@
                     </h3>
                 </div>
                 <p class="text-xs text-surface-500 mt-1">Pemetaan kekuatan formasi manajerial (RM-1, RM-2, RM-3) berdasarkan bidang fungsional operasional.</p>
-                @foreach($stats['supply_plan_provenance'] as $plan)
+                @foreach($period ? [] : $stats['supply_plan_provenance'] as $plan)
                     <p class="text-[11px] text-surface-500 mt-0.5 flex items-center gap-1.5">
                         <i class="fas fa-clock-rotate-left text-surface-400" aria-hidden="true"></i>
                         @if($plan['by'])
@@ -66,12 +66,14 @@
 
             <!-- Action Buttons Cluster -->
             <div class="flex items-center gap-2 shrink-0">
-                <!-- Kelola Rencana Pasokan -->
-                <button type="button" wire:click="$dispatch('open-mpp-supply-plan-editor', { year: {{ $planningYear }}, month: {{ $asOfMonth }} })"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs font-semibold transition-all shadow-2xs">
-                    <i class="fas fa-pen-to-square text-surface-400" aria-hidden="true"></i>
-                    <span>Kelola Rencana Pasokan</span>
-                </button>
+                {{-- Kelola Rencana Pasokan (tidak untuk bulan berisi snapshot: angkanya sudah dibekukan) --}}
+                @unless($period)
+                    <button type="button" wire:click="$dispatch('open-mpp-supply-plan-editor', { year: {{ $planningYear }}, month: {{ $asOfMonth }} })"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs font-semibold transition-all shadow-2xs">
+                        <i class="fas fa-pen-to-square text-surface-400" aria-hidden="true"></i>
+                        <span>Kelola Rencana Pasokan</span>
+                    </button>
+                @endunless
 
                 <!-- Export Excel / CSV -->
                 <button type="button" wire:click="exportCsv"
@@ -145,7 +147,16 @@
             </div>
         @endif
 
-        @if($stats['supply_plan_missing'])
+        @include('livewire.admin.partials.mpp-period-banner', [
+            'periodState' => $periodState,
+            'period' => $period,
+            'periodLabel' => $periodLabel,
+            'periodStamps' => $periodStamps,
+            'periodAction' => $periodAction,
+            'periodError' => $periodError,
+        ])
+
+        @if($stats['supply_plan_missing'] && ! $period)
             <div role="status" class="px-5 py-2.5 bg-warning-50 border-b border-warning-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-warning-800">
                 <p class="flex items-center gap-2">
                     <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
@@ -559,7 +570,9 @@
         </div>
     @endif
 
-    <!-- Laci editor rencana pasokan (dibuka dari tombol Kelola Rencana Pasokan) -->
-    <livewire:admin.mpp-supply-plan-editor />
+    {{-- Laci editor rencana pasokan (dibuka dari tombol Kelola Rencana Pasokan) --}}
+    @unless($period)
+        <livewire:admin.mpp-supply-plan-editor />
+    @endunless
 
 </div>

@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Admin;
 
+use App\Exceptions\MppPeriodRuleViolationException;
+use App\Models\MppPeriod;
 use App\Models\MppSupplyPlan;
 use App\Services\ManPowerPlanningService;
+use App\Services\Mpp\MppPeriodService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -31,6 +34,22 @@ class ManPowerPlanning extends Component
     {
         return $this->mppService ??= app(ManPowerPlanningService::class);
     }
+
+    /** Periode bulan yang sedang dilihat (null bila belum pernah direkam); dibaca sekali per permintaan. */
+    private ?MppPeriod $period = null;
+
+    private bool $periodResolved = false;
+
+    private ?array $liveData = null;
+
+    /** '' = tidak ada panel, 'close' = konfirmasi tutup periode, 'reopen' = konfirmasi buka kembali. */
+    public string $periodAction = '';
+
+    public string $periodNote = '';
+
+    public string $periodReason = '';
+
+    public ?string $periodError = null;
 
     private const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
 
@@ -93,6 +112,7 @@ class ManPowerPlanning extends Component
         if ($this->isValidYear($year)) {
             $this->planningYear = $year;
             $this->asOfMonth = $this->mpp()->defaultAsOfMonth($year);
+            $this->resetPeriodPanel();
         }
     }
 
@@ -100,6 +120,7 @@ class ManPowerPlanning extends Component
     {
         if ($month >= 1 && $month <= 12) {
             $this->asOfMonth = $month;
+            $this->resetPeriodPanel();
         }
     }
 
@@ -118,6 +139,7 @@ class ManPowerPlanning extends Component
         }
 
         $this->asOfMonth = $this->mpp()->defaultAsOfMonth($this->planningYear);
+        $this->resetPeriodPanel();
     }
 
     public function updatingAsOfMonth(): void
@@ -129,7 +151,11 @@ class ManPowerPlanning extends Component
     {
         if ((int) $value < 1 || (int) $value > 12) {
             $this->asOfMonth = $this->previousMonth;
+
+            return;
         }
+
+        $this->resetPeriodPanel();
     }
 
     private function isValidYear(int $year): bool
@@ -147,8 +173,8 @@ class ManPowerPlanning extends Component
             return;
         }
 
-        $service = $this->mpp();
-        $mpp = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
+        $mpp = $this->mppData();
+        $period = $this->period();
         $matrix = $mpp['matrix'];
         $drill = $matrix[$row]['drill'] ?? null;
         if ($drill === null) {
@@ -178,7 +204,10 @@ class ManPowerPlanning extends Component
             $this->drilldownTitle = 'Rincian Formula Kebutuhan';
         } else {
             $this->drilldownFormula = null;
-            $this->drilldownEmployees = $service->getDrilldownEmployees($rm, $bidang, $drill, $this->planningYear, $this->asOfMonth);
+            // Bulan berisi snapshot: personil dibaca dari salinan periode, bukan dari data pegawai terkini.
+            $this->drilldownEmployees = $period
+                ? app(MppPeriodService::class)->membersFor($period, $drill, $rm, $bidang)
+                : $this->mpp()->getDrilldownEmployees($rm, $bidang, $drill, $this->planningYear, $this->asOfMonth);
             $this->drilldownTitle = 'Rincian Personil Formasi';
         }
 
@@ -232,7 +261,7 @@ class ManPowerPlanning extends Component
             'tahun' => $this->planningYear,
             'posisi_per' => $this->asOfKey(),
             'jumlah_baris' => count($employees),
-        ]);
+        ] + $this->periodLogContext());
 
         $rm = $this->drilldownRm;
         $bidang = $this->drilldownBidang;
@@ -274,20 +303,18 @@ class ManPowerPlanning extends Component
 
     public function exportCsv()
     {
-        $service = $this->mpp();
         $this->authorizeAdmin();
 
-        $mppData = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
-        $matrix = $mppData['matrix'];
+        $matrix = $this->mppData()['matrix'];
         $yearT = $this->planningYear;
         $yearT1 = $yearT + 1;
-        $fileName = 'mpp_perencanaan_formasi_'.$yearT.'_'.$yearT1.'_posisi_'.$this->asOfKey().'_'.Carbon::now()->format('Ymd_His').'.csv';
+        $fileName = 'mpp_perencanaan_formasi_'.$yearT.'_'.$yearT1.'_posisi_'.$this->asOfKey().$this->periodFileSuffix().'_'.Carbon::now()->format('Ymd_His').'.csv';
 
         Log::info('Ekspor matriks MPP', [
             'user_id' => auth()->id(),
             'tahun' => $yearT,
             'posisi_per' => $this->asOfKey(),
-        ]);
+        ] + $this->periodLogContext());
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -355,6 +382,149 @@ class ManPowerPlanning extends Component
         }, 200, $headers);
     }
 
+    /** Data matriks: salinan periode bila bulan ini sudah direkam, selain itu dihitung dari data pegawai. */
+    private function mppData(): array
+    {
+        $snapshot = $this->period()?->snapshot;
+        if ($snapshot !== null) {
+            return $snapshot;
+        }
+
+        return $this->liveData ??= $this->mpp()->getMppMatrix($this->planningYear, $this->asOfMonth);
+    }
+
+    private function period(): ?MppPeriod
+    {
+        if (! $this->periodResolved) {
+            $this->period = app(MppPeriodService::class)->find($this->planningYear, $this->asOfMonth)?->load(['capturer', 'closer']);
+            $this->periodResolved = true;
+        }
+
+        return $this->period;
+    }
+
+    /** Setelah menulis ke periode, bacaan periode dan matriks pada permintaan ini harus diulang. */
+    private function forgetPeriod(): void
+    {
+        $this->period = null;
+        $this->periodResolved = false;
+        $this->liveData = null;
+    }
+
+    /** closed | draft (ada salinan), unclosed (bulan lampau belum pernah direkam), live (bulan berjalan atau mendatang). */
+    private function periodState(): string
+    {
+        $period = $this->period();
+        if ($period) {
+            return $period->status === MppPeriod::STATUS_CLOSED ? 'closed' : 'draft';
+        }
+
+        return Carbon::create($this->planningYear, $this->asOfMonth, 1)->startOfMonth()->lt(Carbon::now()->startOfMonth())
+            ? 'unclosed'
+            : 'live';
+    }
+
+    /** Akhiran nama berkas ekspor untuk bulan berisi snapshot, mis. "_ditutup_rev1". */
+    private function periodFileSuffix(): string
+    {
+        $period = $this->period();
+
+        return $period ? '_'.$this->periodLabel($period).'_rev'.$period->revision : '';
+    }
+
+    /** @return array{periode?: string, revisi?: int} */
+    private function periodLogContext(): array
+    {
+        $period = $this->period();
+
+        return $period ? ['periode' => $this->periodLabel($period), 'revisi' => $period->revision] : [];
+    }
+
+    private function periodLabel(MppPeriod $period): string
+    {
+        return $period->status === MppPeriod::STATUS_CLOSED ? 'ditutup' : 'draf';
+    }
+
+    /** "dd Bln YYYY HH:ii" dengan nama bulan Indonesia, tidak bergantung pada locale aplikasi. */
+    private function stamp(?Carbon $at): ?string
+    {
+        return $at ? $this->mpp()->dateLabel($at).' '.$at->format('H:i') : null;
+    }
+
+    public function capturePeriod(): void
+    {
+        $this->authorizeAdmin();
+        $this->flash = null;
+        $this->periodError = null;
+
+        try {
+            app(MppPeriodService::class)->capture($this->planningYear, $this->asOfMonth, auth()->user());
+        } catch (MppPeriodRuleViolationException $e) {
+            $this->periodError = $e->getMessage();
+
+            return;
+        } finally {
+            $this->forgetPeriod();
+        }
+
+        $this->flash = 'Draf periode '.$this->mpp()->monthLabel($this->asOfMonth, $this->planningYear).' berhasil direkam.';
+    }
+
+    public function requestPeriodAction(string $action): void
+    {
+        $this->authorizeAdmin();
+
+        $this->resetPeriodPanel();
+        if (in_array($action, ['close', 'reopen'], true)) {
+            $this->periodAction = $action;
+        }
+    }
+
+    public function confirmPeriodAction(): void
+    {
+        $this->authorizeAdmin();
+        $this->periodError = null;
+        $service = app(MppPeriodService::class);
+        $label = $this->mpp()->monthLabel($this->asOfMonth, $this->planningYear);
+        $action = $this->periodAction;
+
+        try {
+            match ($action) {
+                'close' => $service->close($this->planningYear, $this->asOfMonth, $this->periodNote, auth()->user()),
+                'reopen' => $service->reopen($this->planningYear, $this->asOfMonth, $this->periodReason, auth()->user()),
+                default => null,
+            };
+        } catch (MppPeriodRuleViolationException $e) {
+            // Panel tetap terbuka agar isian tidak hilang.
+            $this->periodError = $e->getMessage();
+
+            return;
+        } finally {
+            $this->forgetPeriod();
+        }
+
+        $this->resetPeriodPanel();
+        $this->flash = match ($action) {
+            'close' => "Periode {$label} ditutup.",
+            'reopen' => "Periode {$label} dibuka kembali sebagai draf.",
+            default => null,
+        };
+    }
+
+    public function cancelPeriodAction(): void
+    {
+        $this->authorizeAdmin();
+        $this->resetPeriodPanel();
+    }
+
+    private function resetPeriodPanel(): void
+    {
+        $this->periodAction = '';
+        $this->periodNote = '';
+        $this->periodReason = '';
+        $this->periodError = null;
+    }
+
     /** Posisi per dalam format YYYY-MM untuk nama berkas dan log audit. */
     private function asOfKey(): string
     {
@@ -369,9 +539,17 @@ class ManPowerPlanning extends Component
 
     public function render()
     {
-        $mppData = $this->mpp()->getMppMatrix($this->planningYear, $this->asOfMonth);
+        $mppData = $this->mppData();
+        $period = $this->period();
 
         return view('livewire.admin.man-power-planning', [
+            'period' => $period,
+            'periodState' => $this->periodState(),
+            'periodStamps' => [
+                'captured' => $this->stamp($period?->captured_at),
+                'closed' => $this->stamp($period?->closed_at),
+            ],
+            'periodLabel' => $this->mpp()->monthLabel($this->asOfMonth, $this->planningYear),
             'matrix' => $mppData['matrix'],
             'stats' => $mppData['stats'],
             'levels' => $mppData['levels'],
