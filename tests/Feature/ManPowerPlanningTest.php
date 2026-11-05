@@ -965,6 +965,44 @@ class ManPowerPlanningTest extends TestCase
         $this->assertSame('90000001', $component->get('drilldownEmployees')[0]['nik']);
     }
 
+    public function test_profile_link_is_hidden_for_employees_no_longer_registered(): void
+    {
+        $gone = $this->makeAsistenKeuangan('90000001');
+        $this->makeAsistenKeuangan('90000002');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $gone->delete();
+
+        $html = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSee('tidak lagi terdaftar')
+            ->html();
+
+        $this->assertStringNotContainsString(route('admin.employees.show', '90000001'), $html);
+        $this->assertStringContainsString(route('admin.employees.show', '90000002'), $html);
+        $this->assertSame(1, substr_count($html, 'Lihat Profil'));
+    }
+
+    public function test_close_panel_refuses_a_draft_updated_by_another_admin(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close');
+
+        Carbon::setTestNow('2026-11-05 09:30:00');
+        $this->periods()->capture(2026, 10, null);
+
+        $component->call('confirmPeriodAction')
+            ->assertSet('periodAction', 'close')
+            ->assertSee('telah diperbarui setelah Anda membukanya');
+        $this->assertSame('draft', $this->periods()->find(2026, 10)->status);
+
+        // Dibuka ulang setelah ditinjau: penutupan berhasil.
+        $component->call('requestPeriodAction', 'close')->call('confirmPeriodAction')
+            ->assertViewHas('periodState', 'closed');
+    }
+
     public function test_snapshot_drawers_use_the_stored_supply_and_formula(): void
     {
         $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);

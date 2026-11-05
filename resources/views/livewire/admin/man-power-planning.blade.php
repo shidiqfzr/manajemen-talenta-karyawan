@@ -489,7 +489,7 @@
                                             </div>
                                         </div>
 
-                                        @if(!empty($emp['nik']))
+                                        @if(!empty($emp['nik']) && ($emp['terdaftar'] ?? true))
                                             <a href="{{ route('admin.employees.show', $emp['nik']) }}"
                                                 target="_blank"
                                                 rel="noopener noreferrer"

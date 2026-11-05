@@ -194,6 +194,32 @@ class MppPeriodServiceTest extends TestCase
         $this->assertRefused('Periode Okt 2026 sudah ditutup. Buka kembali terlebih dulu.', fn () => $this->service->close(2026, 10, null, $this->admin));
     }
 
+    public function test_close_refuses_a_draft_recaptured_after_it_was_reviewed(): void
+    {
+        $this->service->capture(2026, 10, $this->admin);
+        $reviewed = $this->service->find(2026, 10)->captured_at->format('Y-m-d H:i:s');
+
+        Carbon::setTestNow('2026-11-05 09:30:00');
+        $this->service->capture(2026, 10, $this->admin);
+
+        $this->assertRefused(
+            'Draf periode Okt 2026 telah diperbarui setelah Anda membukanya. Tinjau ulang lalu tutup kembali.',
+            fn () => $this->service->close(2026, 10, null, $this->admin, $reviewed)
+        );
+        $this->assertSame('draft', $this->service->find(2026, 10)->status);
+        $this->assertSame(0, MasterAuditLog::where('action', 'mpp_period.closed')->count());
+
+        $current = $this->service->find(2026, 10)->captured_at->format('Y-m-d H:i:s');
+        $this->assertSame('closed', $this->service->close(2026, 10, null, $this->admin, $current)->status);
+    }
+
+    public function test_close_without_a_review_token_keeps_working(): void
+    {
+        $this->service->capture(2026, 10, $this->admin);
+
+        $this->assertSame('closed', $this->service->close(2026, 10, null, $this->admin, null)->status);
+    }
+
     public function test_reopen_requires_a_closed_period(): void
     {
         $this->assertRefused('Periode Okt 2026 belum ditutup.', fn () => $this->service->reopen(2026, 10, 'Koreksi data mutasi', $this->admin));
@@ -231,12 +257,14 @@ class MppPeriodServiceTest extends TestCase
         $this->assertSame('IVA/00', $row['golongan']);
         $this->assertSame($emp->id, $row['id']);
         $this->assertSame(
-            ['id', 'nik', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'tanggal_penempatan', 'tanggal_mbt', 'tanggal_pensiun', 'status_karyawan'],
+            ['id', 'terdaftar', 'nik', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'tanggal_penempatan', 'tanggal_mbt', 'tanggal_pensiun', 'status_karyawan'],
             array_keys($row)
         );
 
         $emp->delete();
         $gone = collect($this->service->membersFor($period, 'realisasi', 'RM-3', 'KEU'))->firstWhere('nik', '90000001');
+        $this->assertTrue($row['terdaftar']);
+        $this->assertFalse($gone['terdaftar']);
         $this->assertSame('tidak lagi terdaftar', $gone['nama']);
         $this->assertSame('—', $gone['golongan']);
         $this->assertSame('Asisten Keuangan Uji', $gone['jabatan']);
