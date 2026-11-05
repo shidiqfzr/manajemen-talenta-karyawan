@@ -105,15 +105,18 @@ class MppPeriodService
     /**
      * Tutup draf yang sudah direkam; yang ditutup adalah isi draf itu (tanpa perekaman ulang diam-diam).
      *
+     * $expectedCapturedAt (Y-m-d H:i:s) adalah waktu rekam draf yang ditinjau admin saat membuka panel tutup;
+     * bila draf direkam ulang sesudahnya, penutupan ditolak agar yang disahkan sama dengan yang ditinjau.
+     *
      * @throws MppPeriodRuleViolationException
      */
-    public function close(int $year, int $month, ?string $note, User $user): MppPeriod
+    public function close(int $year, int $month, ?string $note, User $user, ?string $expectedCapturedAt = null): MppPeriod
     {
         $this->assertClosable($year, $month);
 
         $note = trim((string) $note);
 
-        return DB::transaction(function () use ($year, $month, $note, $user): MppPeriod {
+        return DB::transaction(function () use ($year, $month, $note, $user, $expectedCapturedAt): MppPeriod {
             $period = $this->locked($year, $month);
 
             if ($period === null) {
@@ -121,6 +124,9 @@ class MppPeriodService
             }
             if ($period->status === MppPeriod::STATUS_CLOSED) {
                 throw $this->alreadyClosed($year, $month);
+            }
+            if ($expectedCapturedAt !== null && $period->captured_at?->format('Y-m-d H:i:s') !== $expectedCapturedAt) {
+                throw new MppPeriodRuleViolationException('Draf periode '.$this->label($year, $month).' telah diperbarui setelah Anda membukanya. Tinjau ulang lalu tutup kembali.');
             }
 
             $old = $this->state($period);
@@ -194,6 +200,7 @@ class MppPeriodService
 
             return [
                 'id' => $emp?->id,
+                'terdaftar' => $emp !== null,
                 'nik' => $member->employee_nik,
                 'nama' => $emp?->nama ?? 'tidak lagi terdaftar',
                 'jabatan' => $member->jabatan,

@@ -9,6 +9,7 @@ use App\Services\ManPowerPlanningService;
 use App\Services\Mpp\MppPeriodService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ManPowerPlanning extends Component
@@ -50,6 +51,10 @@ class ManPowerPlanning extends Component
     public string $periodReason = '';
 
     public ?string $periodError = null;
+
+    /** Waktu rekam draf (Y-m-d H:i:s) saat panel tutup dibuka; dipakai MppPeriodService::close() sebagai bukti tinjauan. */
+    #[Locked]
+    public ?string $periodCapturedAt = null;
 
     private const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
 
@@ -470,6 +475,10 @@ class ManPowerPlanning extends Component
         $this->resetPeriodPanel();
         if (in_array($action, ['close', 'reopen'], true)) {
             $this->periodAction = $action;
+            if ($action === 'close') {
+                $this->periodCapturedAt = app(MppPeriodService::class)
+                    ->find($this->planningYear, $this->asOfMonth)?->captured_at?->format('Y-m-d H:i:s');
+            }
         }
     }
 
@@ -483,7 +492,7 @@ class ManPowerPlanning extends Component
 
         try {
             match ($action) {
-                'close' => $service->close($this->planningYear, $this->asOfMonth, $this->periodNote, auth()->user()),
+                'close' => $service->close($this->planningYear, $this->asOfMonth, $this->periodNote, auth()->user(), $this->periodCapturedAt),
                 'reopen' => $service->reopen($this->planningYear, $this->asOfMonth, $this->periodReason, auth()->user()),
                 default => null,
             };
@@ -516,6 +525,7 @@ class ManPowerPlanning extends Component
         $this->periodNote = '';
         $this->periodReason = '';
         $this->periodError = null;
+        $this->periodCapturedAt = null;
     }
 
     /** Posisi per dalam format YYYY-MM untuk nama berkas dan log audit. */
