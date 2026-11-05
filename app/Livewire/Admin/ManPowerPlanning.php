@@ -2,21 +2,31 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\Employee;
-use App\Services\KepegawaianPolicy;
+use App\Models\MppSupplyPlan;
 use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class ManPowerPlanning extends Component
 {
-    public string $sourceMode = 'baseline'; // 'baseline' or 'live'
-
     public string $filterBidang = 'ALL';    // 'ALL', 'KEU', 'TAN', 'TEK', 'UMU'
 
     public string $filterLevel = 'ALL';     // 'ALL', 'RM-1', 'RM-2', 'RM-3'
 
-    public int $planningYear = 2026;        // Dynamic Planning Horizon Year T
+    public int $planningYear;               // Dynamic Planning Horizon Year T
+
+    /** Bulan "Posisi per" (1..12): Realisasi dihitung pada akhir bulan ini. */
+    public int $asOfMonth;
+
+    /** Nilai sebelum perubahan dari wire:model, untuk dikembalikan bila nilai baru tidak sah. */
+    private ?int $previousYear = null;
+
+    private ?int $previousMonth = null;
+
+    private const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
+
+    private const LEVELS = ['RM-1', 'RM-2', 'RM-3'];
 
     // Drilldown modal/drawer state
     public bool $showDrilldown = false;
@@ -33,121 +43,152 @@ class ManPowerPlanning extends Component
 
     public ?array $drilldownFormula = null;
 
-    public function setSourceMode(string $mode): void
+    /** 'people' = daftar personil sel, 'supply' = rencana vs realisasi pasokan, 'formula' = rincian rumus Kebutuhan. */
+    public string $drilldownMode = '';
+
+    /** Rincian sel pasokan: rencana, terealisasi, sisa. */
+    public ?array $drilldownSupply = null;
+
+    /** Konfirmasi singkat setelah rencana pasokan disimpan dari editor. */
+    public ?string $flash = null;
+
+    /** Matriks dihitung ulang (render) setelah rencana pasokan disimpan dari editor. */
+    protected $listeners = ['mpp-supply-plan-saved' => 'onSupplyPlanSaved'];
+
+    public function onSupplyPlanSaved(int $year): void
     {
-        $this->sourceMode = in_array($mode, ['baseline', 'live']) ? $mode : 'baseline';
+        $this->flash = "Rencana pasokan {$year} berhasil disimpan.";
+    }
+
+    public function mount(ManPowerPlanningService $service): void
+    {
+        $this->planningYear = min(max(Carbon::now()->year, ManPowerPlanningService::PLANNING_YEAR_MIN), ManPowerPlanningService::PLANNING_YEAR_MAX);
+        $this->asOfMonth = $service->defaultAsOfMonth($this->planningYear);
     }
 
     public function setFilterBidang(string $bidang): void
     {
-        $this->filterBidang = $bidang;
+        if ($bidang === 'ALL' || in_array($bidang, self::BIDANG, true)) {
+            $this->filterBidang = $bidang;
+        }
     }
 
     public function setFilterLevel(string $level): void
     {
-        $this->filterLevel = $level;
+        if ($level === 'ALL' || in_array($level, self::LEVELS, true)) {
+            $this->filterLevel = $level;
+        }
     }
 
     public function setPlanningYear(int $year): void
     {
-        $this->planningYear = $year;
+        if ($this->isValidYear($year)) {
+            $this->planningYear = $year;
+            $this->asOfMonth = app(ManPowerPlanningService::class)->defaultAsOfMonth($year);
+        }
     }
 
-    public function openDrilldown(string $rm, string $bidang, string $indicator): void
+    public function setAsOfMonth(int $month): void
     {
+        if ($month >= 1 && $month <= 12) {
+            $this->asOfMonth = $month;
+        }
+    }
+
+    // Pemilih tahun dan bulan memakai wire:model.live; nilai di luar rentang dikembalikan ke nilai sebelumnya.
+    public function updatingPlanningYear(): void
+    {
+        $this->previousYear = $this->planningYear;
+    }
+
+    public function updatedPlanningYear(mixed $value): void
+    {
+        if (! $this->isValidYear((int) $value)) {
+            $this->planningYear = $this->previousYear;
+
+            return;
+        }
+
+        $this->asOfMonth = app(ManPowerPlanningService::class)->defaultAsOfMonth($this->planningYear);
+    }
+
+    public function updatingAsOfMonth(): void
+    {
+        $this->previousMonth = $this->asOfMonth;
+    }
+
+    public function updatedAsOfMonth(mixed $value): void
+    {
+        if ((int) $value < 1 || (int) $value > 12) {
+            $this->asOfMonth = $this->previousMonth;
+        }
+    }
+
+    private function isValidYear(int $year): bool
+    {
+        return $year >= ManPowerPlanningService::PLANNING_YEAR_MIN && $year <= ManPowerPlanningService::PLANNING_YEAR_MAX;
+    }
+
+    /**
+     * Buka rincian satu sel. Baris menentukan isinya (ManPowerPlanningService, kunci 'drill'): daftar personil
+     * yang persis dihitung sel itu, atau rincian rumus untuk baris Kebutuhan. Sel angka acuan tidak dibuka.
+     */
+    public function openDrilldown(string $rm, string $bidang, int $row): void
+    {
+        if (! in_array($rm, self::LEVELS, true) || ! in_array($bidang, self::BIDANG, true)) {
+            return;
+        }
+
         $service = app(ManPowerPlanningService::class);
-        $allEmployees = Employee::all();
-        $yearT = Carbon::now()->year;
-        $yearT1 = $yearT + 1;
+        $mpp = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
+        $matrix = $mpp['matrix'];
+        $drill = $matrix[$row]['drill'] ?? null;
+        if ($drill === null) {
+            return;
+        }
 
-        $indicatorLower = strtolower($indicator);
-        $isKebutuhan = str_contains($indicatorLower, 'kebutuhan');
-        $isPensiunT = str_contains($indicator, (string) $yearT) && str_contains($indicatorLower, 'pensiun');
-        $isPensiunT1 = str_contains($indicator, (string) $yearT1) && str_contains($indicatorLower, 'pensiun');
+        $cell = fn (int $no): int => $matrix[$no]['levels'][$rm]['fields'][$bidang] ?? 0;
 
-        // Check if formula breakdown applies (for Kebutuhan rows)
-        if ($isKebutuhan) {
-            $mppData = $service->getMppMatrix($this->sourceMode, $this->planningYear);
-            $matrix = $mppData['matrix'];
-            $f = $matrix[1]['levels'][$rm]['fields'][$bidang] ?? 0;
-            $r = $matrix[2]['levels'][$rm]['fields'][$bidang] ?? 0;
-            $isT = str_contains($indicator, (string) $yearT);
-            $p = $isT
-                ? ($matrix[4]['levels'][$rm]['fields'][$bidang] ?? 0)
-                : (($matrix[4]['levels'][$rm]['fields'][$bidang] ?? 0) + ($matrix[5]['levels'][$rm]['fields'][$bidang] ?? 0));
-            $s = ($matrix[6]['levels'][$rm]['fields'][$bidang] ?? 0) + ($matrix[7]['levels'][$rm]['fields'][$bidang] ?? 0) + ($matrix[8]['levels'][$rm]['fields'][$bidang] ?? 0);
-            $k = $isT
-                ? ($matrix[9]['levels'][$rm]['fields'][$bidang] ?? 0)
-                : ($matrix[10]['levels'][$rm]['fields'][$bidang] ?? 0);
+        if ($drill === 'formula') {
+            $isT = $row === 9;
+            $s = $cell(6) + $cell(7) + $cell(8);
+            if (! $isT) {
+                // Pasokan T+1 kumulatif, sama dengan rumus sel Kebutuhan T+1.
+                $s += $service->supplyFor($this->planningYear + 1, $rm, $bidang);
+            }
+            $k = $cell($row);
 
             $this->drilldownFormula = [
-                'formasi' => $f,
-                'realisasi' => $r,
-                'pensiun' => $p,
+                'formasi' => $cell(1),
+                'realisasi' => $cell(2),
+                'pensiun' => $isT ? $cell(4) : $cell(4) + $cell(5),
                 'pasokan' => $s,
                 'kebutuhan' => $k,
                 'is_surplus' => $k <= 0,
             ];
+            $this->drilldownEmployees = [];
+            $this->drilldownTitle = 'Rincian Formula Kebutuhan';
         } else {
             $this->drilldownFormula = null;
+            $this->drilldownEmployees = $service->getDrilldownEmployees($rm, $bidang, $drill, $this->planningYear, $this->asOfMonth);
+            $this->drilldownTitle = 'Rincian Personil Formasi';
         }
 
-        $matched = [];
-        foreach ($allEmployees as $emp) {
-            $empRm = $service->determineRmLevel($emp);
-            $empBidang = $service->determineBidang($emp);
-
-            if ($empRm !== $rm || $empBidang !== $bidang) {
-                continue;
-            }
-
-            // Check if employee was hired by the filter year
-            $filterYear = $this->planningYear;
-            $tmtYear = $emp->tmt_bekerja ? Carbon::parse($emp->tmt_bekerja)->year : $filterYear;
-            if ($tmtYear > $filterYear) {
-                continue; // Hired after the filter year
-            }
-
-            // Check retirement year
-            $pYear = null;
-            if ($emp->tanggal_pensiun) {
-                $pYear = Carbon::parse($emp->tanggal_pensiun)->year;
-            } elseif ($emp->tanggal_lahir) {
-                $pYear = Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN)->year;
-            }
-
-            if ($pYear !== null && $pYear < $filterYear) {
-                continue; // Retired before the filter year
-            }
-
-            if ($isPensiunT && ! ($pYear !== null && $pYear <= $yearT)) {
-                continue;
-            }
-            if ($isPensiunT1 && ! ($pYear !== null && $pYear === $yearT1)) {
-                continue;
-            }
-
-            $pensiunDate = $emp->tanggal_pensiun
-                ? Carbon::parse($emp->tanggal_pensiun)
-                : ($emp->tanggal_lahir ? Carbon::parse($emp->tanggal_lahir)->addYears(KepegawaianPolicy::BATAS_USIA_PENSIUN) : null);
-
-            $matched[] = [
-                'id' => $emp->id,
-                'nik' => $emp->nik,
-                'nama' => $emp->nama,
-                'jabatan' => $emp->jabatan,
-                'unit_kerja' => $emp->unit_kerja,
-                'golongan' => $emp->golongan,
-                'tanggal_pensiun' => $pensiunDate ? $pensiunDate->translatedFormat('d M Y') : '—',
-                'status_karyawan' => $emp->status_karyawan ?? 'Aktif',
-            ];
+        $this->drilldownSupply = null;
+        if (str_starts_with($drill, 'supply_')) {
+            $source = substr($drill, strlen('supply_'));
+            $this->drilldownSupply = $mpp['supply_breakdown'][$source][$rm][$bidang];
+            $this->drilldownTitle = 'Rincian Pasokan '.MppSupplyPlan::SOURCES[$source];
         }
 
-        $this->drilldownTitle = 'Rincian Personil Formasi';
+        $this->drilldownMode = match (true) {
+            $drill === 'formula' => 'formula',
+            $this->drilldownSupply !== null => 'supply',
+            default => 'people',
+        };
         $this->drilldownRm = $rm;
         $this->drilldownBidang = $bidang;
-        $this->drilldownIndicator = $indicator;
-        $this->drilldownEmployees = $matched;
+        $this->drilldownIndicator = $matrix[$row]['label'];
         $this->showDrilldown = true;
     }
 
@@ -160,15 +201,31 @@ class ManPowerPlanning extends Component
         $this->drilldownRm = '';
         $this->drilldownBidang = '';
         $this->drilldownFormula = null;
+        $this->drilldownSupply = null;
+        $this->drilldownMode = '';
     }
 
     public function exportDrilldownCsv()
     {
+        $this->authorizeAdmin();
+
         if (empty($this->drilldownEmployees)) {
             return;
         }
 
         $employees = $this->drilldownEmployees;
+
+        // Berkas memuat NIK & nama pegawai (UU PDP): catat siapa yang mengunduh, tanpa data pribadinya.
+        Log::info('Ekspor rincian personil MPP', [
+            'user_id' => auth()->id(),
+            'rm' => $this->drilldownRm,
+            'bidang' => $this->drilldownBidang,
+            'indikator' => $this->drilldownIndicator,
+            'tahun' => $this->planningYear,
+            'posisi_per' => $this->asOfKey(),
+            'jumlah_baris' => count($employees),
+        ]);
+
         $rm = $this->drilldownRm;
         $bidang = $this->drilldownBidang;
         $indicator = preg_replace('/[^A-Za-z0-9_]/', '_', $this->drilldownIndicator);
@@ -186,7 +243,7 @@ class ManPowerPlanning extends Component
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8
 
-            fputcsv($handle, ['No.', 'NIK', 'Nama Lengkap', 'Jabatan', 'Unit Kerja', 'Golongan', 'Tanggal Pensiun', 'Status']);
+            fputcsv($handle, ['No.', 'NIK', 'Nama Lengkap', 'Jabatan', 'Unit Kerja', 'Golongan', 'Tanggal Penempatan Karpim', 'Tanggal MBT', 'Tanggal Pensiun', 'Status']);
 
             $no = 1;
             foreach ($employees as $emp) {
@@ -197,6 +254,8 @@ class ManPowerPlanning extends Component
                     $emp['jabatan'],
                     $emp['unit_kerja'],
                     $emp['golongan'] ?? '—',
+                    $emp['tanggal_penempatan'] ?? '—',
+                    $emp['tanggal_mbt'],
                     $emp['tanggal_pensiun'],
                     $emp['status_karyawan'],
                 ]);
@@ -207,12 +266,19 @@ class ManPowerPlanning extends Component
 
     public function exportCsv(ManPowerPlanningService $service)
     {
-        $mppData = $service->getMppMatrix($this->sourceMode, $this->planningYear);
+        $this->authorizeAdmin();
+
+        $mppData = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
         $matrix = $mppData['matrix'];
-        $filterYear = $this->planningYear;
-        $yearT = Carbon::now()->year;
+        $yearT = $this->planningYear;
         $yearT1 = $yearT + 1;
-        $fileName = 'MPP_PTPN_IV_'.$yearT.'-'.$yearT1.'_Filter_'.$filterYear.'_'.strtoupper($this->sourceMode).'_'.date('Ymd_His').'.csv';
+        $fileName = 'mpp_perencanaan_formasi_'.$yearT.'_'.$yearT1.'_posisi_'.$this->asOfKey().'_'.Carbon::now()->format('Ymd_His').'.csv';
+
+        Log::info('Ekspor matriks MPP', [
+            'user_id' => auth()->id(),
+            'tahun' => $yearT,
+            'posisi_per' => $this->asOfKey(),
+        ]);
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -247,6 +313,8 @@ class ManPowerPlanning extends Component
                 'RM-3 UMU',
                 'JUMLAH RM-3',
                 'TOTAL',
+                'TOTAL KEKURANGAN',
+                'TOTAL SURPLUS',
             ]);
 
             foreach ($matrix as $row) {
@@ -269,6 +337,8 @@ class ManPowerPlanning extends Component
                     $row['levels']['RM-3']['fields']['UMU'] ?? 0,
                     $row['levels']['RM-3']['subtotal'] ?? 0,
                     $row['grand_total'] ?? 0,
+                    $row['shortage_total'] ?? '',
+                    $row['surplus_total'] ?? '',
                 ]);
             }
 
@@ -276,16 +346,30 @@ class ManPowerPlanning extends Component
         }, 200, $headers);
     }
 
+    /** Posisi per dalam format YYYY-MM untuk nama berkas dan log audit. */
+    private function asOfKey(): string
+    {
+        return sprintf('%d-%02d', $this->planningYear, $this->asOfMonth);
+    }
+
+    /** Livewire tidak menerapkan ulang middleware role:admin pada permintaan pembaruan komponen. */
+    private function authorizeAdmin(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
     public function render(ManPowerPlanningService $service)
     {
-        $mppData = $service->getMppMatrix($this->sourceMode, $this->planningYear);
+        $mppData = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
 
         return view('livewire.admin.man-power-planning', [
             'matrix' => $mppData['matrix'],
             'stats' => $mppData['stats'],
             'levels' => $mppData['levels'],
             'fields' => $mppData['fields'],
-            'availableYears' => range(2024, 2031),
+            'rmBands' => ManPowerPlanningService::RM_BANDS,
+            'months' => ManPowerPlanningService::MONTHS,
+            'availableYears' => range(ManPowerPlanningService::PLANNING_YEAR_MIN, ManPowerPlanningService::PLANNING_YEAR_MAX),
         ]);
     }
 }
