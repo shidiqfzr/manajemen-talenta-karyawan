@@ -87,9 +87,8 @@ class MppSupplyPlanService
             throw new MppPlanRuleViolationException('Tahun perencanaan harus antara '.ManPowerPlanningService::PLANNING_YEAR_MIN.' dan '.ManPowerPlanningService::PLANNING_YEAR_MAX.'.');
         }
 
-        $cells = $this->normalize($cells);
+        $cells = $this->validateCells($cells);
         $expected = $this->normalize($expected);
-        $this->assertAllowedCells($cells);
 
         $reason = trim((string) $reason);
         if (mb_strlen($reason) < self::REASON_MIN_LENGTH) {
@@ -149,6 +148,22 @@ class MppSupplyPlanService
 
             return $audited;
         }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Validasi isian rencana tanpa menyimpan: bentuk lengkap, bilangan bulat 0..999, dan jalur rekrutmen hanya
+     * pada RM-3. Dipakai editor saat meninjau perubahan dan oleh save(), sehingga aturannya hanya ada di sini.
+     *
+     * @return array<string, array<string, array<string, int>>>
+     *
+     * @throws MppPlanRuleViolationException
+     */
+    public function validateCells(array $cells): array
+    {
+        $cells = $this->normalize($cells);
+        $this->assertAllowedCells($cells);
+
+        return $cells;
     }
 
     /**

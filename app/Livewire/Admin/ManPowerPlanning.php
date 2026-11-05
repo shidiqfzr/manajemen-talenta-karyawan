@@ -24,6 +24,14 @@ class ManPowerPlanning extends Component
 
     private ?int $previousMonth = null;
 
+    /** Satu instance service per permintaan agar pembacaan pegawai dipakai bersama (lihat ManPowerPlanningService). */
+    private ?ManPowerPlanningService $mppService = null;
+
+    private function mpp(): ManPowerPlanningService
+    {
+        return $this->mppService ??= app(ManPowerPlanningService::class);
+    }
+
     private const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
 
     private const LEVELS = ['RM-1', 'RM-2', 'RM-3'];
@@ -60,10 +68,10 @@ class ManPowerPlanning extends Component
         $this->flash = "Rencana pasokan {$year} berhasil disimpan.";
     }
 
-    public function mount(ManPowerPlanningService $service): void
+    public function mount(): void
     {
         $this->planningYear = min(max(Carbon::now()->year, ManPowerPlanningService::PLANNING_YEAR_MIN), ManPowerPlanningService::PLANNING_YEAR_MAX);
-        $this->asOfMonth = $service->defaultAsOfMonth($this->planningYear);
+        $this->asOfMonth = $this->mpp()->defaultAsOfMonth($this->planningYear);
     }
 
     public function setFilterBidang(string $bidang): void
@@ -84,7 +92,7 @@ class ManPowerPlanning extends Component
     {
         if ($this->isValidYear($year)) {
             $this->planningYear = $year;
-            $this->asOfMonth = app(ManPowerPlanningService::class)->defaultAsOfMonth($year);
+            $this->asOfMonth = $this->mpp()->defaultAsOfMonth($year);
         }
     }
 
@@ -109,7 +117,7 @@ class ManPowerPlanning extends Component
             return;
         }
 
-        $this->asOfMonth = app(ManPowerPlanningService::class)->defaultAsOfMonth($this->planningYear);
+        $this->asOfMonth = $this->mpp()->defaultAsOfMonth($this->planningYear);
     }
 
     public function updatingAsOfMonth(): void
@@ -139,7 +147,7 @@ class ManPowerPlanning extends Component
             return;
         }
 
-        $service = app(ManPowerPlanningService::class);
+        $service = $this->mpp();
         $mpp = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
         $matrix = $mpp['matrix'];
         $drill = $matrix[$row]['drill'] ?? null;
@@ -264,8 +272,9 @@ class ManPowerPlanning extends Component
         }, 200, $headers);
     }
 
-    public function exportCsv(ManPowerPlanningService $service)
+    public function exportCsv()
     {
+        $service = $this->mpp();
         $this->authorizeAdmin();
 
         $mppData = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
@@ -358,9 +367,9 @@ class ManPowerPlanning extends Component
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
     }
 
-    public function render(ManPowerPlanningService $service)
+    public function render()
     {
-        $mppData = $service->getMppMatrix($this->planningYear, $this->asOfMonth);
+        $mppData = $this->mpp()->getMppMatrix($this->planningYear, $this->asOfMonth);
 
         return view('livewire.admin.man-power-planning', [
             'matrix' => $mppData['matrix'],

@@ -1,7 +1,7 @@
 <div>
     @if($open)
         <div class="fixed inset-0 z-50 overflow-hidden" aria-labelledby="supply-plan-title" role="dialog" aria-modal="true" x-data x-trap.noscroll="true" tabindex="-1">
-            <div class="fixed inset-0 bg-surface-900/30 transition-opacity duration-300" wire:click="close"></div>
+            <div class="fixed inset-0 bg-surface-900/30 transition-opacity duration-300" wire:click="requestClose"></div>
 
             <div class="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
                 <div class="w-screen max-w-md sm:max-w-2xl bg-white shadow-2xl border-l border-surface-200 flex flex-col">
@@ -15,13 +15,30 @@
                             <p class="text-xs text-surface-500">CKP Internal, Talent Scouting, dan RBB mengurangi Kebutuhan. Jabatan Prioritas Diisi bersifat informasi.</p>
                             <p class="text-xs text-surface-500">Terealisasi s.d. {{ $asOfLabel }}: pegawai jalur tersebut yang sudah ditempatkan sebagai Karpim tahun ini. Matriks hanya mengurangkan sisa rencana.</p>
                         </div>
-                        <button type="button" wire:click="close" class="p-1.5 rounded-lg text-surface-500 hover:bg-surface-200 hover:text-surface-800 transition" aria-label="Tutup">
+                        <button type="button" wire:click="requestClose" class="p-1.5 rounded-lg text-surface-500 hover:bg-surface-200 hover:text-surface-800 transition" aria-label="Tutup">
                             <i class="fas fa-xmark" aria-hidden="true"></i>
                         </button>
                     </div>
 
                     <!-- Body -->
                     <div class="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                        @if($confirmingDiscard)
+                            <div role="alertdialog" aria-labelledby="discard-title" class="rounded-lg border border-warning-200 bg-warning-50 px-3.5 py-3 text-xs text-warning-800 space-y-2">
+                                <p id="discard-title" class="font-bold">Buang perubahan yang belum disimpan?</p>
+                                <p>Angka yang sudah diketik akan hilang dan rencana tetap seperti tersimpan.</p>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" wire:click="keepEditing"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-surface-200 text-surface-700 hover:bg-surface-50 transition">
+                                        Lanjut Mengedit
+                                    </button>
+                                    <button type="button" wire:click="discardChanges"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-danger text-white hover:opacity-90 transition">
+                                        Buang Perubahan
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+
                         @error('plan')
                             <div role="alert" class="rounded-lg border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-xs font-semibold text-danger-700">
                                 {{ $message }}
@@ -125,7 +142,7 @@
                                 <span wire:loading wire:target="save">Menyimpan…</span>
                             </button>
                         @else
-                            <button type="button" wire:click="close"
+                            <button type="button" wire:click="requestClose"
                                 class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-surface-200 text-surface-700 hover:bg-surface-300 transition">
                                 Batal
                             </button>

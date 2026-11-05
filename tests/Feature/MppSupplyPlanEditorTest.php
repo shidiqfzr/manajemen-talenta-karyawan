@@ -8,6 +8,7 @@ use App\Models\MppSupplyPlan;
 use App\Models\User;
 use App\Services\Mpp\MppSupplyPlanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesMppEmployees;
 use Tests\Concerns\StoresMppSupplyPlan;
@@ -171,6 +172,54 @@ class MppSupplyPlanEditorTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(0, MasterAuditLog::where('entity_type', 'mpp_supply')->count());
+    }
+
+    public function test_closing_with_unsaved_changes_asks_before_discarding(): void
+    {
+        // Tanpa perubahan: langsung tertutup.
+        $this->editor()->call('requestClose')->assertSet('open', false);
+
+        $this->editor()
+            ->set('cells.ckp.RM-3.TAN', 9)
+            ->call('requestClose')
+            ->assertSet('open', true)
+            ->assertSet('confirmingDiscard', true)
+            ->assertSee('Buang perubahan yang belum disimpan?')
+            ->call('keepEditing')
+            ->assertSet('confirmingDiscard', false)
+            ->assertSet('cells.ckp.RM-3.TAN', 9)
+            ->call('requestClose')
+            ->call('discardChanges')
+            ->assertSet('open', false);
+
+        $this->assertSame(7, app(MppSupplyPlanService::class)->matrixFor(2026)['ckp']['RM-3']['TAN']);
+    }
+
+    public function test_plan_snapshot_and_year_cannot_be_changed_by_the_client(): void
+    {
+        foreach (['year' => 2027, 'expected' => [], 'realised' => [], 'asOfMonth' => 3] as $property => $value) {
+            try {
+                $this->editor()->set($property, $value);
+                $this->fail("{$property} must be locked.");
+            } catch (CannotUpdateLockedPropertyException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function test_review_flags_invalid_cells_before_the_confirm_step(): void
+    {
+        $this->editor()
+            ->set('cells.ckp.RM-3.KEU', 'abc')
+            ->call('review')
+            ->assertSet('confirming', false)
+            ->assertSee('CKP Internal RM-3 KEU harus berupa bilangan bulat 0 sampai 999.');
+
+        $this->editor()
+            ->set('cells.rbb.RM-1.TEK', 2)
+            ->call('review')
+            ->assertSet('confirming', false)
+            ->assertSee('RBB hanya memasok formasi RM-3. Kosongkan RBB RM-1 TEK.');
     }
 
     public function test_editor_ignores_out_of_range_years(): void
