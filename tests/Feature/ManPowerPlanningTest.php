@@ -485,6 +485,54 @@ class ManPowerPlanningTest extends TestCase
         $this->assertSame('77770011', $service->getDrilldownEmployees('RM-1', 'TAN', 'pensiun_t1', 2026, 6)[0]['nik']);
     }
 
+    public function test_position_members_match_every_personnel_cell(): void
+    {
+        $this->makeKarpim('77770011', '1972-05-14');
+        $this->makeKarpim('77770012', '1971-09-02');
+        $this->makeKarpim('77770013', '1990-01-10');
+        Position::create(['nama' => 'Advisor RM-1', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
+        $this->makeKarpim('77770014', '1990-01-10', ['jabatan' => 'Advisor RM-1']);
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);
+        $this->makeAsistenKeuangan('88880061', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-03-01']);
+        $service = new ManPowerPlanningService;
+        $mpp = $service->getMppMatrix(2026, 11);
+        $members = $service->getPositionMembers(2026, 11);
+
+        $checked = 0;
+        foreach ($mpp['matrix'] as $row) {
+            if ($row['drill'] === null || $row['drill'] === 'formula') {
+                continue;
+            }
+            foreach ($row['levels'] as $rm => $level) {
+                foreach (array_keys($level['fields']) as $bidang) {
+                    $expected = str_starts_with($row['drill'], 'supply_')
+                        ? $mpp['supply_breakdown'][substr($row['drill'], 7)][$rm][$bidang]['terealisasi']
+                        : $level['fields'][$bidang];
+                    $actual = array_filter($members, fn (array $m): bool => $m['scope'] === $row['drill'] && $m['rm_level'] === $rm && $m['bidang'] === $bidang);
+                    $this->assertCount($expected, $actual, "{$row['label']} {$rm} {$bidang}");
+                    $checked += $expected;
+                }
+            }
+        }
+        $this->assertGreaterThanOrEqual(6, $checked);
+
+        $ckp = array_values(array_filter($members, fn (array $m): bool => $m['scope'] === 'supply_ckp'));
+        $this->assertSame('88880061', $ckp[0]['employee_nik']);
+        $this->assertSame('2026-03-01', $ckp[0]['tanggal_penempatan']);
+        $this->assertNotEmpty($ckp[0]['jabatan']);
+        $this->assertArrayHasKey('unit_kerja', $ckp[0]);
+    }
+
+    public function test_matrix_exposes_planned_supply_for_t1(): void
+    {
+        $this->savePlan(2027, ['ckp.RM-3.KEU' => 3]);
+
+        $mpp = (new ManPowerPlanningService)->getMppMatrix(2026, 11);
+
+        $this->assertSame(3, $mpp['supply_t1']['RM-3']['KEU']);
+        $this->assertSame(0, $mpp['supply_t1']['RM-3']['TAN']);
+    }
+
     public function test_supply_cells_report_plan_realised_and_remaining(): void
     {
         // Rencana CKP RM-3: KEU 1, TAN 2. Tiga promosi CKP KEU dan satu TAN sudah ditempatkan Maret 2026.
