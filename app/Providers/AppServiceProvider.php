@@ -3,11 +3,13 @@
 namespace App\Providers;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Observers\EmployeeObserver;
 use App\Services\Formasi\FormasiCatalog;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
         Employee::observe(EmployeeObserver::class);
 
         $this->configureLoginRateLimit();
+
+        Gate::define('export-data', fn (User $user) => $user->role === 'admin');
     }
 
     /**

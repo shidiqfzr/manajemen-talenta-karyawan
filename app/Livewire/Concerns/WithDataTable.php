@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Models\MasterAuditLog;
 use App\Support\DataTable\BulkAction;
 use App\Support\DataTable\Column;
 use App\Support\DataTable\Filter;
@@ -9,8 +10,11 @@ use App\Support\DataTable\QueryPipeline;
 use App\Support\DataTable\TableState;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Throwable;
 
 /**
  * Shared data table behaviour for Livewire list components.
@@ -139,6 +143,15 @@ trait WithDataTable
 
         if ($property === 'sortField' || $property === 'sortDirection') {
             $this->normaliseSort();
+            $this->resetPage($this->paginationName());
+            $this->clearSelection();
+
+            return;
+        }
+
+        // The user ticked or unticked a row: "select all matching" no longer describes the selection.
+        if ($property === 'selected' || str_starts_with($property, 'selected.')) {
+            $this->selectAllMatching = false;
 
             return;
         }
@@ -160,7 +173,7 @@ trait WithDataTable
      *
      * @return array<string, array<string, string>>
      */
-    public function queryStringWithDataTable(): array
+    protected function queryStringWithDataTable(): array
     {
         if (! $this->syncsUrl()) {
             return [];
@@ -209,7 +222,7 @@ trait WithDataTable
         return implode(',', array_map(fn (Filter $filter) => $filter->property, $this->filters()));
     }
 
-    public function tableState(): TableState
+    protected function tableState(): TableState
     {
         $filterValues = [];
 
@@ -221,7 +234,7 @@ trait WithDataTable
     }
 
     /** The searched, filtered and sorted query, unpaginated. */
-    public function filteredQuery(): Builder
+    protected function filteredQuery(): Builder
     {
         return QueryPipeline::apply(
             $this->baseQuery(),
@@ -255,10 +268,124 @@ trait WithDataTable
         return false;
     }
 
-    protected function clearSelection(): void
+    #[Computed]
+    public function matchingCount(): int
+    {
+        return $this->filteredQuery()->reorder()->count();
+    }
+
+    public function selectedCount(): int
+    {
+        return $this->selectAllMatching ? $this->matchingCount : count($this->selected);
+    }
+
+    /** Selects the keys on the current page, or clears them when the whole page is already selected. */
+    public function toggleSelectPage(): void
+    {
+        $pageKeys = $this->rows->getCollection()
+            ->map(fn ($row) => (string) $row->getAttribute($this->rowKey()))
+            ->all();
+
+        $this->selectAllMatching = false;
+        $this->selected = $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [] ? [] : $pageKeys;
+    }
+
+    public function selectAllMatchingRows(): void
+    {
+        $this->selectAllMatching = true;
+    }
+
+    public function clearSelection(): void
     {
         $this->selected = [];
         $this->selectAllMatching = false;
+    }
+
+    public function runBulkAction(string $name): void
+    {
+        $action = null;
+
+        foreach ($this->bulkActions() as $candidate) {
+            if ($candidate->name === $name) {
+                $action = $candidate;
+            }
+        }
+
+        if ($action === null) {
+            abort(403);
+        }
+
+        if ($action->requiredAbility !== null && Gate::denies($action->requiredAbility)) {
+            $this->tableNotice = ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.'];
+
+            return;
+        }
+
+        if ($this->selectedCount() === 0) {
+            $this->tableNotice = ['type' => 'warning', 'message' => 'Pilih minimal satu data.'];
+
+            return;
+        }
+
+        $targets = $this->bulkTargets();
+
+        try {
+            $count = DB::transaction(fn () => $this->{$action->handlerMethod()}($targets));
+        } catch (Throwable $e) {
+            report($e);
+            $this->tableNotice = ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.'];
+
+            return;
+        }
+
+        $this->auditTable('data_table.bulk', [
+            'aksi' => $action->name,
+            'jumlah_baris' => $count,
+            'filter' => $this->activeFilterValues(),
+            'pencarian' => $this->search !== '',
+        ]);
+
+        $this->tableNotice = ['type' => 'success', 'message' => $action->successText($count)];
+        $this->clearSelection();
+        unset($this->rows, $this->matchingCount);
+    }
+
+    /**
+     * Rows a bulk action may touch. Always derived from the current search and filters;
+     * the client-writable selection can only narrow it, never widen it.
+     */
+    protected function bulkTargets(): Builder
+    {
+        // Sorting is irrelevant for writes and not portable inside UPDATE/DELETE statements.
+        $targets = $this->filteredQuery()->reorder();
+
+        if (! $this->selectAllMatching) {
+            $targets->whereIn($targets->getModel()->qualifyColumn($this->rowKey()), $this->selected);
+        }
+
+        return $targets;
+    }
+
+    /** @return array<string, string> [filter property => value] for filters that are set and allowed. */
+    protected function activeFilterValues(): array
+    {
+        $values = [];
+
+        foreach ($this->filters() as $filter) {
+            $value = $this->{$filter->property};
+
+            if ($value !== null && $value !== '' && $filter->allows($value)) {
+                $values[$filter->property] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /** @param array<string, mixed> $detail Never include the raw search term (it may contain personal data). */
+    protected function auditTable(string $action, array $detail): void
+    {
+        MasterAuditLog::record(auth()->user(), $action, 'data_table', null, $this->tableLabel(), null, $detail, null);
     }
 
     /** @return array<string, Column> */
