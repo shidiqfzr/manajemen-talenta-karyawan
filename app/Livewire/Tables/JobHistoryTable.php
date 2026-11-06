@@ -2,47 +2,28 @@
 
 namespace App\Livewire\Tables;
 
+use App\Livewire\Concerns\WithDataTable;
 use App\Models\JobHistory;
+use App\Support\DataTable\Column;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithPagination;
 
+/**
+ * Job (position) history of one employee, embedded on the employee profile page.
+ */
 class JobHistoryTable extends Component
 {
-    use WithPagination;
+    use WithDataTable;
 
+    /** NIK of the profiled employee; locked so the client cannot repoint the table to another employee. */
+    #[Locked]
     public string $employeeId;
-
-    public string $search = '';
-
-    public string $sortField = 'tmt_awal';
-
-    public string $sortDirection = 'desc';
-
-    public int $perPage = 5;
 
     public function mount(string $employeeId): void
     {
         $this->employeeId = $employeeId;
-    }
-
-    public function updatingSearch(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingPerPage(): void
-    {
-        $this->resetPage();
-    }
-
-    public function sortBy(string $field): void
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
     }
 
     public function deleteRow(int $id): void
@@ -53,23 +34,61 @@ class JobHistoryTable extends Component
         session()->flash('message', 'Riwayat jabatan berhasil dihapus.');
     }
 
-    public function render()
+    protected function baseQuery(): Builder
     {
-        $histories = JobHistory::query()
-            ->where('employee_nik', $this->employeeId)
-            ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('jabatan', 'like', '%'.$this->search.'%')
-                        ->orWhere('unit_kerja', 'like', '%'.$this->search.'%')
-                        ->orWhere('jenis_mutasi', 'like', '%'.$this->search.'%')
-                        ->orWhere('nomor_sk', 'like', '%'.$this->search.'%');
-                });
-            })
-            ->orderBy($this->sortField, $this->sortDirection)
-            ->paginate($this->perPage);
+        return JobHistory::query()->where('employee_nik', $this->employeeId);
+    }
 
-        return view('livewire.tables.job-history-table', [
-            'histories' => $histories,
-        ]);
+    protected function columns(): array
+    {
+        return [
+            Column::make('tmt_awal', 'Periode')->sortable(),
+            Column::make('jabatan', 'Jabatan')->sortable()->searchable(),
+            Column::make('unit_kerja', 'Unit Kerja')->sortable()->searchable(),
+            Column::make('level', 'Level / Golongan'),
+            Column::make('jenis_mutasi', 'Mutasi')->searchable(),
+            Column::make('nomor_sk', 'Nomor & Tanggal SK')->searchable(),
+            Column::make('aksi', 'Aksi')->align('center'),
+        ];
+    }
+
+    protected function defaultSort(): array
+    {
+        return ['tmt_awal', 'desc'];
+    }
+
+    protected function tableLabel(): string
+    {
+        return 'Riwayat Jabatan';
+    }
+
+    protected function perPageOptions(): array
+    {
+        return [5, 10, 25, 50];
+    }
+
+    protected function defaultPerPage(): int
+    {
+        return 5;
+    }
+
+    protected function exportName(): ?string
+    {
+        return null;
+    }
+
+    protected function syncsUrl(): bool
+    {
+        return false;
+    }
+
+    protected function paginationName(): string
+    {
+        return 'riwayat_jabatan_page';
+    }
+
+    public function render(): View
+    {
+        return view('livewire.tables.job-history-table');
     }
 }

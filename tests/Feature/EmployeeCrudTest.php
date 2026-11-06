@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\Evaluation;
 use App\Models\JobHistory;
 use App\Models\Position;
+use App\Models\Training;
 use App\Models\Unit;
 use App\Models\User;
 use Carbon\Carbon;
@@ -616,5 +618,58 @@ class EmployeeCrudTest extends TestCase
         $this->assertSame('RM-5', Employee::where('nik', $nik)->value('rm_level'));
 
         Employee::where('nik', $nik)->delete();
+    }
+
+    public function test_profile_renders_three_history_tables_with_separate_pagination(): void
+    {
+        $employee = Employee::factory()->create();
+
+        // Six rows each so every table has a second page (five rows per page).
+        for ($i = 1; $i <= 6; $i++) {
+            JobHistory::create([
+                'employee_nik' => $employee->nik,
+                'jabatan' => 'Jabatan Riwayat '.$i,
+                'unit_kerja' => 'Kebun Riwayat',
+                'tmt_awal' => sprintf('2019-%02d-01', $i),
+            ]);
+            Evaluation::create([
+                'employee_nik' => $employee->nik,
+                'bidang_tugas' => 'Bidang Evaluasi '.$i,
+                'tanggal_pelaksanaan_asesmen' => sprintf('2024-%02d-01', $i),
+            ]);
+            Training::create([
+                'judul' => 'Pelatihan Profil '.$i,
+                'jenis' => 'Teknis',
+                'metode' => 'Luring',
+                'tanggal_mulai' => sprintf('2024-%02d-01', $i),
+                'tanggal_akhir' => sprintf('2024-%02d-02', $i),
+                'biaya_tiket_peserta' => 0,
+                'biaya_pelatihan' => 0,
+                'penyelenggara' => 'Lembaga Profil',
+                'nomor_surat' => 'NS/'.$i,
+                'tanggal_surat' => '2024-01-01',
+                'keterangan' => '-',
+                'bidang_pelatihan' => 'Tanaman',
+                'jam_belajar_per_hari' => 8,
+            ])->employees()->attach($employee->nik);
+        }
+
+        $response = $this->actingAs($this->admin)->get(route('admin.employees.show', $employee->nik));
+
+        $response->assertOk()
+            ->assertSee('aria-label="Halaman pelatihan"', false)
+            ->assertSee('aria-label="Halaman evaluasi"', false)
+            ->assertSee('aria-label="Halaman riwayat jabatan"', false)
+            ->assertSee("gotoPage(2, 'pelatihan_page')", false)
+            ->assertSee("gotoPage(2, 'evaluasi_page')", false)
+            ->assertSee("gotoPage(2, 'riwayat_jabatan_page')", false)
+            ->assertSee('id="per-page-pelatihan_page"', false)
+            ->assertSee('id="per-page-evaluasi_page"', false)
+            ->assertSee('id="per-page-riwayat_jabatan_page"', false);
+
+        // The three tables share one page, so their per-page select ids must not collide.
+        preg_match_all('/\sid="(per-page-[^"]+)"/', $response->getContent(), $matches);
+        $this->assertSame(array_unique($matches[1]), $matches[1]);
+        $this->assertCount(3, $matches[1]);
     }
 }

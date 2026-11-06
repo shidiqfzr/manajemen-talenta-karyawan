@@ -2,47 +2,29 @@
 
 namespace App\Livewire\Tables;
 
+use App\Livewire\Concerns\WithDataTable;
 use App\Models\Evaluation;
+use App\Support\DataTable\Column;
+use App\Support\DataTable\QueryPipeline;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithPagination;
 
+/**
+ * Evaluation (assessment and 9-box) history of one employee, embedded on the employee profile page.
+ */
 class EvaluationTable extends Component
 {
-    use WithPagination;
+    use WithDataTable;
 
+    /** NIK of the profiled employee; locked so the client cannot read another employee's scores. */
+    #[Locked]
     public string $employeeId;
-
-    public string $search = '';
-
-    public string $sortField = 'tanggal_pelaksanaan_asesmen';
-
-    public string $sortDirection = 'desc';
-
-    public int $perPage = 5;
 
     public function mount(string $employeeId): void
     {
         $this->employeeId = $employeeId;
-    }
-
-    public function updatingSearch(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingPerPage(): void
-    {
-        $this->resetPage();
-    }
-
-    public function sortBy(string $field): void
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
     }
 
     public function deleteRow(int $id): void
@@ -53,23 +35,72 @@ class EvaluationTable extends Component
         session()->flash('message', 'Data evaluasi berhasil dihapus.');
     }
 
-    public function render()
+    protected function baseQuery(): Builder
     {
-        $evaluations = Evaluation::query()
-            ->where('employee_nik', $this->employeeId)
-            ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('bidang_tugas', 'like', '%'.$this->search.'%')
-                        ->orWhere('lembaga_asesmen', 'like', '%'.$this->search.'%')
-                        ->orWhere('kategori_9box', 'like', '%'.$this->search.'%')
-                        ->orWhere('kategori_asesmen', 'like', '%'.$this->search.'%');
-                });
-            })
-            ->orderBy($this->sortField, $this->sortDirection)
-            ->paginate($this->perPage);
+        return Evaluation::query()->where('employee_nik', $this->employeeId);
+    }
 
-        return view('livewire.tables.evaluation-table', [
-            'evaluations' => $evaluations,
-        ]);
+    protected function columns(): array
+    {
+        return [
+            Column::make('tanggal_pelaksanaan_asesmen', 'Periode Asesmen')->sortable(),
+            Column::make('nilai_tertimbang', 'Nilai Tertimbang')->sortable()->mono(),
+            Column::make('kategori_9box', '9-Box Performance')->searchable(),
+            Column::make('bidang_tugas', 'Bidang Tugas')->sortable()->searchable(),
+            // One visible column shows both the assessing institution and the assessment category.
+            Column::make('lembaga_asesmen', 'Lembaga & Tanggal')->searchable(fn (Builder $q, string $term) => $this->whereLikeAny($q, ['lembaga_asesmen', 'kategori_asesmen'], $term)),
+            Column::make('aksi', 'Aksi')->align('center'),
+        ];
+    }
+
+    protected function defaultSort(): array
+    {
+        return ['tanggal_pelaksanaan_asesmen', 'desc'];
+    }
+
+    protected function tableLabel(): string
+    {
+        return 'Riwayat Evaluasi';
+    }
+
+    protected function perPageOptions(): array
+    {
+        return [5, 10, 25, 50];
+    }
+
+    protected function defaultPerPage(): int
+    {
+        return 5;
+    }
+
+    protected function exportName(): ?string
+    {
+        return null;
+    }
+
+    protected function syncsUrl(): bool
+    {
+        return false;
+    }
+
+    protected function paginationName(): string
+    {
+        return 'evaluasi_page';
+    }
+
+    /** @param array<int, string> $columns */
+    private function whereLikeAny(Builder $query, array $columns, string $term): void
+    {
+        $grammar = $query->getQuery()->getGrammar();
+        $pattern = '%'.QueryPipeline::escapeLike($term).'%';
+
+        foreach ($columns as $column) {
+            $query->orWhereRaw($grammar->wrap($query->qualifyColumn($column))." LIKE ? ESCAPE '!'", [$pattern]);
+        }
+    }
+
+    public function render(): View
+    {
+        return view('livewire.tables.evaluation-table');
     }
 }
