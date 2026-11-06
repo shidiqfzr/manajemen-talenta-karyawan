@@ -60,6 +60,8 @@ class MasterAuditLog extends Model
         'mpp_access.export_personnel' => 'Rincian personil MPP diunduh',
         'mpp_access.export_matrix' => 'Matriks MPP diunduh',
         'seat_access.view_occupants' => 'Pemegang jabatan formasi dibuka',
+        'data_table.bulk' => 'Aksi massal pada tabel data',
+        'data_table.export' => 'Tabel data diunduh',
     ];
 
     public const ENTITY_LABELS = [
@@ -70,6 +72,7 @@ class MasterAuditLog extends Model
         'mpp_period' => 'Periode MPP',
         'mpp_access' => 'Akses Data MPP',
         'seat_access' => 'Akses Data Formasi',
+        'data_table' => 'Tabel Data',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */

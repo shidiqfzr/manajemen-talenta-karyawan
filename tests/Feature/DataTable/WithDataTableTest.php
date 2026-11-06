@@ -2,13 +2,17 @@
 
 namespace Tests\Feature\DataTable;
 
+use App\Models\MasterAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
 use Tests\TestCase;
+
+use function Livewire\invade;
 
 class WithDataTableTest extends TestCase
 {
@@ -178,8 +182,8 @@ class WithDataTableTest extends TestCase
 
     public function test_url_sync_can_be_disabled(): void
     {
-        $this->assertSame([], (new FixtureTableNoUrl)->queryStringWithDataTable());
-        $this->assertNotSame([], (new FixtureTable)->queryStringWithDataTable());
+        $this->assertSame([], invade(new FixtureTableNoUrl)->queryStringWithDataTable());
+        $this->assertNotSame([], invade(new FixtureTable)->queryStringWithDataTable());
 
         $component = Livewire::withQueryParams(['search' => 'Pegawai 07', 'sort' => 'nilai', 'bidang' => 'KEU'])
             ->test(FixtureTableNoUrl::class)
@@ -194,5 +198,171 @@ class WithDataTableTest extends TestCase
         $this->assertArrayNotHasKey('sortDirection', $url);
         $this->assertArrayNotHasKey('perPage', $url);
         $this->assertArrayHasKey('bidang', $url);
+    }
+
+    private function defineManageFixture(): void
+    {
+        Gate::define('manage-fixture', fn (User $u) => $u->role === 'admin');
+    }
+
+    private function idOf(string $nama): string
+    {
+        return (string) FixtureRow::where('nama', $nama)->value('id');
+    }
+
+    public function test_toggle_select_page_selects_and_clears_current_page_keys(): void
+    {
+        $component = Livewire::test(FixtureTable::class)->set('perPage', 10)->call('toggleSelectPage');
+
+        $this->assertCount(10, $component->get('selected'));
+        $this->assertContains($this->idOf('Pegawai 01'), $component->get('selected'));
+        $this->assertNotContains($this->idOf('Pegawai 11'), $component->get('selected'));
+
+        $component->call('toggleSelectPage')->assertSet('selected', []);
+    }
+
+    public function test_selection_survives_page_change_and_clears_on_search_filter_or_sort(): void
+    {
+        Livewire::test(FixtureTable::class)
+            ->set('selected', ['1', '2'])
+            ->call('gotoPage', 2)
+            ->assertSet('selected', ['1', '2'])
+            ->set('search', 'Pegawai')
+            ->assertSet('selected', [])
+            ->set('selected', ['1'])
+            ->set('selectAllMatching', true)
+            ->set('bidang', 'KEU')
+            ->assertSet('selected', [])
+            ->assertSet('selectAllMatching', false)
+            ->set('selected', ['1'])
+            ->call('sortBy', 'nilai')
+            ->assertSet('selected', []);
+    }
+
+    public function test_unticking_a_row_cancels_select_all_matching(): void
+    {
+        Livewire::test(FixtureTable::class)
+            ->call('selectAllMatchingRows')
+            ->assertSet('selectAllMatching', true)
+            ->set('selected', ['1'])
+            ->assertSet('selectAllMatching', false)
+            ->call('selectAllMatchingRows')
+            ->call('toggleSelectPage')
+            ->assertSet('selectAllMatching', false);
+    }
+
+    public function test_direct_sort_set_resets_page_and_clears_selection(): void
+    {
+        Livewire::test(FixtureTable::class)
+            ->call('gotoPage', 2)
+            ->set('selected', ['1'])
+            ->set('sortField', 'nilai')
+            ->assertSet('paginators.page', 1)
+            ->assertSet('selected', []);
+    }
+
+    public function test_unknown_bulk_action_is_forbidden(): void
+    {
+        Livewire::test(FixtureTable::class)->call('runBulkAction', 'hapus')->assertForbidden();
+    }
+
+    public function test_bulk_action_without_permission_shows_notice_and_changes_nothing(): void
+    {
+        $this->defineManageFixture();
+        $this->actingAs(User::factory()->create(['role' => 'staff']));
+
+        Livewire::test(FixtureTable::class)
+            ->set('selected', [$this->idOf('Pegawai 01')])
+            ->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
+
+        $this->assertSame(30, FixtureRow::where('aktif', true)->count());
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_bulk_action_with_empty_selection_warns(): void
+    {
+        $this->defineManageFixture();
+
+        Livewire::test(FixtureTable::class)
+            ->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Pilih minimal satu data.']);
+
+        $this->assertSame(30, FixtureRow::where('aktif', true)->count());
+    }
+
+    public function test_bulk_action_on_selected_rows_updates_only_those_and_audits(): void
+    {
+        $this->defineManageFixture();
+        $ids = [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')];
+
+        Livewire::test(FixtureTable::class)
+            ->set('search', 'Pegawai')
+            ->set('selected', $ids)
+            ->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data berhasil diproses.'])
+            ->assertSet('selected', []);
+
+        $this->assertSame(28, FixtureRow::where('aktif', true)->count());
+        $this->assertFalse((bool) FixtureRow::find($ids[0])->aktif);
+
+        $log = MasterAuditLog::where('action', 'data_table.bulk')->sole();
+        $this->assertSame('data_table', $log->entity_type);
+        $this->assertSame('Tabel Uji', $log->entity_label);
+        $this->assertSame(
+            ['aksi' => 'nonaktifkan', 'jumlah_baris' => 2, 'filter' => [], 'pencarian' => true],
+            $log->new_values,
+        );
+        $this->assertStringNotContainsString('Pegawai', json_encode($log->new_values));
+    }
+
+    public function test_bulk_action_ignores_keys_outside_current_filter(): void
+    {
+        $this->defineManageFixture();
+        $keu = $this->idOf('Pegawai 02');
+        $tan = $this->idOf('Pegawai 01');
+
+        Livewire::test(FixtureTable::class)
+            ->set('bidang', 'KEU')
+            ->set('selected', [$keu, $tan])
+            ->call('runBulkAction', 'nonaktifkan');
+
+        $this->assertFalse((bool) FixtureRow::find($keu)->aktif);
+        $this->assertTrue((bool) FixtureRow::find($tan)->aktif);
+        $this->assertSame(
+            ['bidang' => 'KEU'],
+            MasterAuditLog::where('action', 'data_table.bulk')->sole()->new_values['filter'],
+        );
+    }
+
+    public function test_select_all_matching_targets_every_filtered_row(): void
+    {
+        $this->defineManageFixture();
+        FixtureRow::query()->where('nilai', '>', 20)->update(['bidang' => 'KEU']);
+        $this->assertSame(20, FixtureRow::where('bidang', 'KEU')->count());
+
+        $component = Livewire::test(FixtureTable::class)
+            ->set('bidang', 'KEU')
+            ->call('selectAllMatchingRows');
+
+        $this->assertSame(20, $component->instance()->selectedCount());
+
+        $component->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '20 data berhasil diproses.'])
+            ->assertSet('selectAllMatching', false);
+
+        $this->assertSame(20, FixtureRow::where('aktif', false)->count());
+        $this->assertSame(0, FixtureRow::where('aktif', false)->where('bidang', '!=', 'KEU')->count());
+    }
+
+    public function test_failed_bulk_handler_rolls_back(): void
+    {
+        Livewire::test(FixtureTable::class)
+            ->set('selected', [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')])
+            ->call('runBulkAction', 'gagal')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
+
+        $this->assertSame(30, FixtureRow::where('aktif', true)->count());
+        $this->assertSame(0, MasterAuditLog::count());
     }
 }
