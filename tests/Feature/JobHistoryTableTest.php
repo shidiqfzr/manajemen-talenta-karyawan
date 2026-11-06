@@ -170,4 +170,16 @@ class JobHistoryTableTest extends TestCase
 
         $this->table()->set('employeeId', $this->other->nik);
     }
+
+    public function test_row_action_shows_loading_state(): void
+    {
+        $targets = 'search, sortBy, perPage, gotoPage, nextPage, previousPage, resetFilters, deleteRow';
+
+        // While the row action runs the skeleton replaces the rows, the table is busy, and the button is disabled.
+        $this->table()
+            ->assertSeeHtml('wire:loading.delay.remove wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.delay.class.remove="hidden" wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.attr="aria-busy" wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.attr="disabled" wire:target="deleteRow"');
+    }
 }
