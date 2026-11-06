@@ -12,8 +12,9 @@
             <div class="flex flex-col md:flex-row gap-6 md:gap-10">
                 <!-- foto Section -->
                 <div class="w-full md:w-1/3 flex justify-center md:justify-start">
-                    <img src="{{ asset('storage/' . ($employee->foto ?? 'images/default.png')) }}" alt="{{ $employee->nama }}"
-                        class="rounded-xl w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 object-cover border border-surface-300 shadow-sm">
+                    <x-employee-avatar :employee="$employee"
+                        size="rounded-xl w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 border border-surface-300 shadow-sm"
+                        text="text-6xl" />
                 </div>
 
                 <!-- Employee Info -->

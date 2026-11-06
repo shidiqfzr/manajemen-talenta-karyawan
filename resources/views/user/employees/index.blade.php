@@ -10,9 +10,8 @@
             <a href="{{ route('user.employees.show', $employee->nik) }}" class="group block h-full">
                 <div class="bg-white rounded-2xl shadow hover:shadow-lg transition p-5 flex flex-col h-full">
                     <div class="w-full h-60 overflow-hidden rounded-xl mb-4">
-                        <img src="{{ $employee->foto ? asset('storage/' . $employee->foto) : asset('images/default.png') }}"
-                            alt="{{ $employee->nama }}"
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        <x-employee-avatar :employee="$employee"
+                            class="group-hover:scale-105 transition-transform duration-300" />
                     </div>
                     <div class="flex-1">
                         <h2 class="text-lg font-semibold mb-1 truncate" title="{{ $employee->nama }}">
