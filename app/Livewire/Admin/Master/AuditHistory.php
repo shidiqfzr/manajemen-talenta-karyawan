@@ -110,6 +110,7 @@ class AuditHistory extends Component
         $term = trim($this->search);
 
         $logs = MasterAuditLog::query()
+            ->excludingViewAccess()
             ->when(array_key_exists($this->entityType, MasterAuditLog::ENTITY_LABELS), fn ($q) => $q->where('entity_type', $this->entityType))
             ->when(ctype_digit($this->userId), fn ($q) => $q->where('user_id', (int) $this->userId))
             ->when($this->validDate($this->from), fn ($q) => $q->where('created_at', '>=', $this->from.' 00:00:00'))

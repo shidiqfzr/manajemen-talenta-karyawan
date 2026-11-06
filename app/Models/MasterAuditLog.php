@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -55,6 +56,10 @@ class MasterAuditLog extends Model
         'mpp_period.captured' => 'Draf periode MPP direkam',
         'mpp_period.closed' => 'Periode MPP ditutup',
         'mpp_period.reopened' => 'Periode MPP dibuka kembali',
+        'mpp_access.view_personnel' => 'Rincian personil MPP dibuka',
+        'mpp_access.export_personnel' => 'Rincian personil MPP diunduh',
+        'mpp_access.export_matrix' => 'Matriks MPP diunduh',
+        'seat_access.view_occupants' => 'Pemegang jabatan formasi dibuka',
     ];
 
     public const ENTITY_LABELS = [
@@ -63,6 +68,8 @@ class MasterAuditLog extends Model
         'seat' => 'Formasi Jabatan',
         'mpp_supply' => 'Rencana Pasokan MPP',
         'mpp_period' => 'Periode MPP',
+        'mpp_access' => 'Akses Data MPP',
+        'seat_access' => 'Akses Data Formasi',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
@@ -80,7 +87,25 @@ class MasterAuditLog extends Model
         'jumlah' => 'Jumlah',
         'status' => 'Status Periode',
         'revision' => 'Revisi',
+        'indikator' => 'Indikator',
+        'unit' => 'Unit Kerja',
+        'jabatan' => 'Jabatan',
+        'tahun' => 'Tahun',
+        'posisi_per' => 'Posisi per',
+        'jumlah_baris' => 'Jumlah Baris',
+        'periode' => 'Periode',
+        'revisi' => 'Revisi',
     ];
+
+    /**
+     * Pembukaan layar yang hanya membaca data (mis. rincian personil MPP, pemegang jabatan formasi) tetap
+     * tersimpan sebagai jejak akses (SECURITY.md, UU PDP), tetapi bukan perubahan data sehingga tidak
+     * ditampilkan pada layar Riwayat Perubahan.
+     */
+    public function scopeExcludingViewAccess(Builder $query): Builder
+    {
+        return $query->whereRaw("action not like '%!_access.view!_%' escape '!'");
+    }
 
     public static function actionLabel(string $action): string
     {

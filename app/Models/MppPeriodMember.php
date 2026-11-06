@@ -23,6 +23,8 @@ class MppPeriodMember extends Model
         'employee_nik',
         'jabatan',
         'unit_kerja',
+        'golongan',
+        'jalur_masuk',
         'tanggal_penempatan',
         'tanggal_mbt',
     ];

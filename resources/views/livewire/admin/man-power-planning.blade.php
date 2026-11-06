@@ -75,18 +75,12 @@
                     </button>
                 @endunless
 
-                <!-- Export Excel / CSV -->
-                <button type="button" wire:click="exportCsv"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300/80 bg-primary-50 text-primary-800 hover:bg-primary-100 hover:border-primary-400 text-xs font-semibold transition-all shadow-2xs">
-                    <i class="fas fa-file-excel text-primary-700" aria-hidden="true"></i>
-                    <span>Export Excel / CSV</span>
-                </button>
-
-                <!-- Cetak -->
-                <button type="button" onclick="window.print()"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs font-medium transition-all shadow-2xs">
-                    <i class="fas fa-print text-surface-400" aria-hidden="true"></i>
-                    <span>Cetak</span>
+                <!-- Export Excel -->
+                <button type="button" wire:click="exportExcel" wire:loading.attr="disabled" wire:target="exportExcel"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300/80 bg-primary-50 text-primary-800 hover:bg-primary-100 hover:border-primary-400 text-xs font-semibold transition-all shadow-2xs disabled:opacity-60 disabled:cursor-wait">
+                    <i class="fas fa-file-excel text-primary-700" wire:loading.remove wire:target="exportExcel" aria-hidden="true"></i>
+                    <i class="fas fa-spinner fa-spin text-primary-700" wire:loading wire:target="exportExcel" aria-hidden="true"></i>
+                    <span>Export Excel</span>
                 </button>
             </div>
         </div>
@@ -311,263 +305,132 @@
         </div>
 
         <!-- Matrix Footer Legend & Guide -->
-        <div class="px-5 py-4 bg-surface-50 border-t border-surface-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-surface-600">
-            <!-- Legend 1 -->
-            <div class="space-y-1">
-                <p class="font-bold text-surface-800 uppercase tracking-wider text-[10px]">Tingkat Golongan Jabatan (RM):</p>
-                <ul class="space-y-0.5 text-surface-600 text-[11px]">
-                    <li><strong class="text-orange-900">RM-1:</strong> {{ $rmBands['RM-1']['positions'] }}</li>
-                    <li><strong class="text-sky-900">RM-2:</strong> {{ $rmBands['RM-2']['positions'] }}</li>
-                    <li><strong class="text-purple-900">RM-3:</strong> {{ $rmBands['RM-3']['positions'] }}</li>
+        <div id="mpp-legend" class="px-5 py-4 bg-surface-50 border-t border-surface-200 grid grid-cols-1 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1.5fr)] gap-x-8 gap-y-4 text-xs text-surface-700">
+            <!-- Legend 1: label colors follow DESIGN.md §5.2 (RM-1 orange, RM-2 sky, RM-3 purple) -->
+            <section aria-labelledby="legend-rm" class="space-y-1">
+                <h3 id="legend-rm" class="font-semibold text-surface-900">Tingkat golongan jabatan (RM)</h3>
+                <ul class="space-y-0.5 leading-snug">
+                    @foreach (['RM-1' => 'text-orange-800', 'RM-2' => 'text-sky-800', 'RM-3' => 'text-purple-800'] as $rm => $tone)
+                        <li><strong class="{{ $tone }}">{{ $rm }}:</strong> {{ $rmBands[$rm]['positions'] }}</li>
+                    @endforeach
                 </ul>
-            </div>
+            </section>
 
-            <!-- Legend 2 -->
-            <div class="space-y-1">
-                <p class="font-bold text-surface-800 uppercase tracking-wider text-[10px]">Bidang Fungsional:</p>
-                <ul class="space-y-0.5 text-surface-600 text-[11px]">
-                    <li><strong>KEU:</strong> Keuangan, Akuntansi &amp; Perbendaharaan</li>
-                    <li><strong>TAN:</strong> Tanaman, Agronomi &amp; Afdeling Kebun</li>
-                    <li><strong>TEK:</strong> Teknik, Pengolahan Pabrik &amp; Bengkel</li>
-                    <li><strong>UMU:</strong> Umum, SDM, Pengadaan, Legal &amp; Sekretariat</li>
+            <!-- Legend 2: Bidang, plain bold codes (no chips, DESIGN.md §1 badge soup) -->
+            <section aria-labelledby="legend-bidang" class="space-y-1 md:pl-4">
+                <h3 id="legend-bidang" class="font-semibold text-surface-900">Bidang fungsional</h3>
+                <ul class="space-y-0.5 leading-snug">
+                    <li><strong class="text-surface-900">KEU:</strong> Keuangan, Akuntansi &amp; Perbendaharaan</li>
+                    <li><strong class="text-surface-900">TAN:</strong> Tanaman, Agronomi &amp; Afdeling Kebun</li>
+                    <li><strong class="text-surface-900">TEK:</strong> Teknik, Pengolahan Pabrik &amp; Bengkel</li>
+                    <li><strong class="text-surface-900">UMU:</strong> Umum, SDM, Pengadaan, Legal &amp; Sekretariat</li>
                 </ul>
-            </div>
+            </section>
 
             <!-- Legend 3 -->
-            <div class="space-y-1">
-                <p class="font-bold text-surface-800 uppercase tracking-wider text-[10px]">Keterangan Formula Kebutuhan:</p>
-                <p class="text-[11px] leading-relaxed text-surface-600">
-                    <span class="font-semibold text-surface-700">Kebutuhan = (Formasi − Realisasi + Pensiun) − Sisa Pasokan (CKP + Scouting + RBB)</span>.
-                    Angka bertanda minus (<span class="text-primary-700 font-bold">-</span>) menandakan kondisi <strong>surplus pasokan talenta</strong> di atas batas kebutuhan minimal.
+            <section aria-labelledby="legend-formula" class="space-y-1">
+                <h3 id="legend-formula" class="font-semibold text-surface-900">Keterangan formula kebutuhan</h3>
+                <p class="leading-relaxed">
+                    <span class="font-semibold text-surface-900">Kebutuhan = (Formasi − Realisasi + Pensiun) − Sisa Pasokan (CKP + Scouting + RBB)</span>.
+                    Angka bertanda minus (<span class="text-primary-700 font-bold">–</span>) menandakan kondisi <strong>surplus pasokan talenta</strong> di atas batas kebutuhan minimal.
                     Realisasi dihitung pada akhir bulan <strong>Posisi per</strong>; kursi dihitung kosong sejak <strong>Masa Bebas Tugas (MBT)</strong>, satu tahun sebelum tanggal pensiun.
                     Sisa pasokan = rencana tahun berjalan dikurangi pegawai jalur tersebut yang sudah masuk hingga tanggal posisi.
                 </p>
-            </div>
+            </section>
         </div>
     </div>
 
-    <!-- Slide-Over Drawer: Modern Employee Drilldown Panel -->
+    {{-- Drawer rincian personil (komponen bersama dengan Master Formasi, DESIGN.md §7.6) --}}
     @if($showDrilldown)
-        <div class="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true" x-data x-trap.noscroll="true" tabindex="-1">
-            <!-- Background Backdrop: Soft semi-transparent overlay without blur -->
-            <div class="fixed inset-0 bg-surface-900/30 transition-opacity duration-300" wire:click="closeDrilldown"></div>
+        <x-admin.personnel-drawer
+            :title="$drilldownTitle"
+            close-action="closeDrilldown"
+            title-id="slide-over-title"
+            :employees="$drilldownEmployees"
+            :count="in_array($drilldownMode, ['people', 'supply'], true) ? count($drilldownEmployees) : null"
+            :show-nik="true"
+            :show-placement="$drilldownMode === 'supply'"
+            :hide-list="$drilldownMode === 'formula'">
+            <x-slot:badges>
+                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-orange-100 text-orange-800 border border-orange-200">
+                    {{ $drilldownRm }}
+                </span>
+                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-sky-100 text-sky-800 border border-sky-200">
+                    Bidang {{ $drilldownBidang }}
+                </span>
+                <span class="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-surface-200/80 text-surface-800">
+                    {{ $drilldownIndicator }}
+                </span>
+            </x-slot:badges>
 
-            <div class="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-                <div class="w-screen max-w-md sm:max-w-lg bg-white shadow-2xl border-l border-surface-200 flex flex-col" x-data="{ search: '' }">
-                    <!-- Drawer Header & Controls -->
-                    <div class="px-5 py-4 bg-surface-50 border-b border-surface-200 space-y-3">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="space-y-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-primary-600 inline-block"></span>
-                                    <h3 class="text-sm font-bold text-surface-900" id="slide-over-title">
-                                        {{ $drilldownTitle }}
-                                    </h3>
-                                    @if(in_array($drilldownMode, ['people', 'supply'], true))
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-primary-100 text-primary-800">
-                                            {{ count($drilldownEmployees) }} Personil
-                                        </span>
-                                    @endif
-                                </div>
-                                
-                                <!-- Context Badges -->
-                                <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                                    <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-orange-100 text-orange-800 border border-orange-200">
-                                        {{ $drilldownRm }}
-                                    </span>
-                                    <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-sky-100 text-sky-800 border border-sky-200">
-                                        Bidang {{ $drilldownBidang }}
-                                    </span>
-                                    <span class="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-surface-200/80 text-surface-800">
-                                        {{ $drilldownIndicator }}
-                                    </span>
-                                </div>
-                            </div>
+            <x-slot:header>
+                <!-- Rencana vs realisasi pasokan (baris Sisa CKP / Talent Scouting / RBB) -->
+                @if($drilldownSupply)
+                    @php
+                        $over = $drilldownSupply['terealisasi'] - $drilldownSupply['rencana'];
+                        $supplyNotes = [];
+                        if ($over > 0) {
+                            $supplyNotes[] = ['text' => "Terealisasi melebihi rencana: {$over}. Sisa dihitung 0; kelebihannya sudah tercatat di Realisasi.", 'class' => 'font-semibold text-warning-800'];
+                        }
+                        $supplyNotes[] = ['text' => "Daftar di bawah: pegawai jalur ini yang ditempatkan sebagai Karpim pada {$planningYear} s.d. akhir {$stats['as_of_label']}. Mereka sudah tercatat di Realisasi, sehingga hanya sisa rencana yang mengurangi Kebutuhan.", 'class' => 'text-warning-800/80'];
+                    @endphp
+                    @include('livewire.admin.partials.mpp-breakdown-card', [
+                        'kind' => 'supply',
+                        'title' => 'Rincian Rencana vs Realisasi Pasokan',
+                        'icon' => 'fas fa-people-arrows',
+                        'badge' => match (true) {
+                            $over > 0 => ['label' => 'Melebihi Rencana', 'class' => 'bg-primary-100 text-primary-800'],
+                            $drilldownSupply['sisa'] === 0 => ['label' => 'Rencana Tercapai', 'class' => 'bg-primary-100 text-primary-800'],
+                            default => ['label' => 'Sisa '.$drilldownSupply['sisa'], 'class' => 'bg-warning-100 text-warning-800'],
+                        },
+                        'terms' => [
+                            ['op' => null, 'label' => 'Rencana '.$planningYear, 'value' => $drilldownSupply['rencana'], 'class' => 'text-surface-900'],
+                            ['op' => '−', 'label' => 'Terealisasi', 'value' => $drilldownSupply['terealisasi'], 'class' => 'text-primary-700'],
+                        ],
+                        'result' => ['label' => 'Sisa', 'value' => $drilldownSupply['sisa'], 'class' => 'text-earth-700'],
+                        'notes' => $supplyNotes,
+                    ])
+                @endif
 
-                            <button type="button" wire:click="closeDrilldown"
-                                class="w-8 h-8 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-200/60 flex items-center justify-center transition"
-                                title="Tutup Panel">
-                                <i class="fas fa-times text-sm" aria-hidden="true"></i>
-                            </button>
-                        </div>
+                <!-- Formula Calculation Breakdown Card (When clicking on Kebutuhan Rows) -->
+                @if($drilldownFormula)
+                    @include('livewire.admin.partials.mpp-breakdown-card', [
+                        'kind' => 'formula',
+                        'title' => 'Rincian Formula Kebutuhan Bersih',
+                        'icon' => 'fas fa-calculator',
+                        'badge' => $drilldownFormula['is_surplus']
+                            ? ['label' => 'Surplus Pasokan (-)', 'class' => 'bg-primary-100 text-primary-800']
+                            : ['label' => 'Defisit Formasi (+)', 'class' => 'bg-danger-100 text-danger'],
+                        'terms' => [
+                            ['op' => null, 'label' => 'Formasi', 'value' => $drilldownFormula['formasi'], 'class' => 'text-surface-900'],
+                            ['op' => '−', 'label' => 'Realisasi', 'value' => $drilldownFormula['realisasi'], 'class' => 'text-info-700'],
+                            ['op' => '+', 'label' => 'Pensiun', 'value' => $drilldownFormula['pensiun'], 'class' => 'text-warning-700'],
+                            ['op' => '−', 'label' => 'Pasokan', 'value' => $drilldownFormula['pasokan'], 'class' => 'text-earth-700'],
+                        ],
+                        'result' => [
+                            'label' => 'Kebutuhan',
+                            'value' => $drilldownFormula['kebutuhan'],
+                            'class' => $drilldownFormula['is_surplus'] ? 'text-primary-700' : 'text-danger',
+                        ],
+                        'notes' => [
+                            ['text' => 'Rincian personil tersedia dengan mengeklik angka pada baris Realisasi, Pensiun, atau Sisa pasokan.', 'class' => 'text-warning-800/80'],
+                        ],
+                    ])
+                @endif
+            </x-slot:header>
 
-                        <!-- Instant Personnel Search Input -->
-                        @if(!empty($drilldownEmployees))
-                            <div class="relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs" aria-hidden="true"></i>
-                                <input x-model="search" type="text"
-                                    placeholder="Cari nama, NIK, atau jabatan di panel..."
-                                    class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-surface-200 bg-white placeholder:text-surface-400 focus:outline-hidden focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 transition shadow-2xs">
-                            </div>
-                        @endif
-
-                        <!-- Rencana vs realisasi pasokan (baris Sisa CKP / Talent Scouting / RBB) -->
-                        @if($drilldownSupply)
-                            @php
-                                $over = $drilldownSupply['terealisasi'] - $drilldownSupply['rencana'];
-                                $supplyNotes = [];
-                                if ($over > 0) {
-                                    $supplyNotes[] = ['text' => "Terealisasi melebihi rencana: {$over}. Sisa dihitung 0; kelebihannya sudah tercatat di Realisasi.", 'class' => 'font-semibold text-warning-800'];
-                                }
-                                $supplyNotes[] = ['text' => "Daftar di bawah: pegawai jalur ini yang ditempatkan sebagai Karpim pada {$planningYear} s.d. akhir {$stats['as_of_label']}. Mereka sudah tercatat di Realisasi, sehingga hanya sisa rencana yang mengurangi Kebutuhan.", 'class' => 'text-warning-800/80'];
-                            @endphp
-                            @include('livewire.admin.partials.mpp-breakdown-card', [
-                                'kind' => 'supply',
-                                'title' => 'Rincian Rencana vs Realisasi Pasokan',
-                                'icon' => 'fas fa-people-arrows',
-                                'badge' => match (true) {
-                                    $over > 0 => ['label' => 'Melebihi Rencana', 'class' => 'bg-primary-100 text-primary-800'],
-                                    $drilldownSupply['sisa'] === 0 => ['label' => 'Rencana Tercapai', 'class' => 'bg-primary-100 text-primary-800'],
-                                    default => ['label' => 'Sisa '.$drilldownSupply['sisa'], 'class' => 'bg-warning-100 text-warning-800'],
-                                },
-                                'terms' => [
-                                    ['op' => null, 'label' => 'Rencana '.$planningYear, 'value' => $drilldownSupply['rencana'], 'class' => 'text-surface-900'],
-                                    ['op' => '−', 'label' => 'Terealisasi', 'value' => $drilldownSupply['terealisasi'], 'class' => 'text-primary-700'],
-                                ],
-                                'result' => ['label' => 'Sisa', 'value' => $drilldownSupply['sisa'], 'class' => 'text-earth-700'],
-                                'notes' => $supplyNotes,
-                            ])
-                        @endif
-
-                        <!-- Formula Calculation Breakdown Card (When clicking on Kebutuhan Rows) -->
-                        @if($drilldownFormula)
-                            @include('livewire.admin.partials.mpp-breakdown-card', [
-                                'kind' => 'formula',
-                                'title' => 'Rincian Formula Kebutuhan Bersih',
-                                'icon' => 'fas fa-calculator',
-                                'badge' => $drilldownFormula['is_surplus']
-                                    ? ['label' => 'Surplus Pasokan (-)', 'class' => 'bg-primary-100 text-primary-800']
-                                    : ['label' => 'Defisit Formasi (+)', 'class' => 'bg-danger-100 text-danger'],
-                                'terms' => [
-                                    ['op' => null, 'label' => 'Formasi', 'value' => $drilldownFormula['formasi'], 'class' => 'text-surface-900'],
-                                    ['op' => '−', 'label' => 'Realisasi', 'value' => $drilldownFormula['realisasi'], 'class' => 'text-info-700'],
-                                    ['op' => '+', 'label' => 'Pensiun', 'value' => $drilldownFormula['pensiun'], 'class' => 'text-warning-700'],
-                                    ['op' => '−', 'label' => 'Pasokan', 'value' => $drilldownFormula['pasokan'], 'class' => 'text-earth-700'],
-                                ],
-                                'result' => [
-                                    'label' => 'Kebutuhan',
-                                    'value' => $drilldownFormula['kebutuhan'],
-                                    'class' => $drilldownFormula['is_surplus'] ? 'text-primary-700' : 'text-danger',
-                                ],
-                                'notes' => [
-                                    ['text' => 'Rincian personil tersedia dengan mengeklik angka pada baris Realisasi, Pensiun, atau Sisa pasokan.', 'class' => 'text-warning-800/80'],
-                                ],
-                            ])
-                        @endif
-                    </div>
-
-                    <!-- Drawer Body: Scrollable Rich Employee Cards List -->
-                    <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-surface-50/40">
-                        @if($drilldownMode === 'formula')
-                            {{-- Baris Kebutuhan hanya menampilkan rincian rumus di atas. --}}
-                        @elseif(empty($drilldownEmployees))
-                            <div class="text-center py-12 px-4 bg-white rounded-xl border border-surface-200">
-                                <div class="w-12 h-12 rounded-full bg-surface-100 text-surface-500 flex items-center justify-center mx-auto mb-3 text-lg">
-                                    <i class="fas fa-folder-open" aria-hidden="true"></i>
-                                </div>
-                                <h4 class="text-sm font-bold text-surface-800">Tidak ada personil pada sel ini</h4>
-                            </div>
-                        @else
-                            @foreach($drilldownEmployees as $emp)
-                                <div x-show="search === '' || $el.innerText.toLowerCase().includes(search.toLowerCase())"
-                                    class="bg-white rounded-xl border border-surface-200 p-4 shadow-2xs hover:shadow-xs transition duration-150 group">
-                                    <div class="flex items-start justify-between gap-3">
-                                        <!-- Employee Info with Avatar Initial -->
-                                        <div class="flex items-start gap-3">
-                                            <div class="w-10 h-10 rounded-full bg-primary-50 text-primary-800 border border-primary-200 flex items-center justify-center font-bold text-sm shrink-0">
-                                                {{ strtoupper(substr($emp['nama'], 0, 2)) }}
-                                            </div>
-                                            <div class="space-y-0.5">
-                                                <h4 class="text-xs font-bold text-surface-900 group-hover:text-primary-700 transition">
-                                                    {{ $emp['nama'] }}
-                                                </h4>
-                                                <p class="text-[11px] font-mono text-surface-500 flex items-center gap-1.5">
-                                                    <span>NIK: {{ $emp['nik'] }}</span>
-                                                    <span class="inline-block w-1 h-1 rounded-full bg-surface-300"></span>
-                                                    <span class="font-medium text-primary-700">{{ $emp['status_karyawan'] }}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        @if(!empty($emp['nik']) && ($emp['terdaftar'] ?? true))
-                                            <a href="{{ route('admin.employees.show', $emp['nik']) }}"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-600 text-primary-800 hover:text-white border border-primary-200/80 hover:border-primary-600 text-xs font-semibold transition-all shadow-2xs group/btn shrink-0"
-                                                title="Buka Profil Lengkap Karyawan (Tab Baru)">
-                                                <span>Lihat Profil</span>
-                                                <i class="fas fa-arrow-up-right-from-square text-[10px] group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" aria-hidden="true"></i>
-                                            </a>
-                                        @endif
-                                    </div>
-
-                                    <!-- Divider -->
-                                    <div class="my-2.5 border-t border-surface-100"></div>
-
-                                    <!-- Job & Unit -->
-                                    <div class="text-xs space-y-1">
-                                        <div class="flex items-center gap-1.5 text-surface-800 font-medium">
-                                            <i class="fas fa-briefcase text-surface-400 text-[11px] w-3.5" aria-hidden="true"></i>
-                                            <span class="truncate">{{ $emp['jabatan'] }}</span>
-                                        </div>
-                                        <div class="flex items-center gap-1.5 text-surface-500 text-[11px]">
-                                            <i class="fas fa-location-dot text-surface-400 text-[11px] w-3.5" aria-hidden="true"></i>
-                                            <span class="truncate">{{ $emp['unit_kerja'] }}</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Badges: Golongan & Pensiun -->
-                                    <div class="mt-3 pt-2.5 border-t border-surface-100 flex items-center justify-between text-[11px]">
-                                        <div class="flex items-center gap-1 text-surface-600">
-                                            <span class="text-surface-500">Golongan:</span>
-                                            <span class="font-bold font-mono px-2 py-0.5 rounded-md bg-surface-100 text-surface-800 border border-surface-200">
-                                                {{ $emp['golongan'] ?? '—' }}
-                                            </span>
-                                        </div>
-                                        <div class="text-right text-surface-600">
-                                            @if($drilldownMode === 'supply')
-                                                <div class="flex items-center justify-end gap-1">
-                                                    <span class="text-surface-500">Penempatan Karpim:</span>
-                                                    <span class="font-semibold text-surface-800">{{ $emp['tanggal_penempatan'] }}</span>
-                                                </div>
-                                            @endif
-                                            <div class="flex items-center justify-end gap-1">
-                                                <i class="fas fa-calendar-day text-warning-700 text-[10px]" aria-hidden="true"></i>
-                                                <span class="text-surface-500">MBT:</span>
-                                                <span class="font-semibold text-surface-800">{{ $emp['tanggal_mbt'] }}</span>
-                                            </div>
-                                            <div class="flex items-center justify-end gap-1">
-                                                <span class="text-surface-500">Pensiun:</span>
-                                                <span class="font-semibold text-surface-800">{{ $emp['tanggal_pensiun'] }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        @endif
-                    </div>
-
-                    <!-- Drawer Footer with CSV Export & Close Button -->
-                    <div class="px-5 py-3.5 bg-surface-50 border-t border-surface-200 flex items-center justify-between gap-2">
-                        @if(in_array($drilldownMode, ['people', 'supply'], true) && ! empty($drilldownEmployees))
-                        <button type="button" wire:click="exportDrilldownCsv"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white hover:bg-primary-50 text-primary-800 text-xs font-semibold transition shadow-2xs"
-                            title="Export daftar personil ini ke CSV">
-                            <i class="fas fa-file-excel text-primary-600" aria-hidden="true"></i>
-                            <span>Export CSV</span>
-                        </button>
-                        @else
-                            <span></span>
-                        @endif
-
-                        <button type="button" wire:click="closeDrilldown"
-                            class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-surface-200 text-surface-700 hover:bg-surface-300 transition">
-                            Tutup Panel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+            @if(in_array($drilldownMode, ['people', 'supply'], true) && ! empty($drilldownEmployees))
+                <x-slot:footer>
+                    <button type="button" wire:click="exportDrilldownExcel" wire:loading.attr="disabled" wire:target="exportDrilldownExcel"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white hover:bg-primary-50 text-primary-800 text-xs font-semibold transition shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                        title="Export daftar personil ini ke Excel">
+                        <i class="fas fa-file-excel text-primary-600" wire:loading.remove wire:target="exportDrilldownExcel" aria-hidden="true"></i>
+                        <i class="fas fa-spinner fa-spin text-primary-600" wire:loading wire:target="exportDrilldownExcel" aria-hidden="true"></i>
+                        <span>Export Excel</span>
+                    </button>
+                </x-slot:footer>
+            @endif
+        </x-admin.personnel-drawer>
     @endif
 
     {{-- Laci editor rencana pasokan (dibuka dari tombol Kelola Rencana Pasokan) --}}
