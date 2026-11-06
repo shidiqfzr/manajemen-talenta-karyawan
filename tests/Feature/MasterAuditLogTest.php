@@ -79,6 +79,22 @@ class MasterAuditLogTest extends TestCase
         $byDate->assertSee('Unit Lama Empat')->assertDontSee('Seat Satu');
     }
 
+    public function test_history_hides_view_only_access_entries_but_keeps_them_stored_and_shows_exports(): void
+    {
+        MasterAuditLog::record($this->admin, 'mpp_access.view_personnel', 'mpp_access', null, 'Rincian Lihat MPP 2026-11', null, ['tahun' => 2026]);
+        MasterAuditLog::record($this->admin, 'seat_access.view_occupants', 'seat_access', 5, 'Pemegang Lihat Formasi');
+        MasterAuditLog::record($this->admin, 'mpp_access.export_matrix', 'mpp_access', null, 'Matriks Unduh MPP 2026-11', null, ['tahun' => 2026]);
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Unit A — Seat Satu');
+
+        Livewire::actingAs($this->admin)->test(AuditHistory::class)
+            ->assertSee('Seat Satu')
+            ->assertSee('Matriks Unduh MPP')
+            ->assertDontSee('Rincian Lihat MPP')
+            ->assertDontSee('Pemegang Lihat Formasi');
+
+        $this->assertSame(2, MasterAuditLog::whereIn('action', ['mpp_access.view_personnel', 'seat_access.view_occupants'])->count());
+    }
+
     public function test_history_shows_who_what_and_reason_but_no_employee_data(): void
     {
         $employee = Employee::factory()->create(['nama' => 'Pegawai Rahasia Uji']);

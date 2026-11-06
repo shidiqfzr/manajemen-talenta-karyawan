@@ -3,6 +3,9 @@
 namespace App\Livewire\Admin;
 
 use App\Exceptions\MppPeriodRuleViolationException;
+use App\Exports\MppMatrixExport;
+use App\Exports\MppPersonnelExport;
+use App\Models\MasterAuditLog;
 use App\Models\MppPeriod;
 use App\Models\MppSupplyPlan;
 use App\Services\ManPowerPlanningService;
@@ -11,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ManPowerPlanning extends Component
 {
@@ -232,6 +236,10 @@ class ManPowerPlanning extends Component
         $this->drilldownBidang = $bidang;
         $this->drilldownIndicator = $matrix[$row]['label'];
         $this->showDrilldown = true;
+
+        if ($this->drilldownEmployees !== []) {
+            $this->auditAccess('mpp_access.view_personnel', 'Rincian personil MPP', count($this->drilldownEmployees));
+        }
     }
 
     public function closeDrilldown(): void
@@ -247,7 +255,7 @@ class ManPowerPlanning extends Component
         $this->drilldownMode = '';
     }
 
-    public function exportDrilldownCsv()
+    public function exportDrilldownExcel()
     {
         $this->authorizeAdmin();
 
@@ -267,124 +275,39 @@ class ManPowerPlanning extends Component
             'posisi_per' => $this->asOfKey(),
             'jumlah_baris' => count($employees),
         ] + $this->periodLogContext());
+        $this->auditAccess('mpp_access.export_personnel', 'Rincian personil MPP', count($employees));
 
         $rm = $this->drilldownRm;
         $bidang = $this->drilldownBidang;
         $indicator = preg_replace('/[^A-Za-z0-9_]/', '_', $this->drilldownIndicator);
-        $fileName = "Personil_{$rm}_{$bidang}_{$indicator}_".date('Ymd_His').'.csv';
+        $fileName = "Personil_{$rm}_{$bidang}_{$indicator}_".date('Ymd_His').'.xlsx';
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
-        ];
-
-        return response()->stream(function () use ($employees) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8
-
-            fputcsv($handle, ['No.', 'NIK', 'Nama Lengkap', 'Jabatan', 'Unit Kerja', 'Golongan', 'Tanggal Penempatan Karpim', 'Tanggal MBT', 'Tanggal Pensiun', 'Status']);
-
-            $no = 1;
-            foreach ($employees as $emp) {
-                fputcsv($handle, [
-                    $no++,
-                    $emp['nik'],
-                    $emp['nama'],
-                    $emp['jabatan'],
-                    $emp['unit_kerja'],
-                    $emp['golongan'] ?? '—',
-                    $emp['tanggal_penempatan'] ?? '—',
-                    $emp['tanggal_mbt'],
-                    $emp['tanggal_pensiun'],
-                    $emp['status_karyawan'],
-                ]);
-            }
-            fclose($handle);
-        }, 200, $headers);
+        return Excel::download(
+            new MppPersonnelExport($employees, "{$rm} {$bidang} — {$this->drilldownIndicator}", auth()->user()),
+            $fileName
+        );
     }
 
-    public function exportCsv()
+    public function exportExcel()
     {
         $this->authorizeAdmin();
 
         $matrix = $this->mppData()['matrix'];
         $yearT = $this->planningYear;
         $yearT1 = $yearT + 1;
-        $fileName = 'mpp_perencanaan_formasi_'.$yearT.'_'.$yearT1.'_posisi_'.$this->asOfKey().$this->periodFileSuffix().'_'.Carbon::now()->format('Ymd_His').'.csv';
+        $fileName = 'mpp_perencanaan_formasi_'.$yearT.'_'.$yearT1.'_posisi_'.$this->asOfKey().$this->periodFileSuffix().'_'.Carbon::now()->format('Ymd_His').'.xlsx';
 
         Log::info('Ekspor matriks MPP', [
             'user_id' => auth()->id(),
             'tahun' => $yearT,
             'posisi_per' => $this->asOfKey(),
         ] + $this->periodLogContext());
+        $this->auditAccess('mpp_access.export_matrix', 'Matriks MPP', count($matrix));
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
-        ];
+        $period = $this->period();
+        $periodLabel = 'Posisi per '.$this->asOfKey().($period ? ' ('.$this->periodLabel($period).', rev '.$period->revision.')' : '');
 
-        return response()->stream(function () use ($matrix) {
-            $handle = fopen('php://output', 'w');
-            // Write BOM for proper Excel UTF-8 display
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-
-            // Header Row
-            fputcsv($handle, [
-                'No.',
-                'URAIAN INDIKATOR',
-                'RM-1 KEU',
-                'RM-1 TAN',
-                'RM-1 TEK',
-                'RM-1 UMU',
-                'JUMLAH RM-1',
-                'RM-2 KEU',
-                'RM-2 TAN',
-                'RM-2 TEK',
-                'RM-2 UMU',
-                'JUMLAH RM-2',
-                'RM-3 KEU',
-                'RM-3 TAN',
-                'RM-3 TEK',
-                'RM-3 UMU',
-                'JUMLAH RM-3',
-                'TOTAL',
-                'TOTAL KEKURANGAN',
-                'TOTAL SURPLUS',
-            ]);
-
-            foreach ($matrix as $row) {
-                fputcsv($handle, [
-                    $row['no'],
-                    $row['label'],
-                    $row['levels']['RM-1']['fields']['KEU'] ?? 0,
-                    $row['levels']['RM-1']['fields']['TAN'] ?? 0,
-                    $row['levels']['RM-1']['fields']['TEK'] ?? 0,
-                    $row['levels']['RM-1']['fields']['UMU'] ?? 0,
-                    $row['levels']['RM-1']['subtotal'] ?? 0,
-                    $row['levels']['RM-2']['fields']['KEU'] ?? 0,
-                    $row['levels']['RM-2']['fields']['TAN'] ?? 0,
-                    $row['levels']['RM-2']['fields']['TEK'] ?? 0,
-                    $row['levels']['RM-2']['fields']['UMU'] ?? 0,
-                    $row['levels']['RM-2']['subtotal'] ?? 0,
-                    $row['levels']['RM-3']['fields']['KEU'] ?? 0,
-                    $row['levels']['RM-3']['fields']['TAN'] ?? 0,
-                    $row['levels']['RM-3']['fields']['TEK'] ?? 0,
-                    $row['levels']['RM-3']['fields']['UMU'] ?? 0,
-                    $row['levels']['RM-3']['subtotal'] ?? 0,
-                    $row['grand_total'] ?? 0,
-                    $row['shortage_total'] ?? '',
-                    $row['surplus_total'] ?? '',
-                ]);
-            }
-
-            fclose($handle);
-        }, 200, $headers);
+        return Excel::download(new MppMatrixExport($matrix, $periodLabel, auth()->user()), $fileName);
     }
 
     /** Data matriks: salinan periode bila bulan ini sudah direkam, selain itu dihitung dari data pegawai. */
@@ -436,6 +359,23 @@ class ManPowerPlanning extends Component
         $period = $this->period();
 
         return $period ? ['periode' => $this->periodLabel($period), 'revisi' => $period->revision] : [];
+    }
+
+    /**
+     * Catat akses data MPP pada master_audit_logs (UU PDP): siapa, kapan, sel mana, dan berapa baris. NIK dan
+     * nama pegawai tidak ikut dicatat. Rincian personil menyebut RM Band, bidang, dan indikator selnya.
+     */
+    private function auditAccess(string $action, string $label, int $rows): void
+    {
+        $detail = ['tahun' => $this->planningYear, 'posisi_per' => $this->asOfKey(), 'jumlah_baris' => $rows];
+        if ($action !== 'mpp_access.export_matrix') {
+            $detail = ['rm_level' => $this->drilldownRm, 'bidang' => $this->drilldownBidang, 'indikator' => $this->drilldownIndicator] + $detail;
+        }
+
+        MasterAuditLog::record(
+            auth()->user(), $action, 'mpp_access', null,
+            $label.' '.$this->asOfKey(), null, $detail + $this->periodLogContext(), null
+        );
     }
 
     private function periodLabel(MppPeriod $period): string

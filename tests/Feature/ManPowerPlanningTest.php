@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Exports\MppMatrixExport;
+use App\Exports\MppPersonnelExport;
 use App\Livewire\Admin\ManPowerPlanning;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\MasterAuditLog;
 use App\Models\MppPeriod;
 use App\Models\Position;
 use App\Models\Unit;
@@ -19,6 +22,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Tests\Concerns\CreatesMppEmployees;
 use Tests\TestCase;
 
@@ -130,13 +135,22 @@ class ManPowerPlanningTest extends TestCase
             ->assertSet('filterBidang', 'KEU');
     }
 
-    public function test_mpp_export_csv_streams_file(): void
+    public function test_mpp_export_excel_downloads_xlsx_file(): void
     {
         Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
-            ->call('exportCsv')
+            ->call('exportExcel')
             ->assertStatus(200)
-            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-11_'.Carbon::now()->format('Ymd_His').'.csv');
+            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-11_'.Carbon::now()->format('Ymd_His').'.xlsx');
+    }
+
+    public function test_mpp_toolbar_offers_excel_only_without_csv_or_print(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Export Excel')
+            ->assertDontSee('CSV')
+            ->assertDontSee('Cetak');
     }
 
     // ───────────────────────── Tahun & posisi per bulan ─────────────────────────
@@ -580,7 +594,7 @@ class ManPowerPlanningTest extends TestCase
             ->assertSee('Rincian Pasokan CKP Internal')
             ->assertSee('Terealisasi melebihi rencana: 2')
             ->assertSee('3 Personil')
-            ->assertSee('Export CSV');
+            ->assertSee('Export Excel');
     }
 
     public function test_supply_and_formula_drawers_share_one_breakdown_card(): void
@@ -640,7 +654,7 @@ class ManPowerPlanningTest extends TestCase
             ->assertSet('drilldownEmployees', [])
             ->assertSee('Rincian Formula Kebutuhan')
             ->assertDontSee('0 Personil')
-            ->assertDontSee('Export CSV');
+            ->assertDontSee('Export daftar personil ini ke Excel');
     }
 
     public function test_drilldown_formula_for_t1_uses_cumulative_remaining_supply(): void
@@ -800,36 +814,68 @@ class ManPowerPlanningTest extends TestCase
 
     // ───────────────────────── Ekspor & keamanan ─────────────────────────
 
-    public function test_mpp_export_csv_has_shortage_and_surplus_columns(): void
+    public function test_mpp_export_excel_has_shortage_and_surplus_columns(): void
     {
         $this->seed(PositionUnitSeeder::class);
         $matrix = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix'];
+        Excel::fake();
 
-        $component = Livewire::actingAs($this->user)
+        Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
-            ->call('exportCsv');
+            ->call('exportExcel');
 
-        $csv = ltrim(base64_decode($component->effects['download']['content']), "\xEF\xBB\xBF");
-        $lines = array_map('str_getcsv', array_values(array_filter(explode("\n", $csv))));
-        $header = $lines[0];
-        $shortageCol = array_search('TOTAL KEKURANGAN', $header, true);
-        $surplusCol = array_search('TOTAL SURPLUS', $header, true);
-        $this->assertNotFalse($shortageCol);
-        $this->assertNotFalse($surplusCol);
+        Excel::assertDownloaded(
+            'mpp_perencanaan_formasi_2026_2027_posisi_2026-11_'.Carbon::now()->format('Ymd_His').'.xlsx',
+            function (MppMatrixExport $export) use ($matrix) {
+                $header = $export->headings();
+                $shortageCol = array_search('TOTAL KEKURANGAN', $header, true);
+                $surplusCol = array_search('TOTAL SURPLUS', $header, true);
+                $this->assertNotFalse($shortageCol);
+                $this->assertNotFalse($surplusCol);
+                $this->assertCount(count($header), $export->array()[0]);
 
-        $byLabel = collect(array_slice($lines, 1))->keyBy(1);
-        $this->assertSame((string) $matrix[9]['shortage_total'], $byLabel['Kebutuhan 2026'][$shortageCol]);
-        $this->assertSame((string) $matrix[9]['surplus_total'], $byLabel['Kebutuhan 2026'][$surplusCol]);
-        $this->assertSame('', $byLabel['Realisasi per Nov 2026'][$shortageCol]);
-        $this->assertSame('', $byLabel['Realisasi per Nov 2026'][$surplusCol]);
+                $byLabel = collect($export->array())->keyBy(1);
+                $this->assertSame($matrix[9]['shortage_total'], $byLabel['Kebutuhan 2026'][$shortageCol]);
+                $this->assertSame($matrix[9]['surplus_total'], $byLabel['Kebutuhan 2026'][$surplusCol]);
+                $this->assertNull($byLabel['Realisasi per Nov 2026'][$shortageCol]);
+                $this->assertNull($byLabel['Realisasi per Nov 2026'][$surplusCol]);
+                // Angka tetap numerik agar dapat dijumlah di Excel.
+                $this->assertIsInt($byLabel['Realisasi per Nov 2026'][array_search('TOTAL', $header, true)]);
+
+                return true;
+            }
+        );
+    }
+
+    public function test_mpp_personnel_export_is_excel_with_nik_as_text(): void
+    {
+        $this->makeKarpim('77770007', '1990-01-10');
+        Excel::fake();
+        Excel::matchByRegex();
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 2)
+            ->call('exportDrilldownExcel');
+
+        Excel::assertDownloaded(
+            '/^Personil_RM-1_TAN_.+_\d{8}_\d{6}\.xlsx$/',
+            function (MppPersonnelExport $export) {
+                $this->assertSame('NIK', $export->headings()[1]);
+                $this->assertSame(['B' => NumberFormat::FORMAT_TEXT], $export->columnFormats());
+                $this->assertContains('77770007', array_column($export->array(), 1));
+
+                return true;
+            }
+        );
     }
 
     public function test_non_admin_cannot_export_mpp_data(): void
     {
         $staff = User::factory()->create(['role' => 'user']);
 
-        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportCsv')->assertForbidden();
-        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportDrilldownCsv')->assertForbidden();
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportExcel')->assertForbidden();
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportDrilldownExcel')->assertForbidden();
     }
 
     public function test_mpp_exports_are_written_to_the_audit_log_without_nik(): void
@@ -840,8 +886,8 @@ class ManPowerPlanningTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
             ->call('openDrilldown', 'RM-1', 'TAN', 2)
-            ->call('exportDrilldownCsv')
-            ->call('exportCsv');
+            ->call('exportDrilldownExcel')
+            ->call('exportExcel');
 
         foreach (['Ekspor rincian personil MPP', 'Ekspor matriks MPP'] as $message) {
             Log::shouldHaveReceived('info')
@@ -851,6 +897,40 @@ class ManPowerPlanningTest extends TestCase
                     && ! str_contains(json_encode($ctx), '77770007'))
                 ->once();
         }
+    }
+
+    public function test_mpp_personnel_access_is_recorded_on_master_audit_log_without_nik(): void
+    {
+        $this->makeKarpim('77770007', '1990-01-10');
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 2)
+            ->call('exportDrilldownExcel')
+            ->call('exportExcel');
+
+        $logs = MasterAuditLog::where('entity_type', 'mpp_access')->get()->keyBy('action');
+        $this->assertSame(
+            ['mpp_access.export_matrix', 'mpp_access.export_personnel', 'mpp_access.view_personnel'],
+            $logs->keys()->sort()->values()->all()
+        );
+        foreach ($logs as $log) {
+            $this->assertSame($this->user->id, $log->user_id);
+            $this->assertSame('2026-11', $log->new_values['posisi_per']);
+            $this->assertStringNotContainsString('77770007', json_encode($log->new_values));
+            $this->assertStringNotContainsString('77770007', $log->entity_label);
+        }
+        $this->assertSame('RM-1', $logs['mpp_access.view_personnel']->new_values['rm_level']);
+        $this->assertGreaterThan(0, $logs['mpp_access.view_personnel']->new_values['jumlah_baris']);
+    }
+
+    public function test_mpp_drilldown_without_personnel_is_not_recorded_as_personnel_access(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 9);
+
+        $this->assertSame(0, MasterAuditLog::where('entity_type', 'mpp_access')->count());
     }
 
     public function test_mpp_component_ignores_unknown_filters_and_drilldown_targets(): void
@@ -980,7 +1060,7 @@ class ManPowerPlanningTest extends TestCase
 
         $this->assertStringNotContainsString(route('admin.employees.show', '90000001'), $html);
         $this->assertStringContainsString(route('admin.employees.show', '90000002'), $html);
-        $this->assertSame(1, substr_count($html, 'Lihat Profil'));
+        $this->assertSame(1, substr_count($html, 'Buka profil lengkap (tab baru)'));
     }
 
     public function test_close_panel_refuses_a_draft_updated_by_another_admin(): void
@@ -1097,8 +1177,8 @@ class ManPowerPlanningTest extends TestCase
         Log::spy();
 
         Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
-            ->call('exportCsv')
-            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-10_ditutup_rev1_'.Carbon::now()->format('Ymd_His').'.csv');
+            ->call('exportExcel')
+            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-10_ditutup_rev1_'.Carbon::now()->format('Ymd_His').'.xlsx');
 
         Log::shouldHaveReceived('info')
             ->withArgs(fn ($msg, $ctx = []) => $msg === 'Ekspor matriks MPP'

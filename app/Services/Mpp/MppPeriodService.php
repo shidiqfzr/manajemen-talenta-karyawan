@@ -181,8 +181,9 @@ class MppPeriodService
 
     /**
      * Personil satu sel pada periode, berbentuk sama dengan ManPowerPlanningService::getDrilldownEmployees().
-     * Jabatan, unit, dan tanggal berasal dari snapshot; nama, golongan, pensiun, dan status dari data pegawai
-     * saat ini ("tidak lagi terdaftar" bila NIK sudah tidak ada).
+     * Jabatan, unit, golongan, dan tanggal berasal dari snapshot (golongan memakai data terkini hanya untuk
+     * baris lama yang belum membekukannya); nama, pensiun, dan status dari data pegawai saat ini
+     * ("tidak lagi terdaftar" bila NIK sudah tidak ada).
      *
      * @return list<array<string, mixed>>
      */
@@ -205,7 +206,7 @@ class MppPeriodService
                 'nama' => $emp?->nama ?? 'tidak lagi terdaftar',
                 'jabatan' => $member->jabatan,
                 'unit_kerja' => $member->unit_kerja,
-                'golongan' => $emp?->golongan ?? '—',
+                'golongan' => $member->golongan ?? $emp?->golongan ?? '—',
                 'tanggal_penempatan' => $this->planning->dateLabel($member->tanggal_penempatan),
                 'tanggal_mbt' => $this->planning->dateLabel($member->tanggal_mbt),
                 'tanggal_pensiun' => $emp ? $this->planning->dateLabel($emp->effective_tanggal_pensiun) : '—',

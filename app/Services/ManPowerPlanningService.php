@@ -456,7 +456,7 @@ class ManPowerPlanningService
      * scope drilldown yang diikuti pegawai. Memakai aturan scope yang sama dengan getDrilldownEmployees(),
      * sehingga jumlah anggota selalu sama dengan angka sel.
      *
-     * @return list<array{scope: string, rm_level: string, bidang: string, employee_nik: string, jabatan: ?string, unit_kerja: ?string, tanggal_penempatan: ?string, tanggal_mbt: ?string}>
+     * @return list<array{scope: string, rm_level: string, bidang: string, employee_nik: string, jabatan: ?string, unit_kerja: ?string, golongan: ?string, jalur_masuk: ?string, tanggal_penempatan: ?string, tanggal_mbt: ?string}>
      */
     public function getPositionMembers(int $year, int $month): array
     {
@@ -472,6 +472,8 @@ class ManPowerPlanningService
                     'employee_nik' => (string) $emp->nik,
                     'jabatan' => $emp->jabatan,
                     'unit_kerja' => $emp->unit_kerja,
+                    'golongan' => $emp->golongan,
+                    'jalur_masuk' => $emp->jalur_masuk,
                     'tanggal_penempatan' => $row['realised_on']?->toDateString(),
                     'tanggal_mbt' => $emp->effective_tanggal_mbt?->toDateString(),
                 ];

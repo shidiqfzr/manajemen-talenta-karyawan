@@ -246,6 +246,7 @@ class MppPeriodServiceTest extends TestCase
         $emp = $this->makeAsistenKeuangan('90000001');
         $period = $this->service->capture(2026, 10, $this->admin);
 
+        $frozenGolongan = $emp->golongan;
         $emp->update(['jabatan' => 'Jabatan Lain', 'golongan' => 'IVA/00']);
         $rows = $this->service->membersFor($period, 'realisasi', 'RM-3', 'KEU');
         $row = collect($rows)->firstWhere('nik', '90000001');
@@ -254,7 +255,7 @@ class MppPeriodServiceTest extends TestCase
         $this->assertSame('Asisten Keuangan Uji', $row['jabatan']);
         $this->assertSame('Bagian Keuangan Uji', $row['unit_kerja']);
         $this->assertSame('Asisten 90000001', $row['nama']);
-        $this->assertSame('IVA/00', $row['golongan']);
+        $this->assertSame($frozenGolongan, $row['golongan']);
         $this->assertSame($emp->id, $row['id']);
         $this->assertSame(
             ['id', 'terdaftar', 'nik', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'tanggal_penempatan', 'tanggal_mbt', 'tanggal_pensiun', 'status_karyawan'],
@@ -266,7 +267,33 @@ class MppPeriodServiceTest extends TestCase
         $this->assertTrue($row['terdaftar']);
         $this->assertFalse($gone['terdaftar']);
         $this->assertSame('tidak lagi terdaftar', $gone['nama']);
-        $this->assertSame('—', $gone['golongan']);
+        $this->assertSame($frozenGolongan, $gone['golongan']);
         $this->assertSame('Asisten Keuangan Uji', $gone['jabatan']);
+    }
+
+    public function test_capture_freezes_golongan_and_jalur_masuk_without_personal_data(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001', ['jalur_masuk' => 'CKP']);
+        $period = $this->service->capture(2026, 10, $this->admin);
+
+        $emp->update(['jalur_masuk' => 'RBB', 'golongan' => 'IVA/00']);
+        $member = $period->members()->where('employee_nik', '90000001')->firstOrFail();
+
+        $this->assertSame('CKP', $member->jalur_masuk);
+        $this->assertNotSame('IVA/00', $member->golongan);
+        $this->assertArrayNotHasKey('nama', $member->getAttributes());
+        $this->assertArrayNotHasKey('tanggal_lahir', $member->getAttributes());
+    }
+
+    public function test_members_for_falls_back_to_current_golongan_for_legacy_rows(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001');
+        $period = $this->service->capture(2026, 10, $this->admin);
+        $period->members()->update(['golongan' => null]);
+
+        $emp->update(['golongan' => 'IVA/00']);
+        $row = collect($this->service->membersFor($period, 'realisasi', 'RM-3', 'KEU'))->firstWhere('nik', '90000001');
+
+        $this->assertSame('IVA/00', $row['golongan']);
     }
 }
