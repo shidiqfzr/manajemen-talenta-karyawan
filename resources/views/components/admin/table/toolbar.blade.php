@@ -14,8 +14,10 @@
     </x-admin.table.toolbar>
 
     table-id        : awalan id unik elemen form (beberapa tabel dapat tampil di satu halaman).
-    filters         : list<App\Support\DataTable\Filter>; select -> x-admin.filter-select, boolean -> chip.
-    filter-values   : [properti => nilai] filter yang sedang aktif, untuk status tekan chip.
+    filters         : list<App\Support\DataTable\Filter>; select -> x-admin.filter-select, boolean -> chip,
+                      date_from/date_to -> input tanggal berlabel (pasangan dari-sampai tampil berdampingan).
+    filter-values   : [properti => nilai] filter yang sedang aktif, untuk status tekan chip dan baris "Filter Aktif".
+    search          : kata kunci pencarian saat ini ($search), untuk chip "Pencarian" pada baris "Filter Aktif".
     search-shortcut : tombol pintas fokus pencarian; null untuk tabel sematan agar tidak berebut pintasan.
 --}}
 @props([
@@ -24,6 +26,7 @@
     'filterValues' => [],
     'export' => false,
     'hasActiveFilters' => false,
+    'search' => '',
     'searchPlaceholder' => 'Cari...',
     'searchShortcut' => '/',
 ])
@@ -31,6 +34,26 @@
 @php
     $selectFilters = array_values(array_filter($filters, fn ($filter) => $filter->type === 'select'));
     $booleanFilters = array_values(array_filter($filters, fn ($filter) => $filter->type === 'boolean'));
+    $dateFilters = array_values(array_filter($filters, fn ($filter) => in_array($filter->type, ['date_from', 'date_to'], true)));
+    $dateClass = 'px-3 py-2 bg-white border border-surface-300 rounded-xl text-xs text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-600 transition shadow-2xs';
+    $chipBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+    $chipClass = $chipBase.' bg-surface-100 text-surface-800 border-surface-300 hover:bg-surface-200';
+    $activeChips = [];
+    foreach (array_merge($selectFilters, $booleanFilters, $dateFilters) as $filter) {
+        $value = (string) ($filterValues[$filter->property] ?? '');
+        if ($value === '') {
+            continue;
+        }
+        $activeChips[] = [
+            'property' => $filter->property,
+            'label' => $filter->label,
+            'text' => match ($filter->type) {
+                'select' => $filter->label.': '.($filter->options()[$value] ?? $value),
+                'boolean' => $filter->label,
+                default => $filter->label.': '.$value,
+            },
+        ];
+    }
     $hasTitle = isset($title) && $title->isNotEmpty();
     $searchId = $tableId.'-search';
 @endphp
@@ -49,7 +72,7 @@
         <label for="{{ $searchId }}" class="sr-only">Pencarian</label>
         <x-admin.search-input model="search" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative flex-1 min-w-[260px]" />
 
-        @if ($selectFilters !== [] || $booleanFilters !== [] || $hasActiveFilters)
+        @if ($selectFilters !== [] || $booleanFilters !== [] || $dateFilters !== [] || $hasActiveFilters)
             <div class="flex flex-wrap items-center gap-2">
                 @foreach ($selectFilters as $filter)
                     <x-admin.filter-select
@@ -60,6 +83,18 @@
                         :options="$filter->options()"
                         :icon="$filter->icon ?? 'fas fa-filter'" />
                 @endforeach
+
+                @if ($dateFilters !== [])
+                    <div class="flex items-center gap-1.5">
+                        @foreach ($dateFilters as $filter)
+                            <label for="{{ $tableId.'-filter-'.$filter->property }}" class="sr-only">{{ $filter->label }}</label>
+                            <input type="date" id="{{ $tableId.'-filter-'.$filter->property }}" wire:model.live="{{ $filter->property }}" class="{{ $dateClass }}">
+                            @if ($filter->type === 'date_from' && ($dateFilters[$loop->index + 1]->type ?? null) === 'date_to')
+                                <span class="text-xs text-surface-500" aria-hidden="true">–</span>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
 
                 @foreach ($booleanFilters as $filter)
                     @php $pressed = ($filterValues[$filter->property] ?? '') === '1'; @endphp
@@ -82,4 +117,22 @@
             </div>
         @endif
     </div>
+
+    @if ($hasActiveFilters && ($search !== '' || $activeChips !== []))
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium text-surface-500">Filter Aktif:</span>
+            @if ($search !== '')
+                <button type="button" wire:key="{{ $tableId }}-active-search" wire:click="$set('search', '')" aria-label="Hapus filter Pencarian"
+                    class="{{ $chipBase }} bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100">
+                    <span>Pencarian: {{ $search }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                </button>
+            @endif
+            @foreach ($activeChips as $chip)
+                <button type="button" wire:key="{{ $tableId }}-active-{{ $chip['property'] }}" wire:click="$set('{{ $chip['property'] }}', '')" aria-label="Hapus filter {{ $chip['label'] }}"
+                    class="{{ $chipClass }}">
+                    <span>{{ $chip['text'] }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                </button>
+            @endforeach
+        </div>
+    @endif
 </div>
