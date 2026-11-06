@@ -9,6 +9,7 @@ use Livewire\Livewire;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableBooleanFilter;
+use Tests\Fixtures\DataTable\FixtureTableDateFilter;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\TestCase;
 
@@ -46,6 +47,60 @@ class TableComponentsTest extends TestCase
             ->assertSeeHtmlInOrder(['aria-sort="descending"', "wire:click=\"sortBy('nama')\""])
             ->call('sortBy', 'nilai')
             ->assertSeeHtmlInOrder(["wire:click=\"sortBy('nama')\"", 'aria-sort="ascending"', "wire:click=\"sortBy('nilai')\""]);
+    }
+
+    public function test_toolbar_renders_labelled_date_inputs(): void
+    {
+        Livewire::test(FixtureTableDateFilter::class)
+            ->assertSeeHtml('type="date"')
+            ->assertSeeHtml('wire:model.live="dari"')
+            ->assertSeeHtml('wire:model.live="sampai"')
+            ->assertSeeHtml('-filter-dari"')
+            ->assertSeeHtml('-filter-sampai"')
+            ->assertSeeHtmlInOrder(['sr-only', 'Dari Tanggal', 'wire:model.live="dari"', 'aria-hidden="true">–</span>', 'sr-only', 'Sampai Tanggal', 'wire:model.live="sampai"']);
+    }
+
+    public function test_toolbar_lists_active_filters_as_removable_chips(): void
+    {
+        Livewire::test(FixtureTableDateFilter::class)
+            ->set('search', 'Budi')
+            ->set('bidang', 'KEU')
+            ->set('dari', '2026-01-01')
+            ->assertSee('Filter Aktif:')
+            ->assertSee('Pencarian: Budi')
+            ->assertSeeHtml('aria-label="Hapus filter Pencarian"')
+            ->assertSeeHtml("wire:click=\"\$set('search', '')\"")
+            ->assertSee('Bidang: KEU')
+            ->assertSeeHtml('aria-label="Hapus filter Bidang"')
+            ->assertSeeHtml("wire:click=\"\$set('bidang', '')\"")
+            ->assertSee('Dari Tanggal: 2026-01-01')
+            ->assertSeeHtml('aria-label="Hapus filter Dari Tanggal"')
+            ->assertSeeHtml("wire:click=\"\$set('dari', '')\"")
+            ->assertDontSee('Sampai Tanggal: ');
+    }
+
+    public function test_boolean_filter_appears_as_a_chip_when_active(): void
+    {
+        Livewire::test(FixtureTableBooleanFilter::class)
+            ->set('aktif', '1')
+            ->assertSee('Filter Aktif:')
+            ->assertSeeHtml('aria-label="Hapus filter Hanya Aktif"')
+            ->assertSeeHtml("wire:click=\"\$set('aktif', '')\"");
+    }
+
+    public function test_chip_row_is_hidden_without_active_filters(): void
+    {
+        Livewire::test(FixtureTableDateFilter::class)
+            ->assertDontSee('Filter Aktif:')
+            ->assertDontSeeHtml('aria-label="Hapus filter');
+    }
+
+    public function test_chip_values_are_escaped(): void
+    {
+        Livewire::test(FixtureTableDateFilter::class)
+            ->set('search', '<script>alert(1)</script>')
+            ->assertSeeHtml('Pencarian: &lt;script&gt;alert(1)&lt;/script&gt;')
+            ->assertDontSeeHtml('<script>alert(1)</script>');
     }
 
     public function test_sortable_header_uses_livewire_sort(): void

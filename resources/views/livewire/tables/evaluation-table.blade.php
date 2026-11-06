@@ -17,6 +17,7 @@
             :filter-values="$this->activeFilterValues()"
             :export="$this->exportName() !== null"
             :has-active-filters="$this->hasActiveFilters()"
+            :search="$search"
             :search-shortcut="null"
             search-placeholder="Cari bidang tugas, lembaga, 9-box..." />
 

@@ -109,6 +109,7 @@ class FixtureTable extends Component
                         :filter-values="$this->activeFilterValues()"
                         :export="$this->exportName() !== null"
                         :has-active-filters="$this->hasActiveFilters()"
+                        :search="$search"
                         search-placeholder="Cari nama...">
                         <x-slot:title><h2 class="text-sm font-bold text-surface-900">Tabel Uji</h2></x-slot:title>
                     </x-admin.table.toolbar>
