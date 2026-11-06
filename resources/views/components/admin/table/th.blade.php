@@ -3,17 +3,21 @@
     dengan keyboard, dan aria-sort pada <th> agar arah urutan terbaca pembaca layar.
 
     <x-admin.table.th sortable field="jabatan" :sort-field="$sortField" :sort-direction="$sortDirection">Jabatan</x-admin.table.th>
+    align = left (bawaan) | center | right.
 --}}
 @props([
     'sortable' => false,
     'field' => null,
     'sortField' => null,
     'sortDirection' => 'asc',
+    'align' => 'left',
 ])
+
+@php $alignClass = ['center' => 'text-center', 'right' => 'text-right'][$align] ?? 'text-left'; @endphp
 
 @if ($sortable && $field)
     @php $isSorted = $sortField === $field; @endphp
-    <th scope="col" @if ($isSorted) aria-sort="{{ $sortDirection === 'asc' ? 'ascending' : 'descending' }}" @endif {{ $attributes->merge(['class' => 'px-4 py-3 text-left']) }}>
+    <th scope="col" @if ($isSorted) aria-sort="{{ $sortDirection === 'asc' ? 'ascending' : 'descending' }}" @endif {{ $attributes->merge(['class' => "px-4 py-3 {$alignClass}"]) }}>
         <button type="button" wire:click="sortBy('{{ $field }}')"
             class="inline-flex items-center gap-1 rounded [text-transform:inherit] cursor-pointer hover:text-surface-900 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <span>{{ $slot }}</span>
@@ -25,7 +29,7 @@
         </button>
     </th>
 @else
-    <th scope="col" {{ $attributes->merge(['class' => 'px-4 py-3 text-left']) }}>
+    <th scope="col" {{ $attributes->merge(['class' => "px-4 py-3 {$alignClass}"]) }}>
         {{ $slot }}
     </th>
 @endif
