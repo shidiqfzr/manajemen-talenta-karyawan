@@ -5,7 +5,7 @@
     <i class="fas fa-edit" aria-hidden="true"></i>
   </a>
 
-  <button wire:click="deleteRow({{ $row->id }})"
+  <button wire:click="deleteRow({{ $row->id }})" wire:loading.attr="disabled" wire:target="deleteRow"
           onclick="return confirm('Hapus riwayat jabatan ini?')"
           class="w-8 h-8 flex items-center justify-center rounded-md bg-danger text-white hover:bg-danger transition"
           title="Hapus">

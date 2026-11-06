@@ -6,7 +6,7 @@
     $selectable = $bulkActions !== [];
     $rowKey = $this->rowKey();
     $pageKeys = $rows->getCollection()->map(fn ($row) => (string) $row->getAttribute($rowKey))->all();
-    $loadingTargets = collect(['search', 'sortBy', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'resetFilters', $this->filterProperties()])->filter()->implode(', ');
+    $loadingTargets = collect(['search', 'sortBy', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'resetFilters', 'deleteRow', $this->filterProperties()])->filter()->implode(', ');
     $columnCount = count(array_filter($columns, fn ($column) => ! $column->isExportOnly())) + ($selectable ? 1 : 0);
 @endphp
 <div>
