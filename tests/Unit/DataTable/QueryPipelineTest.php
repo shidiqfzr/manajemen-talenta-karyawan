@@ -26,6 +26,27 @@ class QueryPipelineTest extends TestCase
         FixtureRow::create(['nama' => 'Citra', 'kode' => 'ZZZ', 'bidang' => 'KEU', 'nilai' => 2]);
     }
 
+    public function test_date_filters_include_the_whole_end_day(): void
+    {
+        FixtureRow::create(['nama' => 'Hari Akhir', 'bidang' => 'KEU', 'nilai' => 4, 'tanggal' => '2026-01-31 23:59:00']);
+        FixtureRow::create(['nama' => 'Hari Esok', 'bidang' => 'KEU', 'nilai' => 5, 'tanggal' => '2026-02-01 00:00:00']);
+
+        $defs = [Filter::dateTo('to', 'Sampai Tanggal', 'tanggal')];
+
+        $this->assertSame(['Hari Akhir'], $this->names(filters: ['to' => '2026-01-31'], filterDefs: $defs));
+    }
+
+    public function test_date_from_starts_at_the_beginning_of_the_day(): void
+    {
+        FixtureRow::create(['nama' => 'Hari Akhir', 'bidang' => 'KEU', 'nilai' => 4, 'tanggal' => '2026-01-31 23:59:00']);
+        FixtureRow::create(['nama' => 'Hari Esok', 'bidang' => 'KEU', 'nilai' => 5, 'tanggal' => '2026-02-01 00:00:00']);
+
+        $defs = [Filter::dateFrom('from', 'Dari Tanggal', 'tanggal')];
+
+        $this->assertSame(['Hari Esok'], $this->names(filters: ['from' => '2026-02-01'], filterDefs: $defs));
+        $this->assertSame(['Hari Akhir', 'Hari Esok'], $this->names(filters: ['from' => '2026-01-31'], filterDefs: $defs));
+    }
+
     private function columns(): array
     {
         return [
