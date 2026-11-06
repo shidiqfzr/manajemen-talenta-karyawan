@@ -1,6 +1,10 @@
 @extends('layouts.admin')
 
 @section('content')
+@php
+    // Jumlah kolom mengikuti kamus kolom (satu sumber), bukan angka tetap pada teks.
+    $guideTotal = collect($dictionaryCategories)->flatMap(fn ($category) => $category['columns'])->count();
+@endphp
 <div x-data="employeeImportWizard()" class="space-y-6 max-w-7xl mx-auto pb-12">
     {{-- MODAL PROSES LATAR BELAKANG & INSPEKSI PERUBAHAN --}}
     @include('admin.employees.partials.import-async-modal')
@@ -18,7 +22,14 @@
         ]"
         back-url="{{ route('admin.employees.index') }}"
         back-label="Kembali ke Direktori"
-    />
+    >
+        <x-admin.button href="{{ route('admin.employees.import.batches.index') }}" variant="secondary" icon="fas fa-clock-rotate-left">
+            Riwayat &amp; Persetujuan
+            @if ($pendingApprovalCount > 0)
+                <span class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-warning-100 text-warning-800 text-xs font-semibold" aria-label="{{ $pendingApprovalCount }} pengajuan menunggu persetujuan">{{ $pendingApprovalCount }}</span>
+            @endif
+        </x-admin.button>
+    </x-admin.page-header>
 
     {{-- Umpan balik gagal: tidak menutup otomatis agar pesan dapat dibaca lengkap (DESIGN.md §7.7) --}}
     <div x-show="errorMessage" x-cloak role="alert" class="flex items-start gap-3 rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
@@ -52,7 +63,7 @@
                         Tahap 1
                     </p>
                     <h4 class="text-xs sm:text-sm font-extrabold text-surface-900 truncate">Unggah & Panduan Kolom</h4>
-                    <p class="text-[11px] text-surface-500 truncate">Pilih spreadsheet & format 26 kolom</p>
+                    <p class="text-[11px] text-surface-500 truncate">Pilih spreadsheet & format {{ $guideTotal }} kolom</p>
                 </div>
             </div>
 

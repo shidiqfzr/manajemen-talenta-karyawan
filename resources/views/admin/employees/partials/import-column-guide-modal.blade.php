@@ -1,3 +1,8 @@
+@php
+    $guideColumns = collect($dictionaryCategories)->flatMap(fn ($category) => $category['columns']);
+    $guideTotal = $guideColumns->count();
+    $guideMandatory = $guideColumns->where('is_mandatory', true)->count();
+@endphp
     <!-- ============================================================ -->
     <!-- SLIDE-OVER DRAWER: KAMUS FORMAT SPREADSHEET (26 KOLOM)       -->
     <!-- ============================================================ -->
@@ -35,7 +40,7 @@
                                         <span>Kamus Format Spreadsheet</span>
                                     </h3>
                                     <p class="text-xs text-surface-500 mt-0.5">
-                                        Panduan header baris 1 &bull; 26 kolom terstandarisasi (<span class="font-semibold text-surface-700">6 wajib</span>, <span class="text-surface-500">20 opsional</span>)
+                                        Panduan header baris 1 &bull; {{ $guideTotal }} kolom terstandarisasi (<span class="font-semibold text-surface-700">{{ $guideMandatory }} wajib</span>, <span class="text-surface-500">{{ $guideTotal - $guideMandatory }} opsional</span>)
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -53,7 +58,7 @@
                             <div class="relative">
                                 <i class="fas fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs" aria-hidden="true"></i>
                                 <input type="text" x-model="searchColumn" x-ref="searchColInput"
-                                    placeholder="Cari nama kolom, tipe dropdown, atau aturan bisnis (lintas 26 kolom)..."
+                                    placeholder="Cari nama kolom, tipe dropdown, atau aturan bisnis (lintas {{ $guideTotal }} kolom)..."
                                     class="w-full pl-9 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-xs text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition shadow-2xs">
                                 <button aria-label="Hapus pencarian kolom" type="button" x-show="searchColumn" @click="searchColumn = ''; $refs.searchColInput?.focus()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-600 text-xs cursor-pointer">
                                     <i class="fas fa-times-circle" aria-hidden="true"></i>
@@ -65,7 +70,7 @@
                                 <div class="px-3 py-1.5 bg-primary-50 border border-primary-200 rounded-lg flex items-center justify-between text-xs text-primary-800">
                                     <span class="flex items-center gap-1.5">
                                         <i class="fas fa-filter text-primary-600" aria-hidden="true"></i>
-                                        <span>Menampilkan hasil pencarian di seluruh 26 kolom</span>
+                                        <span>Menampilkan hasil pencarian di seluruh {{ $guideTotal }} kolom</span>
                                     </span>
                                     <button type="button" @click="searchColumn = ''" class="font-bold underline hover:text-primary-950 cursor-pointer">
                                         Reset Pencarian
@@ -139,7 +144,7 @@
                                                 <div class="space-y-1">
                                                     <h4 class="text-xs font-bold text-surface-800">Tidak Ditemukan Kolom yang Cocok</h4>
                                                     <p class="text-[11px] text-surface-500 leading-relaxed">
-                                                        Kata kunci <span class="font-mono font-bold text-primary-800" x-text="'&ldquo;' + searchColumn + '&rdquo;'"></span> tidak sesuai dengan 26 kolom kamus resmi.
+                                                        Kata kunci <span class="font-mono font-bold text-primary-800" x-text="'&ldquo;' + searchColumn + '&rdquo;'"></span> tidak sesuai dengan {{ $guideTotal }} kolom kamus resmi.
                                                     </p>
                                                 </div>
                                                 <button type="button" @click="searchColumn = ''; $refs.searchColInput?.focus()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold transition cursor-pointer">

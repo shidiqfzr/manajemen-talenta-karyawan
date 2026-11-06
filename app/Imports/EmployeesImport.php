@@ -4,10 +4,12 @@ namespace App\Imports;
 
 use App\Models\Employee;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Services\Import\ConcurrentJobTextParser;
 use App\Services\Import\EmployeeImportRowValidator;
 use App\Services\KepegawaianPolicy;
 use Carbon\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +28,26 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     public int $unchanged = 0;
 
     public int $skipped = 0;
+
+    /**
+     * Baris yang gagal karena kendala sistem (bukan aturan data). Komit nyata dibatalkan seluruhnya bila > 0.
+     */
+    public int $processingFailures = 0;
+
+    /**
+     * Peringatan tinjauan (tidak menghalangi impor): pegawai eksisting yang formasinya sudah tidak sesuai Master Formasi.
+     *
+     * @var list<array{row: int, nik: string, nama: string, messages: list<string>}>
+     */
+    public array $warnings = [];
+
+    /**
+     * Rekaman perubahan per pegawai pada komit nyata (untuk pembatalan impor): aksi, kondisi sebelum impor,
+     * tugas rangkap yang disentuh, dan sidik jari kondisi sesudah impor.
+     *
+     * @var list<array{action: string, nik: string, before: ?array, jobs: list<array>, after_hash: string}>
+     */
+    public array $changes = [];
 
     public array $errors = [];
 
@@ -46,6 +68,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
         public ?string $actorName = null
     ) {
         $this->validator = $validator ?? new EmployeeImportRowValidator;
+        $this->validator->lockSeats = ! $dryRun;
         $this->jobParser = $jobParser ?? new ConcurrentJobTextParser;
     }
 
@@ -71,6 +94,13 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
      * @var list<string>|null
      */
     private ?array $officialUnits = null;
+
+    /**
+     * Alias unit aktif dari Master Data (nama lama/variasi penulisan), dimuat sekali per proses import.
+     *
+     * @var array<string, string>|null
+     */
+    private ?array $unitAliases = null;
 
     /**
      * Cache penampung NIK yang sudah diproses dalam batch berkas yang sama: [nik => rowNumber]
@@ -101,22 +131,12 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     ];
 
     /**
-     * Variasi penulisan unit pada berkas pegawai yang dipetakan ke unit master saat ini.
-     * Hanya pemetaan yang tidak ambigu; nama unit yang sudah tidak ada pada formasi tidak dipetakan.
-     */
-    /**
      * Data keluarga hanya tampil di halaman detail pegawai (DESIGN.md §11, UU PDP): pratinjau impor
      * hanya menandai bahwa nilainya berubah tanpa menampilkan isi lama maupun baru.
      */
     private const HIDDEN_DIFF_FIELDS = ['susunan_keluarga'];
 
     private const HIDDEN_VALUE = 'Diperbarui (data pribadi, tidak ditampilkan)';
-
-    public const UNIT_ALIASES = [
-        'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
-        'PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG' => 'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
-        'PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA' => 'PMO Batu Bara & Bisnis Lainnya',
-    ];
 
     public function collection(Collection $rows): void
     {
@@ -173,10 +193,17 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
                     continue;
                 }
 
+                $warnings = isset($this->existingEmployeesCache[$data['nik']])
+                    ? $this->validator->seatDriftWarnings($data)
+                    : [];
+                if ($warnings !== []) {
+                    $this->warnings[] = ['row' => $rowNumber, 'nik' => $data['nik'], 'nama' => $data['nama'] ?? '-', 'messages' => $warnings];
+                }
+
                 if ($this->dryRun) {
-                    $this->recordDryRunRow($data, $rawRow);
+                    $this->recordDryRunRow($data, $rawRow, $warnings);
                 } else {
-                    $this->saveEmployee($data);
+                    $this->saveEmployee($data, $warnings);
                 }
             } catch (\Exception $e) {
                 $this->handleProcessingError($rowNumber, $data['nik'] ?? 'Unknown', $e, $row->toArray());
@@ -186,7 +213,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
         $this->rowCursor = $rowNumber;
     }
 
-    private function recordDryRunRow(array $data, array $rawRow): void
+    private function recordDryRunRow(array $data, array $rawRow, array $warnings = []): void
     {
         $existingEmployee = $this->existingEmployeesCache[$data['nik']] ?? null;
         $diff = [];
@@ -207,7 +234,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
             $this->created++;
         }
 
-        $rowItem = $this->formatRowSummary($data, $action, $action, $diff);
+        $rowItem = $this->formatRowSummary($data, $action, $action, $diff, $warnings);
 
         $this->validRows[] = $rowItem;
         $this->sampleRows[] = $rowItem;
@@ -216,7 +243,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     /**
      * Membentuk struktur standar rekapitulasi baris data pegawai (DRY pattern).
      */
-    private function formatRowSummary(array $data, string $action, ?string $statusLabel = null, array $diff = []): array
+    private function formatRowSummary(array $data, string $action, ?string $statusLabel = null, array $diff = [], array $warnings = []): array
     {
         return [
             'action' => $action,
@@ -233,6 +260,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
             'tmt_bekerja' => $data['tmt_bekerja'] ?? '-',
             'tugas_rangkap' => $data['tugas_rangkap_penugasan_sementara'] ?? null,
             'diff' => $diff,
+            'warnings' => $warnings,
         ];
     }
 
@@ -335,36 +363,48 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
         return true;
     }
 
-    private function saveEmployee(array $data): void
+    private function saveEmployee(array $data, array $warnings = []): void
     {
-        DB::transaction(function () use ($data) {
+        DB::transaction(function () use ($data, $warnings) {
             $existingEmployee = $this->existingEmployeesCache[$data['nik']] ?? null;
 
             if ($existingEmployee instanceof Employee && $this->isEmployeeIdentical($existingEmployee, $data)) {
                 $this->unchanged++;
-                $this->validRows[] = $this->formatRowSummary($data, 'UNCHANGED', 'TETAP');
+                $this->validRows[] = $this->formatRowSummary($data, 'UNCHANGED', 'TETAP', [], $warnings);
                 Log::info('Employee unchanged via Excel import: NIK '.$this->maskNik($data['nik']));
 
                 return;
             }
 
             $employee = Employee::firstOrNew(['nik' => $data['nik']]);
+            $before = $employee->exists
+                ? Arr::except(Arr::only($employee->getRawOriginal(), $employee->getFillable()), ['nik'])
+                : null;
             if ($employee->exists && $this->actorName) {
                 $employee->historyNote = "Perubahan data melalui impor Excel oleh {$this->actorName}";
             }
             $employee->fill($data)->save();
 
             // Jika terdapat data tugas rangkap / penugasan sementara (Kolom O), otomatis daftarkan ke job_histories
+            $job = null;
             if (! empty($data['tugas_rangkap_penugasan_sementara'])) {
-                $this->jobParser->registerFromText($employee, (string) $data['tugas_rangkap_penugasan_sementara']);
+                $job = $this->jobParser->registerFromText($employee, (string) $data['tugas_rangkap_penugasan_sementara']);
             }
+
+            $this->changes[] = [
+                'action' => $employee->wasRecentlyCreated ? 'CREATE' : 'UPDATE',
+                'nik' => (string) $employee->nik,
+                'before' => $before,
+                'jobs' => $job ? [$job] : [],
+                'after_hash' => Employee::stateHash(Employee::findOrFail($employee->nik)),
+            ];
 
             // Sinkronkan cache in-memory untuk integritas batch
             $this->existingEmployeesCache[$data['nik']] = $employee;
 
             $action = $employee->wasRecentlyCreated ? 'CREATE' : 'UPDATE';
             $status = $employee->wasRecentlyCreated ? 'BARU' : 'UPDATE';
-            $this->validRows[] = $this->formatRowSummary($data, $action, $status);
+            $this->validRows[] = $this->formatRowSummary($data, $action, $status, [], $warnings);
 
             if ($employee->wasRecentlyCreated) {
                 $this->created++;
@@ -580,17 +620,17 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
         }
 
         // 2b. Abaikan perbedaan penulisan '&' dan 'dan' serta spasi ganda
-        $canonical = fn (string $name): string => strtolower(preg_replace('/\s+/', ' ', str_replace('&', ' dan ', $name)));
+        $key = UnitAlias::keyFor($trimmed);
         foreach ($this->officialUnits as $official) {
-            if ($canonical($trimmed) === $canonical($official)) {
+            if ($key === UnitAlias::keyFor($official)) {
                 return $official;
             }
         }
 
-        // 3. Match dari daftar alias
-        $upper = strtoupper($trimmed);
-        if (isset(self::UNIT_ALIASES[$upper]) && in_array(self::UNIT_ALIASES[$upper], $this->officialUnits, true)) {
-            return self::UNIT_ALIASES[$upper];
+        // 3. Nama lama/variasi penulisan yang tercatat di Master Data (alias unit aktif)
+        $this->unitAliases ??= UnitAlias::activeMap();
+        if (isset($this->unitAliases[$key])) {
+            return $this->unitAliases[$key];
         }
 
         return $trimmed;
@@ -611,6 +651,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
 
     private function handleProcessingError(int $rowNumber, string $nik, \Exception $e, array $rawRow = []): void
     {
+        $this->processingFailures++;
         $this->recordFailedRow($rowNumber, ['Kendala data: '.$e->getMessage()], $nik, $rawRow, null, 'error');
     }
 
@@ -725,6 +766,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
             'errors' => $this->errors,
             'sample_rows' => $this->sampleRows,
             'failed_count' => count($this->failedRows),
+            'warning_count' => count($this->warnings),
             'is_dry_run' => $this->dryRun,
         ];
     }

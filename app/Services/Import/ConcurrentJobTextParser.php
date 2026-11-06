@@ -145,11 +145,17 @@ class ConcurrentJobTextParser
     /**
      * Otomatis mendaftarkan penugasan sementara / tugas rangkap (Plt/Pjs) ke job_histories.
      */
-    public function registerFromText(Employee $employee, string $rawText): void
+    /**
+     * Mendaftarkan tugas rangkap ke job_histories. Mengembalikan rincian baris riwayat yang dibuat atau diubah
+     * (untuk pembatalan impor), atau null bila teks tidak menghasilkan tugas rangkap.
+     *
+     * @return array{id: int, created: bool, before: ?array<string, mixed>}|null
+     */
+    public function registerFromText(Employee $employee, string $rawText): ?array
     {
         $parsed = $this->parse($rawText, $employee->unit_kerja);
         if (! $parsed) {
-            return;
+            return null;
         }
 
         $existingJob = JobHistory::where('employee_nik', $employee->nik)
@@ -159,25 +165,31 @@ class ConcurrentJobTextParser
             ->first();
 
         if ($existingJob) {
+            $before = array_intersect_key($existingJob->getRawOriginal(), array_flip(['status_penugasan', 'tmt_awal', 'catatan']));
             $existingJob->update([
                 'status_penugasan' => $parsed['status_penugasan'],
                 'tmt_awal' => $parsed['tmt_awal'],
                 'catatan' => 'Tugas Rangkap via Excel Import: '.$rawText,
             ]);
-        } else {
-            JobHistory::create([
-                'employee_nik' => $employee->nik,
-                'jabatan' => $parsed['jabatan'],
-                'unit_kerja' => $parsed['unit_kerja'],
-                'level' => $employee->level,
-                'golongan' => $employee->golongan,
-                'status_penugasan' => $parsed['status_penugasan'],
-                'tmt_awal' => $parsed['tmt_awal'],
-                'tmt_akhir' => null,
-                'jenis_mutasi' => 'PENUGASAN',
-                'catatan' => 'Tugas Rangkap via Excel Import: '.$rawText,
-            ]);
+
+            return ['id' => $existingJob->id, 'created' => false, 'before' => $before];
         }
+
+        $created = JobHistory::create([
+            'employee_nik' => $employee->nik,
+            'jabatan' => $parsed['jabatan'],
+            'unit_kerja' => $parsed['unit_kerja'],
+            'level' => $employee->level,
+            'golongan' => $employee->golongan,
+            'status_penugasan' => $parsed['status_penugasan'],
+            'tmt_awal' => $parsed['tmt_awal'],
+            'tmt_akhir' => null,
+            'jenis_mutasi' => 'PENUGASAN',
+            'sumber' => JobHistory::SUMBER_IMPOR,
+            'catatan' => 'Tugas Rangkap via Excel Import: '.$rawText,
+        ]);
+
+        return ['id' => $created->id, 'created' => true, 'before' => null];
     }
 
     /**

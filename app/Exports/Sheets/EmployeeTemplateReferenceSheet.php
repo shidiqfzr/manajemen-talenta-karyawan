@@ -28,7 +28,6 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
     {
         return [
             'UNIT KERJA RESMI',
-            'JABATAN FORMASI AKTIF',
             'STRATA PEGAWAI',
             'RM LEVEL',
             'STATUS KARYAWAN',
@@ -46,20 +45,11 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
         // 1. Ambil Unit Kerja resmi
         $activeUnits = Unit::active()->orderBy('urutan')->orderBy('nama')->pluck('nama')->toArray();
 
-        // 2. Ambil Jabatan aktif
-        $activePositions = Position::active()->orderBy('level')->orderBy('nama')->pluck('nama')->toArray();
-        if (empty($activePositions)) {
-            $activePositions = [
-                'Manajer Kebun', 'Askep Tanaman', 'Asisten Afdeling', 'Asisten Tata Usaha (KTU)',
-                'Manajer Pabrik', 'Askep Pengolahan (Masinis Kepala)', 'Asisten Pengolahan',
-                'Asisten Laboratorium / QC', 'Mandor Panen', 'Mandor Pemeliharaan',
-                'Operator PKS', 'Krani Afdeling', 'Mekanik Bengkel', 'Satpam / Keamanan Kebun',
-            ];
-        }
+        // 2. Jabatan tidak dicantumkan di sini: pasangan Unit Kerja dan Jabatan ada pada sheet 'Formasi per Unit'.
 
         // 3. Konstanta Domain sesuai DOMAIN.md
         $levels = array_keys(Employee::LEVELS);
-        $rmLevels = array_keys(Employee::RM_LEVELS);
+        $rmLevels = array_keys(Position::RM_LEVEL_LIST);
         $employmentStatuses = ['Tetap (PKWTT)', 'Kontrak (PKWT)', 'Calon Pegawai'];
         $assignmentStatuses = ['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'];
         $entryChannels = array_keys(Employee::ENTRY_CHANNELS);
@@ -74,11 +64,9 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
         ];
 
         $this->maxUnitRow = count($activeUnits) + 1;
-        $this->maxPositionRow = count($activePositions) + 1;
 
         $maxCount = max(
             count($activeUnits),
-            count($activePositions),
             count($levels),
             count($rmLevels),
             count($employmentStatuses),
@@ -94,7 +82,6 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
         for ($i = 0; $i < $maxCount; $i++) {
             $rows[] = [
                 $activeUnits[$i] ?? '',
-                $activePositions[$i] ?? '',
                 $levels[$i] ?? '',
                 $rmLevels[$i] ?? '',
                 $employmentStatuses[$i] ?? '',
@@ -116,13 +103,13 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
 
-                // Auto size columns A sampai K
-                foreach (range('A', 'K') as $col) {
+                // Auto size columns A sampai J
+                foreach (range('A', 'J') as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 
                 // Header styling: Slate corporate dengan font putih tebal
-                $sheet->getStyle('A1:K1')->applyFromArray([
+                $sheet->getStyle('A1:J1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],

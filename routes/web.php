@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
+use App\Http\Controllers\Admin\EmployeeImportBatchController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
 use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\JobVacancyController;
@@ -64,6 +65,11 @@ Route::prefix('admin')
             Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
             Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
             Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
+            Route::get('/import/batches', [EmployeeImportBatchController::class, 'index'])->name('import.batches.index');
+            Route::get('/import/batches/{log}', [EmployeeImportBatchController::class, 'show'])->name('import.batches.show');
+            Route::post('/import/batches/{log}/approve', [EmployeeImportBatchController::class, 'approve'])->name('import.batches.approve')->middleware('throttle:10,1');
+            Route::post('/import/batches/{log}/reject', [EmployeeImportBatchController::class, 'reject'])->name('import.batches.reject')->middleware('throttle:10,1');
+            Route::post('/import/batches/{log}/rollback', [EmployeeImportBatchController::class, 'rollback'])->name('import.batches.rollback')->middleware('throttle:10,1');
             Route::get('/check-nik', [AdminEmployeeController::class, 'checkNik'])->name('checkNik')->middleware('throttle:60,1');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');

@@ -2,6 +2,7 @@
 
 use App\Exceptions\MppPeriodRuleViolationException;
 use App\Models\MppPeriod;
+use App\Services\EmployeeImportGovernanceService;
 use App\Services\EmployeeImportService;
 use App\Services\ManPowerPlanningService;
 use App\Services\Mpp\MppPeriodService;
@@ -18,6 +19,11 @@ Artisan::command('hris:purge-import-files {--hours=2 : Batas jam kedaluwarsa ber
     $deleted = $importService->purgeExpiredFiles($hours);
     $this->info("Berhasil membersihkan {$deleted} berkas spreadsheet impor sementara yang kedaluwarsa (> {$hours} jam).");
 })->purpose('Membersihkan berkas sementara impor pegawai yang terbengkalai (UU PDP Compliance)');
+
+Artisan::command('hris:purge-import-governance', function (EmployeeImportGovernanceService $governance) {
+    $result = $governance->purgeExpired();
+    $this->info("Pengajuan impor kedaluwarsa: {$result['expired']}; rekaman pembatalan dihapus: {$result['snapshots']}.");
+})->purpose('Menandai pengajuan impor kedaluwarsa dan menghapus rekaman data sebelum impor yang melewati masa pembatalan (UU PDP Compliance)');
 
 Artisan::command('hris:mpp-capture-period {--year= : Tahun periode (default: bulan sebelumnya)} {--month= : Bulan periode 1-12 (default: bulan sebelumnya)}', function (MppPeriodService $periods, ManPowerPlanningService $planning) {
     $default = now()->startOfMonth()->subMonth();
@@ -52,5 +58,6 @@ Artisan::command('hris:mpp-capture-period {--year= : Tahun periode (default: bul
 })->purpose('Merekam draf periode MPP bulan sebelumnya (dijadwalkan tanggal 1 setiap bulan)');
 
 Schedule::command('hris:purge-import-files')->hourly();
+Schedule::command('hris:purge-import-governance')->daily();
 Schedule::command('hr:apply-effective-mutations')->dailyAt('00:01');
 Schedule::command('hris:mpp-capture-period')->monthlyOn(1, '01:00');

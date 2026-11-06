@@ -12,6 +12,9 @@ function employeeImportWizard() {
         fileErrorMessage: '',
         isValidating: false,
         isCommitting: false,
+        requiresApproval: @json(\App\Services\EmployeeImportGovernanceService::requiresApproval()),
+        pendingApproval: false,
+        batchUrl: '',
         errorMessage: '',
         isAsync: false,
         jobProgress: 0,
@@ -201,6 +204,8 @@ function employeeImportWizard() {
             this.validationErrors = [];
             this.commitSummary = null;
             this.commitTimestamp = '';
+            this.pendingApproval = false;
+            this.batchUrl = '';
             this.showDiffModal = false;
             this.activeDiffRow = null;
             document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -354,6 +359,13 @@ function employeeImportWizard() {
                         this.jobMessage = data.message;
                         this.jobProgress = 25;
                         this.pollJobStatus(this.importToken, 'commit');
+                    } else if (data.pending_approval) {
+                        this.pendingApproval = true;
+                        this.batchUrl = data.batch_url;
+                        this.commitSummary = data.summary;
+                        this.commitTimestamp = 'Menunggu persetujuan';
+                        this.currentStep = 3;
+                        document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     } else {
                         this.commitSummary = data.summary;
                         const now = new Date();
