@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,10 @@ class PositionUnitSeeder extends Seeder
             );
             // Seed ulang menyelaraskan atribut master; status aktif yang diatur admin tidak diubah.
             $unit->fill(Arr::only($unitData, ['kode', 'wilayah', 'urutan']))->save();
+
+            foreach ($unitData['aliases'] ?? [] as $alias) {
+                UnitAlias::remember($unit, $alias, 'baseline');
+            }
 
             if (! empty($unitData['positions'])) {
                 foreach ($unitData['positions'] as $posData) {

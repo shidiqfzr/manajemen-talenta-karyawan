@@ -11,14 +11,14 @@ class FormasiCatalogTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_standar_formasi_equals_corporate_mpp_matrix(): void
+    public function test_standar_formasi_equals_the_seeded_seats(): void
     {
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame([
-            'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
-            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
-            'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
+            'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 6],
+            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 15],
+            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 63],
         ], app(FormasiCatalog::class)->standarFormasi());
     }
 

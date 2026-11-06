@@ -8,6 +8,7 @@ use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -165,6 +166,10 @@ class MasterFormasiService
             $unit->update($changes);
 
             if ($isRename) {
+                // Nama lama tetap dikenali impor pegawai; nama baru yang sebelumnya alias kini menjadi nama resmi.
+                UnitAlias::remember($unit, $oldName, 'rename');
+                UnitAlias::where('alias_key', UnitAlias::keyFor($unit->nama))->delete();
+
                 Employee::where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
                 JobHistory::where('is_applied', false)->where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
             }
@@ -230,8 +235,8 @@ class MasterFormasiService
             $this->assertKnownLevel($level);
             $bidang = $data['bidang'] ?? null;
             $this->assertKnownBidang($bidang);
-            $rm = $level === 'Karpel' ? null : ($data['rm_level'] ?? null);
-            $this->assertKnownRm($rm);
+            $rm = $level === 'Karpel' ? $this->karpelRm($data['rm_level'] ?? null) : ($data['rm_level'] ?? null);
+            $this->assertKnownRm($rm, $level);
 
             $position = Position::create([
                 'nama' => $nama,
@@ -261,7 +266,7 @@ class MasterFormasiService
         return DB::transaction(function () use ($position, $data, $reason, $user): Position {
             $incoming = Arr::only($data, ['nama', 'bidang', 'level', 'rm_level']);
             if (($incoming['level'] ?? $position->level) === 'Karpel') {
-                $incoming['rm_level'] = null;
+                $incoming['rm_level'] = $this->karpelRm($incoming['rm_level'] ?? $position->rm_level);
             }
 
             $changes = $this->changedAttributes($position, $incoming);
@@ -276,7 +281,7 @@ class MasterFormasiService
                 $this->assertKnownBidang($changes['bidang']);
             }
             if (array_key_exists('rm_level', $changes)) {
-                $this->assertKnownRm($changes['rm_level']);
+                $this->assertKnownRm($changes['rm_level'], $incoming['level'] ?? $position->level);
             }
 
             $isRename = isset($changes['nama']);
@@ -653,9 +658,15 @@ class MasterFormasiService
         }
     }
 
-    private function assertKnownRm(mixed $rm): void
+    /** Jabatan Karpel hanya memakai RM Band Karpel; nilai lain dianggap belum ditetapkan. */
+    private function karpelRm(mixed $rm): ?string
     {
-        if ($rm !== null && ! in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true)) {
+        return in_array($rm, Position::KARPEL_RM_LEVELS, true) ? $rm : null;
+    }
+
+    private function assertKnownRm(mixed $rm, ?string $level): void
+    {
+        if ($level !== 'Karpel' && $rm !== null && ! in_array($rm, Position::KARPIM_RM_LEVELS, true)) {
             throw new FormasiRuleViolationException('Level RM jabatan Karpim harus RM-1, RM-2, atau RM-3.');
         }
     }

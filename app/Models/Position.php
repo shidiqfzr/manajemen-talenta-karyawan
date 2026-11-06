@@ -74,15 +74,24 @@ class Position extends Model
         'Karpel' => 'Karyawan Pelaksana (Karpel)',
     ];
 
+    /**
+     * Satu-satunya daftar RM Band resmi (DOMAIN.md Bab 4.2): dipakai formulir, impor, template, dan Master Formasi.
+     */
     public const RM_LEVEL_LIST = [
         'RM-1' => 'RM-1 (Pimpinan / Senior Management)',
         'RM-2' => 'RM-2 (Madya / Middle Management)',
         'RM-3' => 'RM-3 (Pratama / First Line Management)',
         'RM-4' => 'RM-4 (Pelaksana / Operational Staff)',
+        'RM-5' => 'RM-5 (Pelaksana / Operational Staff)',
+        'RM-6' => 'RM-6 (Pelaksana / Operational Staff)',
+        'RM-7' => 'RM-7 (Pelaksana / Operational Staff)',
     ];
 
-    /** RM Band yang dapat dipilih untuk jabatan Karpim baru (RM-4 khusus Karpel/pool). */
+    /** RM Band yang dapat dipilih untuk jabatan Karpim baru (RM-4 s.d. RM-7 khusus Karpel/pool). */
     public const KARPIM_RM_LEVELS = ['RM-1', 'RM-2', 'RM-3'];
+
+    /** RM Band jabatan Karpel. */
+    public const KARPEL_RM_LEVELS = ['RM-4', 'RM-5', 'RM-6', 'RM-7'];
 
     /**
      * Token CSS chip RM Band (DESIGN.md §5.2). Satu-satunya sumber warna RM Band di seluruh tampilan.

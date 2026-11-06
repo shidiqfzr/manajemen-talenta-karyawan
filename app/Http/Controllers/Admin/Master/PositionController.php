@@ -25,7 +25,7 @@ class PositionController extends Controller
             'nama' => 'required|string|max:255|unique:positions,nama',
             'bidang' => 'nullable|string|in:TAN,TEK,KEU,UMU',
             'level' => 'required|string|in:Karpim,Karpel',
-            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3',
+            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4,RM-5,RM-6,RM-7',
             'is_active' => 'nullable|boolean',
             'unit_nama' => 'nullable|string|exists:units,nama',
             'kuota' => 'nullable|integer|min:1|max:1000',
@@ -72,7 +72,7 @@ class PositionController extends Controller
             'nama' => 'required|string|max:255|unique:positions,nama,'.$position->id,
             'bidang' => 'nullable|string|in:TAN,TEK,KEU,UMU',
             'level' => 'required|string|in:Karpim,Karpel',
-            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3',
+            'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4,RM-5,RM-6,RM-7',
             'is_active' => 'nullable|boolean',
             'reason' => 'nullable|string|max:1000',
         ], [

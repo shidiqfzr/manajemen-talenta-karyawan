@@ -525,7 +525,7 @@
                     <!-- Eselon / RM Band (Auto-filled Dropdown) -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label for="rmLevelInput" class="block text-xs font-bold text-surface-700">Eselon / <abbr title="Rentang Manajemen: tingkat band jabatan RM-1 sampai RM-4" class="no-underline cursor-help">RM</abbr> Band <span class="text-danger">*</span></label>
+                            <label for="rmLevelInput" class="block text-xs font-bold text-surface-700">Eselon / <abbr title="Rentang Manajemen: tingkat band jabatan RM-1 sampai RM-7" class="no-underline cursor-help">RM</abbr> Band <span class="text-danger">*</span></label>
                             <span x-show="computedRmBand && rmFromFormasi" x-transition class="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-primary-100">
                                 <i class="fas fa-check-circle text-[10px]" aria-hidden="true"></i> Master Formasi
                             </span>

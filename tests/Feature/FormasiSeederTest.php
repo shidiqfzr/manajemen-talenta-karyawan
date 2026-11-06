@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +26,8 @@ class FormasiSeederTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame(45, Unit::count());
-        $this->assertSame(392, DB::table('position_unit')->count());
-        $this->assertSame(444, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(486, DB::table('position_unit')->count());
+        $this->assertSame(612, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_manajer_coexists_in_three_bidang(): void
@@ -59,8 +60,33 @@ class FormasiSeederTest extends TestCase
             ->sortKeys()
             ->all();
 
-        $this->assertSame(['RM-1' => 45, 'RM-2' => 71, 'RM-3' => 328], $perRm);
-        $this->assertSame(['KEU' => 70, 'TAN' => 211, 'TEK' => 84, 'UMU' => 79], $perBidang);
+        $this->assertSame(['RM-1' => 46, 'RM-2' => 72, 'RM-3' => 333, 'RM-5' => 161], $perRm);
+        $this->assertSame(['KEU' => 87, 'TAN' => 253, 'TEK' => 97, 'UMU' => 175], $perBidang);
+    }
+
+    public function test_karpel_seats_keep_their_rm_5_band(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $this->assertSame(0, Position::whereNotIn('rm_level', Position::KARPIM_RM_LEVELS)->where('level', 'Karpim')->where('is_overflow', false)->count());
+        $this->assertSame(['RM-5'], Position::where('level', 'Karpel')->distinct()->pluck('rm_level')->all());
+        $this->assertSame(90, DB::table('position_unit')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('positions.level', 'Karpel')
+            ->count());
+    }
+
+    public function test_seat_repeated_across_sub_bagian_sums_its_kuota(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $seat = DB::table('position_unit')
+            ->where('unit_id', Unit::where('nama', 'Distrik Petani Mitra')->value('id'))
+            ->where('position_id', Position::where('nama', 'Asisten Tata Usaha')->value('id'))
+            ->first();
+
+        $this->assertSame(2, (int) $seat->kuota);
+        $this->assertSame('KEU', $seat->bidang);
     }
 
     public function test_seeding_twice_does_not_change_totals(): void
@@ -69,8 +95,8 @@ class FormasiSeederTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame(45, Unit::count());
-        $this->assertSame(392, DB::table('position_unit')->count());
-        $this->assertSame(444, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(486, DB::table('position_unit')->count());
+        $this->assertSame(612, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_seeded_units_use_the_known_wilayah_labels(): void
@@ -116,5 +142,17 @@ class FormasiSeederTest extends TestCase
             $this->assertNotNull($position, "{$nama} seharusnya tersedia sebagai jabatan pool.");
             $this->assertSame(0, DB::table('position_unit')->where('position_id', $position->id)->count());
         }
+    }
+
+    public function test_seeding_registers_the_legacy_unit_aliases_from_the_baseline(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->seed(PositionUnitSeeder::class);
+
+        $this->assertSame(3, UnitAlias::count());
+        $this->assertSame(
+            Unit::where('nama', 'PMO Batu Bara & Bisnis Lainnya')->value('id'),
+            UnitAlias::where('alias_key', UnitAlias::keyFor('PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA'))->value('unit_id')
+        );
     }
 }

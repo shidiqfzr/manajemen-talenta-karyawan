@@ -11,6 +11,7 @@ use App\Models\Unit;
 use App\Services\Formasi\FormasiDialogs;
 use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
+use App\Services\ManPowerPlanningService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +110,9 @@ class FormasiEditor extends Component
     }
 
     /** Kolom yang dapat diurutkan pada tabel formasi jabatan. */
+    /** Batas baris daftar pemegang jabatan; bila jumlah terisi lebih besar, drawer menampilkan catatan. */
+    public const OCCUPANT_LIMIT = 200;
+
     private const SORTABLE = ['jabatan', 'rm_level', 'bidang', 'kuota', 'filled'];
 
     /** Kolom yang dapat diurutkan pada daftar unit. */
@@ -209,7 +213,28 @@ class FormasiEditor extends Component
         $this->authorizeAdmin();
         if ($this->ownsSeat($seatId)) {
             $this->occupantSeatId = $seatId;
+            $this->auditOccupantAccess();
         }
+    }
+
+    /**
+     * Catat pembukaan daftar pemegang jabatan pada master_audit_logs (UU PDP) karena daftar memuat nama dan tanggal
+     * MBT/pensiun. Yang tercatat hanya unit, jabatan, RM Band, bidang, dan jumlah baris; tidak ada nama atau NIK.
+     */
+    private function auditOccupantAccess(): void
+    {
+        $seat = $this->occupantSeat;
+        $rows = count($this->occupants);
+        if ($seat === null || $rows === 0) {
+            return;
+        }
+
+        MasterAuditLog::record(
+            auth()->user(), 'seat_access.view_occupants', 'seat_access', null,
+            'Pemegang jabatan '.$seat->jabatan, null,
+            ['unit' => $this->unit?->nama, 'jabatan' => $seat->jabatan, 'rm_level' => $seat->rm_level, 'bidang' => $seat->bidang, 'jumlah_baris' => $rows],
+            null
+        );
     }
 
     public function closeOccupants(): void
@@ -668,23 +693,36 @@ class FormasiEditor extends Component
     }
 
     /**
-     * Pegawai yang menempati formasi jabatan terbuka. Hanya nama, NIK (untuk tautan profil), dan golongan yang dimuat.
+     * Pegawai yang menempati formasi jabatan terbuka, dalam bentuk baris untuk `x-admin.personnel-drawer`.
+     * Hanya nama, status, golongan, tanggal MBT/pensiun, dan NIK (khusus untuk tautan profil) yang dimuat; NIK tidak
+     * tampil sebagai teks. Tanggal dihitung model Employee (efektif) dan diformat oleh ManPowerPlanningService.
      *
-     * @return Collection<int, Employee>
+     * @return list<array{nik: string, nama: string, golongan: ?string, status_karyawan: ?string, tanggal_mbt: string, tanggal_pensiun: string}>
      */
     #[Computed]
-    public function occupants(): Collection
+    public function occupants(): array
     {
         $seat = $this->occupantSeat;
         if ($seat === null || $this->unit === null) {
-            return collect();
+            return [];
         }
+
+        $mpp = app(ManPowerPlanningService::class);
 
         return Employee::where('unit_kerja', $this->unit->nama)
             ->where('jabatan', $seat->jabatan)
             ->orderBy('nama')
-            ->limit(50)
-            ->get(['nik', 'nama', 'golongan']);
+            ->limit(self::OCCUPANT_LIMIT)
+            ->get(['nik', 'nama', 'golongan', 'status_karyawan', 'tanggal_lahir', 'tanggal_pensiun', 'tanggal_mbt'])
+            ->map(fn (Employee $employee) => [
+                'nik' => $employee->nik,
+                'nama' => $employee->nama,
+                'golongan' => $employee->golongan ?: null,
+                'status_karyawan' => $employee->status_karyawan,
+                'tanggal_mbt' => $mpp->dateLabel($employee->effective_tanggal_mbt),
+                'tanggal_pensiun' => $mpp->dateLabel($employee->effective_tanggal_pensiun),
+            ])
+            ->all();
     }
 
     public function operationTitle(): string

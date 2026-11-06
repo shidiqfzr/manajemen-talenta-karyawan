@@ -146,7 +146,7 @@
     <td class="py-3.5 px-5 whitespace-nowrap text-center">
         @if($employee->rm_level)
             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border shadow-2xs {{ $employee->rm_theme }}"
-                title="{{ \App\Models\Employee::RM_LEVELS[$employee->rm_level] ?? $employee->rm_level }}">
+                title="{{ \App\Models\Position::RM_LEVEL_LIST[$employee->rm_level] ?? $employee->rm_level }}">
                 {{ $employee->rm_level }}
             </span>
         @else
