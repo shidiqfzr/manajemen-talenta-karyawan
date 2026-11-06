@@ -22,6 +22,9 @@ class MutasiHistory extends Component
 
     public string $statusFilter = ''; // '' = all, 'applied' = aktif/diterapkan, 'scheduled' = terjadwal
 
+    /** 'resmi' (bawaan) = hanya mutasi resmi; 'semua' atau salah satu kunci JobHistory::SUMBER_LABELS. */
+    public string $sumberFilter = 'resmi';
+
     public string $sortField = 'tmt_awal';
 
     public string $sortDirection = 'desc';
@@ -41,6 +44,7 @@ class MutasiHistory extends Component
         'unitFilter' => ['except' => ''],
         'mutasiFilter' => ['except' => ''],
         'statusFilter' => ['except' => ''],
+        'sumberFilter' => ['except' => 'resmi'],
         'sortField' => ['except' => 'tmt_awal'],
         'sortDirection' => ['except' => 'desc'],
     ];
@@ -154,9 +158,22 @@ class MutasiHistory extends Component
         $this->resetPage();
     }
 
+    public function updatingSumberFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    /** Nilai dari URL yang tidak dikenal kembali ke bawaan (mutasi resmi). */
+    private function sumber(): string
+    {
+        return $this->sumberFilter === 'semua' || array_key_exists($this->sumberFilter, JobHistory::SUMBER_LABELS)
+            ? $this->sumberFilter
+            : 'resmi';
+    }
+
     public function resetFilters(): void
     {
-        $this->reset(['search', 'unitFilter', 'mutasiFilter', 'statusFilter']);
+        $this->reset(['search', 'unitFilter', 'mutasiFilter', 'statusFilter', 'sumberFilter']);
         $this->sortField = 'tmt_awal';
         $this->sortDirection = 'desc';
         $this->resetPage();
@@ -177,6 +194,7 @@ class MutasiHistory extends Component
             'jenisMutasi' => $this->mutasiFilter ?: null,
             'isApplied' => $isApplied,
             'onlyDue' => $onlyDue,
+            'sumber' => $this->sumber(),
             'sortBy' => $this->sortField,
             'sortDirection' => $this->sortDirection,
         ];
@@ -204,16 +222,18 @@ class MutasiHistory extends Component
             perPage: $this->perPage,
             sortBy: $this->sortField,
             sortDirection: $this->sortDirection,
+            sumber: $this->sumber(),
         );
 
         $units = $service->getKnownUnits();
         $mutasiTypes = JobHistory::MUTASI_TYPES;
-        $kpis = $service->getMutasiHistoryKpis();
+        $kpis = $service->getMutasiHistoryKpis($this->sumber());
 
         return view('livewire.admin.mutasi-history', [
             'history' => $history,
             'units' => $units,
             'mutasiTypes' => $mutasiTypes,
+            'sumberOptions' => JobHistory::SUMBER_LABELS,
             'totalCount' => $kpis['total'],
             'activeCount' => $kpis['active'],
             'scheduledCount' => $kpis['scheduled'],

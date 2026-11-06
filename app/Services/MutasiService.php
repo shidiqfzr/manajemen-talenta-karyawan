@@ -476,8 +476,9 @@ class MutasiService
         bool $onlyDue = false,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): Builder {
-        return $this->history->getMutasiHistoryQuery($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $sortBy, $sortDirection);
+        return $this->history->getMutasiHistoryQuery($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $sortBy, $sortDirection, $sumber);
     }
 
     /** @see MutasiHistoryReader::getMutasiHistory() */
@@ -490,14 +491,15 @@ class MutasiService
         int $perPage = 15,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): LengthAwarePaginator {
-        return $this->history->getMutasiHistory($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $perPage, $sortBy, $sortDirection);
+        return $this->history->getMutasiHistory($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $perPage, $sortBy, $sortDirection, $sumber);
     }
 
     /** @see MutasiHistoryReader::getMutasiHistoryKpis() */
-    public function getMutasiHistoryKpis(): array
+    public function getMutasiHistoryKpis(?string $sumber = null): array
     {
-        return $this->history->getMutasiHistoryKpis();
+        return $this->history->getMutasiHistoryKpis($sumber);
     }
 
     /** @see MutasiHistoryReader::getScheduledMutationsCount() */

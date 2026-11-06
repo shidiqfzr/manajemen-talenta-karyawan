@@ -61,6 +61,25 @@
                         </div>
                     </div>
 
+                    <!-- Sumber Catatan Filter: bawaan hanya mutasi resmi; data awal & pembaruan data dapat ditampilkan -->
+                    <div class="relative flex-1 sm:flex-initial min-w-[170px]">
+                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-surface-500">
+                            <i class="fas fa-layer-group text-[11px]" aria-hidden="true"></i>
+                        </div>
+                        <select wire:model.live="sumberFilter" aria-label="Sumber catatan"
+                            class="w-full pl-7.5 pr-7 py-2 bg-white border border-surface-300 rounded-xl text-xs text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-600 transition appearance-none cursor-pointer shadow-2xs">
+                            <option value="resmi">Mutasi Resmi</option>
+                            <option value="semua">Semua Catatan</option>
+                            @foreach ($sumberOptions as $key => $label)
+                                @continue($key === \App\Models\JobHistory::SUMBER_MUTASI)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-surface-500">
+                            <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
+                        </div>
+                    </div>
+
                     <!-- Active Filter Pill Indicator (jika statusFilter bukan all) -->
                     @if ($statusFilter !== '')
                         <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-primary-50 text-primary-800 border border-primary-200 rounded-xl text-xs font-semibold shadow-2xs">
@@ -73,7 +92,7 @@
                     @endif
 
                     <!-- Reset Filter Button -->
-                    @if ($search || $unitFilter || $mutasiFilter || $statusFilter !== '')
+                    @if ($search || $unitFilter || $mutasiFilter || $statusFilter !== '' || $sumberFilter !== 'resmi')
                         <button type="button" wire:click="resetFilters"
                             class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-danger-50 hover:text-danger-700 text-surface-600 border border-surface-300 hover:border-danger-200 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
                             title="Reset semua filter">
@@ -102,13 +121,13 @@
                 </div>
                 <h4 class="text-base font-bold text-surface-900">Tidak Ada Catatan Riwayat Mutasi</h4>
                 <p class="text-xs text-surface-500 max-w-sm mt-1 leading-relaxed">
-                    @if ($search || $unitFilter || $mutasiFilter || $statusFilter)
+                    @if ($search || $unitFilter || $mutasiFilter || $statusFilter || $sumberFilter !== 'resmi')
                         Tidak ditemukan catatan dengan kriteria filter saat ini. Silakan bersihkan kata kunci pencarian.
                     @else
                         Belum ada mutasi atau alih tugas yang tercatat dalam sistem.
                     @endif
                 </p>
-                @if ($search || $unitFilter || $mutasiFilter || $statusFilter)
+                @if ($search || $unitFilter || $mutasiFilter || $statusFilter || $sumberFilter !== 'resmi')
                     <button wire:click="resetFilters"
                         class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-100 hover:bg-surface-200 text-surface-800 text-xs font-semibold border border-surface-300 transition cursor-pointer">
                         <i class="fas fa-undo text-[10px]" aria-hidden="true"></i>
@@ -190,6 +209,12 @@
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $record->jenis_mutasi_badge_class }}">
                                             {{ $record->jenis_mutasi_label }}
                                         </span>
+                                        @if ($record->isRecordOnly())
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-info-50 text-info-800 border border-info-200"
+                                                title="Catatan data kepegawaian, bukan SK mutasi resmi">
+                                                <i class="fas fa-database text-[10px]" aria-hidden="true"></i> {{ $record->sumber_label }}
+                                            </span>
+                                        @endif
                                         @if ($record->is_dispensasi)
                                             <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-warning-50 text-warning-800 border border-warning-200"
                                                 title="{{ $record->alasan_dispensasi ?? 'Dispensasi Khusus Direksi' }}">

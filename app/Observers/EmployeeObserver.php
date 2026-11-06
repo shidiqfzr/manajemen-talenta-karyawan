@@ -73,9 +73,11 @@ class EmployeeObserver
             'tmt_awal' => $start->toDateString(),
             'tmt_akhir' => null,
             'jenis_mutasi' => 'PENUGASAN',
-            'nomor_sk' => 'SK.DIR/REG5/REK-AWAL/'.date('Y'),
-            'tanggal_sk' => $start->toDateString(),
-            'catatan' => 'Pengangkatan / Penugasan awal pegawai',
+            // Data awal bukan SK Direksi: nomor dan tanggal SK sengaja kosong (tidak boleh direkayasa).
+            'sumber' => JobHistory::SUMBER_DATA_AWAL,
+            'nomor_sk' => null,
+            'tanggal_sk' => null,
+            'catatan' => 'Data awal penempatan pegawai (bukan SK mutasi)',
         ]);
     }
 
@@ -140,6 +142,7 @@ class EmployeeObserver
                 'tmt_awal' => $newStart->toDateString(),
                 'tmt_akhir' => null,
                 'jenis_mutasi' => null,
+                'sumber' => JobHistory::SUMBER_PEMBARUAN_DATA,
                 'catatan' => $employee->historyNote,
             ]);
         });

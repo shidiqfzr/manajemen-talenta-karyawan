@@ -26,6 +26,92 @@ class MutasiHistoryTest extends TestCase
         $this->adminUser = User::factory()->create(['role' => 'admin']);
     }
 
+    public function test_new_employee_seeds_data_awal_history_without_a_fabricated_sk_number(): void
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Asisten Afdeling', 'unit_kerja' => 'Kebun Danau Salak']);
+
+        $row = JobHistory::where('employee_nik', $emp->nik)->sole();
+        $this->assertSame(JobHistory::SUMBER_DATA_AWAL, $row->sumber);
+        $this->assertNull($row->nomor_sk);
+        $this->assertNull($row->tanggal_sk);
+        $this->assertTrue($row->isRecordOnly());
+
+        $emp->update(['jabatan' => 'Manajer Kebun']);
+        $update = JobHistory::where('employee_nik', $emp->nik)->whereNull('tmt_akhir')->sole();
+        $this->assertSame(JobHistory::SUMBER_PEMBARUAN_DATA, $update->sumber);
+        $this->assertNull($update->nomor_sk);
+    }
+
+    public function test_history_screen_shows_official_mutations_by_default_and_filters_by_source(): void
+    {
+        Employee::factory()->create(['nama' => 'Siti Data Awal', 'jabatan' => 'Asisten Afdeling', 'unit_kerja' => 'Kebun Danau Salak']);
+        $official = Employee::factory()->create(['nama' => 'Rudi Mutasi Resmi', 'jabatan' => 'Asisten Afdeling', 'unit_kerja' => 'Kebun Danau Salak']);
+        JobHistory::create([
+            'employee_nik' => $official->nik, 'jabatan' => 'Manajer Kebun', 'unit_kerja' => 'Kebun Danau Salak',
+            'tmt_awal' => now()->subMonth()->toDateString(), 'jenis_mutasi' => 'PROMOSI', 'nomor_sk' => 'SK/001/2026',
+            'status_penugasan' => 'Definitif', 'is_applied' => true,
+        ]);
+
+        $this->assertSame(JobHistory::SUMBER_MUTASI, JobHistory::where('nomor_sk', 'SK/001/2026')->value('sumber'));
+
+        Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->assertSee('Rudi Mutasi Resmi')
+            ->assertDontSee('Siti Data Awal')
+            ->set('sumberFilter', 'semua')
+            ->assertSee('Siti Data Awal')
+            ->assertSee('Data Awal')
+            ->set('sumberFilter', JobHistory::SUMBER_DATA_AWAL)
+            ->assertSee('Siti Data Awal')
+            ->assertDontSee('SK/001/2026')
+            ->set('sumberFilter', 'nilai-asing')
+            ->assertSee('Rudi Mutasi Resmi')
+            ->assertDontSee('Siti Data Awal')
+            ->call('resetFilters')
+            ->assertSet('sumberFilter', 'resmi');
+
+        // Tidak ada baris yang hilang: dua baris data awal pegawai dan satu mutasi resmi tetap tersimpan.
+        $this->assertSame(3, JobHistory::count());
+        $this->assertSame(2, JobHistory::where('sumber', JobHistory::SUMBER_DATA_AWAL)->count());
+    }
+
+    public function test_export_follows_the_source_filter(): void
+    {
+        Employee::factory()->create(['nama' => 'Siti Data Awal', 'jabatan' => 'Asisten', 'unit_kerja' => 'Kebun Danau Salak']);
+
+        $resmi = (new MutasiHistoryExport(['sumber' => 'resmi']))->query()->count();
+        $semua = (new MutasiHistoryExport(['sumber' => 'semua']))->query()->count();
+
+        $this->assertSame(0, $resmi);
+        $this->assertSame(1, $semua);
+    }
+
+    public function test_export_labels_the_source_of_every_row_and_states_its_scope(): void
+    {
+        $emp = Employee::factory()->create(['nama' => 'Siti Data Awal', 'jabatan' => 'Asisten', 'unit_kerja' => 'Kebun Danau Salak']);
+        JobHistory::create([
+            'employee_nik' => $emp->nik, 'jabatan' => 'Manajer Kebun', 'unit_kerja' => 'Kebun Danau Salak',
+            'tmt_awal' => now()->subMonth()->toDateString(), 'jenis_mutasi' => 'PROMOSI', 'nomor_sk' => 'SK/002/2026',
+            'status_penugasan' => 'Definitif', 'is_applied' => true,
+        ]);
+
+        $export = new MutasiHistoryExport(['sumber' => 'semua', 'sortBy' => 'id', 'sortDirection' => 'asc']);
+        $headings = $export->headings();
+        $col = array_search('SUMBER CATATAN', $headings, true);
+        $this->assertSame(22, count($headings));
+        $this->assertSame('JENIS MUTASI', $headings[$col - 1]);
+
+        $rows = $export->query()->get()->map(fn ($r) => $export->map($r))->all();
+        $this->assertSame('Data Awal', $rows[0][$col]);
+        $this->assertSame('Bukan SK Mutasi (Catatan Data Kepegawaian)', $rows[0][array_search('STATUS REGULASI', $headings, true)]);
+        $this->assertSame('Mutasi Resmi', $rows[1][$col]);
+        $this->assertSame('Sesuai Standar Regulasi', $rows[1][array_search('STATUS REGULASI', $headings, true)]);
+        $this->assertSame('SK/002/2026', $rows[1][array_search('NOMOR SK', $headings, true)]);
+
+        $this->assertStringContainsString('Semua Catatan', $export->properties()['subject']);
+        $this->assertStringContainsString('Mutasi Resmi saja', (new MutasiHistoryExport(['sumber' => 'resmi']))->properties()['subject']);
+        $this->assertSame('O', array_keys($export->columnFormats())[1]);
+    }
+
     public function test_can_render_mutasi_history_with_kpi_metrics(): void
     {
         $unitA = Unit::factory()->create(['nama' => 'Kebun Danau Salak']);
