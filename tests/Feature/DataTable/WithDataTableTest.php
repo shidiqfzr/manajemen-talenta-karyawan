@@ -2,14 +2,18 @@
 
 namespace Tests\Feature\DataTable;
 
+use App\Exports\DataTableExport;
 use App\Models\MasterAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
+use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
+use Tests\Fixtures\DataTable\FixtureTableSmallLimit;
 use Tests\TestCase;
 
 use function Livewire\invade;
@@ -364,5 +368,118 @@ class WithDataTableTest extends TestCase
 
         $this->assertSame(30, FixtureRow::where('aktif', true)->count());
         $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_forged_selection_is_normalised_and_bulk_action_still_works(): void
+    {
+        $this->defineManageFixture();
+        $id = $this->idOf('Pegawai 02');
+
+        Livewire::test(FixtureTable::class)
+            ->set('selected', [['1'], $id, null, $id, ''])
+            ->assertSet('selected', [$id])
+            ->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '1 data berhasil diproses.']);
+    }
+
+    public function test_selection_is_capped_at_1000_entries(): void
+    {
+        $forged = array_map('strval', range(1, 1500));
+
+        $component = Livewire::test(FixtureTable::class)->set('selected', $forged);
+
+        $this->assertCount(1000, $component->get('selected'));
+    }
+
+    public function test_bulk_handler_returning_nothing_counts_zero(): void
+    {
+        Livewire::test(FixtureTable::class)
+            ->set('selected', [$this->idOf('Pegawai 01')])
+            ->call('runBulkAction', 'diam')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '0 data berhasil diproses.']);
+    }
+
+    public function test_export_downloads_the_filtered_rows(): void
+    {
+        Excel::fake();
+        $this->travelTo('2026-11-06 10:00:00');
+        FixtureRow::query()->where('nilai', '>', 20)->update(['bidang' => 'KEU']);
+
+        Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->call('export');
+
+        Excel::assertDownloaded('tabel-uji_2026-11-06_100000.xlsx', fn (DataTableExport $e) => $e->query()->count() === 20);
+
+        $log = MasterAuditLog::where('action', 'data_table.export')->sole();
+        $this->assertSame(
+            ['jumlah_baris' => 20, 'filter' => ['bidang' => 'KEU'], 'pencarian' => false],
+            $log->new_values,
+        );
+    }
+
+    public function test_export_respects_selection(): void
+    {
+        Excel::fake();
+        $this->travelTo('2026-11-06 10:00:00');
+        $ids = [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')];
+
+        Livewire::test(FixtureTable::class)->set('selected', $ids)->call('export');
+
+        Excel::assertDownloaded('tabel-uji_2026-11-06_100000.xlsx', fn (DataTableExport $e) => $e->query()->count() === 2);
+    }
+
+    public function test_export_selection_cannot_widen_the_filter(): void
+    {
+        Excel::fake();
+        $this->travelTo('2026-11-06 10:00:00');
+        $keu = $this->idOf('Pegawai 02');
+        $tan = $this->idOf('Pegawai 01');
+
+        Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->set('selected', [$keu, $tan])->call('export');
+
+        Excel::assertDownloaded('tabel-uji_2026-11-06_100000.xlsx', fn (DataTableExport $e) => $e->query()->count() === 1);
+    }
+
+    public function test_export_requires_permission(): void
+    {
+        Excel::fake();
+        $this->actingAs(User::factory()->create(['role' => 'staff']));
+
+        Livewire::test(FixtureTable::class)
+            ->call('export')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk mengekspor data.']);
+
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
+    }
+
+    public function test_export_over_limit_is_refused(): void
+    {
+        Excel::fake();
+
+        Livewire::test(FixtureTableSmallLimit::class)
+            ->call('export')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Data terlalu besar untuk diekspor. Persempit filter terlebih dahulu.']);
+
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
+    }
+
+    public function test_export_audit_excludes_search_term(): void
+    {
+        Excel::fake();
+        FixtureRow::create(['nama' => 'Budi', 'kode' => 'B1', 'bidang' => 'KEU', 'nilai' => 99]);
+
+        Livewire::test(FixtureTable::class)->set('search', 'Budi')->call('export');
+
+        $detail = MasterAuditLog::where('action', 'data_table.export')->sole()->new_values;
+        $this->assertTrue($detail['pencarian']);
+        $this->assertSame(1, $detail['jumlah_baris']);
+        $this->assertNotContains('Budi', $detail);
+        $this->assertStringNotContainsString('Budi', json_encode($detail));
+    }
+
+    public function test_export_disabled_returns_not_found(): void
+    {
+        Excel::fake();
+
+        Livewire::test(FixtureTableNoExport::class)->call('export')->assertNotFound();
     }
 }

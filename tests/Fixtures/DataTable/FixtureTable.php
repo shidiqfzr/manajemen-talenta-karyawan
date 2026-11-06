@@ -47,7 +47,18 @@ class FixtureTable extends Component
         return [
             BulkAction::make('nonaktifkan', 'Nonaktifkan')->ability('manage-fixture'),
             BulkAction::make('gagal', 'Gagal'),
+            BulkAction::make('diam', 'Diam'),
         ];
+    }
+
+    protected function bulkDiam(Builder $targets): void
+    {
+        // Intentionally returns nothing.
+    }
+
+    protected function exportName(): ?string
+    {
+        return 'tabel-uji';
     }
 
     protected function bulkNonaktifkan(Builder $targets): int
