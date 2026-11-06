@@ -87,7 +87,17 @@ class TrainingTableTest extends TestCase
             ->assertSet('perPage', 5)
             ->assertSeeInOrder(['Pelatihan 07', 'Pelatihan 06', 'Pelatihan 05', 'Pelatihan 04', 'Pelatihan 03'])
             ->assertDontSee('Pelatihan 02')
-            ->assertSeeHtml('aria-label="Halaman pelatihan"');
+            ->assertSeeHtml('aria-label="Halaman pelatihan"')
+            // Sortable headers: Judul Pelatihan, Tanggal, Penyelenggara only.
+            ->assertSeeHtml("sortBy('judul')")
+            ->assertSeeHtml("sortBy('tanggal_mulai')")
+            ->assertSeeHtml("sortBy('penyelenggara')")
+            ->assertDontSeeHtml("sortBy('jenis')")
+            ->assertDontSeeHtml("sortBy('sertifikat')")
+            ->assertDontSeeHtml("sortBy('aksi')")
+            // A cancelled delete confirm must stop the wire:click listener (Livewire ignores preventDefault).
+            ->assertSeeHtml('event.stopImmediatePropagation()')
+            ->assertDontSeeHtml('return confirm(');
 
         $this->assertCount(5, $component->instance()->rows->items());
         $this->assertSame([5, 10, 25, 50], invade($component->instance())->perPageOptions());

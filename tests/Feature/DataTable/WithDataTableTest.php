@@ -3,17 +3,23 @@
 namespace Tests\Feature\DataTable;
 
 use App\Exports\DataTableExport;
+use App\Livewire\Tables\EvaluationTable;
+use App\Livewire\Tables\JobHistoryTable;
+use App\Livewire\Tables\TrainingTable;
 use App\Models\MasterAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
+use Tests\Fixtures\DataTable\FixtureTableOddPerPage;
 use Tests\Fixtures\DataTable\FixtureTableSmallLimit;
+use Tests\Fixtures\DataTable\FixtureTableSmallPerPage;
 use Tests\TestCase;
 
 use function Livewire\invade;
@@ -166,6 +172,27 @@ class WithDataTableTest extends TestCase
             ->assertDontSee('Pegawai 11');
     }
 
+    public function test_default_per_page_outside_the_options_falls_back_to_an_allowed_size(): void
+    {
+        // Default 25 is not offered: the first option of at least 25 wins.
+        Livewire::test(FixtureTableOddPerPage::class)
+            ->assertSet('perPage', 50)
+            ->set('perPage', 9999)
+            ->assertSet('perPage', 50);
+
+        // No option reaches 25: the first option wins.
+        Livewire::withQueryParams(['per_page' => 7])
+            ->test(FixtureTableSmallPerPage::class)
+            ->assertSet('perPage', 5);
+
+        // A default that is one of the options is kept as is (the three employee profile tables).
+        $this->assertSame(25, invade(new FixtureTable)->resolvedDefaultPerPage());
+
+        foreach ([TrainingTable::class, EvaluationTable::class, JobHistoryTable::class] as $table) {
+            $this->assertSame(5, invade(new $table)->resolvedDefaultPerPage(), $table);
+        }
+    }
+
     public function test_reset_filters_clears_search_and_filters_and_returns_to_page_one(): void
     {
         $component = Livewire::test(FixtureTable::class)
@@ -223,6 +250,26 @@ class WithDataTableTest extends TestCase
         $this->assertNotContains($this->idOf('Pegawai 11'), $component->get('selected'));
 
         $component->call('toggleSelectPage')->assertSet('selected', []);
+    }
+
+    public function test_toggle_select_page_keeps_selections_from_other_pages(): void
+    {
+        $pageOne = array_map(fn (int $i) => $this->idOf(sprintf('Pegawai %02d', $i)), range(1, 10));
+        $pageTwo = array_map(fn (int $i) => $this->idOf(sprintf('Pegawai %02d', $i)), range(11, 20));
+
+        $component = Livewire::test(FixtureTable::class)
+            ->set('perPage', 10)
+            ->call('toggleSelectPage')
+            ->call('gotoPage', 2)
+            ->call('toggleSelectPage');
+
+        $this->assertEqualsCanonicalizing([...$pageOne, ...$pageTwo], $component->get('selected'));
+
+        // Clearing the second page leaves the first page's ticks alone.
+        $component->call('toggleSelectPage');
+
+        $this->assertEqualsCanonicalizing($pageOne, $component->get('selected'));
+        $component->assertSet('selectAllMatching', false);
     }
 
     public function test_selection_survives_page_change_and_clears_on_search_filter_or_sort(): void
@@ -366,6 +413,23 @@ class WithDataTableTest extends TestCase
             ->call('runBulkAction', 'gagal')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
 
+        $this->assertSame(30, FixtureRow::where('aktif', true)->count());
+        $this->assertSame(0, MasterAuditLog::count());
+    }
+
+    public function test_failed_audit_write_rolls_back_the_bulk_change(): void
+    {
+        $this->defineManageFixture();
+        MasterAuditLog::creating(function (): never {
+            throw new RuntimeException('Simulated audit failure.');
+        });
+
+        Livewire::test(FixtureTable::class)
+            ->set('selected', [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')])
+            ->call('runBulkAction', 'nonaktifkan')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
+
+        // No audit entry, no change.
         $this->assertSame(30, FixtureRow::where('aktif', true)->count());
         $this->assertSame(0, MasterAuditLog::count());
     }

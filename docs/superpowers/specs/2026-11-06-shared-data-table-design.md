@@ -227,3 +227,4 @@ One test class per system under test (`AGENTS.md` rule 5):
 4. **Audit detail records `pencarian` as a boolean**, never the search term (it is often a name or NIK).
 5. **LIKE escaping uses `!` with `ESCAPE '!'`** so the same SQL works on SQLite (tests) and MySQL (production).
 6. **`dateRange` filters and Shift/Ctrl range selection** are built in the step-3 and step-4 plans respectively, with their first consumers.
+7. Export chunking uses `WithCustomChunkSize` (maatwebsite ignores `WithChunkReading` for exports).

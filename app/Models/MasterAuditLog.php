@@ -96,6 +96,9 @@ class MasterAuditLog extends Model
         'tahun' => 'Tahun',
         'posisi_per' => 'Posisi per',
         'jumlah_baris' => 'Jumlah Baris',
+        'aksi' => 'Aksi',
+        'filter' => 'Filter',
+        'pencarian' => 'Pencarian',
         'periode' => 'Periode',
         'revisi' => 'Revisi',
     ];
@@ -130,12 +133,40 @@ class MasterAuditLog extends Model
             $show = fn (mixed $value): string => match (true) {
                 $value === null => '-',
                 $key === 'is_active' => $value ? 'Aktif' : 'Nonaktif',
-                is_bool($value) => $value ? 'ya' : 'tidak',
-                default => (string) $value,
+                default => self::displayValue($value),
             };
 
             return (self::FIELD_LABELS[$key] ?? $key).': '.$show($old[$key] ?? null).' → '.$show($new[$key] ?? null);
         }, $keys);
+    }
+
+    /**
+     * Readable form of one stored value. Arrays (e.g. the active filters of a data table audit row)
+     * become a "Label=nilai" list; an empty array shows as "-".
+     */
+    private static function displayValue(mixed $value): string
+    {
+        if (is_array($value)) {
+            if ($value === []) {
+                return '-';
+            }
+
+            $parts = [];
+
+            foreach ($value as $key => $item) {
+                $item = self::displayValue($item);
+                $parts[] = is_string($key) ? (self::FIELD_LABELS[$key] ?? $key).'='.$item : $item;
+            }
+
+            return implode(', ', $parts);
+        }
+
+        return match (true) {
+            $value === null => '-',
+            is_bool($value) => $value ? 'ya' : 'tidak',
+            is_scalar($value) => (string) $value,
+            default => '-',
+        };
     }
 
     protected static function booted(): void

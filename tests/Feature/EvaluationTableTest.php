@@ -88,7 +88,10 @@ class EvaluationTableTest extends TestCase
             ->assertSeeHtml("sortBy('nilai_tertimbang')")
             ->assertSeeHtml("sortBy('bidang_tugas')")
             ->assertDontSeeHtml("sortBy('kategori_9box')")
-            ->assertDontSeeHtml("sortBy('lembaga_asesmen')");
+            ->assertDontSeeHtml("sortBy('lembaga_asesmen')")
+            // A cancelled delete confirm must stop the wire:click listener (Livewire ignores preventDefault).
+            ->assertSeeHtml('event.stopImmediatePropagation()')
+            ->assertDontSeeHtml('return confirm(');
 
         $this->assertCount(5, $component->instance()->rows->items());
         $this->assertSame([5, 10, 25, 50], invade($component->instance())->perPageOptions());

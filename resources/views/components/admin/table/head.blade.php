@@ -14,7 +14,7 @@
         <x-slot:trailing><x-admin.table.th align="right"><span class="sr-only">Aksi</span></x-admin.table.th></x-slot:trailing>
     </x-admin.table.head>
 
-    page-keys : kunci baris halaman ini sebagai string (mis. $this->rows->getCollection()->map(fn ($r) => (string) $r->getKey())->all()).
+    page-keys : kunci baris halaman ini sebagai string (mis. $this->rows->getCollection()->map(fn ($r) => (string) $r->getAttribute($this->rowKey()))->all()).
     trailing  : slot opsional untuk header kolom tambahan milik modul (mis. kolom menu aksi).
 --}}
 @props([
