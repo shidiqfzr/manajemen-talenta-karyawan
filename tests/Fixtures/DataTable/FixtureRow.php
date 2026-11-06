@@ -31,6 +31,7 @@ class FixtureRow extends Model
             $table->string('bidang');
             $table->boolean('aktif')->default(true);
             $table->integer('nilai');
+            $table->dateTime('tanggal')->nullable();
         });
     }
 }

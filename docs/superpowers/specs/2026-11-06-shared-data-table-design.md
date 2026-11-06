@@ -228,3 +228,4 @@ One test class per system under test (`AGENTS.md` rule 5):
 5. **LIKE escaping uses `!` with `ESCAPE '!'`** so the same SQL works on SQLite (tests) and MySQL (production).
 6. **`dateRange` filters and Shift/Ctrl range selection** are built in the step-3 and step-4 plans respectively, with their first consumers.
 7. Export chunking uses `WithCustomChunkSize` (maatwebsite ignores `WithChunkReading` for exports).
+8. Date ranges are two single-property filters, `Filter::dateFrom` and `Filter::dateTo`, instead of one `dateRange(from, to)` filter, so the pipeline and trait handle them like any other filter.
