@@ -8,6 +8,7 @@ use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Models\User;
 use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
@@ -631,5 +632,38 @@ class MasterFormasiServiceTest extends TestCase
         }
 
         $this->assertSame(0, DB::table('position_unit')->count());
+    }
+
+    public function test_karpel_position_keeps_its_rm_band(): void
+    {
+        $created = $this->service->createPosition(['nama' => 'Krani Baru', 'level' => 'Karpel', 'rm_level' => 'RM-6'], $this->admin);
+        $this->assertSame('RM-6', $created->rm_level);
+
+        // Mengubah nama tanpa menyertakan RM Band tidak boleh menghapus band jabatan.
+        $this->service->updatePosition($created, ['nama' => 'Krani Nama Baru'], 'Penyesuaian nomenklatur jabatan', $this->admin);
+        $this->assertSame('RM-6', $created->fresh()->rm_level);
+
+        $this->service->updatePosition($created->fresh(), ['rm_level' => 'RM-5'], 'Penyesuaian strata sesuai pedoman', $this->admin);
+        $this->assertSame('RM-5', $created->fresh()->rm_level);
+
+        $this->expectException(FormasiRuleViolationException::class);
+        $this->service->createPosition(['nama' => 'Asisten Salah', 'level' => 'Karpim', 'rm_level' => 'RM-5'], $this->admin);
+    }
+
+    public function test_renaming_a_unit_keeps_the_old_name_resolvable_as_an_alias(): void
+    {
+        $unit = $this->unit('Kebun Lama');
+
+        $this->service->updateUnit($unit, ['nama' => 'Kebun Baru'], 'Penyesuaian nama unit resmi', $this->admin);
+
+        $alias = UnitAlias::where('alias_key', UnitAlias::keyFor('KEBUN LAMA'))->firstOrFail();
+        $this->assertSame($unit->id, $alias->unit_id);
+        $this->assertSame('rename', $alias->source);
+
+        // Mengembalikan nama lama menjadikannya nama resmi lagi, bukan alias.
+        $this->service->updateUnit($unit->fresh(), ['nama' => 'Kebun Lama'], 'Pengembalian nama unit resmi', $this->admin);
+
+        $this->assertDatabaseMissing('unit_aliases', ['alias_key' => UnitAlias::keyFor('Kebun Lama')]);
+        $this->assertDatabaseHas('unit_aliases', ['alias_key' => UnitAlias::keyFor('Kebun Baru')]);
     }
 }

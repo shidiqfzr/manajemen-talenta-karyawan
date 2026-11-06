@@ -42,13 +42,15 @@ class FormasiDialogs
      *
      * @return list<array{value: string, label: string}>
      */
-    public function rmOptions(?string $current = null): array
+    public function rmOptions(?string $current = null, ?string $level = null): array
     {
-        $options = collect(Position::KARPIM_RM_LEVELS)
+        $levels = $level === 'Karpel' ? Position::KARPEL_RM_LEVELS : Position::KARPIM_RM_LEVELS;
+
+        $options = collect($levels)
             ->map(fn ($rm) => ['value' => $rm, 'label' => Position::RM_LEVEL_LIST[$rm]])
             ->all();
 
-        if ($current && ! in_array($current, Position::KARPIM_RM_LEVELS, true)) {
+        if ($current && ! in_array($current, $levels, true)) {
             $options[] = ['value' => $current, 'label' => $current.' (nilai saat ini)'];
         }
 
@@ -141,7 +143,7 @@ class FormasiDialogs
             'fields' => [
                 ['name' => 'nama', 'label' => 'Nama Jabatan', 'type' => 'text', 'value' => $seat->jabatan, 'required' => true],
                 ['name' => 'level', 'label' => 'Strata', 'type' => 'select', 'value' => $seat->level, 'required' => true, 'options' => $this->levelOptions()],
-                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $seat->rm_level, 'required' => false, 'options' => $this->rmOptions($seat->rm_level)],
+                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $seat->rm_level, 'required' => false, 'options' => $this->rmOptions($seat->rm_level, $seat->level)],
                 ['name' => 'is_active', 'type' => 'hidden', 'value' => $seat->position_active ? '1' : '0'],
                 ['name' => 'return_unit', 'type' => 'hidden', 'value' => (string) $unit->id],
                 ['name' => 'reason', 'label' => 'Alasan Perubahan (wajib bila mengubah nama atau RM Band)', 'type' => 'textarea', 'value' => '', 'required' => false, 'placeholder' => self::REASON_HINT],

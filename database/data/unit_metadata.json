@@ -1,11 +1,11 @@
 {
-    "Bagian Sekretariat & Hukum": {
-        "kode": "Bagian",
+    "Divisi Satuan Pengawasan Intern": {
+        "kode": "Divisi",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 1
     },
-    "Bagian Sumber Daya Manusia & Sistem Manajemen": {
-        "kode": "Bagian",
+    "Divisi Sustainability & ESG": {
+        "kode": "Divisi",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 2
     },
@@ -24,23 +24,23 @@
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 5
     },
-    "Tim Penguatan ERP SAP": {
-        "kode": "Tim",
+    "Bagian Pengadaan & Teknologi Informasi": {
+        "kode": "Bagian",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 6
     },
-    "Bagian Pengadaan & Teknologi Informasi": {
+    "Bagian Sekretariat & Hukum": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 7
     },
-    "Distrik Petani Mitra": {
-        "kode": "Distrik",
+    "Bagian Sumber Daya Manusia & Sistem Manajemen": {
+        "kode": "Bagian",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 8
     },
-    "Kebun Kemitraan Area Kalbar": {
-        "kode": "Kebun",
+    "Distrik Petani Mitra": {
+        "kode": "Distrik",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 9
     },
@@ -52,15 +52,22 @@
     "PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng": {
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 11
+        "urutan": 11,
+        "aliases": [
+            "PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG",
+            "PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG"
+        ]
     },
     "PMO Batu Bara & Bisnis Lainnya": {
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 12
+        "urutan": 12,
+        "aliases": [
+            "PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA"
+        ]
     },
-    "Kebun Kemitraan Area Kaltim-Sel": {
-        "kode": "Kebun",
+    "Tim Penguatan ERP SAP": {
+        "kode": "Tim",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 13
     },

@@ -586,4 +586,35 @@ class EmployeeCrudTest extends TestCase
         $this->assertFalse($empPension->isMbtActive());
         $this->assertTrue($empPension->isPensionReached());
     }
+
+    public function test_karpel_can_be_stored_with_the_rm_5_band_of_its_position(): void
+    {
+        $nik = '88990066';
+        Employee::where('nik', $nik)->delete();
+
+        $unit = Unit::firstOrCreate(['nama' => 'Bagian Sekretariat & Hukum'], ['kode' => 'Bagian', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Satpam'], ['level' => 'Karpel', 'rm_level' => 'RM-5', 'is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1]]);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.store'), [
+            'nik' => $nik,
+            'nama' => 'Karpel Testing',
+            'jabatan' => 'Satpam',
+            'unit_kerja' => 'Bagian Sekretariat & Hukum',
+            'level' => 'Karpel',
+            'rm_level' => 'RM-5',
+            'golongan' => 'IIA/00',
+            'tanggal_lahir' => '1990-06-15',
+            'tmt_bekerja' => '2015-01-01',
+            'tanggal_dalam_jabatan' => '2023-01-01',
+            'job_grade' => 5,
+            'person_grade' => 5,
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame('RM-5', Employee::where('nik', $nik)->value('rm_level'));
+
+        Employee::where('nik', $nik)->delete();
+    }
 }

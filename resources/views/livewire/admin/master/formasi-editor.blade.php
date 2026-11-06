@@ -94,7 +94,7 @@
                                 <td class="py-3.5 px-5 tabular-nums">{{ $seat->kuota }}</td>
                                 <td class="py-3.5 px-5 tabular-nums">
                                     @if ($seat->filled > 0)
-                                        <button type="button" wire:click="viewOccupants({{ $seat->id }})" aria-label="Lihat {{ $seat->filled }} pegawai pada formasi {{ $seat->jabatan }}"
+                                        <button type="button" wire:click="viewOccupants({{ $seat->id }})" wire:loading.attr="disabled" wire:loading.class="opacity-50 cursor-wait" wire:target="viewOccupants({{ $seat->id }})" aria-label="Lihat {{ $seat->filled }} pegawai pada formasi {{ $seat->jabatan }}"
                                             class="font-semibold text-primary-700 underline decoration-dotted underline-offset-2 hover:text-primary-900 cursor-pointer rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{{ $seat->filled }}</button>
                                     @else
                                         {{ $seat->filled }}
@@ -443,30 +443,31 @@
         </div>
     @endif
 
-    <!-- Dialog Pemegang Jabatan (drill-down kolom Terisi) -->
+    {{-- Drawer Pemegang Jabatan (drill-down kolom Terisi; komponen bersama dengan MPP, DESIGN.md §7.6 dan §9.11) --}}
     @if ($this->occupantSeat)
         @php $occupantSeat = $this->occupantSeat @endphp
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.closeOccupants()" @click.self="$wire.closeOccupants()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="formasi-occupant-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="formasi-occupant-title" class="text-sm font-extrabold text-surface-900">Pemegang Jabatan</h3>
-                    <p class="text-[11px] text-surface-500">{{ $occupantSeat->jabatan }} — {{ $occupantSeat->filled }} dari {{ $occupantSeat->kuota }} kuota terisi</p>
-                </div>
-                <ul class="max-h-80 overflow-y-auto divide-y divide-surface-100">
-                    @foreach ($this->occupants as $occupant)
-                        <li class="px-6 py-3 flex items-center justify-between gap-3 text-xs" wire:key="occupant-{{ $occupant->nik }}">
-                            <a href="{{ route('admin.employees.show', $occupant->nik) }}" class="font-semibold text-surface-900 hover:text-primary-700 transition">{{ $occupant->nama }}</a>
-                            <span class="text-surface-500">{{ $occupant->golongan ?: '-' }}</span>
-                        </li>
-                    @endforeach
-                </ul>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end">
-                    <x-admin.button variant="secondary" wire:click="closeOccupants">Tutup</x-admin.button>
-                </div>
-            </div>
-        </div>
+        <x-admin.personnel-drawer
+            title="Pemegang Jabatan"
+            title-id="formasi-occupant-title"
+            close-action="closeOccupants"
+            :employees="$this->occupants"
+            :count="count($this->occupants)"
+            :subtitle="$occupantSeat->jabatan.' — '.$occupantSeat->filled.' dari '.$occupantSeat->kuota.' kuota terisi'"
+            empty-text="Belum ada pegawai pada jabatan ini">
+            <x-slot:badges>
+                <span class="inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold border {{ \App\Models\Position::rmTheme($occupantSeat->rm_level) }}">{{ $occupantSeat->rm_level ?? '-' }}</span>
+                @if ($occupantSeat->bidang)
+                    <span class="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-surface-200/80 text-surface-800">Bidang {{ $occupantSeat->bidang }}</span>
+                @endif
+            </x-slot:badges>
+            @if ($occupantSeat->filled > count($this->occupants))
+                <x-slot:header>
+                    <p class="text-[11px] text-warning-800 bg-warning-50 border border-warning-200/80 rounded-lg px-3 py-2" role="status">
+                        Menampilkan {{ count($this->occupants) }} dari {{ $occupantSeat->filled }} pegawai. Gunakan Daftar Pegawai untuk melihat seluruhnya.
+                    </p>
+                </x-slot:header>
+            @endif
+        </x-admin.personnel-drawer>
     @endif
 
     <x-admin.master.action-dialog />

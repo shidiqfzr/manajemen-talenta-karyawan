@@ -82,14 +82,15 @@ class BuildFormasiSeed extends Command
 
         $seed = [];
         foreach ($units as $name => $positions) {
-            $seed[] = [
+            $seed[] = array_filter([
                 'nama' => $name,
                 'kode' => $metadata[$name]['kode'],
                 'wilayah' => $metadata[$name]['wilayah'],
                 'is_active' => true,
                 'urutan' => $metadata[$name]['urutan'],
+                'aliases' => $metadata[$name]['aliases'] ?? [],
                 'positions' => $positions,
-            ];
+            ], fn ($value, $key) => $key !== 'aliases' || $value !== [], ARRAY_FILTER_USE_BOTH);
         }
 
         $out = $this->resolvePath((string) $this->option('out'));

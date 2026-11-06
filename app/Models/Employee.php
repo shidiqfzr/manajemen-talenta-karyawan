@@ -8,6 +8,7 @@ use App\Services\ManPowerPlanningService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 
 class Employee extends Model
 {
@@ -41,19 +42,19 @@ class Employee extends Model
      */
     public const GROUPED_UNITS = [
         'Regional Office (Kantor Direksi Pontianak)' => [
-            'Bagian Sekretariat & Hukum',
-            'Bagian Sumber Daya Manusia & Sistem Manajemen',
+            'Divisi Satuan Pengawasan Intern',
+            'Divisi Sustainability & ESG',
             'Bagian Tanaman',
             'Bagian Teknik & Pengolahan',
             'Bagian Akuntansi & Keuangan',
-            'Tim Penguatan ERP SAP',
             'Bagian Pengadaan & Teknologi Informasi',
+            'Bagian Sekretariat & Hukum',
+            'Bagian Sumber Daya Manusia & Sistem Manajemen',
             'Distrik Petani Mitra',
-            'Kebun Kemitraan Area Kalbar',
             'PMO Investasi Tanaman Wilayah Kalbar',
             'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
             'PMO Batu Bara & Bisnis Lainnya',
-            'Kebun Kemitraan Area Kaltim-Sel',
+            'Tim Penguatan ERP SAP',
         ],
         'Wilayah Kalimantan Barat' => [
             'Group Manager Kalbar',
@@ -116,21 +117,23 @@ class Employee extends Model
     ];
 
     /**
+     * Sidik jari (SHA-256) atribut pegawai sebagaimana tersimpan di basis data. Dipakai pembatalan impor untuk
+     * memastikan baris belum berubah sejak impor (nilai dinormalkan ke teks agar stabil antar driver basis data).
+     */
+    public static function stateHash(self $employee): string
+    {
+        $state = Arr::only($employee->getRawOriginal(), $employee->getFillable());
+        ksort($state);
+
+        return hash('sha256', (string) json_encode(array_map(fn ($value) => $value === null ? null : (string) $value, $state)));
+    }
+
+    /**
      * Strata Pegawai (DOMAIN.md Bab 3).
      */
     public const LEVELS = [
         'Karpim' => 'Karyawan Pimpinan (Karpim)',
         'Karpel' => 'Karyawan Pelaksana (Karpel)',
-    ];
-
-    /**
-     * Eselon Manajemen / RM Band Formasi (DOMAIN.md Bab 4.2).
-     */
-    public const RM_LEVELS = [
-        'RM-1' => 'RM-1 — Pimpinan Puncak Unit / Senior Leadership',
-        'RM-2' => 'RM-2 — Manajemen Madya / Middle Management',
-        'RM-3' => 'RM-3 — Manajemen Pratama / First-Line Management',
-        'RM-4' => 'RM-4 — Karyawan Pelaksana / Operational Staff',
     ];
 
     /**

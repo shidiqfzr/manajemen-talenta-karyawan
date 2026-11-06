@@ -337,6 +337,88 @@ class FormasiEditorTest extends TestCase
             ->assertDontSee('Pegawai Pemegang Uji');
     }
 
+    public function test_occupant_list_opens_as_a_right_drawer_with_profile_link_and_a_blur_free_overlay(): void
+    {
+        $position = $this->position('Asisten Drawer', 'Karpim', 'RM-3');
+        $seatId = $this->seat($position, 2, 'TAN');
+        $employee = Employee::factory()->create([
+            'unit_kerja' => $this->unit->nama,
+            'jabatan' => $position->nama,
+            'nama' => 'Pegawai Drawer Uji',
+            'golongan' => 'IVB/06',
+            'status_karyawan' => 'Tetap (PKWTT)',
+            'tanggal_pensiun' => '2030-02-01',
+            'tanggal_mbt' => '2029-02-01',
+        ]);
+
+        $html = $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Pemegang Jabatan')
+            ->assertSee('1 Personil')
+            ->assertSee('Bidang TAN')
+            ->assertSee('IVB/06')
+            ->assertSee('Tetap (PKWTT)')
+            ->assertSee('01 Feb 2029')
+            ->assertSee('01 Feb 2030')
+            ->assertDontSee('Lihat Profil')
+            ->assertSee('Tutup Panel')
+            ->assertDontSeeText($employee->nik)
+            ->html();
+
+        $this->assertStringContainsString('inset-y-0 right-0', $html);
+        $this->assertStringContainsString('fixed inset-0 bg-surface-950/30 transition-opacity', $html);
+        // Nama pegawai adalah tautan profil (tab baru), bukan tombol terpisah.
+        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('admin.employees.show', $employee->nik), '/').'"[^>]*target="_blank"[^>]*>\s*Pegawai Drawer Uji/', $html);
+    }
+
+    public function test_occupant_drawer_warns_when_the_seat_holds_more_people_than_the_list_limit(): void
+    {
+        $position = $this->position('Mandor Banyak');
+        $seatId = $this->seat($position, 300);
+        Employee::factory()->count(FormasiEditor::OCCUPANT_LIMIT + 1)->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama]);
+
+        $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Menampilkan '.FormasiEditor::OCCUPANT_LIMIT.' dari '.(FormasiEditor::OCCUPANT_LIMIT + 1).' pegawai');
+    }
+
+    public function test_opening_the_occupant_list_is_recorded_on_the_audit_log_without_personal_data(): void
+    {
+        $position = $this->position('Asisten Audit', 'Karpim', 'RM-3');
+        $seatId = $this->seat($position, 2, 'TAN');
+        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Pegawai Audit Uji']);
+
+        $this->editor()->call('viewOccupants', $seatId)->call('closeOccupants');
+
+        $log = MasterAuditLog::where('action', 'seat_access.view_occupants')->sole();
+        $this->assertSame('seat_access', $log->entity_type);
+        $this->assertSame($this->admin->id, $log->user_id);
+        $this->assertSame(
+            ['unit' => $this->unit->nama, 'jabatan' => 'Asisten Audit', 'rm_level' => 'RM-3', 'bidang' => 'TAN', 'jumlah_baris' => 1],
+            $log->new_values
+        );
+        $this->assertStringNotContainsString($employee->nik, json_encode($log->new_values).$log->entity_label);
+        $this->assertStringNotContainsString('Pegawai Audit Uji', json_encode($log->new_values).$log->entity_label);
+    }
+
+    public function test_opening_an_empty_or_foreign_seat_is_not_recorded_as_personnel_access(): void
+    {
+        $emptySeat = $this->seat($this->position('Asisten Tanpa Pemegang'), 1);
+        $other = Unit::create(['nama' => 'Kebun Asing Audit', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 3]);
+        $foreign = DB::table('position_unit')->insertGetId(['unit_id' => $other->id, 'position_id' => $this->position('Asisten Asing Audit')->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->editor()->call('viewOccupants', $emptySeat)->call('viewOccupants', $foreign);
+
+        $this->assertSame(0, MasterAuditLog::where('entity_type', 'seat_access')->count());
+    }
+
+    public function test_occupant_drawer_shows_an_empty_state_for_a_seat_without_holders(): void
+    {
+        $seatId = $this->seat($this->position('Asisten Kosong'), 1);
+
+        $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Belum ada pegawai pada jabatan ini')
+            ->assertSee('0 Personil');
+    }
+
     public function test_occupants_of_a_seat_in_another_unit_cannot_be_opened(): void
     {
         $other = Unit::create(['nama' => 'Kebun Lain', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 2]);
