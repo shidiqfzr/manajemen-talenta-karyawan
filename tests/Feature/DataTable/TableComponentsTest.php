@@ -4,6 +4,7 @@ namespace Tests\Feature\DataTable;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Livewire;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
@@ -253,5 +254,26 @@ class TableComponentsTest extends TestCase
         foreach (['AGENTS.md', 'DOMAIN.md', 'DESIGN.md', 'ENGINEERING.md', 'SECURITY.md', 'SSOT'] as $name) {
             $this->assertStringNotContainsString($name, $html);
         }
+    }
+
+    public function test_pagination_ids_and_page_buttons_follow_the_page_name(): void
+    {
+        $named = new LengthAwarePaginator(range(1, 10), 30, 10, 2, ['pageName' => 'riwayat_page']);
+
+        $this->blade('<x-admin.table.pagination :paginator="$p" noun="riwayat" />', ['p' => $named])
+            ->assertSee('for="per-page-riwayat_page"', false)
+            ->assertSee('id="per-page-riwayat_page"', false)
+            ->assertSee("gotoPage(3, 'riwayat_page')", false)
+            ->assertSee("previousPage('riwayat_page')", false)
+            ->assertSee("nextPage('riwayat_page')", false)
+            ->assertDontSee('per-page-select', false);
+
+        // Existing callers on the default page name keep working.
+        $default = new LengthAwarePaginator(range(1, 10), 30, 10, 1);
+
+        $this->blade('<x-admin.table.pagination :paginator="$p" />', ['p' => $default])
+            ->assertSee('for="per-page-page"', false)
+            ->assertSee('id="per-page-page"', false)
+            ->assertSee("gotoPage(2, 'page')", false);
     }
 }
