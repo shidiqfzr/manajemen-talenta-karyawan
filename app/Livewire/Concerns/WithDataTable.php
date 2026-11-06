@@ -235,6 +235,33 @@ trait WithDataTable
         return implode(',', array_map(fn (Filter $filter) => $filter->property, $this->filters()));
     }
 
+    /**
+     * Comma-joined `wire:target` list for the loading skeleton and aria-busy: the shared table actions,
+     * then the module's own row actions, then the filter properties.
+     */
+    protected function tableLoadingTargets(string ...$actions): string
+    {
+        return collect(['search', 'sortBy', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'resetFilters', ...$actions, $this->filterProperties()])
+            ->filter()
+            ->implode(', ');
+    }
+
+    /** @return list<string> Keys of the rows on the current page, in the form the selection uses. */
+    protected function tablePageKeys(): array
+    {
+        return $this->rows->getCollection()
+            ->map(fn ($row) => (string) $row->getAttribute($this->rowKey()))
+            ->all();
+    }
+
+    /** Visible columns, plus the selection column when the table has bulk actions. */
+    protected function tableColumnCount(): int
+    {
+        $visible = count(array_filter($this->columns(), fn (Column $column) => ! $column->isExportOnly()));
+
+        return $visible + ($this->bulkActions() !== [] ? 1 : 0);
+    }
+
     protected function tableState(): TableState
     {
         $filterValues = [];
