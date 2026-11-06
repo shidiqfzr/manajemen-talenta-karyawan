@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Exports\DataTableExport;
 use App\Models\MasterAuditLog;
 use App\Support\DataTable\BulkAction;
 use App\Support\DataTable\Column;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 /**
@@ -31,6 +34,8 @@ trait WithDataTable
     use WithPagination;
 
     private const SEARCH_MAX_LENGTH = 100;
+
+    private const SELECTION_MAX = 1000;
 
     public string $search = '';
 
@@ -64,7 +69,12 @@ trait WithDataTable
         return [];
     }
 
-    /** @return array<int, BulkAction> */
+    /**
+     * Bulk handlers (`bulk<Name>`) must stay `protected`: a public method would be
+     * client-callable and skip the permission check in runBulkAction().
+     *
+     * @return array<int, BulkAction>
+     */
     protected function bulkActions(): array
     {
         return [];
@@ -151,6 +161,7 @@ trait WithDataTable
 
         // The user ticked or unticked a row: "select all matching" no longer describes the selection.
         if ($property === 'selected' || str_starts_with($property, 'selected.')) {
+            $this->selected = $this->normaliseSelection($this->selected);
             $this->selectAllMatching = false;
 
             return;
@@ -287,7 +298,9 @@ trait WithDataTable
             ->all();
 
         $this->selectAllMatching = false;
-        $this->selected = $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [] ? [] : $pageKeys;
+        $this->selected = $this->normaliseSelection(
+            $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [] ? [] : $pageKeys
+        );
     }
 
     public function selectAllMatchingRows(): void
@@ -330,7 +343,7 @@ trait WithDataTable
         $targets = $this->bulkTargets();
 
         try {
-            $count = DB::transaction(fn () => $this->{$action->handlerMethod()}($targets));
+            $count = DB::transaction(fn () => (int) $this->{$action->handlerMethod()}($targets));
         } catch (Throwable $e) {
             report($e);
             $this->tableNotice = ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.'];
@@ -348,6 +361,48 @@ trait WithDataTable
         $this->tableNotice = ['type' => 'success', 'message' => $action->successText($count)];
         $this->clearSelection();
         unset($this->rows, $this->matchingCount);
+    }
+
+    /** Downloads the searched, filtered (and optionally narrowed by selection) rows as an Excel file. */
+    public function export(): ?BinaryFileResponse
+    {
+        $name = $this->exportName();
+
+        if ($name === null) {
+            abort(404);
+        }
+
+        if (Gate::denies($this->exportAbility())) {
+            $this->tableNotice = ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk mengekspor data.'];
+
+            return null;
+        }
+
+        $query = $this->filteredQuery();
+
+        // The client-writable selection can only narrow the export, never widen it.
+        if ($this->selected !== [] && ! $this->selectAllMatching) {
+            $query->whereIn($query->getModel()->qualifyColumn($this->rowKey()), $this->selected);
+        }
+
+        $count = (clone $query)->reorder()->count();
+
+        if ($count > $this->exportLimit()) {
+            $this->tableNotice = ['type' => 'warning', 'message' => 'Data terlalu besar untuk diekspor. Persempit filter terlebih dahulu.'];
+
+            return null;
+        }
+
+        $this->auditTable('data_table.export', [
+            'jumlah_baris' => $count,
+            'filter' => $this->activeFilterValues(),
+            'pencarian' => $this->search !== '',
+        ]);
+
+        return Excel::download(
+            new DataTableExport($query, $this->columns(), $this->tableLabel(), auth()->user()),
+            $name.'_'.now()->format('Y-m-d_His').'.xlsx',
+        );
     }
 
     /**
@@ -400,6 +455,27 @@ trait WithDataTable
         }
 
         return $sortable;
+    }
+
+    /**
+     * @param  array<mixed>  $selection
+     * @return array<int, string>
+     */
+    private function normaliseSelection(array $selection): array
+    {
+        $keys = [];
+
+        foreach ($selection as $key) {
+            if (is_int($key) || is_string($key)) {
+                $key = (string) $key;
+
+                if ($key !== '') {
+                    $keys[] = $key;
+                }
+            }
+        }
+
+        return array_slice(array_values(array_unique($keys)), 0, self::SELECTION_MAX);
     }
 
     private function normaliseSearch(string $search): string
