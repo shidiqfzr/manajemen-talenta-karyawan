@@ -218,3 +218,12 @@ One test class per system under test (`AGENTS.md` rule 5):
 - `tests/Feature/DataTable/DataTableExportTest.php` — headings/mapping from `exportable()` columns, footer metadata, chunked query.
 - Migrated modules — each existing test class gains the cases it needs; Employees gets `EmployeeDirectoryTest` asserting legacy URLs still filter identically.
 - Every PR: `./vendor/bin/pint` and the full PHPUnit suite pass.
+
+## 9. Deltas found while planning
+
+1. **Feedback is an in-card notice, not a toast.** No global listener exists for the `toast` event, so the trait exposes `$tableNotice` and `x-admin.table.notice` renders it inside the table card (`role="status"` for success, `role="alert"` for error/warning), matching `x-admin.flash`. All copy in §6 is unchanged.
+2. **Export neutralises formula prefixes** (`=`, `+`, `-`, `@`, tab, CR → prefixed with `'`), as the existing exports already do.
+3. **Embedded tables opt out of URL sync and use their own page name** (`syncsUrl()`, `paginationName()`), because three history tables share the employee profile page.
+4. **Audit detail records `pencarian` as a boolean**, never the search term (it is often a name or NIK).
+5. **LIKE escaping uses `!` with `ESCAPE '!'`** so the same SQL works on SQLite (tests) and MySQL (production).
+6. **`dateRange` filters and Shift/Ctrl range selection** are built in the step-3 and step-4 plans respectively, with their first consumers.
