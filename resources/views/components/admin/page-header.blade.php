@@ -1,3 +1,7 @@
+{{--
+    Kepala halaman admin. Slot opsional memuat aksi tambahan di sebelah tombol kembali:
+    <x-admin.page-header title="..." icon="fas fa-file" back-url="..."> <x-admin.button size="sm" variant="secondary">Aksi</x-admin.button> </x-admin.page-header>
+--}}
 @props(['title', 'subtitle' => '', 'icon', 'backUrl' => null, 'backLabel' => 'Kembali', 'breadcrumbs' => []])
 
 <div class="bg-white rounded-xl sm:rounded-2xl border border-surface-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -30,9 +34,14 @@
         </div>
     </div>
 
-    @if($backUrl && $backLabel)
-        <x-admin.button href="{{ $backUrl }}" variant="secondary" icon="fas fa-arrow-left" class="whitespace-nowrap shrink-0">
-            {{ $backLabel }}
-        </x-admin.button>
+    @if (! $slot->isEmpty() || ($backUrl && $backLabel))
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            {{ $slot }}
+            @if($backUrl && $backLabel)
+                <x-admin.button href="{{ $backUrl }}" variant="secondary" icon="fas fa-arrow-left" class="whitespace-nowrap shrink-0">
+                    {{ $backLabel }}
+                </x-admin.button>
+            @endif
+        </div>
     @endif
 </div>

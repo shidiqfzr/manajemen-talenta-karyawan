@@ -123,9 +123,9 @@
                     <div data-overlay class="absolute inset-0 bg-primary-900/70"></div>
 
                     <div class="relative z-10 text-white max-w-md">
-                        <h2 class="text-4xl short:text-3xl font-bold leading-tight tracking-tight text-balance mb-3">Kelola Seluruh Siklus Talenta Pegawai</h2>
+                        <h2 class="text-4xl short:text-3xl font-bold leading-tight tracking-tight text-balance mb-3">Pengelolaan Talenta yang Terpadu dan Akuntabel</h2>
                         <p class="text-base leading-relaxed">
-                            Data pegawai, formasi jabatan, mutasi, pelatihan, penilaian kinerja, dan pemetaan talenta PTPN IV Regional V terpusat dalam satu sistem.
+                            Satu platform untuk mengelola data pegawai, formasi jabatan, mutasi, pelatihan, penilaian kinerja, dan pemetaan talenta di lingkungan PTPN IV Regional V.
                         </p>
                     </div>
                 </aside>
