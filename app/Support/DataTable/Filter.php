@@ -80,6 +80,6 @@ final class Filter
 
     private function with(mixed ...$changes): self
     {
-        return clone ($this, $changes);
+        return new self(...array_merge(get_object_vars($this), $changes));
     }
 }

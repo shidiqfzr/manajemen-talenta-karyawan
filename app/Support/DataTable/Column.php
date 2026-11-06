@@ -117,9 +117,8 @@ final class Column
         return $this->exportValue ? ($this->exportValue)($row) : data_get($row, $this->key);
     }
 
-    /** Returns a modified clone (PHP 8.5 clone-with keeps readonly properties immutable). */
     private function with(mixed ...$changes): self
     {
-        return clone ($this, $changes);
+        return new self(...array_merge(get_object_vars($this), $changes));
     }
 }
