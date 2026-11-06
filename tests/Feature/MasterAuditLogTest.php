@@ -123,6 +123,43 @@ class MasterAuditLogTest extends TestCase
         $response->assertSee('Kuota: 1 → 3')->assertSee('Bidang: - → TAN')->assertSee('Status: Aktif → Nonaktif');
     }
 
+    public function test_change_summary_renders_data_table_audit_details_readably(): void
+    {
+        $plain = MasterAuditLog::record($this->admin, 'data_table.export', 'data_table', null, 'Riwayat Jabatan', null, [
+            'jumlah_baris' => 12, 'filter' => [], 'pencarian' => true,
+        ]);
+        $filtered = MasterAuditLog::record($this->admin, 'data_table.bulk', 'data_table', null, 'Riwayat Jabatan', null, [
+            'aksi' => 'nonaktifkan', 'jumlah_baris' => 3, 'filter' => ['bidang' => 'KEU'], 'pencarian' => false,
+        ]);
+
+        $this->assertSame(
+            ['Jumlah Baris: - → 12', 'Filter: - → -', 'Pencarian: - → ya'],
+            $plain->changeSummary(),
+        );
+        $this->assertSame(
+            ['Aksi: - → nonaktifkan', 'Jumlah Baris: - → 3', 'Filter: - → Bidang=KEU', 'Pencarian: - → tidak'],
+            $filtered->changeSummary(),
+        );
+    }
+
+    public function test_history_page_renders_with_data_table_audit_rows(): void
+    {
+        MasterAuditLog::record($this->admin, 'data_table.export', 'data_table', null, 'Riwayat Jabatan', null, [
+            'jumlah_baris' => 12, 'filter' => [], 'pencarian' => false,
+        ]);
+        MasterAuditLog::record($this->admin, 'data_table.bulk', 'data_table', null, 'Riwayat Jabatan', null, [
+            'aksi' => 'nonaktifkan', 'jumlah_baris' => 3, 'filter' => ['bidang' => 'KEU'], 'pencarian' => true,
+        ]);
+
+        $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))
+            ->assertOk()
+            ->assertSee('Tabel data diunduh')
+            ->assertSee('Aksi massal pada tabel data')
+            ->assertSee('Tabel Data')
+            ->assertSee('Filter: - → Bidang=KEU')
+            ->assertDontSee('Array');
+    }
+
     public function test_record_stores_the_audit_row_with_a_user_snapshot(): void
     {
         $log = $this->log()->fresh();

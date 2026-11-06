@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Support\DataTable\Column;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
-use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -17,7 +17,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
  * Generic Excel export for shared data tables: exports the columns flagged exportable,
  * neutralises spreadsheet formulas and stamps the confidentiality notice.
  */
-final class DataTableExport implements FromQuery, WithChunkReading, WithEvents, WithHeadings, WithMapping, WithProperties
+final class DataTableExport implements FromQuery, WithCustomChunkSize, WithEvents, WithHeadings, WithMapping, WithProperties
 {
     /** @var array<int, Column> */
     private array $columns;

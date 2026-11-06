@@ -292,7 +292,10 @@ trait WithDataTable
         return $this->selectAllMatching ? $this->matchingCount : count($this->selected);
     }
 
-    /** Selects the keys on the current page, or clears them when the whole page is already selected. */
+    /**
+     * Adds the current page's keys to the selection, or removes only the current page's keys when the
+     * whole page is already selected. Selections made on other pages are kept.
+     */
     public function toggleSelectPage(): void
     {
         $pageKeys = $this->rows->getCollection()
@@ -301,7 +304,9 @@ trait WithDataTable
 
         $this->selectAllMatching = false;
         $this->selected = $this->normaliseSelection(
-            $pageKeys !== [] && array_diff($pageKeys, $this->selected) === [] ? [] : $pageKeys
+            $pageKeys !== [] && array_diff($pageKeys, $this->selected) === []
+                ? array_diff($this->selected, $pageKeys)
+                : [...$this->selected, ...$pageKeys]
         );
     }
 
@@ -344,21 +349,26 @@ trait WithDataTable
 
         $targets = $this->bulkTargets();
 
+        // The audit entry is written in the same transaction: no audit entry, no change.
         try {
-            $count = DB::transaction(fn () => (int) $this->{$action->handlerMethod()}($targets));
+            $count = DB::transaction(function () use ($action, $targets): int {
+                $count = (int) $this->{$action->handlerMethod()}($targets);
+
+                $this->auditTable('data_table.bulk', [
+                    'aksi' => $action->name,
+                    'jumlah_baris' => $count,
+                    'filter' => $this->activeFilterValues(),
+                    'pencarian' => $this->search !== '',
+                ]);
+
+                return $count;
+            });
         } catch (Throwable $e) {
             report($e);
             $this->tableNotice = ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.'];
 
             return;
         }
-
-        $this->auditTable('data_table.bulk', [
-            'aksi' => $action->name,
-            'jumlah_baris' => $count,
-            'filter' => $this->activeFilterValues(),
-            'pencarian' => $this->search !== '',
-        ]);
 
         $this->tableNotice = ['type' => 'success', 'message' => $action->successText($count)];
         $this->clearSelection();
@@ -488,8 +498,30 @@ trait WithDataTable
     private function normalisePerPage(): void
     {
         if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = $this->defaultPerPage();
+            $this->perPage = $this->resolvedDefaultPerPage();
         }
+    }
+
+    /**
+     * defaultPerPage() when it is one of perPageOptions(); otherwise the first option of at least 25,
+     * else the first option.
+     */
+    private function resolvedDefaultPerPage(): int
+    {
+        $options = array_values($this->perPageOptions());
+        $default = $this->defaultPerPage();
+
+        if ($options === [] || in_array($default, $options, true)) {
+            return $default;
+        }
+
+        foreach ($options as $option) {
+            if ($option >= 25) {
+                return $option;
+            }
+        }
+
+        return $options[0];
     }
 
     private function normaliseSort(): void

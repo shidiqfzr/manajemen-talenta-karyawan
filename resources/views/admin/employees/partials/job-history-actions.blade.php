@@ -6,7 +6,7 @@
   </a>
 
   <button wire:click="deleteRow({{ $row->id }})" wire:loading.attr="disabled" wire:target="deleteRow"
-          onclick="return confirm('Hapus riwayat jabatan ini?')"
+          onclick="confirm('Hapus riwayat jabatan ini?') || event.stopImmediatePropagation()"
           class="w-8 h-8 flex items-center justify-center rounded-md bg-danger text-white hover:bg-danger transition"
           title="Hapus">
     <i class="fas fa-trash" aria-hidden="true"></i>

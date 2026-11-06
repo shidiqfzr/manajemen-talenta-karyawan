@@ -182,4 +182,12 @@ class JobHistoryTableTest extends TestCase
             ->assertSeeHtml('wire:loading.attr="aria-busy" wire:target="'.$targets.'"')
             ->assertSeeHtml('wire:loading.attr="disabled" wire:target="deleteRow"');
     }
+
+    public function test_cancelling_the_delete_confirm_stops_the_livewire_call(): void
+    {
+        // Livewire ignores preventDefault, so a cancelled confirm must stop the wire:click listener itself.
+        $this->table()
+            ->assertSeeHtml("onclick=\"confirm('Hapus riwayat jabatan ini?') || event.stopImmediatePropagation()\"")
+            ->assertDontSeeHtml('return confirm(');
+    }
 }

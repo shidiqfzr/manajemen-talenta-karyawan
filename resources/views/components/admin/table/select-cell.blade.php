@@ -2,7 +2,7 @@
     Sel centang baris tabel data Livewire (DESIGN.md §7.5): <input type="checkbox"> sungguhan berlabel nama baris,
     terikat ke properti $selected milik trait WithDataTable.
 
-    <x-admin.table.select-cell :key="(string) $row->getKey()" :label="$row->nama" />
+    <x-admin.table.select-cell :key="(string) $row->getAttribute($this->rowKey())" :label="$row->nama" />
 --}}
 @props(['key', 'label'])
 

@@ -5,6 +5,7 @@ namespace Tests\Feature\DataTable;
 use App\Exports\DataTableExport;
 use App\Models\User;
 use App\Support\DataTable\Column;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\TestCase;
@@ -46,6 +47,8 @@ class DataTableExportTest extends TestCase
 
     public function test_chunk_size_is_500(): void
     {
+        // Query exports only honour WithCustomChunkSize; WithChunkReading applies to imports.
+        $this->assertInstanceOf(WithCustomChunkSize::class, $this->export());
         $this->assertSame(500, $this->export()->chunkSize());
     }
 
