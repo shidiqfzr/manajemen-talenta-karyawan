@@ -546,4 +546,41 @@ class WithDataTableTest extends TestCase
 
         Livewire::test(FixtureTableNoExport::class)->call('export')->assertNotFound();
     }
+
+    public function test_table_loading_targets_include_actions_and_filters(): void
+    {
+        $table = invade(Livewire::test(FixtureTable::class)->instance());
+
+        $this->assertSame(
+            'search, sortBy, perPage, gotoPage, nextPage, previousPage, resetFilters, hapus, bidang',
+            $table->tableLoadingTargets('hapus')
+        );
+        $this->assertSame(
+            'search, sortBy, perPage, gotoPage, nextPage, previousPage, resetFilters, bidang',
+            $table->tableLoadingTargets()
+        );
+    }
+
+    public function test_table_page_keys_use_the_row_key(): void
+    {
+        $table = invade(Livewire::test(FixtureTable::class)->instance());
+
+        $expected = FixtureRow::query()->orderBy('nama')->limit(25)->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        $this->assertSame($expected, $table->tablePageKeys());
+    }
+
+    public function test_table_column_count_adds_the_selection_column(): void
+    {
+        $withBulk = invade(Livewire::test(FixtureTable::class)->instance());
+        $withoutBulk = invade(Livewire::test(TrainingTable::class, ['employeeId' => '12345678'])->instance());
+
+        $this->assertNotSame([], $withBulk->bulkActions());
+        $this->assertSame([], $withoutBulk->bulkActions());
+
+        $visible = fn ($table) => count(array_filter($table->columns(), fn ($column) => ! $column->isExportOnly()));
+
+        $this->assertSame($visible($withBulk) + 1, $withBulk->tableColumnCount());
+        $this->assertSame($visible($withoutBulk), $withoutBulk->tableColumnCount());
+    }
 }

@@ -5,9 +5,9 @@
     $bulkActions = $this->bulkActions();
     $selectable = $bulkActions !== [];
     $rowKey = $this->rowKey();
-    $pageKeys = $rows->getCollection()->map(fn ($row) => (string) $row->getAttribute($rowKey))->all();
-    $loadingTargets = collect(['search', 'sortBy', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'resetFilters', 'detachTraining', $this->filterProperties()])->filter()->implode(', ');
-    $columnCount = count(array_filter($columns, fn ($column) => ! $column->isExportOnly())) + ($selectable ? 1 : 0);
+    $pageKeys = $this->tablePageKeys();
+    $loadingTargets = $this->tableLoadingTargets('detachTraining');
+    $columnCount = $this->tableColumnCount();
 @endphp
 <div>
     <x-admin.table.card :notice="$tableNotice">

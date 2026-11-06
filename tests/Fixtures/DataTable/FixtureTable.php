@@ -97,9 +97,9 @@ class FixtureTable extends Component
                 $columns = $this->columns();
                 $bulkActions = $this->bulkActions();
                 $selectable = $bulkActions !== [];
-                $pageKeys = $rows->getCollection()->map(fn ($row) => (string) $row->getKey())->all();
-                $loadingTargets = collect(['search', 'sortBy', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'resetFilters', $this->filterProperties()])->filter()->implode(', ');
-                $columnCount = count(array_filter($columns, fn ($column) => ! $column->isExportOnly())) + ($selectable ? 1 : 0);
+                $pageKeys = $this->tablePageKeys();
+                $loadingTargets = $this->tableLoadingTargets();
+                $columnCount = $this->tableColumnCount();
             @endphp
             <div>
                 <x-admin.table.card :notice="$tableNotice">
