@@ -8,6 +8,7 @@ use App\Models\Unit;
 use App\Services\KepegawaianPolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class EmployeeImportRowValidator
 {
@@ -16,7 +17,6 @@ class EmployeeImportRowValidator
         'nama' => 'required|string|max:255',
         'jabatan' => 'required|string|max:255',
         'level' => 'required|string|in:Karpim,Karpel',
-        'rm_level' => 'nullable|string|in:RM-1,RM-2,RM-3,RM-4',
         'unit_kerja' => 'required|string|max:255',
         'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
         'status_karyawan' => 'required|string|max:50',
@@ -67,15 +67,33 @@ class EmployeeImportRowValidator
     private array $occupancyCache = [];
 
     /**
+     * Saat komit nyata, baris unit dikunci (`FOR UPDATE`) sampai transaksi komit selesai, sehingga penambahan
+     * pegawai lain pada unit yang sama menunggu dan kuota formasi tidak dapat terlampaui (sama dengan FormasiSeatGuard).
+     */
+    public bool $lockSeats = false;
+
+    /**
      * Melakukan validasi menyeluruh (schema dasar + aturan bisnis kepegawaian).
      * Mengembalikan daftar string error. Jika array kosong, data dinyatakan valid.
      */
     public function validateRow(array &$data, array $existingEmployeesCache = []): array
     {
-        $validator = Validator::make($data, self::VALIDATION_RULES, self::CUSTOM_MESSAGES);
+        // Strata (Karpim/Karpel) melekat pada Formasi Jabatan: bila kosong, diturunkan dari Master Formasi.
+        $levelKnown = $this->deriveLevel($data, $existingEmployeesCache);
+
+        // RM Band mengikuti daftar resmi pada model Position (satu sumber), bukan salinan di validator ini.
+        $rules = self::VALIDATION_RULES + ['rm_level' => ['nullable', 'string', Rule::in(array_keys(Position::RM_LEVEL_LIST))]];
+        if (! $levelKnown) {
+            $rules['level'] = 'nullable|string|in:Karpim,Karpel';
+        }
+        $validator = Validator::make($data, $rules, self::CUSTOM_MESSAGES + ['rm_level.in' => 'RM Level tidak dikenal (RM-1 sampai RM-7).']);
 
         if ($validator->fails()) {
             return $validator->errors()->all();
+        }
+
+        if (! $levelKnown) {
+            return [$this->pairingGuidance($data['unit_kerja'], $data['jabatan'], null)];
         }
 
         $businessErrors = [];
@@ -144,11 +162,13 @@ class EmployeeImportRowValidator
             if (! $unitExists) {
                 $businessErrors[] = "Unit Kerja '{$data['unit_kerja']}' tidak terdaftar di Master Unit Organisasi.";
             } elseif ($validPositions === []) {
-                $businessErrors[] = "Unit Kerja '{$data['unit_kerja']}' belum memiliki formasi jabatan untuk Level Strata '{$data['level']}'.";
+                $businessErrors[] = "Unit Kerja '{$data['unit_kerja']}' belum memiliki formasi jabatan untuk Level Strata '{$data['level']}'."
+                    .$this->pairingHint($data['unit_kerja'], $data['jabatan'], $data['level']);
             } else {
                 $matchedPosition = $this->matchPosition($data['jabatan'], array_keys($validPositions));
                 if (! $matchedPosition) {
-                    $businessErrors[] = "Jabatan '{$data['jabatan']}' tidak valid untuk Unit Kerja '{$data['unit_kerja']}' dan Level Strata '{$data['level']}'.";
+                    $businessErrors[] = "Jabatan '{$data['jabatan']}' tidak valid untuk Unit Kerja '{$data['unit_kerja']}' dan Level Strata '{$data['level']}'."
+                        .$this->pairingHint($data['unit_kerja'], $data['jabatan'], $data['level']);
                 } else {
                     $data['jabatan'] = $matchedPosition;
                     $seat = $validPositions[$matchedPosition];
@@ -164,7 +184,8 @@ class EmployeeImportRowValidator
                     $isDefinitif = ($data['status_penugasan'] ?? 'Definitif') === 'Definitif';
                     if ($isDefinitif && ! $seat['pool']) {
                         if ($this->occupancy($data['unit_kerja'], $matchedPosition) >= $seat['kuota']) {
-                            $businessErrors[] = "Kuota formasi jabatan '{$matchedPosition}' pada Unit Kerja '{$data['unit_kerja']}' sudah terpenuhi ({$seat['kuota']} formasi).";
+                            $businessErrors[] = "Kuota formasi jabatan '{$matchedPosition}' pada Unit Kerja '{$data['unit_kerja']}' sudah terpenuhi ({$seat['kuota']} formasi)."
+                                .$this->openSeatsHint($data['unit_kerja'], $data['level'], $matchedPosition);
                         } elseif ($businessErrors === []) {
                             $this->occupancyCache[$data['unit_kerja']][$matchedPosition]++;
                         }
@@ -174,6 +195,177 @@ class EmployeeImportRowValidator
         }
 
         return $businessErrors;
+    }
+
+    /**
+     * Mengisi Strata dari Master Formasi bila kolom Level kosong: pegawai eksisting memakai strata tercatatnya,
+     * pegawai baru memakai strata Formasi Jabatan yang cocok pada unit. Mengembalikan false bila tidak dapat ditentukan.
+     */
+    private function deriveLevel(array &$data, array $existingEmployeesCache): bool
+    {
+        if (filled($data['level'] ?? null)) {
+            return true;
+        }
+
+        $existing = $existingEmployeesCache[$data['nik'] ?? ''] ?? null;
+        if ($existing) {
+            $existingLevel = $existing['level'] ?? ($existing instanceof Employee ? $existing->level : null);
+            if (filled($existingLevel)) {
+                $data['level'] = $existingLevel;
+
+                return true;
+            }
+        }
+
+        $unitName = (string) ($data['unit_kerja'] ?? '');
+        $jabatan = (string) ($data['jabatan'] ?? '');
+        if ($unitName === '' || $jabatan === '') {
+            return false;
+        }
+
+        $levels = [];
+        foreach (['Karpim', 'Karpel'] as $level) {
+            [, $positions] = $this->getUnitPositionData($unitName, $level);
+            if ($this->matchPosition($jabatan, array_keys($positions)) !== null) {
+                $levels[] = $level;
+            }
+        }
+
+        if (count($levels) !== 1) {
+            return false;
+        }
+
+        $data['level'] = $levels[0];
+
+        return true;
+    }
+
+    /**
+     * Pesan lengkap untuk pasangan Unit Kerja dan Jabatan yang tidak ditemukan pada Master Formasi.
+     */
+    private function pairingGuidance(string $unitName, string $jabatan, ?string $level): string
+    {
+        [$unitExists] = $this->getUnitPositionData($unitName, 'Karpim');
+        if (! $unitExists) {
+            return "Unit Kerja '{$unitName}' tidak terdaftar di Master Unit Organisasi.";
+        }
+
+        if ($this->unitPositionNames($unitName) === []) {
+            return "Unit Kerja '{$unitName}' belum memiliki formasi jabatan pada Master Formasi.";
+        }
+
+        return "Jabatan '{$jabatan}' tidak valid untuk Unit Kerja '{$unitName}'.".$this->pairingHint($unitName, $jabatan, $level);
+    }
+
+    /**
+     * Petunjuk memperbaiki pasangan Unit Kerja dan Jabatan: strata berbeda, unit lain yang memiliki jabatan itu,
+     * atau jabatan serupa pada unit ini.
+     */
+    private function pairingHint(string $unitName, string $jabatan, ?string $level): string
+    {
+        $namesByLevel = $this->unitPositionNames($unitName);
+        $hint = '';
+
+        $matched = $this->matchPosition($jabatan, array_keys($namesByLevel));
+        if ($matched !== null && $level !== null && $namesByLevel[$matched] !== $level) {
+            $hint .= " Jabatan ini berstrata {$namesByLevel[$matched]} pada unit tersebut; kosongkan kolom Level agar terisi otomatis.";
+        } elseif ($matched === null) {
+            $elsewhere = Unit::active()
+                ->whereHas('positions', fn ($query) => $query->where('positions.is_active', true)->whereRaw('lower(positions.nama) = ?', [mb_strtolower($jabatan)]))
+                ->orderBy('urutan')->limit(4)->pluck('nama')->all();
+            if ($elsewhere !== []) {
+                $hint .= ' Jabatan ini terdaftar pada unit: '.implode(', ', $elsewhere).'.';
+            }
+
+            $similar = collect(array_keys($namesByLevel))
+                ->map(function (string $name) use ($jabatan): array {
+                    similar_text(mb_strtolower($jabatan), mb_strtolower($name), $percent);
+
+                    return [$name, $percent];
+                })
+                ->filter(fn (array $pair) => $pair[1] >= 30)
+                ->sortByDesc(fn (array $pair) => $pair[1])
+                ->take(5)->pluck(0)->all();
+            if ($similar !== []) {
+                $hint .= ' Jabatan serupa di unit ini: '.implode(', ', $similar).'.';
+            }
+        }
+
+        return $hint." Daftar lengkap ada pada sheet 'Formasi per Unit' di template.";
+    }
+
+    /**
+     * Formasi Jabatan pada unit yang masih memiliki sisa kuota (selain jabatan yang sedang ditolak).
+     */
+    private function openSeatsHint(string $unitName, string $level, string $excludeJabatan): string
+    {
+        [, $positions] = $this->getUnitPositionData($unitName, $level);
+
+        $open = [];
+        foreach ($positions as $name => $seat) {
+            if ($name !== $excludeJabatan && ! $seat['pool'] && $this->occupancy($unitName, $name) < $seat['kuota']) {
+                $open[] = $name;
+            }
+        }
+
+        return $open === [] ? '' : ' Formasi masih kosong di unit ini: '.implode(', ', array_slice($open, 0, 5)).(count($open) > 5 ? ', dan lainnya' : '').'.';
+    }
+
+    /**
+     * Jabatan aktif pada unit untuk seluruh strata: [nama jabatan => strata].
+     *
+     * @return array<string, string>
+     */
+    private function unitPositionNames(string $unitName): array
+    {
+        $names = [];
+        foreach (['Karpim', 'Karpel'] as $level) {
+            foreach (array_keys($this->getUnitPositionData($unitName, $level)[1]) as $name) {
+                $names[$name] = $level;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Peringatan tinjauan untuk pegawai eksisting yang lolos validasi: formasinya (unit, strata, jabatan, kuota)
+     * sudah tidak sesuai Master Formasi. Bersifat informatif dan tidak pernah menolak baris; perubahan
+     * penempatan tetap hanya melalui modul Mutasi, perubahan formasi melalui Master Formasi.
+     * Strata yang belum memiliki formasi sama sekali pada unit tersebut (mis. Karpel) tidak dinilai.
+     *
+     * @return list<string>
+     */
+    public function seatDriftWarnings(array $data): array
+    {
+        $unitName = (string) ($data['unit_kerja'] ?? '');
+        $jabatan = (string) ($data['jabatan'] ?? '');
+        $level = (string) ($data['level'] ?? '');
+
+        [$unitExists, $positions] = $this->getUnitPositionData($unitName, $level);
+
+        if (! $unitExists) {
+            return ["Unit Kerja '{$unitName}' tidak aktif atau tidak terdaftar di Master Unit Organisasi."];
+        }
+
+        if ($positions === [] && $level === 'Karpel') {
+            return [];
+        }
+
+        if (! isset($positions[$jabatan])) {
+            return ["Jabatan '{$jabatan}' tidak lagi tercantum pada formasi Unit Kerja '{$unitName}' untuk Level Strata '{$level}'."];
+        }
+
+        $seat = $positions[$jabatan];
+        $isDefinitif = ($data['status_penugasan'] ?? 'Definitif') === 'Definitif';
+        if ($isDefinitif && ! $seat['pool']) {
+            $terisi = $this->occupancy($unitName, $jabatan);
+            if ($terisi > $seat['kuota']) {
+                return ["Pemangku definitif jabatan '{$jabatan}' pada Unit Kerja '{$unitName}' melebihi kuota formasi ({$terisi} dari {$seat['kuota']})."];
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -200,9 +392,11 @@ class EmployeeImportRowValidator
     public function getUnitPositionData(string $unitName, string $level): array
     {
         if (! isset($this->unitPositionsCache[$unitName])) {
-            $unit = Unit::with(['positions' => function ($query) {
+            $unitQuery = Unit::with(['positions' => function ($query) {
                 $query->where('positions.is_active', true);
-            }])->where('nama', $unitName)->where('is_active', true)->first();
+            }])->where('nama', $unitName)->where('is_active', true);
+
+            $unit = ($this->lockSeats ? $unitQuery->lockForUpdate() : $unitQuery)->first();
 
             $positionsByLevel = [];
             foreach ($unit?->positions ?? [] as $pos) {

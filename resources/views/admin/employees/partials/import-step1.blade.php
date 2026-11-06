@@ -102,7 +102,7 @@
                 <template x-if="isValidating">
                     <span class="inline-flex items-center gap-2">
                         <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
-                        <span>Menganalisis Format &amp; 26 Kolom...</span>
+                        <span>Menganalisis Format &amp; {{ $guideTotal }} Kolom...</span>
                     </span>
                 </template>
             </button>
@@ -119,7 +119,7 @@
                     @click="openDictionaryDrawer()"
                     class="py-2.5 px-3 rounded-xl border border-primary-200 bg-primary-50/50 hover:bg-primary-100/60 text-primary-800 text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer">
                     <i class="fas fa-book-bookmark text-primary-600 text-sm" aria-hidden="true"></i>
-                    <span>Kamus Format (26 Kolom)</span>
+                    <span>Kamus Format ({{ $guideTotal }} Kolom)</span>
                     <i class="fas fa-arrow-up-right-from-square text-[10px] text-primary-600" aria-hidden="true"></i>
                 </button>
             </div>

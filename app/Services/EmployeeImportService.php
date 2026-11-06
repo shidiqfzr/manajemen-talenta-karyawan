@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ImportAbortedException;
 use App\Imports\EmployeesImport;
 use App\Jobs\ProcessEmployeeImportCommitJob;
 use App\Jobs\ProcessEmployeeImportPreviewJob;
@@ -10,10 +11,13 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Exceptions\NoTypeDetectedException;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class EmployeeImportService
@@ -96,7 +100,13 @@ class EmployeeImportService
         }
 
         // Eksekusi Sinkron untuk volume data wajar (<= 500 baris)
-        $summary = $this->executeDryRun($fullPath, $storedPath, $file->getClientOriginalName(), $file->getSize(), $token);
+        try {
+            $summary = $this->executeDryRun($fullPath, $storedPath, $file->getClientOriginalName(), $file->getSize(), $token);
+        } catch (ImportAbortedException $e) {
+            Storage::disk(self::DISK)->delete($storedPath);
+
+            throw $e;
+        }
 
         return [
             'token' => $token,
@@ -125,12 +135,13 @@ class EmployeeImportService
     public function executeDryRun(string $fullPath, string $storedPath, string $originalName, int $fileSize, string $token): array
     {
         $import = new EmployeesImport(dryRun: true);
-        Excel::import($import, $fullPath);
+        $this->importSpreadsheet($import, $fullPath);
 
         $summary = $import->getImportSummary();
 
         // Cache metadata pratinjau untuk proses komit atau unduh baris gagal
         Cache::put("import_preview_{$token}", [
+            'file_hash' => hash_file('sha256', $fullPath),
             'file_path' => $storedPath,
             'original_name' => $originalName,
             'file_size' => $fileSize,
@@ -202,6 +213,62 @@ class EmployeeImportService
             throw new \RuntimeException('Sesi pratinjau impor telah kedaluwarsa atau berkas tidak ditemukan. Silakan unggah ulang berkas.');
         }
 
+        // Satu token hanya boleh dikomit sekali: klik ganda atau permintaan paralel tidak boleh menulis dua kali.
+        if (! Cache::add($this->commitGuardKey($token), true, now()->addMinutes(self::CACHE_TTL_MINUTES))) {
+            throw new \RuntimeException('Komit untuk berkas ini sudah dijalankan atau sedang diproses.');
+        }
+
+        try {
+            return $this->dispatchOrRunCommit($cached, $token, $user, $ip, $userAgent);
+        } catch (\Throwable $e) {
+            Cache::forget($this->commitGuardKey($token));
+
+            throw $e;
+        }
+    }
+
+    private function commitGuardKey(string $token): string
+    {
+        return "import_commit_started_{$token}";
+    }
+
+    /**
+     * Menyimpan pengajuan yang sudah disetujui admin lain (dipanggil EmployeeImportGovernanceService).
+     */
+    public function commitApproved(string $token, User $checker, ?string $ip = null, ?string $userAgent = null): array
+    {
+        $cached = Cache::get("import_preview_{$token}");
+        if (! $cached || ! Storage::disk(self::DISK)->exists($cached['file_path'])) {
+            throw new ImportAbortedException('Berkas pengajuan tidak ditemukan atau sesi peninjauan berakhir. Tinjau ulang pengajuan.');
+        }
+
+        if (! Cache::add($this->commitGuardKey($token), true, now()->addMinutes(self::CACHE_TTL_MINUTES))) {
+            throw new ImportAbortedException('Penyimpanan pengajuan ini sudah dijalankan atau sedang diproses.');
+        }
+
+        try {
+            return $this->dispatchOrRunCommit($cached, $token, $checker, $ip, $userAgent, true);
+        } catch (\Throwable $e) {
+            Cache::forget($this->commitGuardKey($token));
+
+            throw $e;
+        }
+    }
+
+    private function dispatchOrRunCommit(array $cached, string $token, ?User $user, ?string $ip, ?string $userAgent, bool $approved = false): array
+    {
+        // Kebijakan empat mata: impor hanya diajukan, belum disimpan. Penyetuju memakai token yang sama.
+        if (! $approved && EmployeeImportGovernanceService::requiresApproval()) {
+            if ($user === null) {
+                throw new ImportAbortedException('Pengajuan impor memerlukan pengguna yang masuk.');
+            }
+
+            $result = app(EmployeeImportGovernanceService::class)->submit($cached, $token, $user, $ip, $userAgent);
+            Cache::forget($this->commitGuardKey($token));
+
+            return $result;
+        }
+
         $totalProcessed = $cached['summary']['total_processed'] ?? 0;
 
         // Hybrid Execution untuk Commit volume besar
@@ -245,14 +312,23 @@ class EmployeeImportService
         ?string $ip = null,
         ?string $userAgent = null
     ): array {
+        // Penyimpanan nyata hanya sah untuk impor yang sudah disetujui bila kebijakan empat mata aktif.
+        $approvedLog = EmployeeImportLog::where('token', $token)->where('status', EmployeeImportLog::STATUS_APPROVED)->first();
+        if ($approvedLog === null && EmployeeImportGovernanceService::requiresApproval()) {
+            throw new ImportAbortedException('Impor ini memerlukan persetujuan admin lain sebelum dapat disimpan.');
+        }
+
         $fullPath = Storage::disk(self::DISK)->path($cached['file_path']);
-        $import = new EmployeesImport(dryRun: false, actorName: $user?->name);
 
-        Excel::import($import, $fullPath);
+        // Berkas yang ditulis harus identik dengan berkas yang sudah dipratinjau dan disetujui admin.
+        $fileHash = (string) hash_file('sha256', $fullPath);
+        if (! is_string($cached['file_hash'] ?? null) || ! hash_equals($cached['file_hash'], $fileHash)) {
+            throw new \RuntimeException('Berkas impor berubah sejak pratinjau. Silakan unggah ulang berkas dan periksa kembali pratinjaunya.');
+        }
 
-        $summary = $import->getImportSummary();
-
-        $this->recordAuditLog($summary, $user, $ip, $userAgent, $cached['original_name'] ?? 'unknown.xlsx', $cached['file_size'] ?? 0, $token);
+        [$import, $summary] = $this->commitAtomically(
+            $fullPath, $user, $ip, $userAgent, $cached['original_name'] ?? 'unknown.xlsx', (int) ($cached['file_size'] ?? 0), $token, $fileHash, $approvedLog
+        );
 
         Log::info('HRIS Import Data Pegawai dieksekusi (via Dry-Run Commit)', [
             'user_id' => $user?->id,
@@ -306,34 +382,107 @@ class EmployeeImportService
     }
 
     /**
-     * Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
+     * Menulis seluruh baris valid beserta jejak auditnya dalam SATU transaksi. Bila terjadi kendala sistem pada
+     * salah satu baris, atau jejak audit gagal tercatat, seluruh komit dibatalkan dan tidak ada data yang tersimpan.
+     * Baris yang melanggar aturan data tetap dilewati dan dilaporkan, sama seperti pada pratinjau.
+     *
+     * @return array{0: EmployeesImport, 1: array}
      */
-    private function recordAuditLog(array $summary, ?User $user, ?string $ip, ?string $userAgent, string $fileName, int $fileSize, ?string $token): void
+    private function commitAtomically(
+        string|UploadedFile $source,
+        ?User $user,
+        ?string $ip,
+        ?string $userAgent,
+        string $fileName,
+        int $fileSize,
+        ?string $token,
+        string $fileHash,
+        ?EmployeeImportLog $approvedLog = null
+    ): array {
+        try {
+            return DB::transaction(function () use ($source, $user, $ip, $userAgent, $fileName, $fileSize, $token, $fileHash, $approvedLog): array {
+                // Pada impor yang disetujui, catatan riwayat menyebut pengaju dan penyetuju.
+                $actorName = $approvedLog ? "{$approvedLog->user_name} (disetujui {$user?->name})" : $user?->name;
+                $import = new EmployeesImport(dryRun: false, actorName: $actorName);
+                $this->importSpreadsheet($import, $source);
+
+                if ($import->processingFailures > 0) {
+                    throw new ImportAbortedException("Komit dibatalkan: {$import->processingFailures} baris gagal diproses akibat kendala sistem. Tidak ada data yang tersimpan, silakan coba lagi atau hubungi administrator sistem.");
+                }
+
+                $summary = $import->getImportSummary();
+                $log = $this->recordAuditLog($summary, $user, $ip, $userAgent, $fileName, $fileSize, $token, $fileHash, $approvedLog);
+
+                // Rekaman perubahan per pegawai disimpan dalam transaksi yang sama agar impor dapat dibatalkan.
+                foreach ($import->changes as $change) {
+                    $log->changes()->create($change);
+                }
+
+                return [$import, $summary];
+            });
+        } catch (ImportAbortedException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Komit impor pegawai dibatalkan dan di-rollback: '.$e->getMessage(), ['exception' => $e::class]);
+
+            throw new ImportAbortedException('Komit dibatalkan karena kendala sistem. Tidak ada data yang tersimpan, silakan coba lagi atau hubungi administrator sistem.', 0, $e);
+        }
+    }
+
+    /**
+     * Membaca spreadsheet; berkas yang tidak dapat dibaca menjadi galat yang aman ditampilkan, bukan galat 500.
+     */
+    private function importSpreadsheet(EmployeesImport $import, string|UploadedFile $source): void
     {
         try {
-            EmployeeImportLog::create([
-                'user_id' => $user?->id,
-                'user_name' => $user?->name ?? 'System Administrator',
-                'user_email' => $user?->email,
-                'ip_address' => $ip,
-                'user_agent' => $userAgent,
-                'file_name' => $fileName,
-                'file_size' => $fileSize,
-                'total_rows' => $summary['total_processed'] ?? 0,
-                'created_count' => $summary['created'] ?? 0,
-                'updated_count' => $summary['updated'] ?? 0,
-                'unchanged_count' => $summary['unchanged'] ?? 0,
-                'skipped_count' => $summary['skipped'] ?? 0,
-                'has_errors' => $summary['has_errors'] ?? false,
-                'status' => 'completed',
-                'token' => $token,
-                'metadata' => [
-                    'summary' => $this->redactSummary($summary),
-                ],
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('Gagal mencatat audit log persisten ke database: '.$e->getMessage());
+            Excel::import($import, $source);
+        } catch (SpreadsheetException|NoTypeDetectedException $e) {
+            Log::warning('Berkas impor pegawai tidak dapat dibaca: '.$e->getMessage());
+
+            throw new ImportAbortedException('Berkas tidak dapat dibaca sebagai spreadsheet Excel. Pastikan berkas berasal dari template impor pegawai dan tidak rusak.', 0, $e);
         }
+    }
+
+    /**
+     * Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
+     * Dipanggil di dalam transaksi komit; kegagalan mencatat membatalkan komit.
+     */
+    private function recordAuditLog(array $summary, ?User $user, ?string $ip, ?string $userAgent, string $fileName, int $fileSize, ?string $token, string $fileHash, ?EmployeeImportLog $approvedLog = null): EmployeeImportLog
+    {
+        $result = [
+            'file_name' => $fileName,
+            'file_size' => $fileSize,
+            'file_sha256' => $fileHash,
+            'stored_path' => null,
+            'total_rows' => $summary['total_processed'] ?? 0,
+            'created_count' => $summary['created'] ?? 0,
+            'updated_count' => $summary['updated'] ?? 0,
+            'unchanged_count' => $summary['unchanged'] ?? 0,
+            'skipped_count' => $summary['skipped'] ?? 0,
+            'has_errors' => $summary['has_errors'] ?? false,
+            'status' => EmployeeImportLog::STATUS_COMPLETED,
+            'committed_at' => now(),
+            'token' => $token,
+            'metadata' => [
+                'file_sha256' => $fileHash,
+                'summary' => $this->redactSummary($summary),
+            ],
+        ];
+
+        // Impor yang disetujui memperbarui catatan pengajuan (pengaju tetap tercatat sebagai pengaju).
+        if ($approvedLog) {
+            $approvedLog->update($result);
+
+            return $approvedLog;
+        }
+
+        return EmployeeImportLog::create($result + [
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'System Administrator',
+            'user_email' => $user?->email,
+            'ip_address' => $ip,
+            'user_agent' => $userAgent,
+        ]);
     }
 
     /**
@@ -343,8 +492,10 @@ class EmployeeImportService
     private function redactSummary(array $summary): array
     {
         unset($summary['sample_rows']);
+        // Pesan galat dapat memuat NIK (mis. duplikat): disamarkan sebelum disimpan permanen.
+        $mask = fn (string $text): string => preg_replace_callback('/\b[0-9]{8}\b/', fn (array $m) => substr($m[0], 0, 2).'****'.substr($m[0], -2), $text) ?? $text;
         $summary['errors'] = array_map(
-            fn (array $error) => ['row' => $error['row'] ?? null, 'errors' => $error['errors'] ?? []],
+            fn (array $error) => ['row' => $error['row'] ?? null, 'errors' => array_map(fn ($message) => $mask((string) $message), $error['errors'] ?? [])],
             $summary['errors'] ?? []
         );
 
@@ -377,6 +528,8 @@ class EmployeeImportService
             return $this->executeCommit($cached, $token, $user, $ip, $userAgent);
         } catch (\Throwable $e) {
             Log::error("Gagal menjalankan commit import background job [Token: {$token}]: ".$e->getMessage());
+            Cache::forget($this->commitGuardKey($token));
+            app(EmployeeImportGovernanceService::class)->releaseApproval($token);
 
             Cache::put("import_commit_job_{$token}", [
                 'status' => 'failed',
@@ -398,12 +551,14 @@ class EmployeeImportService
         ?string $ip = null,
         ?string $userAgent = null
     ): array {
-        $import = new EmployeesImport(dryRun: false, actorName: $user?->name);
-        Excel::import($import, $file);
+        if (EmployeeImportGovernanceService::requiresApproval()) {
+            throw new ImportAbortedException('Impor langsung dinonaktifkan karena kebijakan persetujuan empat mata aktif. Gunakan alur pratinjau lalu ajukan persetujuan.');
+        }
 
-        $summary = $import->getImportSummary();
-
-        $this->recordAuditLog($summary, $user, $ip, $userAgent, $file->getClientOriginalName(), (int) $file->getSize(), null);
+        [, $summary] = $this->commitAtomically(
+            $file, $user, $ip, $userAgent, $file->getClientOriginalName(), (int) $file->getSize(), null,
+            (string) hash_file('sha256', (string) $file->getRealPath())
+        );
 
         Log::info('HRIS Import Data Pegawai dieksekusi', [
             'channel' => 'direct_import',

@@ -2,28 +2,44 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\ImportAbortedException;
 use App\Exports\EmployeesExport;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesExport;
 use App\Exports\FailedEmployeesWorkbook;
 use App\Exports\ImportSummaryExport;
 use App\Exports\Sheets\EmployeeTemplateDataSheet;
+use App\Exports\Sheets\EmployeeTemplateFormasiSheet;
 use App\Exports\Sheets\EmployeeTemplateReferenceSheet;
+use App\Imports\EmployeesImport;
 use App\Models\Employee;
+use App\Models\EmployeeImportChange;
 use App\Models\EmployeeImportLog;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Models\User;
+use App\Services\EmployeeImportService;
 use App\Services\Import\EmployeeImportDictionary;
 use Carbon\Carbon;
+use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Sheet;
+use PhpOffice\PhpSpreadsheet\Calculation\Calculation;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -133,11 +149,12 @@ class EmployeeImportTest extends TestCase
         $response->assertSeeText('Unggah & Panduan Kolom');
         $response->assertSee('Unduh Template Excel Resmi');
         $response->assertSee('searchColumn');
-        $response->assertSee('6 wajib');
+        $mandatory = collect(EmployeeImportDictionary::getColumns())->where('is_mandatory', true)->count();
+        $response->assertSee($mandatory.' wajib');
 
-        // Pastikan seluruh 26 kolom dari EmployeeImportDictionary ter-render
+        // Pastikan seluruh kolom dari EmployeeImportDictionary ter-render (jumlahnya mengikuti template: 24 kolom)
         $columns = EmployeeImportDictionary::getColumns();
-        $this->assertCount(26, $columns);
+        $this->assertCount(24, $columns);
         foreach ($columns as $col) {
             $response->assertSee($col['key']);
         }
@@ -530,9 +547,10 @@ class EmployeeImportTest extends TestCase
         Excel::assertDownloaded('karyawan_import_template.xlsx', function (EmployeeTemplateExport $export) {
             $sheets = $export->sheets();
 
-            return count($sheets) === 2
+            return count($sheets) === 3
                 && $sheets[0] instanceof EmployeeTemplateDataSheet
-                && $sheets[1] instanceof EmployeeTemplateReferenceSheet;
+                && $sheets[1] instanceof EmployeeTemplateFormasiSheet
+                && $sheets[2] instanceof EmployeeTemplateReferenceSheet;
         });
     }
 
@@ -541,23 +559,26 @@ class EmployeeImportTest extends TestCase
         $export = new EmployeeTemplateExport;
         $sheets = $export->sheets();
 
-        $this->assertCount(2, $sheets);
+        $this->assertCount(3, $sheets);
 
         $dataSheet = $sheets[0];
         $this->assertEquals('Data Karyawan', $dataSheet->title());
-        $this->assertCount(26, $dataSheet->headings(), 'Template data sheet harus memiliki tepat 26 kolom');
+        $this->assertCount(24, $dataSheet->headings(), 'Template data sheet harus memiliki tepat 24 kolom (Level dan RM Level diturunkan)');
         $this->assertContains('NIK*', $dataSheet->headings());
         $this->assertContains('UNIT KERJA*', $dataSheet->headings());
         $this->assertContains('TUGAS RANGKAP / PENUGASAN SEMENTARA', $dataSheet->headings());
         $sampleData = $dataSheet->array();
         $this->assertCount(1, $sampleData);
-        $this->assertCount(26, $sampleData[0], 'Baris data contoh template harus memiliki 26 kolom');
+        $this->assertCount(24, $sampleData[0], 'Baris data contoh template harus memiliki 24 kolom');
         $this->assertEquals('13009988', $sampleData[0][0]); // Sample NIK
 
-        $refSheet = $sheets[1];
+        $this->assertSame('Formasi per Unit', $sheets[1]->title());
+
+        // Pasangan Unit Kerja dan Jabatan hanya ada di katalog Formasi, bukan sebagai dua daftar terpisah.
+        $refSheet = $sheets[2];
         $this->assertEquals('Referensi Master Data', $refSheet->title());
         $this->assertContains('UNIT KERJA RESMI', $refSheet->headings());
-        $this->assertContains('JABATAN FORMASI AKTIF', $refSheet->headings());
+        $this->assertNotContains('JABATAN FORMASI AKTIF', $refSheet->headings());
         $refData = $refSheet->array();
         $this->assertNotEmpty($refData);
         // Pastikan Kebun Inti Gunung Meliau ada di kolom A
@@ -589,19 +610,23 @@ class EmployeeImportTest extends TestCase
 
         // 1. Verifikasi Freeze Pane A2 dan AutoFilter A1:Z1
         $this->assertSame('A2', $activeSheet->getFreezePane());
-        $this->assertSame('A1:Z1', $activeSheet->getAutoFilter()->getRange());
+        $this->assertSame('A1:X1', $activeSheet->getAutoFilter()->getRange());
 
         // 2. Verifikasi Styling Background Header: Seragam Hijau Korporat PTPN IV (#1B5330)
         $a1Fill = $activeSheet->getStyle('A1')->getFill()->getStartColor()->getRGB();
-        $o1Fill = $activeSheet->getStyle('O1')->getFill()->getStartColor()->getRGB();
-        $z1Fill = $activeSheet->getStyle('Z1')->getFill()->getStartColor()->getRGB();
+        $o1Fill = $activeSheet->getStyle('M1')->getFill()->getStartColor()->getRGB();
+        $z1Fill = $activeSheet->getStyle('X1')->getFill()->getStartColor()->getRGB();
 
         $this->assertSame('1B5330', strtoupper($a1Fill), 'Header A1 harus berwarna Hijau Korporat PTPN IV (1B5330)');
-        $this->assertSame('1B5330', strtoupper($o1Fill), 'Header O1 harus berwarna Hijau Korporat PTPN IV (1B5330)');
-        $this->assertSame('1B5330', strtoupper($z1Fill), 'Header Z1 harus berwarna Hijau Korporat PTPN IV (1B5330)');
+        $this->assertSame('1B5330', strtoupper($o1Fill), 'Header M1 harus berwarna Hijau Korporat PTPN IV (1B5330)');
+        $this->assertSame('1B5330', strtoupper($z1Fill), 'Header X1 harus berwarna Hijau Korporat PTPN IV (1B5330)');
 
         // 3. Verifikasi Tanda Bintang (*) Berwarna Merah (#EF4444) pada kolom wajib
-        $mandatoryCells = ['A1', 'B1', 'H1', 'I1', 'J1', 'K1'];
+        // Level dan RM Level diturunkan dari Formasi Jabatan, sehingga bukan kolom template.
+        $this->assertNotContains('LEVEL', $dataSheet->headings());
+        $this->assertNotContains('RM LEVEL', $dataSheet->headings());
+
+        $mandatoryCells = ['A1', 'B1', 'H1', 'I1', 'J1'];
         foreach ($mandatoryCells as $cellId) {
             $cell = $activeSheet->getCell($cellId);
             $val = $cell->getValue();
@@ -630,9 +655,9 @@ class EmployeeImportTest extends TestCase
         $this->assertTrue($valB1->getShowInputMessage(), 'Cell B1 harus memiliki Input Message aktif');
         $this->assertSame('Panduan Nama Pegawai (Wajib)', $valB1->getPromptTitle());
 
-        $valO1 = $activeSheet->getCell('O1')->getDataValidation();
-        $this->assertTrue($valO1->getShowInputMessage(), 'Cell O1 harus memiliki Input Message aktif');
-        $this->assertSame('Panduan Tugas Rangkap', $valO1->getPromptTitle());
+        $valM1 = $activeSheet->getCell('M1')->getDataValidation();
+        $this->assertTrue($valM1->getShowInputMessage(), 'Cell M1 harus memiliki Input Message aktif');
+        $this->assertSame('Panduan Tugas Rangkap', $valM1->getPromptTitle());
     }
 
     public function test_template_sample_row_is_fully_compatible_with_import_processor(): void
@@ -641,7 +666,7 @@ class EmployeeImportTest extends TestCase
         $dataSheet = $export->sheets()[0];
 
         // Buat file Excel persis seperti template data sheet
-        $file = $this->createExcelUploadFile($dataSheet->array(), 'downloaded_template.xlsx');
+        $file = $this->createExcelUploadFile($dataSheet->array(), 'downloaded_template.xlsx', $dataSheet->headings());
 
         $response = $this->actingAs($this->admin)->post(route('admin.employees.import'), [
             'import_file' => $file,
@@ -1453,6 +1478,9 @@ class EmployeeImportTest extends TestCase
             $pos->id => ['kuota' => 1],
         ]);
 
+        // Nama lama pada berkas dipetakan lewat alias yang tercatat di Master Data, bukan konstanta kode.
+        UnitAlias::remember($pmoUnit, 'PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG', 'baseline');
+
         $rows = [
             [
                 '13001428', 'JAN PURDY RAJAGUKGUK', 'L', 'Bakara', '1971-01-11',
@@ -2077,5 +2105,1069 @@ class EmployeeImportTest extends TestCase
         $employee = Employee::find('13008899');
         $this->assertNotNull($employee);
         $this->assertEquals('BUDI SANTOSO', $employee->nama);
+    }
+
+    private function previewToken(array $rows): string
+    {
+        $response = $this->actingAs($this->admin)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile($rows)])
+            ->assertOk();
+
+        return $response->json('token');
+    }
+
+    public function test_commit_is_all_or_nothing_when_a_row_hits_a_system_error(): void
+    {
+        $this->formasiUnit('Kebun Atomik', 'Manajer Atomik', 'RM-1', 5);
+        $token = $this->previewToken([
+            $this->karpimImportRow('88007001', 'Manajer Atomik', 'Kebun Atomik'),
+            $this->karpimImportRow('88007002', 'Manajer Atomik', 'Kebun Atomik'),
+            $this->karpimImportRow('88007003', 'Manajer Atomik', 'Kebun Atomik'),
+        ]);
+
+        // Kendala sistem (bukan aturan data) pada baris kedua saat penulisan nyata.
+        Employee::saving(function (Employee $employee) {
+            if ($employee->nik === '88007002') {
+                throw new \RuntimeException('Simulasi kegagalan penulisan');
+            }
+        });
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.employees.import.commit'), ['token' => $token])
+            ->assertStatus(422);
+
+        $this->assertDatabaseMissing('employees', ['nik' => '88007001']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88007003']);
+        $this->assertSame(0, EmployeeImportLog::count());
+        $this->assertSame(0, JobHistory::whereIn('employee_nik', ['88007001', '88007003'])->count());
+    }
+
+    public function test_commit_rolls_back_the_data_when_the_audit_log_cannot_be_written(): void
+    {
+        $this->formasiUnit('Kebun Audit', 'Manajer Audit', 'RM-1', 5);
+        $token = $this->previewToken([$this->karpimImportRow('88007101', 'Manajer Audit', 'Kebun Audit')]);
+
+        EmployeeImportLog::creating(fn () => throw new \RuntimeException('Simulasi kegagalan audit'));
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token]);
+
+        $response->assertStatus(422);
+        $this->assertStringNotContainsString('Simulasi', $response->json('message'), 'Rincian internal tidak boleh sampai ke peramban.');
+        $this->assertStringContainsString('Tidak ada data yang tersimpan', $response->json('message'));
+        $this->assertDatabaseMissing('employees', ['nik' => '88007101']);
+    }
+
+    public function test_commit_refuses_a_file_that_changed_after_the_preview(): void
+    {
+        $this->formasiUnit('Kebun Hash', 'Manajer Hash', 'RM-1', 5);
+        $token = $this->previewToken([$this->karpimImportRow('88007201', 'Manajer Hash', 'Kebun Hash')]);
+
+        $swapped = $this->createExcelUploadFile([$this->karpimImportRow('88007299', 'Manajer Hash', 'Kebun Hash')]);
+        Storage::disk('local')->put(Cache::get("import_preview_{$token}")['file_path'], file_get_contents($swapped->getRealPath()));
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('berubah sejak pratinjau', $response->json('message'));
+        $this->assertDatabaseMissing('employees', ['nik' => '88007299']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88007201']);
+    }
+
+    public function test_commit_audit_log_records_the_sha256_of_the_committed_file(): void
+    {
+        $this->formasiUnit('Kebun Jejak', 'Manajer Jejak', 'RM-1', 5);
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88007301', 'Manajer Jejak', 'Kebun Jejak')]);
+        $expected = hash_file('sha256', $file->getRealPath());
+
+        $token = $this->actingAs($this->admin)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $file])
+            ->json('token');
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+        $this->assertSame($expected, EmployeeImportLog::sole()->metadata['file_sha256']);
+    }
+
+    public function test_the_same_preview_token_cannot_be_committed_twice_in_parallel(): void
+    {
+        $this->formasiUnit('Kebun Ganda', 'Manajer Ganda', 'RM-1', 5);
+        $token = $this->previewToken([$this->karpimImportRow('88007401', 'Manajer Ganda', 'Kebun Ganda')]);
+
+        // Permintaan pertama sedang berjalan (penanda terpasang): permintaan kedua harus ditolak.
+        Cache::put("import_commit_started_{$token}", true, now()->addMinutes(5));
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('sudah dijalankan', $response->json('message'));
+        $this->assertDatabaseMissing('employees', ['nik' => '88007401']);
+    }
+
+    public function test_a_failed_commit_releases_the_token_so_the_admin_can_retry(): void
+    {
+        $this->formasiUnit('Kebun Ulang', 'Manajer Ulang', 'RM-1', 5);
+        $token = $this->previewToken([$this->karpimImportRow('88007501', 'Manajer Ulang', 'Kebun Ulang')]);
+
+        $path = Cache::get("import_preview_{$token}")['file_path'];
+        $original = Storage::disk('local')->get($path);
+        Storage::disk('local')->put($path, 'rusak');
+
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertStatus(422);
+
+        Storage::disk('local')->put($path, $original);
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+        $this->assertDatabaseHas('employees', ['nik' => '88007501']);
+    }
+
+    public function test_only_a_real_commit_locks_the_unit_rows_it_counts_against_the_quota(): void
+    {
+        $this->assertTrue((new EmployeesImport(dryRun: false))->validator->lockSeats);
+        $this->assertFalse((new EmployeesImport(dryRun: true))->validator->lockSeats);
+
+        $this->formasiUnit('Kebun Kunci', 'Manajer Kunci', 'RM-1', 1);
+        $token = $this->previewToken([$this->karpimImportRow('88007601', 'Manajer Kunci', 'Kebun Kunci')]);
+
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+        $this->assertDatabaseHas('employees', ['nik' => '88007601']);
+    }
+
+    public function test_preview_rejects_an_unreadable_file_cleanly_and_removes_it(): void
+    {
+        $fake = UploadedFile::fake()->createWithContent('pegawai.xlsx', 'ini bukan spreadsheet');
+        $before = Storage::disk('local')->files('imports');
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.employees.import.preview'), ['import_file' => $fake])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertSame($before, Storage::disk('local')->files('imports'), 'Berkas yang tidak terbaca tidak boleh tertinggal di disk.');
+    }
+
+    public function test_import_resolves_a_legacy_unit_name_from_the_unit_alias_master(): void
+    {
+        $unit = $this->formasiUnit('Kebun Nama Baru', 'Manajer Alias', 'RM-1', 2);
+        UnitAlias::remember($unit, 'Kebun Nama Lama', 'rename');
+
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88008001', 'Manajer Alias', 'KEBUN NAMA LAMA')]);
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertDatabaseHas('employees', ['nik' => '88008001', 'unit_kerja' => 'Kebun Nama Baru']);
+    }
+
+    public function test_import_does_not_resolve_an_alias_of_an_inactive_unit(): void
+    {
+        $unit = $this->formasiUnit('Kebun Tutup', 'Manajer Tutup', 'RM-1', 2);
+        UnitAlias::remember($unit, 'Kebun Tutup Lama', 'rename');
+        $unit->update(['is_active' => false]);
+
+        $file = $this->createExcelUploadFile([$this->karpimImportRow('88008101', 'Manajer Tutup', 'Kebun Tutup Lama')]);
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertDatabaseMissing('employees', ['nik' => '88008101']);
+        $this->assertStringContainsString('tidak terdaftar', session('import_summary')['errors'][0]['errors'][0]);
+    }
+
+    public function test_import_accepts_every_rm_band_in_the_official_list_and_rejects_others(): void
+    {
+        $this->formasiUnit('Kebun RM Resmi', 'Manajer RM Resmi', 'RM-1', 1);
+        $ok = $this->karpimImportRow('88008201', 'Manajer RM Resmi', 'Kebun RM Resmi');
+        $bad = $this->karpimImportRow('88008202', 'Manajer RM Resmi', 'Kebun RM Resmi');
+        $bad[12] = 'RM-9';
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$ok, $bad])]);
+
+        $this->assertDatabaseHas('employees', ['nik' => '88008201']);
+        $this->assertStringContainsString('RM-1 sampai RM-7', session('import_summary')['errors'][0]['errors'][0]);
+    }
+
+    public function test_existing_employee_whose_position_left_the_formasi_gets_a_warning_but_is_still_imported(): void
+    {
+        $this->formasiUnit('Kebun Geser', 'Manajer Geser', 'RM-1', 2);
+        Employee::factory()->create([
+            'nik' => '88008301', 'nama' => 'LAMA', 'jabatan' => 'Jabatan Dihapus', 'unit_kerja' => 'Kebun Geser',
+            'level' => 'Karpim', 'rm_level' => null, 'status_penugasan' => 'Definitif',
+        ]);
+
+        $row = $this->karpimImportRow('88008301', 'Jabatan Dihapus', 'Kebun Geser');
+        $row[1] = 'NAMA DIPERBARUI';
+        $row[12] = '';
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$row])]);
+
+        $response->assertOk()->assertJsonPath('summary.skipped', 0)->assertJsonPath('summary.warning_count', 1);
+        $this->assertStringContainsString('tidak lagi tercantum', $response->json('summary.sample_rows.0.warnings.0'));
+
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $response->json('token')])->assertOk();
+        $this->assertSame('NAMA DIPERBARUI', Employee::find('88008301')->nama);
+        $this->assertArrayNotHasKey('warnings', EmployeeImportLog::sole()->metadata['summary']);
+        $this->assertSame(1, EmployeeImportLog::sole()->metadata['summary']['warning_count']);
+    }
+
+    public function test_existing_employee_in_an_overfilled_seat_gets_a_quota_warning(): void
+    {
+        $this->formasiUnit('Kebun Penuh', 'Manajer Penuh', 'RM-1', 1);
+        foreach (['88008401', '88008402'] as $nik) {
+            Employee::factory()->create([
+                'nik' => $nik, 'jabatan' => 'Manajer Penuh', 'unit_kerja' => 'Kebun Penuh',
+                'level' => 'Karpim', 'rm_level' => 'RM-1', 'status_penugasan' => 'Definitif',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88008401', 'Manajer Penuh', 'Kebun Penuh')]),
+        ]);
+
+        $response->assertOk()->assertJsonPath('summary.warning_count', 1);
+        $this->assertStringContainsString('melebihi kuota', $response->json('summary.sample_rows.0.warnings.0'));
+    }
+
+    public function test_existing_karpel_in_a_unit_without_karpel_formasi_is_not_warned(): void
+    {
+        $this->formasiUnit('Kebun Karpel', 'Manajer Karpel', 'RM-1', 1);
+        Employee::factory()->create([
+            'nik' => '88008501', 'jabatan' => 'Mandor Lepas', 'unit_kerja' => 'Kebun Karpel',
+            'level' => 'Karpel', 'rm_level' => 'RM-4', 'status_penugasan' => 'Definitif', 'job_grade' => 5, 'person_grade' => 5,
+        ]);
+
+        $row = $this->karpimImportRow('88008501', 'Mandor Lepas', 'Kebun Karpel');
+        $row[9] = 'Karpel';
+        $row[12] = '';
+        $row[19] = 5;
+        $row[20] = 5;
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$row])]);
+
+        $response->assertOk()->assertJsonPath('summary.skipped', 0)->assertJsonPath('summary.warning_count', 0);
+    }
+
+    public function test_formasi_sheet_lists_every_seat_grouped_by_unit_with_vacancy(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $tajati = Unit::where('nama', 'Kebun Tajati')->firstOrFail();
+        $seatsOfTajati = DB::table('position_unit')->where('unit_id', $tajati->id)->count();
+        Employee::factory()->create([
+            'nik' => '88010001', 'unit_kerja' => 'Kebun Tajati', 'jabatan' => 'Manajer',
+            'level' => 'Karpim', 'rm_level' => 'RM-1', 'status_penugasan' => 'Definitif',
+        ]);
+
+        $rows = (new EmployeeTemplateFormasiSheet)->array();
+        $seatRows = array_values(array_filter($rows, fn (array $row) => $row[0] !== ''));
+
+        $this->assertCount(DB::table('position_unit')->count(), $seatRows);
+
+        // Setiap unit membentuk satu blok berurutan (syarat rentang bernama), tidak muncul kembali di tempat lain.
+        $blocks = [];
+        foreach (array_column($seatRows, 0) as $unit) {
+            if (end($blocks) !== $unit) {
+                $blocks[] = $unit;
+            }
+        }
+        $this->assertSame(count($blocks), count(array_unique($blocks)));
+        $this->assertCount($seatsOfTajati, array_filter($seatRows, fn (array $row) => $row[0] === 'Kebun Tajati'));
+
+        $manajer = collect($seatRows)->first(fn (array $row) => $row[0] === 'Kebun Tajati' && $row[1] === 'Manajer');
+        $this->assertSame(['Karpim', 'RM-1', 'TAN', 1, 1, 0], array_slice($manajer, 2, 6));
+    }
+
+    public function test_template_workbook_makes_jabatan_depend_on_the_selected_unit(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $path = tempnam(sys_get_temp_dir(), 'tpl_').'.xlsx';
+        file_put_contents($path, Excel::raw(new EmployeeTemplateExport, ExcelWriter::XLSX));
+        $workbook = IOFactory::load($path);
+        unlink($path);
+
+        $data = $workbook->getSheetByName('Data Karyawan');
+        $formasi = $workbook->getSheetByName('Formasi per Unit');
+        $this->assertNotNull($formasi);
+        $this->assertTrue($formasi->getProtection()->getSheet(), 'Katalog dikunci agar pengelompokan per unit tidak rusak.');
+        $this->assertTrue($formasi->getProtection()->getSort(), 'Pengurutan dikunci karena merusak pengelompokan per unit.');
+        $this->assertFalse($formasi->getProtection()->getAutoFilter(), 'Penyaringan tetap boleh.');
+        $this->assertSame([], $workbook->getDefinedNames(), 'Tanpa rentang bernama atau kolom bantu: hanya katalog.');
+        // Nol harus tertulis sebagai 0 di berkas (bukan sel kosong): Terisi 0 dan Sisa 0 sama-sama bermakna.
+        $this->assertSame(0, $formasi->getCell('G2')->getValue(), 'Kolom Terisi tanpa pemangku harus bernilai 0.');
+        $this->assertSame('', (string) $formasi->getCell('I1')->getValue());
+
+        // Rumus validasi: Jabatan (J) bergantung pada Unit (I) di baris yang sama, dan menolak pilihan di luar daftar.
+        $validation = $data->getCell('J7')->getDataValidation();
+        $formula = $validation->getFormula1();
+        $this->assertStringContainsString('$I7', $formula);
+        $this->assertSame(DataValidation::STYLE_STOP, $validation->getErrorStyle());
+        $this->assertSame(DataValidation::STYLE_STOP, $data->getCell('I7')->getDataValidation()->getErrorStyle());
+
+        // Rumus yang persis sama dihitung oleh mesin kalkulasi untuk SETIAP unit: hasilnya harus tepat jabatan unit itu.
+        $scratch = $workbook->getSheetByName('Referensi Master Data');
+        $checked = 0;
+        foreach (Unit::pluck('nama') as $unit) {
+            // Mesin kalkulasi menyimpan hasil per sel; kosongkan agar tiap unit dihitung ulang.
+            Calculation::getInstance($workbook)->clearCalculationCache();
+            $scratch->setCellValue('Y1', $unit);
+            $list = str_replace('$I7', '$Y$1', $formula);
+            $scratch->setCellValue('Y2', "=ROWS({$list})");
+            $scratch->setCellValue('Y3', "=INDEX({$list},1,1)");
+            $scratch->setCellValue('Y4', '=INDEX('.$list.',ROWS('.$list.'),1)');
+
+            $expected = DB::table('position_unit')
+                ->join('units', 'units.id', '=', 'position_unit.unit_id')
+                ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+                ->where('units.nama', $unit)
+                ->orderByRaw("case positions.level when 'Karpim' then 0 else 1 end")->orderBy('positions.rm_level')->orderBy('positions.nama')
+                ->pluck('positions.nama')->all();
+
+            $this->assertSame(count($expected), (int) $scratch->getCell('Y2')->getCalculatedValue(), "Jumlah Jabatan untuk {$unit}");
+            $this->assertSame($expected[0], $scratch->getCell('Y3')->getCalculatedValue(), "Jabatan pertama untuk {$unit}");
+            $this->assertSame(end($expected), $scratch->getCell('Y4')->getCalculatedValue(), "Jabatan terakhir untuk {$unit}");
+            $checked++;
+        }
+        $this->assertSame(Unit::count(), $checked);
+    }
+
+    public function test_import_derives_strata_when_the_level_column_is_blank(): void
+    {
+        $this->formasiUnit('Kebun Turunan', 'Manajer Turunan', 'RM-1', 2);
+        $karpel = Position::create(['nama' => 'Mandor Turunan', 'level' => 'Karpel', 'rm_level' => 'RM-5', 'is_active' => true]);
+        Unit::where('nama', 'Kebun Turunan')->first()->positions()->attach($karpel->id, ['kuota' => 2, 'bidang' => 'TAN']);
+
+        $karpim = $this->karpimImportRow('88010101', 'Manajer Turunan', 'Kebun Turunan');
+        $karpim[9] = '';
+        $karpim[12] = '';
+        $pelaksana = $this->karpimImportRow('88010102', 'Mandor Turunan', 'Kebun Turunan');
+        $pelaksana[9] = '';
+        $pelaksana[12] = '';
+        $pelaksana[19] = 5;
+        $pelaksana[20] = 5;
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$karpim, $pelaksana])]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? [], 'Kedua baris seharusnya valid tanpa kolom Level.');
+        $this->assertDatabaseHas('employees', ['nik' => '88010101', 'level' => 'Karpim', 'rm_level' => 'RM-1']);
+        $this->assertDatabaseHas('employees', ['nik' => '88010102', 'level' => 'Karpel', 'rm_level' => 'RM-5']);
+    }
+
+    public function test_import_works_with_the_template_format_that_has_no_level_or_rm_columns(): void
+    {
+        $this->formasiUnit('Kebun Tanpa Level', 'Manajer Tanpa Level', 'RM-1', 2);
+        $headings = (new EmployeeTemplateDataSheet)->headings();
+        $row = (new EmployeeTemplateDataSheet)->array()[0];
+        $set = function (string $heading, mixed $value) use (&$row, $headings): void {
+            $row[array_search($heading, $headings, true)] = $value;
+        };
+        $set('NIK*', '88010201');
+        $set('UNIT KERJA*', 'Kebun Tanpa Level');
+        $set('JABATAN*', 'Manajer Tanpa Level');
+        $set('JOB GRADE', 13);
+        $set('PERSON GRADE', 13);
+
+        $this->assertNotContains('LEVEL', $headings);
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$row], 'tanpa_level.xlsx', $headings)]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? []);
+        $this->assertDatabaseHas('employees', ['nik' => '88010201', 'level' => 'Karpim', 'rm_level' => 'RM-1']);
+    }
+
+    public function test_import_rejects_a_level_that_contradicts_the_formasi_strata(): void
+    {
+        $this->formasiUnit('Kebun Strata', 'Manajer Strata', 'RM-1', 2);
+        $row = $this->karpimImportRow('88010301', 'Manajer Strata', 'Kebun Strata');
+        $row[9] = 'Karpel';
+        $row[19] = 5;
+        $row[20] = 5;
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$row])]);
+
+        $message = session('import_summary')['errors'][0]['errors'][0];
+        $this->assertStringContainsString('berstrata Karpim', $message);
+        $this->assertStringContainsString('kosongkan kolom Level', $message);
+        $this->assertDatabaseMissing('employees', ['nik' => '88010301']);
+    }
+
+    public function test_import_guides_the_admin_when_jabatan_and_unit_do_not_match(): void
+    {
+        $this->formasiUnit('Kebun Pencarian A', 'Manajer Pencarian', 'RM-1', 1);
+        $this->formasiUnit('Kebun Pencarian B', 'Asisten Pencarian Khusus', 'RM-3', 1);
+
+        $elsewhere = $this->karpimImportRow('88010401', 'Asisten Pencarian Khusus', 'Kebun Pencarian A');
+        $elsewhere[9] = '';
+        $typo = $this->karpimImportRow('88010402', 'Manajer Pencarin', 'Kebun Pencarian A');
+        $typo[9] = '';
+        $noSeats = $this->karpimImportRow('88010403', 'Manajer Pencarian', 'Kebun Tanpa Formasi');
+        $noSeats[9] = '';
+        Unit::create(['nama' => 'Kebun Tanpa Formasi', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 99]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$elsewhere, $typo, $noSeats])]);
+
+        $errors = collect(session('import_summary')['errors'])->mapWithKeys(fn ($e) => [$e['nik'] => $e['errors'][0]]);
+        $this->assertStringContainsString('terdaftar pada unit: Kebun Pencarian B', $errors['88010401']);
+        $this->assertStringContainsString('Jabatan serupa di unit ini: Manajer Pencarian', $errors['88010402']);
+        $this->assertStringContainsString("sheet 'Formasi per Unit'", $errors['88010402']);
+        $this->assertStringContainsString('belum memiliki formasi jabatan', $errors['88010403']);
+    }
+
+    public function test_full_quota_error_lists_the_formasi_that_are_still_open(): void
+    {
+        $unit = $this->formasiUnit('Kebun Penuh Sebagian', 'Manajer Penuh Sebagian', 'RM-1', 1);
+        $open = Position::create(['nama' => 'Asisten Masih Kosong', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+        $unit->positions()->attach($open->id, ['kuota' => 2, 'bidang' => 'TAN']);
+        Employee::factory()->create([
+            'nik' => '88010501', 'jabatan' => 'Manajer Penuh Sebagian', 'unit_kerja' => 'Kebun Penuh Sebagian',
+            'level' => 'Karpim', 'rm_level' => 'RM-1', 'status_penugasan' => 'Definitif',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), [
+            'import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88010502', 'Manajer Penuh Sebagian', 'Kebun Penuh Sebagian')]),
+        ]);
+
+        $this->assertStringContainsString('Formasi masih kosong di unit ini: Asisten Masih Kosong', session('import_summary')['errors'][0]['errors'][0]);
+    }
+
+    public function test_template_columns_dropdowns_prompts_and_guide_are_aligned_by_heading(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $sheet = new EmployeeTemplateDataSheet;
+        $headings = $sheet->headings();
+
+        $path = tempnam(sys_get_temp_dir(), 'tpl_').'.xlsx';
+        file_put_contents($path, Excel::raw(new EmployeeTemplateExport, ExcelWriter::XLSX));
+        $workbook = IOFactory::load($path);
+        unlink($path);
+        $data = $workbook->getSheetByName('Data Karyawan');
+
+        $column = fn (string $heading): string => Coordinate::stringFromColumnIndex(array_search($heading, $headings, true) + 1);
+        $normalize = fn (string $heading): string => strtolower(trim(preg_replace('/[^a-zA-Z0-9]+/', '_', str_replace('*', '', $heading)), '_'));
+
+        // Panduan kolom: setiap huruf dan kunci pada kamus sama dengan header template pada huruf itu.
+        $this->assertCount(count($headings), EmployeeImportDictionary::getColumns());
+        foreach (EmployeeImportDictionary::getColumns() as $guide) {
+            $heading = $headings[Coordinate::columnIndexFromString($guide['letter']) - 1];
+            $this->assertSame($guide['key'], $normalize($heading), "Kamus kolom {$guide['letter']} harus cocok dengan header template.");
+        }
+
+        // Dropdown: setiap kolom menunjuk daftar yang benar, termasuk pada rujukan ke sheet referensi.
+        $listValues = function (string $formula) use ($workbook): array {
+            if (str_starts_with($formula, '"')) {
+                return array_map('trim', explode(',', trim($formula, '"')));
+            }
+            [$sheetName, $range] = explode('!', $formula);
+            $source = $workbook->getSheetByName(trim($sheetName, "'"));
+            $values = array_column($source->rangeToArray(str_replace('$', '', $range), null, true, false), 0);
+
+            return array_values(array_filter($values, fn ($value) => $value !== null && $value !== ''));
+        };
+        $expected = [
+            'JENIS KELAMIN' => ['L', 'P'],
+            'AGAMA' => Employee::RELIGIONS,
+            'SUSUNAN KELUARGA' => array_keys(Employee::FAMILY_STATUSES),
+            'STATUS KARYAWAN*' => ['Tetap (PKWTT)', 'Kontrak (PKWT)', 'Calon Pegawai'],
+            'UNIT KERJA*' => Unit::orderBy('urutan')->orderBy('nama')->pluck('nama')->all(),
+            'STATUS PENUGASAN' => ['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'],
+            'JALUR MASUK' => array_keys(Employee::ENTRY_CHANNELS),
+            'PENDIDIKAN TERAKHIR' => Employee::EDUCATION_LEVELS,
+        ];
+        foreach ($expected as $heading => $values) {
+            $cell = $column($heading).'7';
+            $this->assertSame($values, $listValues($data->getCell($cell)->getDataValidation()->getFormula1()), "Dropdown {$heading} ({$cell})");
+        }
+        $this->assertStringContainsString('OFFSET(', $data->getCell($column('JABATAN*').'7')->getDataValidation()->getFormula1());
+
+        // Panduan input pada header: judulnya membahas kolom yang benar.
+        $titles = [
+            'UNIT KERJA*' => 'Unit Kerja', 'JABATAN*' => 'Jabatan', 'GOLONGAN' => 'Golongan', 'STATUS PENUGASAN' => 'Status Penugasan',
+            'TUGAS RANGKAP / PENUGASAN SEMENTARA' => 'Tugas Rangkap', 'TMT BEKERJA' => 'TMT Bekerja', 'TANGGAL DIANGKAT STAF' => 'Tgl Diangkat Staf',
+            'JOB GRADE' => 'Job Grade', 'PERSON GRADE' => 'Person Grade', 'TANGGAL MBT' => 'Tanggal MBT', 'TANGGAL PENSIUN' => 'Tanggal Pensiun',
+        ];
+        foreach ($titles as $heading => $needle) {
+            $this->assertStringContainsString($needle, $data->getCell($column($heading).'1')->getDataValidation()->getPromptTitle(), "Panduan header {$heading}");
+        }
+
+        // Format tanggal terpasang pada kolom tanggal, bukan pada kolom lain yang bergeser.
+        foreach (['TANGGAL LAHIR', 'TMT BEKERJA', 'TANGGAL DIANGKAT STAF', 'TANGGAL DALAM JABATAN', 'TMT UNIT KERJA', 'TANGGAL MBT', 'TANGGAL PENSIUN'] as $heading) {
+            $this->assertArrayHasKey($column($heading), $sheet->columnFormats(), "Format tanggal untuk {$heading}");
+        }
+    }
+
+    public function test_reimporting_an_existing_employee_from_the_template_format_keeps_strata_and_rm_band(): void
+    {
+        $this->formasiUnit('Kebun Reimpor', 'Manajer Reimpor', 'RM-1', 2);
+        Employee::factory()->create([
+            'nik' => '88010601', 'nama' => 'NAMA LAMA', 'jabatan' => 'Manajer Reimpor', 'unit_kerja' => 'Kebun Reimpor',
+            'level' => 'Karpim', 'rm_level' => 'RM-1', 'status_penugasan' => 'Definitif', 'status_karyawan' => 'Tetap (PKWTT)',
+        ]);
+
+        $headings = (new EmployeeTemplateDataSheet)->headings();
+        $row = (new EmployeeTemplateDataSheet)->array()[0];
+        $set = function (string $heading, mixed $value) use (&$row, $headings): void {
+            $row[array_search($heading, $headings, true)] = $value;
+        };
+        $set('NIK*', '88010601');
+        $set('NAMA*', 'NAMA BARU');
+        $set('UNIT KERJA*', 'Kebun Reimpor');
+        $set('JABATAN*', 'Manajer Reimpor');
+        $set('JOB GRADE', 13);
+        $set('PERSON GRADE', 13);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $this->createExcelUploadFile([$row], 'reimpor.xlsx', $headings)]);
+
+        $this->assertSame([], session('import_summary')['errors'] ?? []);
+        $this->assertSame(1, session('import_summary')['updated']);
+        $this->assertDatabaseHas('employees', ['nik' => '88010601', 'nama' => 'NAMA BARU', 'level' => 'Karpim', 'rm_level' => 'RM-1']);
+    }
+
+    /* ------------------------------------------------------------------ tata kelola: maker-checker & undo */
+
+    private function enableApproval(): void
+    {
+        config(['hris.import.require_approval' => true]);
+    }
+
+    private function commitRows(array $rows, ?User $as = null): TestResponse
+    {
+        $as ??= $this->admin;
+        $token = $this->actingAs($as)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile($rows)])
+            ->assertOk()
+            ->json('token');
+
+        return $this->actingAs($as)->postJson(route('admin.employees.import.commit'), ['token' => $token]);
+    }
+
+    private function otherAdmin(): User
+    {
+        return User::factory()->create(['role' => 'admin']);
+    }
+
+    private function reviewDigest(EmployeeImportLog $log, User $checker): string
+    {
+        $html = $this->actingAs($checker)->get(route('admin.employees.import.batches.show', $log))->assertOk()->getContent();
+        $this->assertSame(1, preg_match('/name="reviewed_digest" value="([a-f0-9]{64})"/', $html, $match), 'Formulir persetujuan harus tampil untuk penyetuju.');
+
+        return $match[1];
+    }
+
+    private function seedGovernanceUnit(string $nama, string $jabatan): void
+    {
+        $this->formasiUnit($nama, $jabatan, 'RM-1', 5);
+        Employee::factory()->create([
+            'nik' => '88021001', 'nama' => 'NAMA ASLI', 'jabatan' => $jabatan, 'unit_kerja' => $nama,
+            'level' => 'Karpim', 'rm_level' => 'RM-1', 'status_penugasan' => 'Definitif',
+            'status_karyawan' => 'Tetap (PKWTT)', 'golongan' => 'IIIA/00',
+        ]);
+    }
+
+    public function test_batch_detail_offers_correction_download_with_expiry_and_a_sample_per_skipped_reason(): void
+    {
+        $log = EmployeeImportLog::create([
+            'user_id' => $this->admin->id, 'user_name' => $this->admin->name, 'file_name' => 'koreksi.xlsx', 'file_size' => 2048,
+            'file_sha256' => hash('sha256', 'koreksi'), 'total_rows' => 3, 'created_count' => 1, 'skipped_count' => 2, 'has_errors' => true,
+            'status' => EmployeeImportLog::STATUS_COMPLETED, 'committed_at' => now(), 'token' => 'token-koreksi',
+            'metadata' => ['summary' => ['errors' => [
+                ['row' => 7, 'errors' => ["Kuota formasi jabatan 'Asisten Kepala' pada Unit Kerja 'Kebun Tajati' sudah terpenuhi (3 formasi)."]],
+                ['row' => 9, 'errors' => ["Kuota formasi jabatan 'Mandor' pada Unit Kerja 'Kebun Lain' sudah terpenuhi (2 formasi)."]],
+            ]]],
+        ]);
+
+        $page = fn () => $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk();
+
+        $page()->assertDontSee('Unduh Berkas Koreksi')->assertSee('Berkas koreksi sudah tidak tersedia karena memuat data pribadi', false);
+
+        Cache::put('import_failed_rows_token-koreksi', 'sealed', now()->addHours(2));
+        $page()->assertSee('Unduh Berkas Koreksi')
+            ->assertSee('tersedia sampai', false)
+            ->assertSee($log->committed_at->copy()->addHours(2)->format('d/m/Y H:i'))
+            ->assertSee("Contoh: Kuota formasi jabatan 'Asisten Kepala'")
+            ->assertSeeText('3 baris dalam berkas');
+    }
+
+    /** @return array{0: EmployeeImportLog, 1: string} impor tersimpan (kebijakan nonaktif) dan hash kondisi awal pegawai eksisting */
+    private function committedImport(): array
+    {
+        $this->seedGovernanceUnit('Kebun Undo', 'Manajer Undo');
+        $hashBefore = Employee::stateHash(Employee::findOrFail('88021001'));
+
+        $this->commitRows([
+            $this->karpimImportRow('88021001', 'Manajer Undo', 'Kebun Undo'),
+            $this->karpimImportRow('88021002', 'Manajer Undo', 'Kebun Undo'),
+        ])->assertOk();
+
+        return [EmployeeImportLog::latest('id')->firstOrFail(), $hashBefore];
+    }
+
+    public function test_the_four_eyes_policy_is_off_by_default_and_the_import_page_reflects_the_setting(): void
+    {
+        $this->assertFalse(config('hris.import.require_approval'));
+
+        $this->enableApproval();
+        $this->actingAs($this->admin)->get(route('admin.employees.import.page'))->assertOk()->assertSee('requiresApproval: true', false);
+    }
+
+    public function test_commit_only_submits_for_approval_when_the_policy_is_active(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+
+        $response = $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+
+        $response->assertOk()->assertJsonPath('pending_approval', true)->assertJsonPath('summary.created', 1);
+        $log = EmployeeImportLog::sole();
+        $this->assertSame('pending_approval', $log->status);
+        $this->assertSame($this->admin->id, $log->user_id);
+        $this->assertNull($log->checker_id);
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+        Storage::disk('local')->assertExists($log->stored_path);
+        $this->assertSame(0, $log->changes()->count());
+    }
+
+    public function test_the_maker_cannot_approve_their_own_submission(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk()->assertDontSee('reviewed_digest');
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => str_repeat('a', 64)]);
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('pengajunya sendiri', session('error'));
+        $this->assertSame('pending_approval', $log->fresh()->status);
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+    }
+
+    public function test_another_admin_reviews_and_approves_and_both_names_reach_the_history(): void
+    {
+        $this->enableApproval();
+        $this->seedGovernanceUnit('Kebun Tata Kelola', 'Manajer Tata Kelola');
+        $this->commitRows([
+            $this->karpimImportRow('88021001', 'Manajer Tata Kelola', 'Kebun Tata Kelola'),
+            $this->karpimImportRow('88020002', 'Manajer Tata Kelola', 'Kebun Tata Kelola'),
+        ])->assertOk();
+        $log = EmployeeImportLog::sole();
+        $checker = $this->otherAdmin();
+
+        $page = $this->actingAs($checker)->get(route('admin.employees.import.batches.show', $log));
+        $page->assertOk()->assertSee('PEGAWAI UJI FORMASI')->assertSee('Pratinjau Terkini');
+        $digest = $this->reviewDigest($log, $checker);
+
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => $digest])
+            ->assertRedirect()->assertSessionHas('success');
+
+        $log->refresh();
+        $this->assertSame('completed', $log->status);
+        $this->assertSame($this->admin->id, $log->user_id, 'Pengaju tetap tercatat sebagai pengaju.');
+        $this->assertSame($checker->id, $log->checker_id);
+        $this->assertSame($checker->name, $log->checker_name);
+        $this->assertNotNull($log->committed_at);
+        $this->assertNull($log->stored_path);
+        $this->assertDatabaseHas('employees', ['nik' => '88020002']);
+        $this->assertSame(2, $log->changes()->count());
+
+        $note = JobHistory::where('employee_nik', '88021001')->latest('id')->value('catatan');
+        $this->assertStringContainsString($this->admin->name, $note);
+        $this->assertStringContainsString("disetujui {$checker->name}", $note);
+    }
+
+    public function test_approval_is_refused_when_the_preview_changed_since_the_review(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+        $checker = $this->otherAdmin();
+        $digest = $this->reviewDigest($log, $checker);
+
+        // Master berubah setelah ditinjau: unit dinonaktifkan sehingga baris tidak lagi valid.
+        Unit::where('nama', 'Kebun Tata Kelola')->update(['is_active' => false]);
+
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => $digest])->assertRedirect();
+
+        $this->assertStringContainsString('berubah sejak Anda meninjau', session('error'));
+        $this->assertSame('pending_approval', $log->fresh()->status);
+        $this->assertNull($log->fresh()->checker_id, 'Persetujuan yang gagal dilepas agar dapat ditinjau ulang.');
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+    }
+
+    public function test_rejecting_requires_a_reason_and_removes_the_submitted_file(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+        $path = $log->stored_path;
+        $checker = $this->otherAdmin();
+
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.reject', $log), ['reason' => 'singkat'])->assertSessionHasErrors('reason');
+        $this->assertSame('pending_approval', $log->fresh()->status);
+
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.reject', $log), ['reason' => 'Jabatan pada berkas tidak sesuai SK'])
+            ->assertRedirect(route('admin.employees.import.batches.index'));
+
+        $log->refresh();
+        $this->assertSame('rejected', $log->status);
+        $this->assertSame('Jabatan pada berkas tidak sesuai SK', $log->decision_note);
+        $this->assertSame($checker->id, $log->checker_id);
+        Storage::disk('local')->assertMissing($path);
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+    }
+
+    public function test_the_maker_can_withdraw_their_own_submission(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.reject', $log), ['reason' => 'Salah mengunggah berkas periode lama'])->assertRedirect();
+
+        $this->assertSame('rejected', $log->fresh()->status);
+    }
+
+    public function test_real_saving_paths_are_blocked_when_approval_is_required(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+
+        // Rute impor langsung ditolak.
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), [
+            'import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]),
+        ])->assertSessionHasErrors('import_file');
+
+        // Jalur dalam (fallback sinkron, antrean) pun tidak dapat menyimpan tanpa persetujuan.
+        $token = $this->actingAs($this->admin)
+            ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')])])
+            ->json('token');
+        try {
+            app(EmployeeImportService::class)->executeCommit(Cache::get("import_preview_{$token}"), $token, $this->admin);
+            $this->fail('Penyimpanan tanpa persetujuan seharusnya ditolak.');
+        } catch (ImportAbortedException $e) {
+            $this->assertStringContainsString('persetujuan admin lain', $e->getMessage());
+        }
+
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+    }
+
+    public function test_a_stale_submission_expires_and_cannot_be_approved(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+        $path = $log->stored_path;
+        $checker = $this->otherAdmin();
+        $digest = $this->reviewDigest($log, $checker);
+
+        $log->update(['submitted_at' => now()->subDays(8)]);
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => $digest])->assertRedirect();
+
+        $this->assertStringContainsString('kedaluwarsa', session('error'));
+        $this->assertSame('expired', $log->fresh()->status);
+        Storage::disk('local')->assertMissing($path);
+        $this->assertDatabaseMissing('employees', ['nik' => '88020001']);
+    }
+
+    public function test_the_housekeeping_command_expires_old_submissions_and_deletes_old_snapshots(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $pending = EmployeeImportLog::sole();
+        $pending->update(['submitted_at' => now()->subDays(8)]);
+
+        config(['hris.import.require_approval' => false]);
+        [$saved] = $this->committedImport();
+        EmployeeImportChange::query()->update(['created_at' => now()->subDays(8)]);
+
+        $this->artisan('hris:purge-import-governance')->assertSuccessful();
+
+        $this->assertSame('expired', $pending->fresh()->status);
+        $this->assertSame(0, EmployeeImportChange::count());
+        $this->assertSame('completed', $saved->fresh()->status);
+    }
+
+    public function test_a_submitted_file_that_was_tampered_with_cannot_be_reviewed_or_approved(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Tata Kelola', 'Manajer Tata Kelola', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')]);
+        $log = EmployeeImportLog::sole();
+        Storage::disk('local')->put($log->stored_path, 'berkas diganti');
+
+        $this->actingAs($this->otherAdmin())->get(route('admin.employees.import.batches.show', $log))
+            ->assertOk()->assertSee('berubah sejak diajukan')->assertDontSee('reviewed_digest');
+    }
+
+    public function test_governance_pages_are_admin_only_and_list_the_history(): void
+    {
+        $this->seedGovernanceUnit('Kebun Riwayat', 'Manajer Riwayat');
+        $this->commitRows([$this->karpimImportRow('88021002', 'Manajer Riwayat', 'Kebun Riwayat')])->assertOk();
+
+        $this->actingAs(User::factory()->create(['role' => 'user']))->get(route('admin.employees.import.batches.index'))->assertForbidden();
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index'))
+            ->assertOk()->assertSee('Riwayat & Persetujuan Impor')->assertSee('Tersimpan')->assertSee($this->admin->name);
+    }
+
+    public function test_commit_records_encrypted_change_snapshots_for_every_created_and_updated_employee(): void
+    {
+        [$log] = $this->committedImport();
+
+        $this->assertSame(2, $log->changes()->count());
+        $actions = $log->changes()->pluck('action')->sort()->values()->all();
+        $this->assertSame(['CREATE', 'UPDATE'], $actions);
+
+        // Data pribadi tidak tersimpan polos pada basis data.
+        $rawNik = implode('', DB::table('employee_import_changes')->pluck('nik')->all());
+        $rawBefore = implode('', DB::table('employee_import_changes')->pluck('before')->filter()->all());
+        $this->assertStringNotContainsString('88021001', $rawNik);
+        $this->assertStringNotContainsString('NAMA ASLI', $rawBefore);
+        $this->assertSame('NAMA ASLI', $log->changes()->where('action', 'UPDATE')->first()->before['nama']);
+    }
+
+    public function test_rollback_restores_updated_employees_and_removes_created_ones(): void
+    {
+        [$log, $hashBefore] = $this->committedImport();
+        $historyBefore = JobHistory::where('employee_nik', '88021001')->count();
+        $this->assertSame('PEGAWAI UJI FORMASI', Employee::find('88021001')->nama);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])
+            ->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('employees', ['nik' => '88021002']);
+        $this->assertSame($hashBefore, Employee::stateHash(Employee::find('88021001')), 'Pegawai eksisting kembali persis ke kondisi sebelum impor.');
+        $this->assertSame('NAMA ASLI', Employee::find('88021001')->nama);
+        $this->assertSame('IIIA/00', Employee::find('88021001')->golongan);
+
+        $log->refresh();
+        $this->assertSame('rolled_back', $log->status);
+        $this->assertSame('Berkas periode salah diunggah', $log->rollback_reason);
+        $this->assertSame($this->admin->id, $log->rolled_back_by);
+        $this->assertSame(0, $log->changes()->count(), 'Rekaman data pribadi dihapus setelah pembatalan.');
+
+        // Riwayat tidak dihapus: pembatalan menambah catatan baru.
+        $this->assertGreaterThan($historyBefore, JobHistory::where('employee_nik', '88021001')->count());
+        $this->assertStringContainsString('Pembatalan impor Excel', JobHistory::where('employee_nik', '88021001')->latest('id')->value('catatan'));
+    }
+
+    public function test_rollback_is_all_or_nothing_when_an_employee_changed_after_the_import(): void
+    {
+        [$log] = $this->committedImport();
+        Employee::where('nik', '88021002')->update(['sekolah' => 'DIUBAH SETELAH IMPOR']);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah']);
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('Pembatalan dihentikan', session('error'));
+        $this->assertStringContainsString('88****02', session('error'), 'NIK ditampilkan tersamar.');
+        $this->assertSame('completed', $log->fresh()->status);
+        $this->assertSame('PEGAWAI UJI FORMASI', Employee::find('88021001')->nama, 'Tidak ada pegawai yang dikembalikan sebagian.');
+        $this->assertDatabaseHas('employees', ['nik' => '88021002']);
+        $this->assertSame(2, $log->changes()->count());
+    }
+
+    public function test_rollback_is_refused_for_a_created_employee_that_gained_history_after_the_import(): void
+    {
+        [$log] = $this->committedImport();
+
+        $this->travel(5)->minutes();
+        JobHistory::create(['employee_nik' => '88021002', 'jabatan' => 'Manajer Undo', 'unit_kerja' => 'Kebun Undo', 'status_penugasan' => 'Plt', 'tmt_awal' => now()->toDateString()]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])->assertRedirect();
+
+        $this->assertStringContainsString('Pembatalan dihentikan', session('error'));
+        $this->assertDatabaseHas('employees', ['nik' => '88021002']);
+        $this->assertSame('completed', $log->fresh()->status);
+    }
+
+    public function test_rollback_needs_a_reason_works_once_and_expires_with_the_undo_window(): void
+    {
+        [$log] = $this->committedImport();
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'pendek'])->assertSessionHasErrors('reason');
+        $this->assertSame('completed', $log->fresh()->status);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])->assertSessionHas('success');
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])->assertRedirect();
+        $this->assertStringContainsString('status impor saat ini', session('error'));
+
+        $second = $this->freshImportAfterRollback();
+        $second->update(['committed_at' => now()->subDays(8)]);
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $second), ['reason' => 'Berkas periode salah diunggah'])->assertRedirect();
+        $this->assertStringContainsString('Masa pembatalan', session('error'));
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $second))->assertOk()->assertSee('tidak dapat lagi dibatalkan');
+    }
+
+    private function freshImportAfterRollback(): EmployeeImportLog
+    {
+        $this->commitRows([$this->karpimImportRow('88021003', 'Manajer Undo', 'Kebun Undo')])->assertOk();
+
+        return EmployeeImportLog::latest('id')->firstOrFail();
+    }
+
+    public function test_rollback_cancels_the_concurrent_assignment_the_import_created_without_deleting_history(): void
+    {
+        $pksUnit = Unit::firstOrCreate(['nama' => 'PKS Gunung Meliau'], ['kode' => 'PKGM', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $manajerPos = Position::firstOrCreate(['nama' => 'Manajer PKS', 'level' => 'Karpim'], ['is_active' => true]);
+        $pksUnit->positions()->syncWithoutDetaching([$manajerPos->id => ['kuota' => 1]]);
+        Employee::factory()->create([
+            'nik' => '13009901', 'nama' => 'NAMA ASLI', 'jabatan' => 'Asisten Afdeling', 'unit_kerja' => 'Kebun Inti Gunung Meliau',
+            'level' => 'Karpim', 'rm_level' => 'RM-3', 'status_penugasan' => 'Definitif', 'status_karyawan' => 'Tetap (PKWTT)', 'golongan' => 'IIIA/00',
+        ]);
+
+        $row = [
+            '13009901', 'BUDI SANTOSO', 'L', 'Pontianak', '1988-05-10',
+            'Islam', 'K/2', 'Tetap (PKWTT)', 'Asisten Afdeling', 'Karpim',
+            'Kebun Inti Gunung Meliau', 'IIIA/00', 'RM-3', 'Definitif',
+            'Plt. Manajer PKS PKS Gunung Meliau TMT 15 Juli 2026',
+            '2015-01-01', '2017-01-01', '2020-01-01', '2020-01-01',
+            'Reguler', 11, 11, 'S1', 'Universitas Tanjungpura',
+            '2043-05-01', '2044-05-01',
+        ];
+        $this->commitRows([$row])->assertOk();
+        $employee = Employee::findOrFail('13009901');
+        $this->assertSame(1, $employee->concurrentJobs()->count());
+        $jobId = $employee->concurrentJobs()->value('id');
+        $log = EmployeeImportLog::sole();
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Tugas rangkap pada berkas keliru'])->assertSessionHas('success');
+
+        $this->assertSame(0, Employee::findOrFail('13009901')->concurrentJobs()->count());
+        $job = JobHistory::withTrashed()->findOrFail($jobId);
+        $this->assertTrue($job->trashed(), 'Dibatalkan (soft delete), bukan dihapus permanen.');
+        $this->assertSame($this->admin->id, $job->cancelled_by);
+        $this->assertStringContainsString('Pembatalan impor Excel', $job->alasan_pembatalan);
+        $this->assertSame('NAMA ASLI', Employee::find('13009901')->nama);
+    }
+
+    /* ------------------------------------------------------------------ tata kelola: antarmuka */
+
+    public function test_import_status_badge_follows_the_registered_labels_icons_and_partial_state(): void
+    {
+        $expected = [
+            ['pending_approval', 0, 'Menunggu Persetujuan', 'fa-clock'],
+            ['approved', 0, 'Menyimpan', 'fa-rotate'],
+            ['completed', 0, 'Tersimpan', 'fa-check'],
+            ['completed', 3, 'Tersimpan Sebagian', 'fa-triangle-exclamation'],
+            ['rejected', 0, 'Ditolak', 'fa-ban'],
+            ['rolled_back', 0, 'Dibatalkan', 'fa-rotate-left'],
+            ['expired', 0, 'Kedaluwarsa', 'fa-hourglass-end'],
+        ];
+
+        foreach ($expected as [$status, $skipped, $label, $icon]) {
+            $html = Blade::render('<x-admin.import-status :status="$status" :skipped="$skipped" />', compact('status', 'skipped'));
+
+            $this->assertStringContainsString($label, $html);
+            $this->assertStringContainsString($icon, $html, "Status {$label} harus memiliki ikon, bukan hanya warna.");
+            $this->assertStringNotContainsString('uppercase', $html, 'Lencana status tidak memakai huruf kapital.');
+        }
+    }
+
+    public function test_history_list_filters_by_tab_and_search_and_the_import_page_shows_the_pending_count(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Filter', 'Manajer Filter', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88022001', 'Manajer Filter', 'Kebun Filter')])->assertOk();
+        config(['hris.import.require_approval' => false]);
+        $this->commitRows([$this->karpimImportRow('88022002', 'Manajer Filter', 'Kebun Filter')])->assertOk();
+
+        $pending = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['status' => 'pending']))->assertOk();
+        $pending->assertViewHas('logs', fn ($logs) => $logs->count() === 1 && $logs->first()->status === 'pending_approval');
+        $pending->assertViewHas('counts', ['all' => 2, 'pending' => 1, 'saved' => 1, 'closed' => 0]);
+
+        $saved = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['status' => 'saved']));
+        $saved->assertViewHas('logs', fn ($logs) => $logs->count() === 1 && $logs->first()->status === 'completed');
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['q' => 'tidak-ada-berkas-ini']))
+            ->assertOk()->assertViewHas('logs', fn ($logs) => $logs->isEmpty())->assertSee('Tidak ada impor yang cocok dengan filter ini');
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['q' => 'test_import']))
+            ->assertViewHas('logs', fn ($logs) => $logs->count() === 2);
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.page'))
+            ->assertOk()->assertSee('1 pengajuan menunggu persetujuan')->assertSee('Riwayat &amp; Persetujuan', false);
+    }
+
+    public function test_detail_groups_skipped_rows_by_reason_and_never_stores_a_nik_in_the_messages(): void
+    {
+        $this->formasiUnit('Kebun Alasan', 'Manajer Alasan', 'RM-1', 5);
+        $good = $this->karpimImportRow('88023001', 'Manajer Alasan', 'Kebun Alasan');
+        $dupA = $this->karpimImportRow('88023002', 'Manajer Alasan', 'Kebun Alasan');
+        $dupB = $this->karpimImportRow('88023002', 'Manajer Alasan', 'Kebun Alasan');
+        $badA = $this->karpimImportRow('88023003', 'Jabatan Salah Satu', 'Kebun Alasan');
+        $badB = $this->karpimImportRow('88023004', 'Jabatan Salah Dua', 'Kebun Alasan');
+
+        $this->commitRows([$good, $dupA, $dupB, $badA, $badB])->assertOk();
+        $log = EmployeeImportLog::sole();
+
+        // NIK pada pesan galat disamarkan sebelum disimpan permanen.
+        $this->assertStringNotContainsString('88023002', json_encode($log->metadata));
+        $this->assertStringContainsString('88****02', json_encode($log->metadata));
+
+        $page = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk();
+        $page->assertSee('Baris yang Dilewati (3)')->assertSee('Tersimpan Sebagian')->assertSee('3 baris dilewati');
+        $groups = $page->viewData('skippedGroups');
+        $this->assertCount(2, $groups, 'Dua pola alasan: jabatan tidak valid dan NIK ganda.');
+        $this->assertSame(2, $groups[0]['count']);
+        $this->assertStringContainsString("Jabatan '…' tidak valid untuk Unit Kerja '…'", $groups[0]['reason']);
+        $this->assertSame(1, $groups[1]['count']);
+        $page->assertSee('Lihat seluruh baris beserta pesannya');
+    }
+
+    public function test_detail_shows_whether_the_rollback_is_ready_before_the_admin_clicks(): void
+    {
+        [$log] = $this->committedImport();
+
+        $ready = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk();
+        $ready->assertSee('Tindakan Berisiko')->assertSee('Siap dibatalkan')->assertSee('rollback-reason', false);
+        $this->assertTrue($ready->viewData('readiness')['ready']);
+
+        Employee::where('nik', '88021002')->update(['sekolah' => 'DIUBAH SETELAH IMPOR']);
+
+        $blocked = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk();
+        $blocked->assertSee('Belum dapat dibatalkan')->assertSee('88****02')->assertDontSee('rollback-reason', false);
+        $this->assertFalse($blocked->viewData('readiness')['ready']);
+    }
+
+    public function test_a_large_rollback_needs_the_confirmation_word_typed(): void
+    {
+        config(['hris.import.typed_confirmation_threshold' => 1]);
+        [$log] = $this->committedImport();
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk()->assertSee('rollback-confirmation', false);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])->assertRedirect();
+        $this->assertStringContainsString('Ketik kata BATALKAN', session('error'));
+        $this->assertSame('completed', $log->fresh()->status);
+        $this->assertDatabaseHas('employees', ['nik' => '88021002']);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah', 'confirmation' => 'batalkan'])
+            ->assertSessionHas('success');
+        $this->assertSame('rolled_back', $log->fresh()->status);
+    }
+
+    public function test_small_rollbacks_do_not_ask_for_the_confirmation_word(): void
+    {
+        [$log] = $this->committedImport();
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.show', $log))->assertOk()->assertDontSee('rollback-confirmation', false);
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])->assertSessionHas('success');
+    }
+
+    public function test_the_timeline_lists_each_decision_step_with_actor_and_reason(): void
+    {
+        $this->enableApproval();
+        $this->formasiUnit('Kebun Linimasa', 'Manajer Linimasa', 'RM-1', 5);
+        $this->commitRows([$this->karpimImportRow('88024001', 'Manajer Linimasa', 'Kebun Linimasa')])->assertOk();
+        $log = EmployeeImportLog::sole();
+        $checker = $this->otherAdmin();
+
+        $this->actingAs($checker)->get(route('admin.employees.import.batches.show', $log))
+            ->assertOk()->assertSee('Diajukan')->assertSee('Menunggu persetujuan admin lain')->assertDontSee('Disetujui');
+
+        $digest = $this->reviewDigest($log, $checker);
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => $digest])->assertRedirect();
+        $this->actingAs($checker)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Dibatalkan karena SK belum terbit'])->assertSessionHas('success');
+
+        $page = $this->actingAs($checker)->get(route('admin.employees.import.batches.show', $log->fresh()))->assertOk();
+        foreach (['Diajukan', 'Disetujui', 'Disimpan', 'Dibatalkan', $this->admin->name, $checker->name, 'Dibatalkan karena SK belum terbit'] as $text) {
+            $page->assertSee($text);
+        }
+        $page->assertDontSee('Menunggu persetujuan admin lain')->assertDontSee('Tindakan Berisiko');
     }
 }

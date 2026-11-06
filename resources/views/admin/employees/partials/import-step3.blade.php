@@ -127,7 +127,23 @@
             </template>
 
             <!-- Kasus B: Jika skipped === 0 (100% Sempurna) -->
-            <template x-if="!commitSummary?.skipped || commitSummary?.skipped === 0">
+            <template x-if="pendingApproval">
+                <div role="status" class="p-3.5 rounded-xl bg-warning-50 border border-warning-200 flex items-start gap-3 text-xs text-warning-800">
+                    <div class="w-8 h-8 rounded-lg bg-warning-100 text-warning-700 flex items-center justify-center shrink-0">
+                        <i class="fas fa-user-clock text-sm" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold">Pengajuan terkirim. Data pegawai belum diubah.</p>
+                        <p class="text-[11px] mt-0.5 leading-relaxed">
+                            Admin lain perlu meninjau dan menyetujui sebelum data disimpan (persetujuan empat mata).
+                            Pantau statusnya pada <a :href="batchUrl" class="font-bold underline">Riwayat &amp; Persetujuan Impor</a>.
+                        </p>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Kasus B: Jika skipped === 0 (100% Sempurna) -->
+            <template x-if="!pendingApproval && (!commitSummary?.skipped || commitSummary?.skipped === 0)">
                 <div class="p-3.5 rounded-xl bg-primary-50/80 border border-primary-200 flex items-center gap-3 text-xs text-primary-950">
                     <div class="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
                         <i class="fas fa-circle-check text-sm" aria-hidden="true"></i>

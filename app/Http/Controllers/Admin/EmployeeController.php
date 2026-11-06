@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\ImportAbortedException;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesWorkbook;
 use App\Exports\ImportSummaryExport;
@@ -12,6 +13,7 @@ use App\Http\Requests\Admin\ImportTokenRequest;
 use App\Http\Requests\Admin\StoreEmployeeRequest;
 use App\Http\Requests\Admin\UpdateEmployeeRequest;
 use App\Models\Employee;
+use App\Models\EmployeeImportLog;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Services\EmployeeExportService;
@@ -125,7 +127,7 @@ class EmployeeController extends Controller
         $levels = Employee::select('level')->whereNotNull('level')->where('level', '!=', '')->distinct()->orderBy('level')->pluck('level');
         $units = Employee::select('unit_kerja')->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->orderBy('unit_kerja')->pluck('unit_kerja');
         $golongans = Employee::select('golongan')->whereNotNull('golongan')->where('golongan', '!=', '')->distinct()->orderBy('golongan')->pluck('golongan');
-        $rmLevels = Employee::RM_LEVELS;
+        $rmLevels = Position::RM_LEVEL_LIST;
 
         // Dynamic hire years from database (Fast substring extraction)
         $availableYears = Employee::whereNotNull('tmt_bekerja')
@@ -196,7 +198,7 @@ class EmployeeController extends Controller
         $familyStatuses = Employee::FAMILY_STATUSES;
         $educationLevels = Employee::EDUCATION_LEVELS;
         $entryChannels = Employee::ENTRY_CHANNELS;
-        $rmLevels = Employee::RM_LEVELS;
+        $rmLevels = Position::RM_LEVEL_LIST;
 
         return view('admin.employees.add-employee', compact(
             'prefill',
@@ -296,18 +298,23 @@ class EmployeeController extends Controller
     public function importPage()
     {
         $dictionaryCategories = EmployeeImportDictionary::getCategories();
+        $pendingApprovalCount = EmployeeImportLog::where('status', EmployeeImportLog::STATUS_PENDING)->count();
 
-        return view('admin.employees.import', compact('dictionaryCategories'));
+        return view('admin.employees.import', compact('dictionaryCategories', 'pendingApprovalCount'));
     }
 
     public function import(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
     {
-        $summary = $importService->directImport(
-            $request->file('import_file'),
-            auth()->user(),
-            $request->ip(),
-            $request->userAgent()
-        );
+        try {
+            $summary = $importService->directImport(
+                $request->file('import_file'),
+                auth()->user(),
+                $request->ip(),
+                $request->userAgent()
+            );
+        } catch (ImportAbortedException $e) {
+            return back()->withErrors(['import_file' => $e->getMessage()]);
+        }
 
         return redirect()
             ->route('admin.employees.index')
@@ -319,7 +326,11 @@ class EmployeeController extends Controller
 
     public function previewImport(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
     {
-        $previewData = $importService->preview($request->file('import_file'), auth()->user());
+        try {
+            $previewData = $importService->preview($request->file('import_file'), auth()->user());
+        } catch (ImportAbortedException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'success' => true,
@@ -348,6 +359,16 @@ class EmployeeController extends Controller
                 ]);
             }
 
+            if ($summary['pending_approval'] ?? false) {
+                return response()->json([
+                    'success' => true,
+                    'is_async' => false,
+                    'pending_approval' => true,
+                    'batch_url' => route('admin.employees.import.batches.show', $summary['batch_id']),
+                    'summary' => $summary['summary'],
+                ]);
+            }
+
             session()->flash('success', "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.");
             session()->flash('import_summary', $summary);
 
@@ -357,7 +378,7 @@ class EmployeeController extends Controller
                 'redirect_url' => route('admin.employees.index'),
                 'summary' => $summary,
             ]);
-        } catch (\DomainException|\RuntimeException $e) {
+        } catch (ImportAbortedException|\DomainException|\RuntimeException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -489,7 +510,7 @@ class EmployeeController extends Controller
         $familyStatuses = Employee::FAMILY_STATUSES;
         $educationLevels = Employee::EDUCATION_LEVELS;
         $entryChannels = Employee::ENTRY_CHANNELS;
-        $rmLevels = Employee::RM_LEVELS;
+        $rmLevels = Position::RM_LEVEL_LIST;
 
         return view('admin.employees.edit-employee', compact(
             'employee',

@@ -78,6 +78,16 @@
         </x-admin.kpi-card>
     </div>
 
+    <!-- Peringatan tinjauan: informatif, tidak menghalangi impor -->
+    <div x-show="(validationSummary?.warning_count ?? 0) > 0" x-cloak role="status"
+        class="flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-800">
+        <i class="fas fa-circle-info mt-0.5 text-warning-700" aria-hidden="true"></i>
+        <p class="text-xs leading-relaxed">
+            <span class="font-bold" x-text="validationSummary?.warning_count"></span> pegawai tercatat pada formasi yang sudah tidak sesuai Master Formasi
+            (unit tidak aktif, jabatan tidak lagi tercantum, atau melebihi kuota). Impor tetap dapat dilanjutkan; tinjau melalui Master Formasi atau modul Mutasi.
+        </p>
+    </div>
+
     <!-- ============================================================ -->
     <!-- FULL-WIDTH TABBED WORKBENCH DENGAN FILTER & SEARCH CEPAT    -->
     <!-- ============================================================ -->
@@ -171,6 +181,12 @@
                                         <i class="fas fa-building text-[10px] text-surface-400" aria-hidden="true"></i>
                                         <span class="truncate" x-text="row.unit_kerja"></span>
                                     </div>
+                                    <template x-if="row.warnings && row.warnings.length > 0">
+                                        <div class="mt-1 flex items-start gap-1 text-[10px] font-semibold text-warning-800 leading-snug" :title="row.warnings.join(' ')">
+                                            <i class="fas fa-triangle-exclamation mt-0.5 text-warning-600" aria-hidden="true"></i>
+                                            <span x-text="row.warnings[0]"></span>
+                                        </div>
+                                    </template>
                                 </td>
                                 
                                 <!-- Kolom 3: Strata & Golongan (Karpim/Karpel + Golongan/RM Band) -->
@@ -393,7 +409,7 @@
                     <template x-if="!isCommitting">
                         <span class="inline-flex items-center gap-2">
                             <i class="fas fa-check-circle" aria-hidden="true"></i>
-                            <span x-text="'Konfirmasi & Impor ' + sampleRows.length + ' Data Valid'"></span>
+                            <span x-text="(requiresApproval ? 'Ajukan Persetujuan untuk ' : 'Konfirmasi & Impor ') + sampleRows.length + ' Data Valid'"></span>
                         </span>
                     </template>
 
