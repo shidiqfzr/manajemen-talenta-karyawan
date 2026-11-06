@@ -446,7 +446,7 @@ class WithDataTableTest extends TestCase
 
         Livewire::test(FixtureTable::class)
             ->call('export')
-            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk mengekspor data.']);
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
 
         $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
     }

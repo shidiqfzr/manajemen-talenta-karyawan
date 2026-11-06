@@ -37,6 +37,8 @@ trait WithDataTable
 
     private const SELECTION_MAX = 1000;
 
+    private const NO_PERMISSION_MESSAGE = 'Anda tidak memiliki akses untuk tindakan ini.';
+
     public string $search = '';
 
     public string $sortField = '';
@@ -329,7 +331,7 @@ trait WithDataTable
         }
 
         if ($action->requiredAbility !== null && Gate::denies($action->requiredAbility)) {
-            $this->tableNotice = ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.'];
+            $this->tableNotice = ['type' => 'error', 'message' => self::NO_PERMISSION_MESSAGE];
 
             return;
         }
@@ -373,7 +375,7 @@ trait WithDataTable
         }
 
         if (Gate::denies($this->exportAbility())) {
-            $this->tableNotice = ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk mengekspor data.'];
+            $this->tableNotice = ['type' => 'error', 'message' => self::NO_PERMISSION_MESSAGE];
 
             return null;
         }
