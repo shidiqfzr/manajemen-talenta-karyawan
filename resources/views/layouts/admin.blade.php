@@ -6,6 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name', 'HRIS Talenta Hub') }} - PTPN IV</title>
 
+    {{-- Apply the saved sidebar state before first paint so wire:navigate page swaps never flash the wrong state --}}
+    <script>
+        try {
+            document.documentElement.classList.toggle('sidebar-collapsed', localStorage.getItem('sidebar_collapsed') === 'true');
+        } catch (e) {}
+    </script>
+
     @livewireStyles
 
     <!-- Google Fonts: Plus Jakarta Sans -->
@@ -48,6 +55,17 @@
         [x-cloak] {
             display: none !important;
         }
+
+        /* Pre-Alpine sidebar state, driven by the class set in <head> (mirrors the :class bindings below) */
+        @media (min-width: 1024px) {
+            #sidebar { width: 16rem; }
+            html.sidebar-collapsed #sidebar { width: 5rem; }
+        }
+
+        html.sidebar-collapsed #sidebar [x-show="!sidebarCollapsed"],
+        html:not(.sidebar-collapsed) #sidebar [x-show="sidebarCollapsed"] {
+            display: none;
+        }
     </style>
 
     @stack('styles')
@@ -61,7 +79,11 @@
             this.sidebarCollapsed = !this.sidebarCollapsed;
             localStorage.setItem('sidebar_collapsed', this.sidebarCollapsed);
         }
-    }">
+    }"
+    x-init="
+        document.documentElement.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+        $watch('sidebarCollapsed', value => document.documentElement.classList.toggle('sidebar-collapsed', value));
+    ">
 
     <div class="flex h-dvh overflow-hidden">
         <!-- Mobile Menu Overlay -->
@@ -318,7 +340,7 @@
                         <span class="w-2 h-2 rounded-full bg-primary-600"></span>
                         <span class="font-semibold text-surface-900">PTPN IV</span>
                         <span class="text-surface-300">|</span>
-                        <span class="text-surface-500">Regional V</span>
+                        <span class="text-surface-600">Regional V</span>
                     </div>
 
                     <!-- Notification Center Bell -->

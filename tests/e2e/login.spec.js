@@ -77,7 +77,7 @@ test.describe('desktop 1366px', () => {
     test('kosakata baku: Indonesia, tanpa nama dokumen internal', async ({ page }) => {
         await open(page);
         // The photo panel carries a headline and a description only.
-        await expect(page.locator('aside h2')).toHaveText('Kelola Seluruh Siklus Talenta Pegawai');
+        await expect(page.locator('aside h2')).toHaveText('Pengelolaan Talenta yang Terpadu dan Akuntabel');
         await expect(page.locator('aside li')).toHaveCount(0);
         const text = await page.locator('body').innerText();
         for (const banned of ['Admin Login', 'Secure', 'Efficient', 'Modern', 'All rights reserved', 'AGENTS', 'DOMAIN.md', 'DESIGN.md', 'SSOT']) {
