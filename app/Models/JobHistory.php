@@ -29,7 +29,24 @@ class JobHistory extends Model
         'Plt',
     ];
 
+    /** Asal baris riwayat (DOMAIN.md §2.2): hanya `mutasi` yang berdasar SK mutasi resmi. */
+    public const SUMBER_MUTASI = 'mutasi';
+
+    public const SUMBER_DATA_AWAL = 'data_awal';
+
+    public const SUMBER_PEMBARUAN_DATA = 'pembaruan_data';
+
+    public const SUMBER_IMPOR = 'impor';
+
+    public const SUMBER_LABELS = [
+        self::SUMBER_MUTASI => 'Mutasi Resmi',
+        self::SUMBER_DATA_AWAL => 'Data Awal',
+        self::SUMBER_PEMBARUAN_DATA => 'Pembaruan Data',
+        self::SUMBER_IMPOR => 'Impor Excel',
+    ];
+
     protected $fillable = [
+        'sumber',
         'batch_id',
         'chain_order',
         'is_applied',
@@ -66,6 +83,31 @@ class JobHistory extends Model
         'tanggal_sk' => 'date',
         'is_dispensasi' => 'boolean',
     ];
+
+    /** Baris yang bukan SK mutasi resmi: data awal, pembaruan data pegawai, dan tugas rangkap hasil impor. */
+    public function isRecordOnly(): bool
+    {
+        return $this->sumber !== self::SUMBER_MUTASI;
+    }
+
+    /** Label sumber dengan istilah bisnis. */
+    public function getSumberLabelAttribute(): string
+    {
+        return self::SUMBER_LABELS[$this->sumber] ?? self::SUMBER_LABELS[self::SUMBER_MUTASI];
+    }
+
+    /**
+     * Saring menurut sumber. `resmi` (bawaan layar riwayat) hanya memuat mutasi resmi; `semua` atau kosong
+     * memuat seluruhnya; nilai lain harus salah satu kunci SUMBER_LABELS.
+     */
+    public function scopeBySumber($query, ?string $sumber)
+    {
+        return match (true) {
+            $sumber === 'resmi' => $query->where('sumber', self::SUMBER_MUTASI),
+            array_key_exists((string) $sumber, self::SUMBER_LABELS) => $query->where('sumber', $sumber),
+            default => $query,
+        };
+    }
 
     /**
      * Scope to only applied (active/historical) records.

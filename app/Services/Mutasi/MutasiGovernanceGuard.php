@@ -160,7 +160,7 @@ class MutasiGovernanceGuard
             ];
 
             $isEligible = $hasMinGol && $hasAskepTenure;
-        } elseif ($currentRmNum === 4 && $targetRmNum <= 3) {
+        } elseif ($currentRmNum >= 4 && $targetRmNum <= 3) {
             // Pelaksana ke Staf via CKP
             $criteria[] = [
                 'label' => 'Jalur Karir CKP (Calon Karyawan Pimpinan)',

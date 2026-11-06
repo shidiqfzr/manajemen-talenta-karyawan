@@ -1058,4 +1058,16 @@ class MutasiServiceTest extends TestCase
 
         $this->service->processMutasi(new MutasiRequest($empA->nik, 'Posisi B', 'Unit A', now()->toDateString(), 'ROTASI'));
     }
+
+    public function test_rm_5_to_karpim_promotion_follows_the_ckp_path(): void
+    {
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+
+        $emp = Employee::factory()->create(['jabatan' => 'Krani Pemetaan', 'level' => 'Karpel', 'rm_level' => 'RM-5']);
+
+        $result = $this->service->checkPromotionEligibility($emp, 'Asisten Tanaman');
+
+        $this->assertTrue($result['is_applicable']);
+        $this->assertSame('Jalur Karir CKP (Calon Karyawan Pimpinan)', $result['criteria'][0]['label']);
+    }
 }

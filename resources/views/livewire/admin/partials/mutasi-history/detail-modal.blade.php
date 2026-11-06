@@ -36,7 +36,7 @@
                             </div>
                         </div>
                         <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border {{ $detailJob->is_applied ? 'bg-primary-100 text-primary-800 border-primary-300' : 'bg-warning-100 text-warning-800 border-warning-200' }}">
-                            {{ $detailJob->jenis_mutasi_label }}
+                            {{ $detailJob->isRecordOnly() ? $detailJob->sumber_label : $detailJob->jenis_mutasi_label }}
                         </span>
                     </div>
 

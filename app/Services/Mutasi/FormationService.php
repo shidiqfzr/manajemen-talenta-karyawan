@@ -189,12 +189,12 @@ class FormationService
     }
 
     /**
-     * Derive Karpim (RM-1..RM-3) vs Karpel (RM-4) classification per DOMAIN.md §4.1.
+     * Derive Karpim (RM-1..RM-3) vs Karpel (RM-4..RM-7) classification per DOMAIN.md §4.1.
      */
     public function deriveLevelForRm(string $rmLevel, ?string $fallback = null): ?string
     {
         return match ($rmLevel) {
-            'RM-4' => 'Karpel',
+            'RM-4', 'RM-5', 'RM-6', 'RM-7' => 'Karpel',
             'RM-1', 'RM-2', 'RM-3' => 'Karpim',
             default => $fallback,
         };
@@ -234,7 +234,7 @@ class FormationService
         ];
     }
 
-    /** RM band (RM-1..RM-4) of an employee in canonical format. */
+    /** RM band (RM-1..RM-7) of an employee in canonical format. */
     public function resolveEmployeeRm(Employee $employee): string
     {
         return $this->planning->determineRmLevel($employee);
