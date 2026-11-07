@@ -15,6 +15,7 @@ use Tests\Fixtures\DataTable\FixtureTableControlless;
 use Tests\Fixtures\DataTable\FixtureTableDateFilter;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableWidth;
+use Tests\Fixtures\DataTable\FixtureToolbarCustomSearch;
 use Tests\Fixtures\DataTable\FixtureToolbarOnly;
 use Tests\TestCase;
 
@@ -280,6 +281,25 @@ class TableComponentsTest extends TestCase
             $this->assertStringContainsString('sm:w-40', $class);
         }
         $this->assertStringNotContainsString('sm:flex-1', $panel);
+    }
+
+    public function test_toolbar_uses_custom_search_model_and_reset_action(): void
+    {
+        $html = Livewire::test(FixtureToolbarCustomSearch::class)->set('seatQuery', 'abc')->html();
+
+        $this->assertStringContainsString('wire:model.live.debounce.300ms="seatQuery"', $html);
+        $this->assertStringContainsString('$set(\'seatQuery\', \'\')', $html);
+        $this->assertStringContainsString('wire:click="resetSeatFilters"', $html);
+        $this->assertStringNotContainsString('wire:click="resetFilters"', $html);
+    }
+
+    public function test_toolbar_defaults_to_search_and_reset_filters(): void
+    {
+        $html = Livewire::test(FixtureToolbarOnly::class)->set('search', 'abc')->html();
+
+        $this->assertStringContainsString('wire:model.live.debounce.300ms="search"', $html);
+        $this->assertStringContainsString('$set(\'search\', \'\')', $html);
+        $this->assertStringContainsString('wire:click="resetFilters"', $html);
     }
 
     public function test_toolbar_lists_active_filters_as_removable_chips(): void
