@@ -4,32 +4,43 @@ namespace App\Livewire\Admin;
 
 use App\Exceptions\MutasiRuleViolationException;
 use App\Exports\MutasiHistoryExport;
+use App\Livewire\Concerns\WithDataTable;
 use App\Models\JobHistory;
+use App\Models\User;
 use App\Services\MutasiService;
+use App\Support\DataTable\Column;
+use App\Support\DataTable\Filter;
+use App\Support\DataTable\QueryPipeline;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
-use Maatwebsite\Excel\Facades\Excel;
 
+/**
+ * Riwayat Mutasi: jejak audit seluruh mutasi, aktivasi jadwal TMT, dan ekspor log kepatuhan.
+ *
+ * Berjalan di atas lapisan tabel data bersama (WithDataTable): pencarian, urutan, filter, dan
+ * jumlah baris per halaman divalidasi di sana; arti status dan sumber catatan hanya ditentukan
+ * oleh scope JobHistory (DOMAIN.md), bukan oleh komponen ini.
+ */
 class MutasiHistory extends Component
 {
-    use WithPagination;
+    use WithDataTable;
 
-    public string $search = '';
-
+    #[Url(except: '')]
     public string $unitFilter = '';
 
+    #[Url(except: '')]
     public string $mutasiFilter = '';
 
-    public string $statusFilter = ''; // '' = all, 'applied' = aktif/diterapkan, 'scheduled' = terjadwal
+    /** '' = semua, 'applied' = aktif/diterapkan, 'scheduled' = terjadwal, 'due' = siap diaktifkan. */
+    #[Url(except: '')]
+    public string $statusFilter = '';
 
-    /** 'resmi' (bawaan) = hanya mutasi resmi; 'semua' atau salah satu kunci JobHistory::SUMBER_LABELS. */
-    public string $sumberFilter = 'resmi';
-
-    public string $sortField = 'tmt_awal';
-
-    public string $sortDirection = 'desc';
-
-    public int $perPage = 15;
+    /** '' (bawaan) = hanya mutasi resmi; 'semua' atau salah satu kunci JobHistory::SUMBER_LABELS. */
+    #[Url(except: '')]
+    public string $sumberFilter = '';
 
     public ?string $selectedBatchId = null;
 
@@ -39,20 +50,128 @@ class MutasiHistory extends Component
 
     public ?JobHistory $detailJob = null;
 
-    protected $queryString = [
-        'search' => ['except' => ''],
-        'unitFilter' => ['except' => ''],
-        'mutasiFilter' => ['except' => ''],
-        'statusFilter' => ['except' => ''],
-        'sumberFilter' => ['except' => 'resmi'],
-        'sortField' => ['except' => 'tmt_awal'],
-        'sortDirection' => ['except' => 'desc'],
-    ];
+    /**
+     * Known units for the unit filter; computed once per request because filters() is built several times.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function units(): array
+    {
+        return app(MutasiService::class)->getKnownUnits()->all();
+    }
+
+    protected function baseQuery(): Builder
+    {
+        // The compliance export maps employee and creator per row: keep them eager loaded.
+        return JobHistory::with(['employee', 'creator'])
+            ->when($this->sumberFilter === '', fn (Builder $query) => $query->bySumber('resmi'));
+    }
+
+    protected function columns(): array
+    {
+        return [
+            Column::make('employee_nik', 'Karyawan')
+                ->sortable()
+                ->searchable(fn (Builder $query, string $term) => $query->whereHas(
+                    'employee',
+                    fn (Builder $employee) => QueryPipeline::whereLikeAny($employee, ['nama', 'nik'], $term)
+                ))
+                ->width('w-[18%]'),
+            Column::make('jabatan', 'Jabatan & Unit Kerja')
+                ->sortable()
+                ->searchable(fn (Builder $query, string $term) => QueryPipeline::whereLikeAny($query, ['jabatan', 'unit_kerja'], $term))
+                ->width('w-[24%]'),
+            Column::make('jenis_mutasi', 'Jenis & Regulasi')->sortable()->align('center')->width('w-[12%]'),
+            Column::make('tmt_awal', 'TMT Efektif')->sortable()->width('w-[12%]'),
+            Column::make('status', 'Status')->align('center')->width('w-[12%]'),
+            Column::make('nomor_sk', 'Dasar SK')->sortable()->width('w-[14%]'),
+            Column::make('aksi', 'Aksi')->align('center')->width('w-[8%]'),
+        ];
+    }
+
+    protected function filters(): array
+    {
+        $units = $this->units;
+        $sumberOptions = ['semua' => 'Semua Catatan'];
+
+        foreach (JobHistory::SUMBER_LABELS as $key => $label) {
+            if ($key !== JobHistory::SUMBER_MUTASI) {
+                $sumberOptions[$key] = $label;
+            }
+        }
+
+        return [
+            Filter::select('unitFilter', 'Unit Kerja', array_combine($units, $units))
+                ->icon('fas fa-building')
+                ->allLabel('Semua Unit Kerja')
+                ->apply(fn (Builder $query, string $value) => $query->where('unit_kerja', $value)),
+            Filter::select('mutasiFilter', 'Jenis Mutasi', array_combine(
+                JobHistory::MUTASI_TYPES,
+                array_map(fn (string $type) => JobHistory::labelFor($type), JobHistory::MUTASI_TYPES)
+            ))
+                ->icon('fas fa-tag')
+                ->apply(fn (Builder $query, string $value) => $query->where('jenis_mutasi', $value)),
+            Filter::select('statusFilter', 'Status', [
+                'applied' => 'Aktif Menjabat',
+                'scheduled' => 'Terjadwal',
+                'due' => 'Siap Diaktifkan',
+            ])
+                ->icon('fas fa-flag')
+                ->apply(fn (Builder $query, string $value) => $query->byStatus($value)),
+            Filter::select('sumberFilter', 'Sumber Catatan', $sumberOptions)
+                ->icon('fas fa-layer-group')
+                ->allLabel('Mutasi Resmi')
+                ->apply(fn (Builder $query, string $value) => $query->bySumber($value)),
+        ];
+    }
+
+    protected function defaultSort(): array
+    {
+        return ['tmt_awal', 'desc'];
+    }
+
+    protected function defaultPerPage(): int
+    {
+        return 15;
+    }
+
+    protected function perPageOptions(): array
+    {
+        return [10, 15, 25, 50, 100];
+    }
+
+    protected function tableLabel(): string
+    {
+        return 'Riwayat Mutasi';
+    }
+
+    protected function exportName(): ?string
+    {
+        return 'riwayat-mutasi';
+    }
+
+    protected function exportFileName(): string
+    {
+        return 'Audit_Log_Mutasi_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
+    }
+
+    /** The compliance workbook (Inspektorat/BPK format) over exactly the rows on screen. */
+    protected function buildExport(Builder $query, ?User $user): object
+    {
+        return new MutasiHistoryExport(['sumber' => $this->sumber()], $user, $query);
+    }
+
+    /** Source scope for the KPI counts and the export metadata: the empty default means official mutations. */
+    private function sumber(): string
+    {
+        return $this->sumberFilter === '' ? 'resmi' : $this->sumberFilter;
+    }
 
     public function toggleStatusFilter(string $status): void
     {
         $this->statusFilter = ($this->statusFilter === $status) ? '' : $status;
-        $this->resetPage();
+        $this->resetPage($this->paginationName());
     }
 
     public function showDetail(int $id, MutasiService $service): void
@@ -65,17 +184,6 @@ class MutasiHistory extends Component
     {
         $this->selectedJobId = null;
         $this->detailJob = null;
-    }
-
-    public function sortBy(string $field): void
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-        $this->resetPage();
     }
 
     public function viewBatch(string $batchId, MutasiService $service): void
@@ -138,102 +246,11 @@ class MutasiHistory extends Component
         }
     }
 
-    public function updatingSearch(): void
+    public function render(MutasiService $service): View
     {
-        $this->resetPage();
-    }
-
-    public function updatingUnitFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingMutasiFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSumberFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    /** Nilai dari URL yang tidak dikenal kembali ke bawaan (mutasi resmi). */
-    private function sumber(): string
-    {
-        return $this->sumberFilter === 'semua' || array_key_exists($this->sumberFilter, JobHistory::SUMBER_LABELS)
-            ? $this->sumberFilter
-            : 'resmi';
-    }
-
-    public function resetFilters(): void
-    {
-        $this->reset(['search', 'unitFilter', 'mutasiFilter', 'statusFilter', 'sumberFilter']);
-        $this->sortField = 'tmt_awal';
-        $this->sortDirection = 'desc';
-        $this->resetPage();
-    }
-
-    public function exportAuditLog()
-    {
-        $isApplied = match ($this->statusFilter) {
-            'applied' => true,
-            'scheduled', 'due' => false,
-            default => null,
-        };
-        $onlyDue = ($this->statusFilter === 'due');
-
-        $filters = [
-            'search' => $this->search ?: null,
-            'unitKerja' => $this->unitFilter ?: null,
-            'jenisMutasi' => $this->mutasiFilter ?: null,
-            'isApplied' => $isApplied,
-            'onlyDue' => $onlyDue,
-            'sumber' => $this->sumber(),
-            'sortBy' => $this->sortField,
-            'sortDirection' => $this->sortDirection,
-        ];
-
-        $filename = 'Audit_Log_Mutasi_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
-
-        return Excel::download(new MutasiHistoryExport($filters, auth()->user()), $filename);
-    }
-
-    public function render(MutasiService $service)
-    {
-        $isApplied = match ($this->statusFilter) {
-            'applied' => true,
-            'scheduled', 'due' => false,
-            default => null,
-        };
-        $onlyDue = ($this->statusFilter === 'due');
-
-        $history = $service->getMutasiHistory(
-            search: $this->search ?: null,
-            unitKerja: $this->unitFilter ?: null,
-            jenisMutasi: $this->mutasiFilter ?: null,
-            isApplied: $isApplied,
-            onlyDue: $onlyDue,
-            perPage: $this->perPage,
-            sortBy: $this->sortField,
-            sortDirection: $this->sortDirection,
-            sumber: $this->sumber(),
-        );
-
-        $units = $service->getKnownUnits();
-        $mutasiTypes = JobHistory::MUTASI_TYPES;
         $kpis = $service->getMutasiHistoryKpis($this->sumber());
 
         return view('livewire.admin.mutasi-history', [
-            'history' => $history,
-            'units' => $units,
-            'mutasiTypes' => $mutasiTypes,
-            'sumberOptions' => JobHistory::SUMBER_LABELS,
             'totalCount' => $kpis['total'],
             'activeCount' => $kpis['active'],
             'scheduledCount' => $kpis['scheduled'],
