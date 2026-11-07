@@ -5,6 +5,7 @@ namespace Tests\Feature\DataTable;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
@@ -54,6 +55,25 @@ class TableComponentsTest extends TestCase
     {
         Livewire::test(FixtureTableWidth::class)->assertSeeHtml('w-[30%]');
         Livewire::test(FixtureTable::class)->assertDontSeeHtml('w-[30%]');
+    }
+
+    public function test_filter_select_can_show_a_visible_label(): void
+    {
+        $html = Blade::render('<x-admin.filter-select id="unit" model="unitFilter" label="Unit Kerja" all-label="Semua Unit Kerja" :options="[\'a\' => \'Kebun A\']" :show-label="true" />');
+
+        $this->assertStringContainsString('<label for="unit" class="mb-1 block text-xs font-medium text-surface-600">Unit Kerja</label>', $html);
+        $this->assertStringNotContainsString('sr-only', $html);
+        $this->assertStringContainsString('<select id="unit" wire:model.live="unitFilter"', $html);
+        $this->assertStringContainsString('<option value="">Semua Unit Kerja</option>', $html);
+    }
+
+    public function test_filter_select_default_output_is_unchanged(): void
+    {
+        $html = Blade::render('<x-admin.filter-select id="unit" model="unitFilter" label="Unit Kerja" all-label="Semua Unit Kerja" :options="[\'a\' => \'Kebun A\']" />');
+
+        $this->assertStringContainsString('<label for="unit" class="sr-only">Unit Kerja</label>', $html);
+        $this->assertStringContainsString('class="relative flex-1 sm:flex-initial min-w-[150px]"', $html);
+        $this->assertStringNotContainsString('mb-1 block', $html);
     }
 
     public function test_toolbar_renders_labelled_date_inputs(): void
