@@ -27,73 +27,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
-    // Display all employees
-    public function index(Request $request)
+    // Display all employees: page-level KPI metrics and the expired-sanction notice. The directory list itself
+    // (search, filters, sort, pagination) is the Livewire component App\Livewire\Admin\Employees\EmployeeTable.
+    public function index()
     {
-        $query = Employee::with(['concurrentJobs']);
-
-        // Text search (Omnisearch: NIK, Nama, Jabatan, Unit Kerja via Eloquent Scope)
-        if ($request->filled('search')) {
-            $query->search($request->search);
-        }
-
-        // Dropdown filters
-        if ($request->filled('jabatan')) {
-            $query->where('jabatan', $request->jabatan);
-        }
-
-        if ($request->filled('level')) {
-            $query->where('level', $request->level);
-        }
-
-        if ($request->filled('unit_kerja')) {
-            $query->where('unit_kerja', $request->unit_kerja);
-        }
-
-        if ($request->filled('rm_level')) {
-            $query->where('rm_level', $request->rm_level);
-        }
-
-        if ($request->filled('golongan')) {
-            $query->where('golongan', $request->golongan);
-        }
-
-        // Filter: Status Penugasan (Definitif vs Plt/Pjs/Diperbantukan)
-        if ($request->filled('status_penugasan')) {
-            $status = $request->status_penugasan;
-            if ($status === 'sementara') {
-                $query->whereHas('concurrentJobs');
-            } elseif ($status === 'definitif') {
-                $query->whereDoesntHave('concurrentJobs');
-            } else {
-                $query->whereHas('concurrentJobs', function ($q) use ($status) {
-                    $q->where('status_penugasan', $status);
-                });
-            }
-        }
-
-        // Filter: Status Khusus / Tata Kelola (Sanksi, Overflow, Rangkap)
-        if ($request->filled('status_khusus')) {
-            $khusus = $request->status_khusus;
-            if ($khusus === 'sanksi') {
-                $query->sanctionAll();
-            } elseif ($khusus === 'overflow') {
-                $query->overflow();
-            } elseif ($khusus === 'rangkap') {
-                $query->whereHas('concurrentJobs');
-            }
-        }
-
-        // Period filter: Tahun Masuk (TMT Bekerja)
-        if ($request->filled('tahun_masuk')) {
-            $query->whereYear('tmt_bekerja', $request->tahun_masuk);
-        }
-
-        // Period filter: Bulan Masuk (TMT Bekerja)
-        if ($request->filled('bulan_masuk')) {
-            $query->whereMonth('tmt_bekerja', $request->bulan_masuk);
-        }
-
         // Fixed Global Headcount KPI Metrics (Executive Overview)
         $totalEmployees = Employee::count();
         $totalUnits = Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
@@ -101,49 +38,11 @@ class EmployeeController extends Controller
         $pelaksanaCount = Employee::pelaksana()->count();
 
         // Global reference
-        $globalTotalEmployees = $totalEmployees;
         $penugasanSementaraCount = Employee::whereHas('concurrentJobs')->count();
 
         // Special governance metrics
         $sanksiAktifCount = Employee::sanctionActive()->count();
-        $sanksiTotalCount = Employee::sanctionAll()->count();
         $overflowCount = Employee::overflow()->count();
-
-        // Column sorting (Enterprise HRIS standard: sortable table columns)
-        $sortColumn = $request->query('sort', 'nama');
-        $sortDirection = $request->query('direction', 'asc') === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['nama', 'jabatan', 'rm_level', 'level', 'golongan'];
-
-        if (in_array($sortColumn, $allowedSorts)) {
-            $query->orderBy($sortColumn, $sortDirection);
-        } else {
-            $query->orderBy('nama', 'asc');
-        }
-
-        $employees = $query->paginate(20)->withQueryString();
-
-        // Get unique sorted values for filters
-        $jabatans = Employee::select('jabatan')->whereNotNull('jabatan')->where('jabatan', '!=', '')->distinct()->orderBy('jabatan')->pluck('jabatan');
-        $levels = Employee::select('level')->whereNotNull('level')->where('level', '!=', '')->distinct()->orderBy('level')->pluck('level');
-        $units = Employee::select('unit_kerja')->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->orderBy('unit_kerja')->pluck('unit_kerja');
-        $golongans = Employee::select('golongan')->whereNotNull('golongan')->where('golongan', '!=', '')->distinct()->orderBy('golongan')->pluck('golongan');
-        $rmLevels = Position::RM_LEVEL_LIST;
-
-        // Dynamic hire years from database (Fast substring extraction)
-        $availableYears = Employee::whereNotNull('tmt_bekerja')
-            ->pluck('tmt_bekerja')
-            ->map(fn ($date) => $date ? substr((string) $date, 0, 4) : null)
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values();
-
-        $months = [
-            '01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
-            '04' => 'April',   '05' => 'Mei',      '06' => 'Juni',
-            '07' => 'Juli',    '08' => 'Agustus',  '09' => 'September',
-            '10' => 'Oktober', '11' => 'November', '12' => 'Desember',
-        ];
 
         // Fetch employees with expired sanctions (Diperban)
         $expiredSanksiEmployees = Employee::sanctionExpired()
@@ -151,23 +50,13 @@ class EmployeeController extends Controller
             ->get();
 
         return view('admin.employees.index', compact(
-            'employees',
-            'jabatans',
-            'levels',
-            'units',
-            'golongans',
-            'rmLevels',
-            'availableYears',
-            'months',
             'totalEmployees',
             'totalUnits',
             'karpimCount',
             'pelaksanaCount',
-            'globalTotalEmployees',
             'expiredSanksiEmployees',
             'penugasanSementaraCount',
             'sanksiAktifCount',
-            'sanksiTotalCount',
             'overflowCount'
         ));
     }
