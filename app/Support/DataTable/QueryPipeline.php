@@ -45,10 +45,7 @@ final class QueryPipeline
             return;
         }
 
-        $grammar = $base->getQuery()->getGrammar();
-        $pattern = '%'.self::escapeLike($term).'%';
-
-        $base->where(function (Builder $q) use ($searchable, $grammar, $pattern, $term) {
+        $base->where(function (Builder $q) use ($searchable, $term) {
             foreach ($searchable as $column) {
                 if ($custom = $column->searchUsing()) {
                     $q->orWhere(fn (Builder $inner) => $custom($inner, $term));
@@ -56,8 +53,29 @@ final class QueryPipeline
                     continue;
                 }
 
-                $wrapped = $grammar->wrap($q->qualifyColumn($column->key));
-                $q->orWhereRaw($wrapped." LIKE ? ESCAPE '!'", [$pattern]);
+                $q->orWhere(fn (Builder $inner) => self::whereLikeAny($inner, [$column->key], $term));
+            }
+        });
+    }
+
+    /**
+     * Add one grouped OR of `column LIKE %term% ESCAPE '!'` over the given columns.
+     *
+     * Columns are qualified with the model table and wrapped by the query grammar;
+     * the term is escaped with escapeLike() and always bound as a parameter. All
+     * conditions live in a single where() group so an OR never leaks outside it.
+     *
+     * @param  array<int, string>  $columns
+     */
+    public static function whereLikeAny(Builder $query, array $columns, string $term): void
+    {
+        $pattern = '%'.self::escapeLike($term).'%';
+
+        $query->where(function (Builder $group) use ($columns, $pattern) {
+            $grammar = $group->getQuery()->getGrammar();
+
+            foreach ($columns as $column) {
+                $group->orWhereRaw($grammar->wrap($group->qualifyColumn($column))." LIKE ? ESCAPE '!'", [$pattern]);
             }
         });
     }

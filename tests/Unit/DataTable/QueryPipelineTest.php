@@ -83,6 +83,21 @@ class QueryPipelineTest extends TestCase
         $this->assertSame('a!!b!%c!_d', QueryPipeline::escapeLike('a!b%c_d'));
     }
 
+    public function test_where_like_any_groups_columns_and_escapes_the_term(): void
+    {
+        FixtureRow::query()->delete();
+        FixtureRow::create(['nama' => 'SK_01', 'kode' => 'A', 'bidang' => 'KEU', 'nilai' => 1]);
+        FixtureRow::create(['nama' => 'Lain', 'kode' => 'xSK_01x', 'bidang' => 'KEU', 'nilai' => 1]);
+        FixtureRow::create(['nama' => 'SKX01', 'kode' => 'B', 'bidang' => 'KEU', 'nilai' => 1]);
+        FixtureRow::create(['nama' => 'SK_01 TAN', 'kode' => 'C', 'bidang' => 'TAN', 'nilai' => 1]);
+
+        $query = FixtureRow::query()->where('bidang', 'KEU');
+        QueryPipeline::whereLikeAny($query, ['nama', 'kode'], 'SK_01');
+
+        $this->assertSame(['Lain', 'SK_01'], $query->orderBy('nama')->pluck('nama')->all());
+        $this->assertStringContainsString("ESCAPE '!'", $query->toSql());
+    }
+
     public function test_search_uses_custom_closure(): void
     {
         $columns = [
