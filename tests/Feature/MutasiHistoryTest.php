@@ -825,4 +825,27 @@ class MutasiHistoryTest extends TestCase
             // The empty-state button comes after its message; the toolbar's own Reset button comes before it.
             ->assertSeeInOrder(['Tidak ada data yang sesuai dengan pencarian atau filter.', 'Reset filter']);
     }
+
+    public function test_status_has_no_toolbar_field_because_the_kpi_cards_drive_it(): void
+    {
+        $this->official(Employee::factory()->create());
+
+        Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->assertDontSeeHtml('wire:model.live="statusFilter"')
+            ->call('toggleStatusFilter', 'due')
+            ->assertSet('statusFilter', 'due')
+            ->assertDontSeeHtml('wire:model.live="statusFilter"')
+            ->assertSee('Status: Siap Diaktifkan')
+            ->assertSeeHtml('aria-label="Hapus filter Status"')
+            ->assertSeeHtml("wire:click=\"\$set('statusFilter', '')\"");
+    }
+
+    public function test_unit_jenis_and_source_fields_have_visible_labels(): void
+    {
+        $html = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)->html();
+
+        foreach (['Unit Kerja', 'Jenis Mutasi', 'Sumber Catatan'] as $label) {
+            $this->assertStringContainsString('class="mb-1 block text-xs font-medium text-surface-600">'.$label.'</label>', $html);
+        }
+    }
 }
