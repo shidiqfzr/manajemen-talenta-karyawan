@@ -69,6 +69,17 @@ class TrainingTableTest extends TestCase
         return Livewire::test(TrainingTable::class, ['employeeId' => $this->employee->nik]);
     }
 
+    public function test_summary_shows_the_row_count(): void
+    {
+        $total = $this->table()->instance()->rows->total();
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($this->table()->html())));
+        $this->assertStringContainsString($total.' pelatihan', $text);
+        $this->assertStringNotContainsString('sesuai filter', $text);
+
+        $filtered = trim(preg_replace('/\s+/', ' ', strip_tags($this->table()->set('search', 'Pelatihan 01')->html())));
+        $this->assertStringContainsString('1 dari '.$total.' pelatihan sesuai filter', $filtered);
+    }
+
     public function test_lists_only_this_employees_records(): void
     {
         $component = $this->table()->set('perPage', 10)

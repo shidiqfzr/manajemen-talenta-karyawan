@@ -18,6 +18,9 @@
             :export="$this->exportName() !== null"
             :has-active-filters="$this->hasActiveFilters()"
             :search="$search"
+            :result-count="$rows->total()"
+            :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
+            noun="riwayat jabatan"
             :search-shortcut="null"
             search-placeholder="Cari jabatan, unit, SK..." />
 
