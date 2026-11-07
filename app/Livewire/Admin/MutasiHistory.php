@@ -18,11 +18,12 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Riwayat Mutasi: jejak audit seluruh mutasi, aktivasi jadwal TMT, dan ekspor log kepatuhan.
+ * Mutation history (Riwayat Mutasi): the audit trail of every mutation, TMT schedule activation and
+ * the compliance log export.
  *
- * Berjalan di atas lapisan tabel data bersama (WithDataTable): pencarian, urutan, filter, dan
- * jumlah baris per halaman divalidasi di sana; arti status dan sumber catatan hanya ditentukan
- * oleh scope JobHistory (DOMAIN.md), bukan oleh komponen ini.
+ * Runs on the shared data table layer (WithDataTable), which validates search, sort, filters and
+ * page size; the meaning of each status and record source is defined only by the JobHistory scopes
+ * (DOMAIN.md), never by this component.
  */
 class MutasiHistory extends Component
 {
@@ -34,11 +35,11 @@ class MutasiHistory extends Component
     #[Url(except: '')]
     public string $mutasiFilter = '';
 
-    /** '' = semua, 'applied' = aktif/diterapkan, 'scheduled' = terjadwal, 'due' = siap diaktifkan. */
+    /** '' = all; otherwise a key of statusOptions(): 'active', 'applied', 'scheduled' or 'due'. */
     #[Url(except: '')]
     public string $statusFilter = '';
 
-    /** '' (bawaan) = hanya mutasi resmi; 'semua' atau salah satu kunci JobHistory::SUMBER_LABELS. */
+    /** '' (default) = official mutations only; 'semua' = every record, or one key of JobHistory::SUMBER_LABELS. */
     #[Url(except: '')]
     public string $sumberFilter = '';
 
@@ -49,6 +50,15 @@ class MutasiHistory extends Component
     public ?int $selectedJobId = null;
 
     public ?JobHistory $detailJob = null;
+
+    /**
+     * Admin-only screen that changes formation data and shows personal data: refuse non-admins on every
+     * request, because route middleware is not re-applied to Livewire update requests.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
 
     /**
      * Known units for the unit filter; computed once per request because filters() is built several times.
@@ -65,7 +75,8 @@ class MutasiHistory extends Component
     {
         // The compliance export maps employee and creator per row: keep them eager loaded.
         return JobHistory::with(['employee', 'creator'])
-            ->when($this->sumberFilter === '', fn (Builder $query) => $query->bySumber('resmi'));
+            // The official-only default is enforced here, not left to the trait's normalisation.
+            ->when($this->sumber() === 'resmi', fn (Builder $query) => $query->bySumber('resmi'));
     }
 
     protected function columns(): array
@@ -112,17 +123,29 @@ class MutasiHistory extends Component
             ))
                 ->icon('fas fa-tag')
                 ->apply(fn (Builder $query, string $value) => $query->where('jenis_mutasi', $value)),
-            Filter::select('statusFilter', 'Status', [
-                'applied' => 'Aktif Menjabat',
-                'scheduled' => 'Terjadwal',
-                'due' => 'Siap Diaktifkan',
-            ])
+            Filter::select('statusFilter', 'Status', $this->statusOptions())
                 ->icon('fas fa-flag')
                 ->apply(fn (Builder $query, string $value) => $query->byStatus($value)),
             Filter::select('sumberFilter', 'Sumber Catatan', $sumberOptions)
                 ->icon('fas fa-layer-group')
                 ->allLabel('Mutasi Resmi')
                 ->apply(fn (Builder $query, string $value) => $query->bySumber($value)),
+        ];
+    }
+
+    /**
+     * Status filter options, keyed by the JobHistory::byStatus values. `active` matches the Aktif Menjabat
+     * KPI card; `applied` also lists finished rows.
+     *
+     * @return array<string, string>
+     */
+    private function statusOptions(): array
+    {
+        return [
+            'active' => 'Aktif Menjabat',
+            'scheduled' => 'Terjadwal',
+            'due' => 'Siap Diaktifkan',
+            'applied' => 'Sudah Diterapkan',
         ];
     }
 
@@ -162,14 +185,28 @@ class MutasiHistory extends Component
         return new MutasiHistoryExport(['sumber' => $this->sumber()], $user, $query);
     }
 
-    /** Source scope for the KPI counts and the export metadata: the empty default means official mutations. */
+    /**
+     * Source scope for the base query, the KPI counts and the export metadata. Fails closed: the empty
+     * default, SUMBER_MUTASI itself and any unknown value all mean official mutations ('resmi').
+     */
     private function sumber(): string
     {
-        return $this->sumberFilter === '' ? 'resmi' : $this->sumberFilter;
+        $value = $this->sumberFilter;
+
+        if ($value === 'semua' || ($value !== JobHistory::SUMBER_MUTASI && array_key_exists($value, JobHistory::SUMBER_LABELS))) {
+            return $value;
+        }
+
+        return 'resmi';
     }
 
+    /** KPI-card toggle; values outside the status filter options are ignored (server calls bypass the trait's normalisation). */
     public function toggleStatusFilter(string $status): void
     {
+        if ($status !== '' && ! array_key_exists($status, $this->statusOptions())) {
+            return;
+        }
+
         $this->statusFilter = ($this->statusFilter === $status) ? '' : $status;
         $this->resetPage($this->paginationName());
     }

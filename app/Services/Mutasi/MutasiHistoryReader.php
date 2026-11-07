@@ -95,7 +95,7 @@ class MutasiHistoryReader
     {
         return [
             'total' => JobHistory::bySumber($sumber)->count(),
-            'active' => JobHistory::bySumber($sumber)->where('is_applied', true)->whereNull('tmt_akhir')->count(),
+            'active' => JobHistory::bySumber($sumber)->active()->count(),
             'scheduled' => JobHistory::bySumber($sumber)->where('is_applied', false)->count(),
             'due' => JobHistory::bySumber($sumber)->dueForActivation()->count(),
         ];
