@@ -155,7 +155,7 @@ class TableComponentsTest extends TestCase
         $this->assertStringContainsString('Reset Filter', $html);
         $this->assertStringNotContainsString('wire:model.live="bidang"', $html);
         $this->assertStringNotContainsString('data-filter-count', $html);
-        $this->assertStringNotContainsString('Hapus Filter Tambahan', $html, 'nothing in the panel to clear');
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $html);
     }
 
     /** Visible text of the rendered component with whitespace collapsed, for asserting on summary copy. */
@@ -266,15 +266,20 @@ class TableComponentsTest extends TestCase
         $this->assertStringNotContainsString('pr-12', $select[1]);
     }
 
-    public function test_active_filter_row_offers_hapus_filter_tambahan(): void
+    public function test_active_filter_row_has_no_partial_clear_link_and_buttons_share_one_size(): void
     {
         $panel = Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->html();
-        $this->assertStringContainsString('Hapus Filter Tambahan', $panel);
-        $this->assertStringContainsString('wire:click="resetPanelFilters"', $panel);
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $panel, 'Reset Filter already clears everything');
+        $this->assertStringNotContainsString('resetPanelFilters', $panel);
 
-        $searchOnly = Livewire::test(FixtureTable::class)->set('search', 'Budi')->html();
-        $this->assertStringNotContainsString('Hapus Filter Tambahan', $searchOnly, 'a search term is not a panel filter');
-        $this->assertStringContainsString('Reset Filter', $searchOnly);
+        // Filter Lanjutan and Reset Filter share one width and height; the search field is compact, not full-row.
+        preg_match_all('/class="([^"]*)"[^>]*>\s*<i class="fas (?:fa-sliders|fa-rotate-left)/', $panel, $buttons);
+        $this->assertCount(2, $buttons[1]);
+        foreach ($buttons[1] as $class) {
+            $this->assertStringContainsString('h-10', $class);
+            $this->assertStringContainsString('sm:w-40', $class);
+        }
+        $this->assertStringNotContainsString('sm:flex-1', $panel);
     }
 
     public function test_toolbar_lists_active_filters_as_removable_chips(): void

@@ -1,12 +1,11 @@
 {{--
     Toolbar pencarian dan filter tabel data Livewire (DESIGN.md §7.5, §8.4), dipakai di dalam x-admin.table.card bersama
     trait WithDataTable. Tata letaknya mengikuti Direktori Pegawai supaya semua tabel terlihat dan terasa sama:
-    Baris pencarian: pencarian selebar baris (debounce 300ms, maks. 100 karakter), tombol "Filter Lanjutan" berhitungan,
-    dan "Reset Filter" di kanan (tampil hanya bila ada pencarian atau filter aktif).
+    Baris pencarian: kolom pencarian ringkas (debounce 300ms, maks. 100 karakter), tombol "Filter Lanjutan" berhitungan,
+    dan "Reset Filter" (tampil hanya bila ada pencarian atau filter aktif). Kedua tombol berukuran sama.
     Panel filter: kolom berlabel terlihat dengan ikon (pilihan, rentang tanggal, saklar ya-tidak); tertutup secara
     bawaan, Esc menutupnya dan mengembalikan fokus ke tombol. Filter langsung diterapkan saat kolom berubah.
-    Baris "Filter Aktif": chip yang dapat dihapus satu per satu, dan "Hapus Filter Tambahan" (menghapus filter di panel
-    saja; pencarian dan filter yang dikendalikan dari luar, mis. kartu KPI, tetap).
+    Baris "Filter Aktif": chip yang dapat dihapus satu per satu; menghapus semuanya cukup dengan "Reset Filter".
     Judul tabel, jumlah data, rentang, dan Ekspor Excel ada di x-admin.table.header tepat di bawah toolbar ini.
 
     <x-admin.table.toolbar
@@ -70,16 +69,18 @@
         ];
     }
     $searchId = $tableId.'-search';
+    // Both toolbar buttons share one width and height so the row reads as a single control group.
+    $toolbarButton = 'inline-flex items-center justify-center gap-1.5 h-10 px-2.5 sm:w-40 rounded-xl border border-surface-200 bg-white text-xs font-semibold shadow-2xs shrink-0 cursor-pointer whitespace-nowrap transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 @endphp
 
 <div x-data="{ open: false }" @keydown.escape="if (open) { open = false; $nextTick(() => $refs.filterToggle?.focus()) }" class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200 space-y-3">
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         <label for="{{ $searchId }}" class="sr-only">Pencarian</label>
-        <x-admin.search-input model="search" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative flex-1 min-w-0" />
+        <x-admin.search-input model="search" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative w-full sm:w-60 lg:w-72 sm:flex-none min-w-0" />
 
         @if ($hasPanel)
             <button type="button" x-ref="filterToggle" @click="open = ! open" aria-expanded="false" :aria-expanded="open" aria-controls="{{ $panelId }}"
-                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-surface-200 bg-white text-xs font-semibold text-surface-700 hover:bg-surface-50 transition shadow-2xs shrink-0 cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                class="{{ $toolbarButton }} text-surface-700 hover:bg-surface-50">
                 <i class="fas fa-sliders text-primary-600 text-xs" aria-hidden="true"></i>
                 <span>Filter Lanjutan</span>
                 @if ($panelCount > 0)
@@ -91,7 +92,7 @@
 
         @if ($hasActiveFilters)
             <button type="button" wire:click="resetFilters" title="Reset semua filter" aria-label="Reset Filter"
-                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white border border-surface-200 text-surface-600 hover:text-danger hover:border-danger-200 hover:bg-danger-50/50 rounded-xl text-xs font-semibold transition shadow-2xs shrink-0 cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                class="{{ $toolbarButton }} text-surface-600 hover:text-danger hover:border-danger-200 hover:bg-danger-50/50">
                 <i class="fas fa-rotate-left text-xs" aria-hidden="true"></i>
                 <span class="hidden sm:inline">Reset Filter</span>
             </button>
@@ -167,11 +168,6 @@
                     @endif
                 </button>
             @endforeach
-            @if ($panelCount > 0)
-                <button type="button" wire:click="resetPanelFilters" class="ml-1 text-xs font-medium text-danger hover:underline cursor-pointer rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                    Hapus Filter Tambahan
-                </button>
-            @endif
         </div>
     @endif
 </div>

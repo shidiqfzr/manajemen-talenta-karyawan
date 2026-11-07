@@ -223,7 +223,7 @@ class MutasiHistoryTest extends TestCase
         $this->assertStringContainsString('Ekspor Excel', $html, 'export stays reachable (the shared gate and limit still apply)');
     }
 
-    public function test_hapus_filter_tambahan_keeps_the_kpi_status_and_the_search(): void
+    public function test_reset_filter_clears_search_and_kpi_status_and_no_partial_clear_link_is_offered(): void
     {
         $this->official(Employee::factory()->create(['nama' => 'Cari Saya']));
 
@@ -233,18 +233,10 @@ class MutasiHistoryTest extends TestCase
             ->set('mutasiFilter', 'ROTASI');
 
         $html = $component->html();
-        $this->assertStringContainsString('Hapus Filter Tambahan', $html);
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $html, 'Reset Filter is the only clear-all action');
         $this->assertStringContainsString('Status: <strong>Sudah Diterapkan</strong>', $html);
 
-        // Only the panel filters go; the KPI-driven status and the search term stay.
-        $component->call('resetPanelFilters')
-            ->assertSet('mutasiFilter', '')
-            ->assertSet('statusFilter', 'applied')
-            ->assertSet('search', 'Cari');
-        $this->assertStringNotContainsString('Hapus Filter Tambahan', $component->html());
-
-        // "Reset Filter" clears everything.
-        $component->call('resetFilters')->assertSet('statusFilter', '')->assertSet('search', '');
+        $component->call('resetFilters')->assertSet('statusFilter', '')->assertSet('search', '')->assertSet('mutasiFilter', '');
     }
 
     public function test_can_filter_and_sort_mutasi_history(): void

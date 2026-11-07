@@ -358,11 +358,12 @@
                     <x-admin.search-input
                         name="search"
                         id="employeeSearchInput"
-                        placeholder="Cari NIK, Nama, Jabatan, atau Unit Kerja..." />
+                        placeholder="Cari NIK, Nama, Jabatan, atau Unit Kerja..."
+                        containerClass="relative w-full sm:w-60 lg:w-72 sm:flex-none min-w-0" />
 
                     <!-- Toggle Button for Advanced Dropdown Filters -->
                     <button type="button" @click="showAdvancedFilters = !showAdvancedFilters"
-                        class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-surface-200 bg-white text-xs font-semibold text-surface-700 hover:bg-surface-50 transition shadow-2xs shrink-0 cursor-pointer">
+                        class="inline-flex items-center justify-center gap-1.5 h-10 px-2.5 sm:w-40 rounded-xl border border-surface-200 bg-white text-xs font-semibold text-surface-700 hover:bg-surface-50 transition shadow-2xs shrink-0 cursor-pointer whitespace-nowrap">
                         <i class="fas fa-sliders text-primary-600 text-xs" aria-hidden="true"></i>
                         <span>Filter Lanjutan</span>
                         @php
@@ -384,7 +385,7 @@
                     <!-- Reset Filter Button (Shown when filters active) -->
                     @if(request()->hasAny(['search', 'unit_kerja', 'jabatan', 'level', 'rm_level', 'golongan', 'tahun_masuk', 'status_penugasan']))
                         <a href="{{ route('admin.employees.index') }}"
-                            class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white border border-surface-200 text-surface-600 hover:text-danger hover:border-danger-200 hover:bg-danger-50/50 rounded-xl text-xs font-semibold transition shadow-2xs shrink-0 cursor-pointer"
+                            class="inline-flex items-center justify-center gap-1.5 h-10 px-2.5 sm:w-40 bg-white border border-surface-200 text-surface-600 hover:text-danger hover:border-danger-200 hover:bg-danger-50/50 rounded-xl text-xs font-semibold transition shadow-2xs shrink-0 cursor-pointer whitespace-nowrap"
                             title="Reset semua filter">
                             <i class="fas fa-rotate-left text-xs" aria-hidden="true"></i>
                             <span class="hidden sm:inline">Reset Filter</span>
@@ -567,11 +568,6 @@
                                 <i class="fas fa-times text-[10px]" aria-hidden="true"></i>
                             </a>
                         @endif
-
-                        <a href="{{ route('admin.employees.index', array_filter(['level' => request('level')])) }}"
-                            class="text-xs text-danger hover:underline ml-1 font-medium">
-                            Hapus Filter Tambahan
-                        </a>
                     </div>
                 @endif
             </form>

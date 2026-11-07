@@ -358,7 +358,7 @@ class MasterAuditLogTest extends TestCase
         $this->assertSame('0 Catatan', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
         $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 Catatan'));
         $this->assertStringContainsString('Reset Filter', $html);
-        $this->assertStringContainsString('Hapus Filter Tambahan', $html);
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $html);
     }
 
     public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void
