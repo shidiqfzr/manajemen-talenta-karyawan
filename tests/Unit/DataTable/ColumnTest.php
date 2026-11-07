@@ -46,4 +46,14 @@ class ColumnTest extends TestCase
 
         Column::make('nama', 'Nama')->align('justify');
     }
+
+    public function test_width_is_kept_on_a_clone(): void
+    {
+        $original = Column::make('nama', 'Nama');
+        $wide = $original->width('w-[18%]');
+
+        $this->assertNull($original->width);
+        $this->assertSame('w-[18%]', $wide->width);
+        $this->assertNotSame($original, $wide);
+    }
 }

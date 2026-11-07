@@ -55,7 +55,7 @@
                 :sort-field="$sortField"
                 :sort-direction="$sortDirection"
                 :align="$column->alignment"
-                @class(['whitespace-nowrap', 'font-mono tabular-nums' => $column->isMono()])>{{ $column->label }}</x-admin.table.th>
+                @class(['whitespace-nowrap', 'font-mono tabular-nums' => $column->isMono(), $column->width => $column->width !== null])>{{ $column->label }}</x-admin.table.th>
         @endforeach
 
         {{ $trailing ?? '' }}
