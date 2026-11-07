@@ -23,6 +23,9 @@
                       tampil sebagai chip dan ikut Reset Filter.
     filter-values   : [properti => nilai] filter yang sedang aktif, untuk hitungan tombol, saklar, kolom, dan chip.
     search          : kata kunci pencarian saat ini ($search), untuk chip "Pencarian".
+    search-model    : properti Livewire yang menampung kata kunci (bawaan 'search'); isi bila halaman punya lebih dari
+                      satu tabel/pencarian. Dipakai untuk kolom pencarian dan chip "Pencarian".
+    reset-action    : nama method Livewire untuk "Reset Filter" (bawaan 'resetFilters').
     search-shortcut : tombol pintas fokus pencarian; null untuk tabel sematan agar tidak berebut pintasan.
     Tabel tanpa filter hanya menampilkan pencarian: tidak ada tombol Filter Lanjutan dan tidak ada panel.
 --}}
@@ -32,6 +35,8 @@
     'filterValues' => [],
     'hasActiveFilters' => false,
     'search' => '',
+    'searchModel' => 'search',
+    'resetAction' => 'resetFilters',
     'searchPlaceholder' => 'Cari...',
     'searchShortcut' => '/',
 ])
@@ -76,7 +81,7 @@
 <div x-data="{ open: false }" @keydown.escape="if (open) { open = false; $nextTick(() => $refs.filterToggle?.focus()) }" class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200 space-y-3">
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         <label for="{{ $searchId }}" class="sr-only">Pencarian</label>
-        <x-admin.search-input model="search" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative w-full sm:w-60 lg:w-72 sm:flex-none min-w-0" />
+        <x-admin.search-input :model="$searchModel" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative w-full sm:w-60 lg:w-72 sm:flex-none min-w-0" />
 
         @if ($hasPanel)
             <button type="button" x-ref="filterToggle" @click="open = ! open" aria-expanded="false" :aria-expanded="open" aria-controls="{{ $panelId }}"
@@ -91,7 +96,7 @@
         @endif
 
         @if ($hasActiveFilters)
-            <button type="button" wire:click="resetFilters" title="Reset semua filter" aria-label="Reset Filter"
+            <button type="button" wire:click="{{ $resetAction }}" title="Reset semua filter" aria-label="Reset Filter"
                 class="{{ $toolbarButton }} text-surface-600 hover:text-danger hover:border-danger-200 hover:bg-danger-50/50">
                 <i class="fas fa-rotate-left text-xs" aria-hidden="true"></i>
                 <span class="hidden sm:inline">Reset Filter</span>
@@ -153,7 +158,7 @@
         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-surface-200">
             <span class="text-xs font-medium text-surface-500">Filter Aktif:</span>
             @if ($search !== '')
-                <button type="button" wire:key="{{ $tableId }}-active-search" wire:click="$set('search', '')" aria-label="Hapus filter Pencarian"
+                <button type="button" wire:key="{{ $tableId }}-active-search" wire:click="$set('{{ $searchModel }}', '')" aria-label="Hapus filter Pencarian"
                     class="{{ $chipBase }} bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100">
                     <span>Pencarian: "<strong>{{ $search }}</strong>"</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
                 </button>
