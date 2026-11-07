@@ -12,9 +12,12 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\Mutasi\MutasiHistoryReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
 use Tests\TestCase;
+
+use function Livewire\invade;
 
 class MutasiHistoryTest extends TestCase
 {
@@ -375,9 +378,9 @@ class MutasiHistoryTest extends TestCase
         Livewire::actingAs($this->adminUser)
             ->test(MutasiHistory::class)
             // Test KPI Toggle Filter
-            ->call('toggleStatusFilter', 'applied')
-            ->assertSet('statusFilter', 'applied')
-            ->call('toggleStatusFilter', 'applied')
+            ->call('toggleStatusFilter', 'active')
+            ->assertSet('statusFilter', 'active')
+            ->call('toggleStatusFilter', 'active')
             ->assertSet('statusFilter', '')
             // Test Open Detail Modal
             ->call('showDetail', $job->id)
@@ -408,6 +411,8 @@ class MutasiHistoryTest extends TestCase
         ])->id;
 
         $applied = $make(true, now()->subMonth()->toDateString());
+        $finished = $make(true, now()->subYear()->toDateString());
+        JobHistory::whereKey($finished)->update(['tmt_akhir' => now()->subMonths(2)->toDateString()]);
         $future = $make(false, now()->addMonth()->toDateString());
         $yesterday = $make(false, now()->subDay()->toDateString());
         $today = $make(false, now()->toDateString());
@@ -416,12 +421,14 @@ class MutasiHistoryTest extends TestCase
         $ids = fn (?string $status) => JobHistory::byStatus($status)->whereKeyNot($seeded)->pluck('id')->sort()->values()->all();
         $sorted = fn (array $list) => collect($list)->sort()->values()->all();
 
-        $this->assertSame([$applied], $ids('applied'));
+        // Applied covers finished rows too; active is applied and still open (tmt_akhir NULL).
+        $this->assertSame($sorted([$applied, $finished]), $ids('applied'));
+        $this->assertSame([$applied], $ids('active'));
         $this->assertSame($sorted([$future, $yesterday, $today, $tomorrow]), $ids('scheduled'));
         // Due means scheduled with a TMT up to and including today; tomorrow is not due yet.
         $this->assertSame($sorted([$yesterday, $today]), $ids('due'));
 
-        $all = $sorted([$applied, $future, $yesterday, $today, $tomorrow]);
+        $all = $sorted([$applied, $finished, $future, $yesterday, $today, $tomorrow]);
         $this->assertSame($all, $ids('zzz'));
         $this->assertSame($all, $ids(null));
 
@@ -659,14 +666,137 @@ class MutasiHistoryTest extends TestCase
     {
         Excel::fake();
         $this->official(Employee::factory()->create());
-        $staff = User::factory()->create(['role' => 'user']);
+        // Only admins can mount the screen, so deny the export gate itself to isolate it.
+        Gate::define('export-data', fn () => false);
 
-        Livewire::actingAs($staff)->test(MutasiHistory::class)
+        Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
             ->call('export')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.'])
-            ->assertSee('Anda tidak memiliki akses untuk tindakan ini.');
+            ->assertSee('Anda tidak memiliki akses untuk tindakan ini.')
+            ->assertNoFileDownloaded();
 
         $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
+    }
+
+    public function test_non_admin_cannot_mount_the_component(): void
+    {
+        $staff = User::factory()->create(['role' => 'user']);
+
+        Livewire::actingAs($staff)->test(MutasiHistory::class)->assertForbidden();
+    }
+
+    public function test_aktif_menjabat_card_lists_exactly_the_rows_it_counts(): void
+    {
+        $open = $this->official(Employee::factory()->create(['nama' => 'Aktif Satu']));
+        $openToo = $this->official(Employee::factory()->create(['nama' => 'Aktif Dua']), ['tmt_awal' => now()->subMonths(2)->toDateString()]);
+        $this->official(Employee::factory()->create(['nama' => 'Sudah Selesai']), [
+            'tmt_awal' => now()->subYears(2)->toDateString(), 'tmt_akhir' => now()->subYear()->toDateString(),
+        ]);
+        $this->official(Employee::factory()->create(['nama' => 'Masih Terjadwal']), [
+            'is_applied' => false, 'tmt_awal' => now()->addMonth()->toDateString(),
+        ]);
+
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->assertSeeHtml("wire:click=\"toggleStatusFilter('active')\"")
+            ->call('toggleStatusFilter', 'active')
+            ->assertSet('statusFilter', 'active')
+            ->assertSee('Status: Aktif Menjabat')
+            ->assertDontSee('Sudah Selesai')
+            ->assertDontSee('Masih Terjadwal');
+
+        $rows = $component->instance()->rows;
+        $this->assertSame([$open->id, $openToo->id], $rows->pluck('id')->all());
+        $this->assertSame($rows->total(), $component->viewData('activeCount'));
+    }
+
+    public function test_applied_status_includes_finished_rows_under_an_honest_label(): void
+    {
+        $open = $this->official(Employee::factory()->create(['nama' => 'Aktif Satu']));
+        $finished = $this->official(Employee::factory()->create(['nama' => 'Sudah Selesai']), [
+            'tmt_awal' => now()->subYears(2)->toDateString(), 'tmt_akhir' => now()->subYear()->toDateString(),
+        ]);
+        $this->official(Employee::factory()->create(['nama' => 'Masih Terjadwal']), [
+            'is_applied' => false, 'tmt_awal' => now()->addMonth()->toDateString(),
+        ]);
+
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->set('statusFilter', 'applied')
+            ->assertSee('Status: Sudah Diterapkan')
+            ->assertSee('Sudah Selesai')
+            ->assertDontSee('Masih Terjadwal');
+
+        $this->assertSame([$open->id, $finished->id], $component->instance()->rows->pluck('id')->all());
+    }
+
+    public function test_toggle_status_filter_ignores_unknown_values(): void
+    {
+        Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->call('toggleStatusFilter', 'zzz')
+            ->assertSet('statusFilter', '')
+            ->call('toggleStatusFilter', 'due')
+            ->call('toggleStatusFilter', 'zzz')
+            ->assertSet('statusFilter', 'due')
+            ->call('toggleStatusFilter', 'due')
+            ->assertSet('statusFilter', '');
+    }
+
+    public function test_base_query_keeps_the_official_default_for_unknown_sources(): void
+    {
+        $official = $this->official(Employee::factory()->create());
+        $this->official(Employee::factory()->create(), ['sumber' => JobHistory::SUMBER_IMPOR]);
+        $officialIds = JobHistory::where('sumber', JobHistory::SUMBER_MUTASI)->pluck('id')->all();
+        $this->assertSame([$official->id], $officialIds);
+
+        foreach (['', 'zzz', JobHistory::SUMBER_MUTASI] as $value) {
+            $component = new MutasiHistory;
+            // Assigned directly: no mount or update hook normalises the value first.
+            $component->sumberFilter = $value;
+
+            $this->assertSame($officialIds, invade($component)->baseQuery()->pluck('id')->all(), "sumberFilter '{$value}'");
+        }
+
+        $component = new MutasiHistory;
+        $component->sumberFilter = 'semua';
+        $this->assertSame(JobHistory::count(), invade($component)->baseQuery()->count());
+    }
+
+    public function test_export_covers_all_sources_when_asked_and_states_the_scope(): void
+    {
+        Excel::fake();
+        Excel::matchByRegex();
+
+        $official = $this->official(Employee::factory()->create(['nama' => 'Promosi Resmi']), ['jenis_mutasi' => 'PROMOSI']);
+        $imported = $this->official(Employee::factory()->create(['nama' => 'Promosi Impor']), [
+            'jenis_mutasi' => 'PROMOSI', 'sumber' => JobHistory::SUMBER_IMPOR, 'tmt_awal' => now()->subMonths(2)->toDateString(),
+        ]);
+        // Excluded by the mutation type.
+        $this->official(Employee::factory()->create(['nama' => 'Rotasi Resmi']));
+
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->set('sumberFilter', 'semua')
+            ->set('mutasiFilter', 'PROMOSI');
+
+        $screenIds = $component->instance()->rows->pluck('id')->all();
+        $this->assertSame([$official->id, $imported->id], $screenIds);
+
+        $component->call('export');
+
+        Excel::assertDownloaded(
+            '/^Audit_Log_Mutasi_PTPN4_Reg5_\d{8}_\d{6}\.xlsx$/',
+            fn (MutasiHistoryExport $export) => $export->query()->pluck('id')->all() === $screenIds
+                && str_contains($export->properties()['subject'], 'Semua Catatan')
+        );
+
+        Excel::fake();
+        Excel::matchByRegex();
+
+        $component->set('sumberFilter', JobHistory::SUMBER_IMPOR)->call('export');
+
+        Excel::assertDownloaded(
+            '/^Audit_Log_Mutasi_PTPN4_Reg5_\d{8}_\d{6}\.xlsx$/',
+            fn (MutasiHistoryExport $export) => $export->query()->pluck('id')->all() === [$imported->id]
+                && str_contains($export->properties()['subject'], JobHistory::SUMBER_LABELS[JobHistory::SUMBER_IMPOR].' saja')
+        );
     }
 
     public function test_row_actions_show_loading_state(): void
@@ -674,7 +804,7 @@ class MutasiHistoryTest extends TestCase
         $this->official(Employee::factory()->create(), ['is_applied' => false, 'tmt_awal' => now()->addDays(5)->toDateString()]);
 
         Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
-            ->assertSeeHtml('applyNow, cancelScheduled, applyAllDue')
+            ->assertSeeHtml('applyNow, cancelScheduled, applyAllDue, toggleStatusFilter')
             ->assertSeeHtml('wire:loading.attr="aria-busy"')
             ->assertSeeHtml('wire:loading.delay.class.remove="hidden"')
             ->assertSeeHtml('wire:loading.attr="disabled" wire:target="applyNow"')

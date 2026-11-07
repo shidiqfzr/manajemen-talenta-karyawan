@@ -118,6 +118,14 @@ class JobHistory extends Model
     }
 
     /**
+     * Scope to applied records that are still held (Aktif Menjabat): tmt_akhir is NULL while active.
+     */
+    public function scopeActive($query)
+    {
+        return $query->applied()->whereNull('tmt_akhir');
+    }
+
+    /**
      * Scope to only scheduled (future staging) records.
      */
     public function scopeScheduled($query)
@@ -137,12 +145,14 @@ class JobHistory extends Model
     }
 
     /**
-     * Filter by mutation status using the single domain definitions above: `applied`, `scheduled` or
-     * `due` (scheduled and TMT reached). Any other value, including null, leaves the query unchanged.
+     * Filter by mutation status using the single domain definitions above: `active` (applied and still
+     * open), `applied` (including finished rows), `scheduled` or `due` (scheduled and TMT reached). Any
+     * other value, including null, leaves the query unchanged.
      */
     public function scopeByStatus($query, ?string $status)
     {
         return match ($status) {
+            'active' => $query->active(),
             'applied' => $query->applied(),
             'scheduled' => $query->scheduled(),
             'due' => $query->dueForActivation(),

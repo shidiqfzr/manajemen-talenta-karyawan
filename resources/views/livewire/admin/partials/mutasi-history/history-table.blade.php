@@ -4,8 +4,8 @@
     $columns = $this->columns();
     $selectable = $this->bulkActions() !== [];
     $pageKeys = $this->tablePageKeys();
-    // Aktivasi/pembatalan menampilkan kerangka pemuatan; membuka popup detail atau gerbong tidak.
-    $loadingTargets = $this->tableLoadingTargets('applyNow', 'cancelScheduled', 'applyAllDue');
+    // Activation, cancellation and the KPI-card status toggle show the loading skeleton; opening the detail or batch popup does not.
+    $loadingTargets = $this->tableLoadingTargets('applyNow', 'cancelScheduled', 'applyAllDue', 'toggleStatusFilter');
     $columnCount = $this->tableColumnCount();
 @endphp
 <x-admin.table.card :notice="$tableNotice">

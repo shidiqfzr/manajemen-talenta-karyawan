@@ -22,8 +22,8 @@
             icon="fas fa-user-check"
             theme="info"
             :coloredValue="false"
-            :active="$statusFilter === 'applied'"
-            wire:click="toggleStatusFilter('applied')"
+            :active="$statusFilter === 'active'"
+            wire:click="toggleStatusFilter('active')"
         />
         <x-admin.kpi-card
             title="Terjadwal (Staging)"
