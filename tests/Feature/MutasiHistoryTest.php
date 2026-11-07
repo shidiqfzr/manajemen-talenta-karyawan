@@ -9,6 +9,7 @@ use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Mutasi\MutasiHistoryReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
@@ -387,6 +388,45 @@ class MutasiHistoryTest extends TestCase
             ->call('closeDetailModal')
             ->assertSet('selectedJobId', null)
             ->assertDontSee('Detail Riwayat & Jejak Audit Mutasi');
+    }
+
+    public function test_by_status_scope_uses_the_domain_definitions(): void
+    {
+        $emp = Employee::factory()->create();
+        // The factory seeds a data_awal row for the employee; keep it out of the assertions.
+        $seeded = JobHistory::where('employee_nik', $emp->nik)->pluck('id')->all();
+
+        $make = fn (bool $applied, string $tmt) => JobHistory::create([
+            'employee_nik' => $emp->nik,
+            'jabatan' => 'Kepala Bagian',
+            'unit_kerja' => 'Kantor Direksi',
+            'tmt_awal' => $tmt,
+            'jenis_mutasi' => 'PROMOSI',
+            'status_penugasan' => 'Definitif',
+            'is_applied' => $applied,
+        ])->id;
+
+        $applied = $make(true, now()->subMonth()->toDateString());
+        $future = $make(false, now()->addMonth()->toDateString());
+        $yesterday = $make(false, now()->subDay()->toDateString());
+        $today = $make(false, now()->toDateString());
+        $tomorrow = $make(false, now()->addDay()->toDateString());
+
+        $ids = fn (?string $status) => JobHistory::byStatus($status)->whereKeyNot($seeded)->pluck('id')->sort()->values()->all();
+        $sorted = fn (array $list) => collect($list)->sort()->values()->all();
+
+        $this->assertSame([$applied], $ids('applied'));
+        $this->assertSame($sorted([$future, $yesterday, $today, $tomorrow]), $ids('scheduled'));
+        // Due means scheduled with a TMT up to and including today; tomorrow is not due yet.
+        $this->assertSame($sorted([$yesterday, $today]), $ids('due'));
+
+        $all = $sorted([$applied, $future, $yesterday, $today, $tomorrow]);
+        $this->assertSame($all, $ids('zzz'));
+        $this->assertSame($all, $ids(null));
+
+        // The reader shares the same definition of "due".
+        $kpis = app(MutasiHistoryReader::class)->getMutasiHistoryKpis(null);
+        $this->assertSame(2, $kpis['due']);
     }
 
     public function test_can_export_audit_log_excel(): void
