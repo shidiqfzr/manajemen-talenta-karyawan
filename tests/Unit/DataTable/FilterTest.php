@@ -81,6 +81,36 @@ class FilterTest extends TestCase
         $this->assertSame(['2026-11-01'], $query->getBindings());
     }
 
+    public function test_filters_have_a_control_by_default(): void
+    {
+        $this->assertTrue(Filter::select('bidang', 'Bidang', ['KEU' => 'KEU'])->hasControl());
+        $this->assertTrue(Filter::boolean('aktif', 'Aktif')->hasControl());
+        $this->assertTrue(Filter::dateFrom('from', 'Dari', 'created_at')->hasControl());
+    }
+
+    public function test_without_control_keeps_the_filter_otherwise_intact(): void
+    {
+        $original = Filter::select('status', 'Status', ['due' => 'Siap Diaktifkan'])
+            ->icon('fas fa-flag')
+            ->apply(fn ($q, $v) => $q->where('kode', $v));
+        $driven = $original->withoutControl();
+
+        $this->assertTrue($original->hasControl(), 'the original must stay untouched');
+        $this->assertFalse($driven->hasControl());
+        $this->assertNotSame($original, $driven);
+
+        $this->assertSame('status', $driven->property);
+        $this->assertSame('Status', $driven->label);
+        $this->assertSame('fas fa-flag', $driven->icon);
+        $this->assertSame(['due' => 'Siap Diaktifkan'], $driven->options());
+        $this->assertTrue($driven->allows('due'));
+        $this->assertFalse($driven->allows('zzz'));
+
+        $query = Employee::query();
+        $driven->applyTo($query, 'due');
+        $this->assertStringContainsString('"kode" = ?', $query->toSql());
+    }
+
     public function test_apply_to_uses_custom_closure(): void
     {
         $query = Employee::query();

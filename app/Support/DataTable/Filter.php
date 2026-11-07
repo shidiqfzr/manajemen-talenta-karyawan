@@ -19,6 +19,7 @@ final class Filter
         public readonly ?string $allLabel = null,
         private readonly ?Closure $apply = null,
         private readonly ?string $column = null,
+        private readonly bool $control = true,
     ) {}
 
     /** @param  array<string, string>  $options  [value => label] */
@@ -42,6 +43,21 @@ final class Filter
     public static function dateTo(string $property, string $label, string $column): self
     {
         return new self($property, $label, 'date_to', column: $column);
+    }
+
+    /**
+     * Declare that something other than the toolbar drives this filter (e.g. KPI cards). It is still validated,
+     * kept in the URL, shown as a removable chip and counted by "Reset filter", but the toolbar renders no field.
+     */
+    public function withoutControl(): self
+    {
+        return $this->with(control: false);
+    }
+
+    /** Whether the toolbar should render a field for this filter. */
+    public function hasControl(): bool
+    {
+        return $this->control;
     }
 
     public function icon(string $icon): self
