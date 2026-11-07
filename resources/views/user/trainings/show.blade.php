@@ -22,28 +22,30 @@
     </div>
 
     {{-- Tabel Peserta --}}
-    <div class="bg-white shadow-md rounded-xl p-6">
-        <h2 class="text-2xl font-semibold text-surface-800 mb-4">Peserta Pelatihan</h2>
+    <x-admin.table.card>
+        <div class="px-5 py-3 border-b border-surface-200 bg-white">
+            <h2 class="text-sm font-bold text-surface-900">Peserta Pelatihan</h2>
+        </div>
 
-        <div class="overflow-x-auto rounded-md">
-            <table class="min-w-full divide-y divide-surface-200 text-sm">
-                <thead class="bg-surface-50">
-                    <tr>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Nama</th>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Jabatan</th>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Level</th>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Unit Kerja</th>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-surface-600">Sertifikat</th>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-surface-50 sticky top-0 z-10">
+                    <tr class="border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+                        <x-admin.table.th>Nama</x-admin.table.th>
+                        <x-admin.table.th>Jabatan</x-admin.table.th>
+                        <x-admin.table.th>Level</x-admin.table.th>
+                        <x-admin.table.th>Unit Kerja</x-admin.table.th>
+                        <x-admin.table.th>Sertifikat</x-admin.table.th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-surface-100">
+                <tbody class="divide-y divide-surface-100 text-surface-800">
                     @forelse ($training->employees as $employee)
-                        <tr class="hover:bg-surface-50">
-                            <td class="px-4 py-2 text-surface-900">{{ $employee->nama }}</td>
-                            <td class="px-4 py-2 text-surface-700">{{ $employee->jabatan }}</td>
-                            <td class="px-4 py-2 text-surface-700">{{ $employee->level }}</td>
-                            <td class="px-4 py-2 text-surface-700">{{ $employee->unit_kerja }}</td>
-                            <td class="px-4 py-2">
+                        <tr class="hover:bg-surface-50/75 transition">
+                            <td class="px-4 py-3 font-medium text-surface-900">{{ $employee->nama }}</td>
+                            <td class="px-4 py-3 text-surface-700">{{ $employee->jabatan }}</td>
+                            <td class="px-4 py-3 text-surface-700">{{ $employee->level }}</td>
+                            <td class="px-4 py-3 text-surface-700">{{ $employee->unit_kerja }}</td>
+                            <td class="px-4 py-3">
                                 @if (!empty($employee->pivot->sertifikat))
                                     <a href="{{ asset('storage/' . $employee->pivot->sertifikat) }}" target="_blank"
                                        class="inline-flex items-center px-3 py-1 bg-info text-white hover:bg-info rounded-md text-xs font-medium transition">
@@ -58,13 +60,13 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center py-4 text-surface-500">Belum ada peserta.</td>
+                            <td colspan="5" class="text-center py-6 text-surface-500">Belum ada peserta.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-    </div>
+    </x-admin.table.card>
 
 </div>
 @endsection

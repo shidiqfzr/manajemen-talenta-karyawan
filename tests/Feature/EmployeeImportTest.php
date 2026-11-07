@@ -12,6 +12,7 @@ use App\Exports\Sheets\EmployeeTemplateDataSheet;
 use App\Exports\Sheets\EmployeeTemplateFormasiSheet;
 use App\Exports\Sheets\EmployeeTemplateReferenceSheet;
 use App\Imports\EmployeesImport;
+use App\Livewire\Admin\Employees\ImportBatchTable;
 use App\Models\Employee;
 use App\Models\EmployeeImportChange;
 use App\Models\EmployeeImportLog;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Livewire\Livewire;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
@@ -3067,18 +3069,20 @@ class EmployeeImportTest extends TestCase
         config(['hris.import.require_approval' => false]);
         $this->commitRows([$this->karpimImportRow('88022002', 'Manajer Filter', 'Kebun Filter')])->assertOk();
 
-        $pending = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['status' => 'pending']))->assertOk();
-        $pending->assertViewHas('logs', fn ($logs) => $logs->count() === 1 && $logs->first()->status === 'pending_approval');
-        $pending->assertViewHas('counts', ['all' => 2, 'pending' => 1, 'saved' => 1, 'closed' => 0]);
+        // Tabs, search and counts are covered by ImportBatchTableTest; here: the page renders the same data end to end.
+        $pending = Livewire::withQueryParams(['status' => 'pending'])->test(ImportBatchTable::class);
+        $this->assertSame(['all' => 2, 'pending' => 1, 'saved' => 1, 'closed' => 0], $pending->instance()->tabCounts);
+        $this->assertSame(['pending_approval'], $pending->instance()->rows->pluck('status')->all());
 
-        $saved = $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['status' => 'saved']));
-        $saved->assertViewHas('logs', fn ($logs) => $logs->count() === 1 && $logs->first()->status === 'completed');
+        $saved = Livewire::withQueryParams(['status' => 'saved'])->test(ImportBatchTable::class);
+        $this->assertSame(['completed'], $saved->instance()->rows->pluck('status')->all());
 
-        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['q' => 'tidak-ada-berkas-ini']))
-            ->assertOk()->assertViewHas('logs', fn ($logs) => $logs->isEmpty())->assertSee('Tidak ada impor yang cocok dengan filter ini');
-        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['q' => 'test_import']))
-            ->assertViewHas('logs', fn ($logs) => $logs->count() === 2);
+        Livewire::withQueryParams(['search' => 'tidak-ada-berkas-ini'])->test(ImportBatchTable::class)
+            ->assertSee('Tidak ada impor yang cocok dengan filter ini');
+        $this->assertCount(2, Livewire::withQueryParams(['search' => 'test_import'])->test(ImportBatchTable::class)->instance()->rows);
 
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index', ['status' => 'pending']))
+            ->assertOk()->assertSeeLivewire(ImportBatchTable::class);
         $this->actingAs($this->admin)->get(route('admin.employees.import.page'))
             ->assertOk()->assertSee('1 pengajuan menunggu persetujuan')->assertSee('Riwayat &amp; Persetujuan', false);
     }
