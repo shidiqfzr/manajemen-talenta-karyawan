@@ -309,6 +309,16 @@ trait WithDataTable
         return false;
     }
 
+    /**
+     * Rows the module offers before any search or filter (its base query only), for "12 dari 339 ..." summaries.
+     * A computed property, so it is cached per request and cannot be called from the browser.
+     */
+    #[Computed]
+    public function unfilteredCount(): int
+    {
+        return $this->baseQuery()->reorder()->count();
+    }
+
     #[Computed]
     public function matchingCount(): int
     {
