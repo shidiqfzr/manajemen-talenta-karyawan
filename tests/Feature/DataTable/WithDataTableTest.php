@@ -21,7 +21,6 @@ use Tests\Fixtures\DataTable\FixtureTableCustomExportSmallLimit;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
 use Tests\Fixtures\DataTable\FixtureTableOddPerPage;
-use Tests\Fixtures\DataTable\FixtureTablePanelReset;
 use Tests\Fixtures\DataTable\FixtureTableSmallLimit;
 use Tests\Fixtures\DataTable\FixtureTableSmallPerPage;
 use Tests\TestCase;
@@ -573,27 +572,6 @@ class WithDataTableTest extends TestCase
         Excel::fake();
 
         Livewire::test(FixtureTableNoExport::class)->call('export')->assertNotFound();
-    }
-
-    public function test_reset_panel_filters_keeps_search_and_controlless_filters(): void
-    {
-        $component = Livewire::test(FixtureTablePanelReset::class)
-            ->set('search', 'Pegawai')
-            ->set('bidang', 'KEU')
-            ->set('aktif', '1')
-            ->call('gotoPage', 2)
-            ->set('selected', ['1', '2'])
-            ->call('resetPanelFilters')
-            ->assertSet('bidang', '')
-            ->assertSet('search', 'Pegawai')
-            ->assertSet('aktif', '1')
-            ->assertSet('selected', [])
-            ->assertSet('selectAllMatching', false);
-
-        $this->assertSame(1, $component->instance()->getPage());
-
-        // "Reset Filter" (everything) is a different action and still clears all three.
-        $component->call('resetFilters')->assertSet('search', '')->assertSet('aktif', '');
     }
 
     public function test_table_loading_targets_include_actions_and_filters(): void

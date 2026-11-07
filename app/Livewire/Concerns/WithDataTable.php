@@ -230,22 +230,6 @@ trait WithDataTable
         $this->clearSelection();
     }
 
-    /**
-     * "Hapus Filter Tambahan": clears only the filters that have a field in the panel. The search term and filters
-     * driven from outside the toolbar (e.g. KPI cards) stay; resetFilters() clears everything.
-     */
-    public function resetPanelFilters(): void
-    {
-        foreach ($this->filters() as $filter) {
-            if ($filter->hasControl()) {
-                $this->{$filter->property} = '';
-            }
-        }
-
-        $this->resetPage($this->paginationName());
-        $this->clearSelection();
-    }
-
     /** Comma-joined filter property names, e.g. for `wire:target`. */
     public function filterProperties(): string
     {
