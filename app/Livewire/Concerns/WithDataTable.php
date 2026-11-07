@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Exports\DataTableExport;
 use App\Models\MasterAuditLog;
+use App\Models\User;
 use App\Support\DataTable\BulkAction;
 use App\Support\DataTable\Column;
 use App\Support\DataTable\Filter;
@@ -436,10 +437,25 @@ trait WithDataTable
             'pencarian' => $this->search !== '',
         ]);
 
-        return Excel::download(
-            new DataTableExport($query, $this->columns(), $this->tableLabel(), auth()->user()),
-            $name.'_'.now()->format('Y-m-d_His').'.xlsx',
-        );
+        return Excel::download($this->buildExport($query, auth()->user()), $this->exportFileName());
+    }
+
+    /**
+     * Name of the downloaded file. A module may override it; the permission check, row limit
+     * and audit entry in export() apply regardless.
+     */
+    protected function exportFileName(): string
+    {
+        return $this->exportName().'_'.now()->format('Y-m-d_His').'.xlsx';
+    }
+
+    /**
+     * The workbook for the already authorised, limited and audited query. A module may return its
+     * own export object (for example a compliance format) instead of the generic one.
+     */
+    protected function buildExport(Builder $query, ?User $user): object
+    {
+        return new DataTableExport($query, $this->columns(), $this->tableLabel(), $user);
     }
 
     /**

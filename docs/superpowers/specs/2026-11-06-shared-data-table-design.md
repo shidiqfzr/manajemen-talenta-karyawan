@@ -231,3 +231,4 @@ One test class per system under test (`AGENTS.md` rule 5):
 8. Date ranges are two single-property filters, `Filter::dateFrom` and `Filter::dateTo`, instead of one `dateRange(from, to)` filter, so the pipeline and trait handle them like any other filter.
 9. The toolbar shows a "Filter Aktif" chip row listing every active search and filter value, each removable on its own (carried over from the audit history screen).
 10. `Column::width()` sets header width classes so a module can use a fixed-layout table (the mutasi history keeps its proportional columns).
+11. The trait's `buildExport()` and `exportFileName()` hooks let a module keep its own workbook format while using the shared permission check, row limit, audit entry and filtered query.
