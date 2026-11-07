@@ -22,45 +22,21 @@ class EmployeeImportBatchController extends Controller
 
     public function __construct(private EmployeeImportGovernanceService $governance) {}
 
-    private const TABS = [
-        'all' => 'Semua',
-        'pending' => 'Perlu Tindakan',
-        'saved' => 'Tersimpan',
-        'closed' => 'Ditutup',
-    ];
-
-    private const TAB_STATUSES = [
-        'pending' => [EmployeeImportLog::STATUS_PENDING, EmployeeImportLog::STATUS_APPROVED],
-        'saved' => [EmployeeImportLog::STATUS_COMPLETED],
-        'closed' => [EmployeeImportLog::STATUS_REJECTED, EmployeeImportLog::STATUS_EXPIRED, EmployeeImportLog::STATUS_ROLLED_BACK],
-    ];
-
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
-        $tab = array_key_exists((string) $request->query('status'), self::TABS) ? (string) $request->query('status') : 'all';
-        $search = trim((string) $request->query('q', ''));
+        // Old links used `q`; the shared table reads `search`.
+        if ($request->query->has('q')) {
+            $query = $request->query();
+            if (is_string($query['q'])) {
+                $query['search'] = $query['q'];
+            }
+            unset($query['q']);
 
-        $logs = EmployeeImportLog::query()->withCount('changes')
-            ->when(isset(self::TAB_STATUSES[$tab]), fn ($query) => $query->whereIn('status', self::TAB_STATUSES[$tab]))
-            ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('file_name', 'like', "%{$search}%")
-                ->orWhere('user_name', 'like', "%{$search}%")))
-            ->latest('id')
-            ->paginate(15)
-            ->withQueryString();
-
-        $byStatus = EmployeeImportLog::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-        $counts = ['all' => (int) $byStatus->sum()];
-        foreach (self::TAB_STATUSES as $key => $statuses) {
-            $counts[$key] = (int) $byStatus->only($statuses)->sum();
+            return redirect()->route('admin.employees.import.batches.index', $query);
         }
 
+        // The list, status tabs and search live in the ImportBatchTable Livewire component.
         return view('admin.employees.import-batches.index', [
-            'logs' => $logs,
-            'tabs' => self::TABS,
-            'tab' => $tab,
-            'counts' => $counts,
-            'search' => $search,
             'requiresApproval' => EmployeeImportGovernanceService::requiresApproval(),
             'undoWindowDays' => (int) config('hris.import.undo_window_days', 7),
             'approvalTtlDays' => (int) config('hris.import.approval_ttl_days', 7),

@@ -60,7 +60,7 @@
 
             {{-- Peninjauan pengajuan (checker) --}}
             @if ($isPending)
-                <section class="bg-white rounded-2xl border border-surface-200/80 shadow-xs overflow-hidden" aria-labelledby="review-title">
+                <x-admin.table.card role="region" aria-labelledby="review-title">
                     <div class="px-5 py-3.5 border-b border-surface-200 bg-surface-50 flex flex-wrap items-center justify-between gap-2">
                         <h3 id="review-title" class="text-base font-bold text-surface-900">Pratinjau Terkini terhadap Master Formasi</h3>
                         <a href="{{ route('admin.employees.import.batches.show', [$log, 'refresh' => 1]) }}" class="text-sm font-semibold text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
@@ -82,19 +82,20 @@
                             <span class="{{ ($reviewSummary['warning_count'] ?? 0) > 0 ? 'text-warning-800 font-semibold' : '' }}"><strong class="font-mono tabular-nums">{{ $reviewSummary['warning_count'] ?? 0 }}</strong> peringatan formasi</span>
                         </div>
 
+                        <x-admin.table.header title="Pratinjau Perubahan" :paginator="$reviewRows" noun="Baris" />
                         <div class="overflow-x-auto">
-                            <table class="min-w-full text-left text-sm">
-                                <thead class="sticky top-0 z-10 bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-600">
-                                    <tr>
-                                        <th scope="col" class="px-4 py-3">Pegawai</th>
-                                        <th scope="col" class="px-4 py-3">Formasi &amp; Penempatan</th>
-                                        <th scope="col" class="px-4 py-3">Strata &amp; RM</th>
-                                        <th scope="col" class="px-4 py-3">Aksi &amp; Perubahan</th>
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-surface-50 sticky top-0 z-10">
+                                    <tr class="border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+                                        <x-admin.table.th>Pegawai</x-admin.table.th>
+                                        <x-admin.table.th>Formasi &amp; Penempatan</x-admin.table.th>
+                                        <x-admin.table.th>Strata &amp; RM</x-admin.table.th>
+                                        <x-admin.table.th>Aksi &amp; Perubahan</x-admin.table.th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-surface-100">
+                                <tbody class="divide-y divide-surface-100 text-surface-800">
                                     @foreach ($reviewRows as $row)
-                                        <tr class="align-top hover:bg-surface-50/70">
+                                        <tr class="align-top hover:bg-surface-50/75 transition">
                                             <td class="px-4 py-3">
                                                 <span class="block font-semibold text-surface-900">{{ $row['nama'] }}</span>
                                                 <span class="block font-mono tabular-nums text-xs text-surface-500">NIK {{ $row['nik'] }}</span>
@@ -120,7 +121,7 @@
                         </div>
                         <x-pagination-ui :data="$reviewRows" />
                     @endif
-                </section>
+                </x-admin.table.card>
 
                 {{-- Aksi keputusan --}}
                 <div class="bg-white rounded-2xl border border-surface-200/80 p-5 shadow-xs flex flex-wrap items-center gap-3">
