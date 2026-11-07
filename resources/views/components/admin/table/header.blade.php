@@ -35,7 +35,7 @@
 
     @if ($export)
         <div class="flex items-center gap-2">
-            <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="export" target="export">Ekspor Excel<span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-surface-100 text-surface-600 font-mono text-[10px]">{{ $format($total) }}</span></x-admin.button>
+            <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="export" target="export">Ekspor Excel <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-surface-100 text-surface-600 font-mono text-[10px]" aria-hidden="true">{{ $format($total) }}</span><span class="sr-only">untuk {{ $format($total) }} data</span></x-admin.button>
         </div>
     @endif
 </div>

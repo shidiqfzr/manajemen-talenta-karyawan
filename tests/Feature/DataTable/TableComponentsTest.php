@@ -182,6 +182,10 @@ class TableComponentsTest extends TestCase
         $this->assertStringContainsString('Tabel Uji', $text);
         $this->assertSame('30 Data | Menampilkan 1 – 25 dari 30', $this->statusText($html));
         $this->assertMatchesRegularExpression('/Ekspor Excel\s*<span[^>]*>30<\/span>/', $html);
+
+        // Accessible name: the visual badge is hidden from assistive tech and a spoken phrase replaces it,
+        // so the name reads "Ekspor Excel untuk 30 data" instead of "Ekspor Excel30".
+        $this->assertMatchesRegularExpression('/Ekspor Excel <span[^>]*aria-hidden="true"[^>]*>30<\/span><span class="sr-only">untuk 30 data<\/span>/', $html);
     }
 
     public function test_header_without_rows_shows_zero_and_no_range(): void
@@ -251,6 +255,15 @@ class TableComponentsTest extends TestCase
 
         $active = Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->html();
         $this->assertMatchesRegularExpression('/<button type="button" wire:click="\$set\(\'bidang\', \'\'\)" aria-label="Hapus pilihan Bidang"/', $active);
+
+        // DESIGN §10: the touch target is at least 32px wide (w-8) and spans the field height; the select reserves room for it.
+        preg_match('/<button type="button" wire:click="\$set\(\'bidang\', \'\'\)" aria-label="Hapus pilihan Bidang" class="([^"]*)"/', $active, $button);
+        $this->assertStringContainsString('w-8', $button[1]);
+        $this->assertStringContainsString('inset-y-0', $button[1]);
+        $this->assertStringContainsString('justify-center', $button[1]);
+        preg_match('/<select id="[^"]*-filter-bidang" wire:model.live="bidang" class="([^"]*)"/', $active, $select);
+        $this->assertStringContainsString('pr-14', $select[1]);
+        $this->assertStringNotContainsString('pr-12', $select[1]);
     }
 
     public function test_active_filter_row_offers_hapus_filter_tambahan(): void
