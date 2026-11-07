@@ -19,6 +19,7 @@ use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableCustomExport;
 use Tests\Fixtures\DataTable\FixtureTableCustomExportSmallLimit;
+use Tests\Fixtures\DataTable\FixtureTableCustomTotal;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
 use Tests\Fixtures\DataTable\FixtureTableOddPerPage;
@@ -592,6 +593,15 @@ class WithDataTableTest extends TestCase
         // 15 of the 30 rows are KEU: the scoped base query is the "total", not the whole table.
         $this->assertSame(15, $component->instance()->unfilteredCount);
         $this->assertLessThan(15, $component->instance()->rows->total());
+    }
+
+    public function test_unfiltered_count_can_follow_a_module_specific_total_query(): void
+    {
+        $component = Livewire::test(FixtureTableCustomTotal::class)->set('search', 'Pegawai 0');
+
+        // The module says its "total" is the 15 TAN rows, even though its base query returns all 30.
+        $this->assertSame(15, $component->instance()->unfilteredCount);
+        $this->assertSame(30, FixtureRow::query()->count());
     }
 
     public function test_unfiltered_count_cannot_be_called_from_the_browser(): void

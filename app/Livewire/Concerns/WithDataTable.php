@@ -310,13 +310,23 @@ trait WithDataTable
     }
 
     /**
-     * Rows the module offers before any search or filter (its base query only), for "12 dari 339 ..." summaries.
+     * Query whose count is the "dari Y" total of the summary bar. Defaults to the base query; override it when the
+     * total must follow a scope that one of the filters changes (e.g. a source selector), so Y never contradicts
+     * the number shown elsewhere on the screen.
+     */
+    protected function unfilteredQuery(): Builder
+    {
+        return $this->baseQuery();
+    }
+
+    /**
+     * Rows the module offers before any search or filter, for "12 dari 339 ..." summaries.
      * A computed property, so it is cached per request and cannot be called from the browser.
      */
     #[Computed]
     public function unfilteredCount(): int
     {
-        return $this->baseQuery()->reorder()->count();
+        return $this->unfilteredQuery()->reorder()->count();
     }
 
     #[Computed]
