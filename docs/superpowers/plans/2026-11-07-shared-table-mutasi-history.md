@@ -27,7 +27,7 @@
 - Exact copy: toolbar placeholder `Cari nama karyawan, NIK, jabatan, atau unit...`; live region `{n} riwayat ditemukan`; empty states: no data `Belum ada mutasi atau alih tugas yang tercatat dalam sistem.`, filtered `Tidak ada data yang sesuai dengan pencarian atau filter.` + `Reset filter`; export file name `Audit_Log_Mutasi_PTPN4_Reg5_{Ymd_His}.xlsx`; audit table label `Riwayat Mutasi`.
 - Export: gate `export-data`, limit 10000 rows, audit entry `data_table.export` (no search term), same rows as the screen.
 - Run `./vendor/bin/pint` before every commit; one test class per system under test (screen + export tests stay in `tests/Feature/MutasiHistoryTest.php`).
-- Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Commit trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
 
