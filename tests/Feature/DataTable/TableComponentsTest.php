@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\DataTable;
 
+use App\Livewire\Tables\TrainingTable;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -10,9 +11,11 @@ use Livewire\Livewire;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableBooleanFilter;
+use Tests\Fixtures\DataTable\FixtureTableControlless;
 use Tests\Fixtures\DataTable\FixtureTableDateFilter;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableWidth;
+use Tests\Fixtures\DataTable\FixtureToolbarOnly;
 use Tests\TestCase;
 
 /**
@@ -84,7 +87,86 @@ class TableComponentsTest extends TestCase
             ->assertSeeHtml('wire:model.live="sampai"')
             ->assertSeeHtml('-filter-dari"')
             ->assertSeeHtml('-filter-sampai"')
-            ->assertSeeHtmlInOrder(['sr-only', 'Dari Tanggal', 'wire:model.live="dari"', 'aria-hidden="true">–</span>', 'sr-only', 'Sampai Tanggal', 'wire:model.live="sampai"']);
+            ->assertSeeHtmlInOrder(['>Dari Tanggal</label>', 'wire:model.live="dari"', 'aria-hidden="true">–</span>', '>Sampai Tanggal</label>', 'wire:model.live="sampai"']);
+    }
+
+    public function test_toolbar_without_filters_shows_only_search(): void
+    {
+        Livewire::test(TrainingTable::class, ['employeeId' => '12345678'])
+            ->assertSeeHtml('wire:model.live.debounce.300ms="search"')
+            ->assertDontSeeHtml('aria-controls=')
+            ->assertDontSeeHtml('-filter-panel')
+            ->assertDontSeeHtml('data-filter-count');
+    }
+
+    public function test_filter_button_counts_active_filters(): void
+    {
+        Livewire::test(FixtureTableDateFilter::class)
+            ->assertSeeHtml('aria-controls=')
+            ->assertDontSeeHtml('data-filter-count')
+            ->set('search', 'Budi')
+            ->set('bidang', 'KEU')
+            ->set('dari', '2026-01-01')
+            ->assertSeeHtml('data-filter-count="2"')
+            ->assertDontSeeHtml('data-filter-count="3"');
+    }
+
+    public function test_filter_panel_is_accessible(): void
+    {
+        $html = Livewire::test(FixtureTableDateFilter::class)->html();
+
+        $this->assertMatchesRegularExpression('/<button type="button"[^>]*aria-controls="([^"]+)"/', $html);
+        preg_match('/aria-controls="([^"]+)"/', $html, $panel);
+        $this->assertStringContainsString('id="'.$panel[1].'"', $html);
+        $this->assertStringContainsString(':aria-expanded="open"', $html);
+        $this->assertStringContainsString('@keydown.escape="open = false"', $html);
+
+        preg_match_all('/<label for="([^"]+)"/', $html, $labels);
+        $this->assertNotEmpty($labels[1]);
+        foreach (array_unique($labels[1]) as $for) {
+            $this->assertStringContainsString('id="'.$for.'"', $html, "label for={$for} has no control");
+        }
+    }
+
+    public function test_filter_panel_shows_visible_labels(): void
+    {
+        $html = Livewire::test(FixtureTableDateFilter::class)->html();
+
+        foreach (['Bidang', 'Dari Tanggal', 'Sampai Tanggal'] as $label) {
+            $this->assertStringContainsString('class="mb-1 block text-xs font-medium text-surface-600">'.$label.'</label>', $html);
+            $this->assertStringNotContainsString('class="sr-only">'.$label.'</label>', $html);
+        }
+    }
+
+    public function test_controlless_filter_shows_as_a_chip_but_has_no_field(): void
+    {
+        Livewire::test(FixtureTableControlless::class)
+            ->assertDontSeeHtml('aria-controls=')
+            ->set('bidang', 'KEU')
+            ->assertSee('Filter Aktif:')
+            ->assertSee('Bidang: KEU')
+            ->assertSeeHtml('aria-label="Hapus filter Bidang"')
+            ->assertSee('Reset filter')
+            ->assertDontSeeHtml('wire:model.live="bidang"')
+            ->assertDontSeeHtml('data-filter-count');
+    }
+
+    public function test_export_sits_in_the_search_row_without_a_title(): void
+    {
+        $html = Livewire::test(FixtureToolbarOnly::class)->html();
+
+        $this->assertStringContainsString('Ekspor Excel', $html);
+        $this->assertStringNotContainsString('justify-between', $html, 'no separate title row without a title');
+        $this->assertGreaterThan(strpos($html, '-search"'), strpos($html, 'Ekspor Excel'));
+    }
+
+    public function test_title_row_is_kept_when_a_title_is_given(): void
+    {
+        $html = Livewire::test(FixtureTable::class)->html();
+
+        $this->assertStringContainsString('justify-between', $html);
+        $this->assertLessThan(strpos($html, 'Ekspor Excel'), strpos($html, 'Tabel Uji'));
+        $this->assertLessThan(strpos($html, '-search"'), strpos($html, 'Ekspor Excel'));
     }
 
     public function test_toolbar_lists_active_filters_as_removable_chips(): void
