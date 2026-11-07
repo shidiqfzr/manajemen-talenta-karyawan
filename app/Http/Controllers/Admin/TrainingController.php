@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\EmployeeStatistic;
 use App\Models\Training;
 use App\Services\TrainingService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class TrainingController extends Controller
@@ -19,38 +17,13 @@ class TrainingController extends Controller
     }
 
     // Display training
-    public function index(Request $request)
+    /**
+     * Manajemen Pelatihan page; the list, its filters (including the legacy start_date / end_date URL keys)
+     * and the summary cards are handled by the TrainingIndexTable Livewire component.
+     */
+    public function index()
     {
-        $start = $request->start_date;
-        $end = $request->end_date;
-
-        $trainings = Training::withCount('employees')
-            ->when($start && $end, fn ($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))
-            ->paginate(20);
-
-        $summary = Training::when($start && $end, fn ($q) => $q->whereBetween('tanggal_mulai', [$start, $end]))->get();
-
-        $totalManHours = $summary->sum('jumlah_man_hours');
-        $totalTiketPeserta = $summary->sum('biaya_tiket_peserta');
-        $totalBiayaPelatihan = $summary->sum('biaya_pelatihan');
-
-        $totalKaryawan = null;
-        if ($start && $end) {
-            $startDate = Carbon::parse($start)->startOfMonth();
-            $endDate = Carbon::parse($end)->endOfMonth();
-            $statistics = EmployeeStatistic::whereBetween('periode', [$startDate, $endDate])->get();
-            if ($statistics->count()) {
-                $totalKaryawan = $statistics->sum('total_karyawan');
-            }
-        }
-
-        return view('admin.trainings.index', compact(
-            'trainings',
-            'totalManHours',
-            'totalTiketPeserta',
-            'totalBiayaPelatihan',
-            'totalKaryawan'
-        ));
+        return view('admin.trainings.index');
     }
 
     // Store new training

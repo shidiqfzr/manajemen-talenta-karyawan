@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Training;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -30,13 +31,21 @@ class TrainingsExport implements FromCollection, WithEvents, WithHeadings, WithM
         'jumlah_man_hours',
     ];
 
-    public function __construct($filters = [])
+    /**
+     * @param  Builder|null  $query  An already searched and filtered query (for example from the Manajemen Pelatihan table);
+     *                               when given it replaces the date-range rebuild below, so the file matches what the screen shows.
+     */
+    public function __construct($filters = [], protected ?Builder $query = null)
     {
         $this->filters = $filters;
     }
 
     public function collection()
     {
+        if ($this->query !== null) {
+            return (clone $this->query)->get();
+        }
+
         $query = Training::withCount('employees');
 
         if (! empty($this->filters['start_date'])) {
