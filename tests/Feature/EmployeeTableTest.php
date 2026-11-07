@@ -274,6 +274,91 @@ class EmployeeTableTest extends TestCase
         $this->assertStringContainsString('name="search" value="EKSPOR"', $html);
     }
 
+    /** KPI metrics as the controller passes them to the component. */
+    private function kpi(): array
+    {
+        return [
+            'total' => Employee::count(),
+            'units' => 1,
+            'karpim' => Employee::where('level', Employee::LEVEL_KARPIM)->count(),
+            'karpel' => Employee::where('level', Employee::LEVEL_KARPEL)->count(),
+            'rangkap' => 0,
+            'sanksi' => 0,
+            'overflow' => 0,
+            'expired' => 0,
+        ];
+    }
+
+    public function test_kpi_cards_drive_the_live_table_state(): void
+    {
+        Employee::factory()->create(['nama' => 'PIMPINAN KPI', 'level' => Employee::LEVEL_KARPIM]);
+        Employee::factory()->create(['nama' => 'PELAKSANA KPI', 'level' => Employee::LEVEL_KARPEL]);
+
+        $component = Livewire::test(EmployeeTable::class, ['kpi' => $this->kpi()])
+            ->set('search', 'KPI');
+
+        // Cards act on the component (no page reload) and keep a plain link fallback carrying the live state.
+        $html = $component->html();
+        $this->assertStringContainsString('wire:click.prevent="$set(\'level\', \''.Employee::LEVEL_KARPEL.'\')"', $html);
+        $this->assertStringContainsString('wire:click.prevent="$set(\'level\', \''.Employee::LEVEL_KARPIM.'\')"', $html);
+        $this->assertStringNotContainsString('level=Pelaksana', $html);
+        $this->assertStringContainsString('search=KPI', $html, 'card links carry the search typed in the table');
+
+        // Clicking the Karyawan Pelaksana card filters on Karpel: list, highlight and export agree.
+        $component->set('level', Employee::LEVEL_KARPEL)
+            ->assertSee('PELAKSANA KPI')->assertDontSee('PIMPINAN KPI')
+            ->assertSet('search', 'KPI');
+        $html = $component->html();
+        $this->assertSame(1, substr_count($html, 'aria-current="true"'), 'one active card');
+        $activeCard = substr($html, strpos($html, 'aria-current="true"'));
+        $activeCard = substr($activeCard, 0, strpos($activeCard, '</a>'));
+        $this->assertStringContainsString('Karyawan Pelaksana', $activeCard);
+        $this->assertStringContainsString('wire:click.prevent="$set(\'level\', \'\')"', $html, 'the active card toggles the filter off');
+        $this->assertStringContainsString('name="level" value="'.Employee::LEVEL_KARPEL.'"', $html);
+
+        // "Total Pegawai" clears the card-driven filters but keeps the search.
+        $component->call('clearKpiFilters')
+            ->assertSet('level', '')->assertSet('statusKhusus', '')->assertSet('statusPenugasan', '')
+            ->assertSet('search', 'KPI')
+            ->assertSee('PIMPINAN KPI')->assertSee('PELAKSANA KPI');
+    }
+
+    public function test_governance_strip_follows_chip_changes(): void
+    {
+        Employee::factory()->create(['nama' => 'PEGAWAI STRIP']);
+
+        $component = Livewire::test(EmployeeTable::class, ['kpi' => $this->kpi()])
+            ->set('statusKhusus', 'sanksi');
+
+        $html = $component->html();
+        $this->assertStringContainsString('aria-pressed="true"', $html);
+        $this->assertStringContainsString('Reset Status Khusus', $html);
+        $this->assertStringContainsString('wire:click.prevent="$set(\'statusKhusus\', \'\')"', $html);
+
+        // Removing the Tata Kelola chip inside the table un-highlights the strip and hides its reset link.
+        $html = $component->set('statusKhusus', '')->html();
+        $this->assertStringNotContainsString('aria-pressed="true"', $html);
+        $this->assertStringNotContainsString('Reset Status Khusus', $html);
+        $this->assertStringContainsString('wire:click.prevent="$set(\'statusKhusus\', \'rangkap\')"', $html);
+        $this->assertStringNotContainsString('status_khusus=sanksi', $html, 'a removed filter does not come back through a card link');
+
+        // Values sent by a tampered card click are validated like any filter value.
+        $component->call('$set', 'statusKhusus', 'drop')->assertSet('statusKhusus', '')
+            ->call('$set', 'level', 'Pelaksana')->assertSet('level', '');
+    }
+
+    public function test_kpi_card_counts_match_the_filtered_rows(): void
+    {
+        Employee::factory()->count(2)->create(['level' => Employee::LEVEL_KARPIM]);
+        Employee::factory()->count(3)->create(['level' => Employee::LEVEL_KARPEL]);
+
+        $page = $this->get(route('admin.employees.index'))->assertOk();
+        $page->assertViewHas('kpi', fn (array $kpi) => $kpi['karpim'] === 2 && $kpi['karpel'] === 3 && $kpi['total'] === 5);
+
+        $this->assertSame(2, Livewire::withQueryParams(['level' => Employee::LEVEL_KARPIM])->test(EmployeeTable::class)->instance()->rows->total());
+        $this->assertSame(3, Livewire::withQueryParams(['level' => Employee::LEVEL_KARPEL])->test(EmployeeTable::class)->instance()->rows->total());
+    }
+
     public function test_non_admin_is_refused(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'user']));

@@ -128,12 +128,18 @@ class Employee extends Model
         return hash('sha256', (string) json_encode(array_map(fn ($value) => $value === null ? null : (string) $value, $state)));
     }
 
+    /** Stored `level` value of a Karyawan Pimpinan. */
+    public const LEVEL_KARPIM = 'Karpim';
+
+    /** Stored `level` value of a Karyawan Pelaksana. */
+    public const LEVEL_KARPEL = 'Karpel';
+
     /**
      * Strata Pegawai (DOMAIN.md Bab 3).
      */
     public const LEVELS = [
-        'Karpim' => 'Karyawan Pimpinan (Karpim)',
-        'Karpel' => 'Karyawan Pelaksana (Karpel)',
+        self::LEVEL_KARPIM => 'Karyawan Pimpinan (Karpim)',
+        self::LEVEL_KARPEL => 'Karyawan Pelaksana (Karpel)',
     ];
 
     /**

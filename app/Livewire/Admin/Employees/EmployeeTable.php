@@ -11,6 +11,7 @@ use App\Support\DataTable\Filter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -18,8 +19,9 @@ use Livewire\Component;
  * Direktori Pegawai (admin employees index) on the shared data table layer (WithDataTable).
  *
  * Every filter keeps its URL key from the former GET form, so old bookmarks open with the same
- * filters, sort and page. The KPI cards drive `level` and the governance strip drives `status_khusus`
- * through `?level=` / `?status_khusus=` links, so the toolbar shows them only as removable chips.
+ * filters, sort and page. The KPI cards (rendered here so they follow the live state) drive `level`
+ * and the governance strip drives `status_khusus` through `$set`, which the shared layer validates
+ * like any filter value; the toolbar shows them only as removable chips.
  * Row actions stay plain links and the CSRF-protected DELETE form handled by EmployeeController;
  * row selection, bulk delete and the export button still post to their existing routes.
  */
@@ -70,6 +72,15 @@ class EmployeeTable extends Component
     public string $bulanMasuk = '';
 
     /**
+     * Page-level KPI metrics computed by EmployeeController::index (total, units, karpim, karpel,
+     * rangkap, sanksi, overflow, expired). Empty: the cards and the governance strip are not rendered.
+     *
+     * @var array<string, int>
+     */
+    #[Locked]
+    public array $kpi = [];
+
+    /**
      * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
      * non-admins on every request.
      */
@@ -82,6 +93,30 @@ class EmployeeTable extends Component
     public function mount(): void
     {
         $this->bulanMasuk = $this->padMonth($this->bulanMasuk);
+    }
+
+    /** "Total Pegawai" card: clears the filters the KPI cards and governance strip drive, keeps search and panel filters. */
+    public function clearKpiFilters(): void
+    {
+        $this->level = '';
+        $this->statusKhusus = '';
+        $this->statusPenugasan = '';
+
+        $this->resetPage($this->paginationName());
+        $this->clearSelection();
+    }
+
+    /**
+     * No-JS fallback link of a KPI card or strip chip: the current table state with the given changes
+     * (URL key => value, '' removes the key).
+     *
+     * @param  array<string, string>  $changes
+     */
+    public function kpiUrl(array $changes): string
+    {
+        $query = array_filter(array_merge($this->exportQuery(), $changes), fn ($value) => $value !== '');
+
+        return route('admin.employees.index', $query);
     }
 
     /** @return array<string, string> */

@@ -28,37 +28,30 @@ use Maatwebsite\Excel\Facades\Excel;
 class EmployeeController extends Controller
 {
     // Display all employees: page-level KPI metrics and the expired-sanction notice. The directory list itself
-    // (search, filters, sort, pagination) is the Livewire component App\Livewire\Admin\Employees\EmployeeTable.
+    // (search, filters, sort, pagination) and the KPI cards that drive it are the Livewire component
+    // App\Livewire\Admin\Employees\EmployeeTable, which receives these metrics as `kpi`.
     public function index()
     {
-        // Fixed Global Headcount KPI Metrics (Executive Overview)
-        $totalEmployees = Employee::count();
-        $totalUnits = Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
-        $karpimCount = Employee::karpim()->count();
-        $pelaksanaCount = Employee::pelaksana()->count();
-
-        // Global reference
-        $penugasanSementaraCount = Employee::whereHas('concurrentJobs')->count();
-
-        // Special governance metrics
-        $sanksiAktifCount = Employee::sanctionActive()->count();
-        $overflowCount = Employee::overflow()->count();
-
         // Fetch employees with expired sanctions (Diperban)
         $expiredSanksiEmployees = Employee::sanctionExpired()
             ->orderBy('tanggal_berakhir_sanksi', 'asc')
             ->get();
 
-        return view('admin.employees.index', compact(
-            'totalEmployees',
-            'totalUnits',
-            'karpimCount',
-            'pelaksanaCount',
-            'expiredSanksiEmployees',
-            'penugasanSementaraCount',
-            'sanksiAktifCount',
-            'overflowCount'
-        ));
+        // Fixed Global Headcount KPI Metrics (Executive Overview). The Karpim/Karpel counts use the same
+        // equality condition as the table's `level` filter, so a card's count matches the rows it shows.
+        $kpi = [
+            'total' => Employee::count(),
+            'units' => Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja'),
+            'karpim' => Employee::where('level', Employee::LEVEL_KARPIM)->count(),
+            'karpel' => Employee::where('level', Employee::LEVEL_KARPEL)->count(),
+            // Special governance metrics
+            'rangkap' => Employee::whereHas('concurrentJobs')->count(),
+            'sanksi' => Employee::sanctionActive()->count(),
+            'overflow' => Employee::overflow()->count(),
+            'expired' => $expiredSanksiEmployees->count(),
+        ];
+
+        return view('admin.employees.index', compact('kpi', 'expiredSanksiEmployees'));
     }
 
     // Show form to create new employee (can be pre-filled from vacancy)
