@@ -75,7 +75,7 @@
     $searchId = $tableId.'-search';
 @endphp
 
-<div x-data="{ open: false }" @keydown.escape="open = false" class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200 space-y-3">
+<div x-data="{ open: false }" @keydown.escape="if (open) { open = false; $nextTick(() => $refs.filterToggle?.focus()) }" class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200 space-y-3">
     @if ($hasTitle)
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">{{ $title }}</div>
@@ -90,7 +90,7 @@
         <x-admin.search-input model="search" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative flex-1 min-w-0" />
 
         @if ($hasPanel)
-            <button type="button" @click="open = ! open" aria-expanded="false" :aria-expanded="open" aria-controls="{{ $panelId }}"
+            <button type="button" x-ref="filterToggle" @click="open = ! open" aria-expanded="false" :aria-expanded="open" aria-controls="{{ $panelId }}"
                 :class="{ 'border-primary-300 bg-primary-50 text-primary-800': open }"
                 class="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-white hover:bg-surface-100 text-surface-700 border border-surface-300 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                 <i class="fas fa-sliders text-[11px]" aria-hidden="true"></i>

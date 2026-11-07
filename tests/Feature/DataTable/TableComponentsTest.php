@@ -119,7 +119,9 @@ class TableComponentsTest extends TestCase
         preg_match('/aria-controls="([^"]+)"/', $html, $panel);
         $this->assertStringContainsString('id="'.$panel[1].'"', $html);
         $this->assertStringContainsString(':aria-expanded="open"', $html);
-        $this->assertStringContainsString('@keydown.escape="open = false"', $html);
+        $this->assertStringContainsString('x-ref="filterToggle"', $html);
+        // Esc closes an open panel and puts keyboard focus back on the Filter button (it must not strand focus on a hidden field).
+        $this->assertStringContainsString('@keydown.escape="if (open) { open = false; $nextTick(() => $refs.filterToggle?.focus()) }"', $html);
 
         preg_match_all('/<label for="([^"]+)"/', $html, $labels);
         $this->assertNotEmpty($labels[1]);
