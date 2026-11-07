@@ -3,7 +3,6 @@
 namespace App\Services\Mutasi;
 
 use App\Models\JobHistory;
-use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -56,7 +55,7 @@ class MutasiHistoryReader
             ->when($unitKerja, fn ($q) => $q->where('unit_kerja', $unitKerja))
             ->when($jenisMutasi, fn ($q) => $q->where('jenis_mutasi', $jenisMutasi))
             ->when($isApplied !== null, fn ($q) => $q->where('is_applied', $isApplied))
-            ->when($onlyDue, fn ($q) => $q->where('is_applied', false)->where('tmt_awal', '<=', Carbon::today()->toDateString()))
+            ->when($onlyDue, fn ($q) => $q->dueForActivation())
             ->orderBy($sortCol, $direction)
             ->orderByDesc('id');
     }
@@ -98,9 +97,7 @@ class MutasiHistoryReader
             'total' => JobHistory::bySumber($sumber)->count(),
             'active' => JobHistory::bySumber($sumber)->where('is_applied', true)->whereNull('tmt_akhir')->count(),
             'scheduled' => JobHistory::bySumber($sumber)->where('is_applied', false)->count(),
-            'due' => JobHistory::bySumber($sumber)->where('is_applied', false)
-                ->where('tmt_awal', '<=', Carbon::today()->toDateString())
-                ->count(),
+            'due' => JobHistory::bySumber($sumber)->dueForActivation()->count(),
         ];
     }
 

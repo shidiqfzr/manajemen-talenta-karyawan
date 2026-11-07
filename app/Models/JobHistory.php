@@ -136,6 +136,20 @@ class JobHistory extends Model
             ->whereDate('tmt_awal', '<=', $targetDate);
     }
 
+    /**
+     * Filter by mutation status using the single domain definitions above: `applied`, `scheduled` or
+     * `due` (scheduled and TMT reached). Any other value, including null, leaves the query unchanged.
+     */
+    public function scopeByStatus($query, ?string $status)
+    {
+        return match ($status) {
+            'applied' => $query->applied(),
+            'scheduled' => $query->scheduled(),
+            'due' => $query->dueForActivation(),
+            default => $query,
+        };
+    }
+
     public function setTmtAkhirEstimasiAttribute($value): void
     {
         $this->attributes['tmt_akhir_estimasi'] = ! empty($value) ? $value : null;
