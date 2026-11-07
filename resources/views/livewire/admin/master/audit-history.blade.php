@@ -9,9 +9,6 @@
     $columnCount = $this->tableColumnCount();
 @endphp
 <div>
-    {{-- Wilayah live permanen: hasil filter diumumkan walau penomoran halaman tidak tampil. --}}
-    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ number_format($rows->total()) }} catatan ditemukan</div>
-
     <x-admin.table.card :notice="$tableNotice">
         <x-admin.table.toolbar
             :table-id="$this->getId()"
@@ -20,6 +17,9 @@
             :export="$this->exportName() !== null"
             :has-active-filters="$this->hasActiveFilters()"
             :search="$search"
+            :result-count="$rows->total()"
+            :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
+            noun="catatan"
             search-placeholder="Cari unit, jabatan, admin, atau alasan..." />
 
         <div class="overflow-x-auto">

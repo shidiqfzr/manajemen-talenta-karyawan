@@ -332,9 +332,27 @@ class MasterAuditLogTest extends TestCase
             MasterAuditLog::record($this->admin, 'unit.created', 'unit', $i, "Unit Hitung {$i}");
         }
 
-        $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))
-            ->assertSee('3 catatan ditemukan')
-            ->assertSeeHtml('role="status"');
+        $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->html();
+
+        // One permanent live region, owned by the shared toolbar's summary bar.
+        $this->assertSame(1, substr_count($html, 'role="status"'));
+        $this->assertStringContainsString('<p role="status" aria-live="polite" aria-atomic="true"', $html);
+        $this->assertStringContainsString('3 catatan', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        $this->assertStringNotContainsString('ditemukan', $html);
+    }
+
+    public function test_history_shows_the_filtered_count_above_the_empty_state(): void
+    {
+        foreach (range(1, 3) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, "Seat Hitung {$i}");
+        }
+
+        $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->set('entityType', 'position')->html();
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
+
+        $this->assertStringContainsString('0 dari 3 catatan sesuai filter', $text);
+        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 dari 3 catatan sesuai filter'));
+        $this->assertStringContainsString('Reset filter', $html);
     }
 
     public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void

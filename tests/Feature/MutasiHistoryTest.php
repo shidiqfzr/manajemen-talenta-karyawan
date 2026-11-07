@@ -195,9 +195,27 @@ class MutasiHistoryTest extends TestCase
 
     public function test_result_count_is_announced_through_a_permanent_live_region(): void
     {
-        Livewire::actingAs($this->adminUser)
-            ->test(MutasiHistory::class)
-            ->assertSeeHtml('role="status" aria-live="polite" aria-atomic="true">0 riwayat ditemukan');
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class);
+        $html = $component->html();
+
+        // One permanent live region, owned by the shared toolbar's summary bar.
+        $this->assertSame(1, substr_count($html, 'role="status"'));
+        $this->assertStringContainsString('<p role="status" aria-live="polite" aria-atomic="true"', $html);
+        $this->assertStringContainsString($component->instance()->rows->total().' riwayat', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        $this->assertStringNotContainsString('ditemukan', $html);
+    }
+
+    public function test_history_shows_the_filtered_count_above_the_empty_state(): void
+    {
+        $this->official(Employee::factory()->create());
+
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)->set('search', 'tidak-ada-yang-cocok');
+        $total = $component->instance()->unfilteredCount;
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($component->html())));
+
+        $this->assertStringContainsString('0 dari '.$total.' riwayat sesuai filter', $text);
+        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 dari '.$total.' riwayat sesuai filter'));
+        $this->assertStringContainsString('Reset filter', $component->html());
     }
 
     public function test_can_filter_and_sort_mutasi_history(): void

@@ -9,9 +9,6 @@
     $columnCount = $this->tableColumnCount();
 @endphp
 <x-admin.table.card :notice="$tableNotice">
-    {{-- Wilayah live permanen: hasil filter diumumkan walau penomoran halaman tidak tampil. --}}
-    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ number_format($rows->total()) }} riwayat ditemukan</div>
-
     {{-- Tanpa tombol pintas: tabel ini juga disematkan sebagai tab di halaman Mutasi & Penempatan. --}}
     <x-admin.table.toolbar
         :table-id="$this->getId()"
@@ -20,6 +17,9 @@
         :export="$this->exportName() !== null"
         :has-active-filters="$this->hasActiveFilters()"
         :search="$search"
+        :result-count="$rows->total()"
+        :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
+        noun="riwayat"
         :search-shortcut="null"
         search-placeholder="Cari nama karyawan, NIK, jabatan, atau unit..." />
 
