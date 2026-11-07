@@ -61,9 +61,7 @@ class TrainingController extends Controller
      */
     public function show(Training $training)
     {
-        $participants = $training->employees()->paginate(20);
-
-        return view('admin.trainings.show', compact('training', 'participants'));
+        return view('admin.trainings.show', compact('training'));
     }
 
     public function edit(Training $training)
