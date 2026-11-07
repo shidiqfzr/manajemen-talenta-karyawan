@@ -11,7 +11,7 @@ Five tables are already on the shared engine (Riwayat Mutasi, Riwayat Perubahan,
 
 **Out of scope (agreed):** editing grids and modal previews — MPP supply plan editor, MPP planning, mutasi review modal, import preview/diff/column-guide modals, statistics, and `import-batches/partials/skipped-rows`. They keep their layout; they only get the shared table styling tokens where a trivial class swap suffices (no new behaviour).
 
-Assumption to confirm: the Employees directory is in scope for **behaviour** parity too (see §4, phase D), not only looks.
+Confirmed by the user (2026-11-08): the Employees directory is in scope for **behaviour** parity too (see §4, phase D), not only looks.
 
 ## 2. Inventory and target
 
@@ -26,6 +26,11 @@ Assumption to confirm: the Employees directory is in scope for **behaviour** par
 | 7 | Formasi editor — unit list and seat table `livewire/admin/master/formasi-editor` | Livewire, own toolbar/pager, 21 `wire:` hooks | Use `x-admin.table.toolbar/header/head`; keep editor-specific row actions |
 | 8 | Employees directory `admin/employees/index` | Controller + GET form, shared look but own markup | Phase D (see §4) |
 | 9 | User-side training `user/trainings/show` | Own small table | Shared table markup only (read-only, no toolbar) |
+
+**Revisions after reading the code (2026-11-08, while planning):**
+- #5 and #9 show a paginated *approval preview* (`governance->review()` sample rows, an array) and a short read-only list. They have no search, sort or filter to share, so they get the shared card, header bar and column styling only. They do not get the engine.
+- #6 (rows built by `JobVacancyService` from a query builder plus computed severity) and #7 (computed seat and unit statistics) are collection-backed. `WithDataTable` is Eloquent-builder-only, so these keep their in-memory data and adopt the **presentational** shared components (`toolbar`, `header`, `pagination`), with filters declared as `Filter` objects so the panel, chips and Reset Filter are identical. To support two lists in one component (#7), the toolbar gains `search-model` (default `search`) and `reset-action` (default `resetFilters`) props.
+- URL keys stay as they are today wherever bookmarks exist: trainings `start_date`/`end_date`, employees `search`, `sort`, `direction` and every filter key. The import batches search moves from `q` to the shared `search` key, and `?q=` redirects to it.
 
 ## 3. Approach
 
