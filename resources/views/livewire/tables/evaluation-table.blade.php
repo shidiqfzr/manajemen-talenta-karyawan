@@ -15,14 +15,11 @@
             :table-id="$this->getId()"
             :filters="$this->filters()"
             :filter-values="$this->activeFilterValues()"
-            :export="$this->exportName() !== null"
             :has-active-filters="$this->hasActiveFilters()"
             :search="$search"
-            :result-count="$rows->total()"
-            :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
-            noun="evaluasi"
             :search-shortcut="null"
             search-placeholder="Cari bidang tugas, lembaga, 9-box..." />
+        <x-admin.table.header :paginator="$rows" noun="Evaluasi" />
 
         @if ($selectable)
             <x-admin.table.bulk-bar

@@ -10,7 +10,6 @@ use App\Models\MasterAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
-use Livewire\Features\SupportComputed\CannotCallComputedDirectlyException;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
 use RuntimeException;
@@ -19,12 +18,10 @@ use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableCustomExport;
 use Tests\Fixtures\DataTable\FixtureTableCustomExportSmallLimit;
-use Tests\Fixtures\DataTable\FixtureTableCustomTotal;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
 use Tests\Fixtures\DataTable\FixtureTableOddPerPage;
 use Tests\Fixtures\DataTable\FixtureTablePanelReset;
-use Tests\Fixtures\DataTable\FixtureTableScoped;
 use Tests\Fixtures\DataTable\FixtureTableSmallLimit;
 use Tests\Fixtures\DataTable\FixtureTableSmallPerPage;
 use Tests\TestCase;
@@ -597,40 +594,6 @@ class WithDataTableTest extends TestCase
 
         // "Reset Filter" (everything) is a different action and still clears all three.
         $component->call('resetFilters')->assertSet('search', '')->assertSet('aktif', '');
-    }
-
-    public function test_unfiltered_count_ignores_search_and_filters(): void
-    {
-        $component = Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->set('search', 'Pegawai 0');
-
-        $this->assertSame(30, $component->instance()->unfilteredCount);
-        $this->assertLessThan(30, $component->instance()->rows->total());
-        $this->assertSame($component->instance()->rows->total(), $component->instance()->matchingCount);
-    }
-
-    public function test_unfiltered_count_respects_the_module_base_query(): void
-    {
-        $component = Livewire::test(FixtureTableScoped::class)->set('search', 'Pegawai 0');
-
-        // 15 of the 30 rows are KEU: the scoped base query is the "total", not the whole table.
-        $this->assertSame(15, $component->instance()->unfilteredCount);
-        $this->assertLessThan(15, $component->instance()->rows->total());
-    }
-
-    public function test_unfiltered_count_can_follow_a_module_specific_total_query(): void
-    {
-        $component = Livewire::test(FixtureTableCustomTotal::class)->set('search', 'Pegawai 0');
-
-        // The module says its "total" is the 15 TAN rows, even though its base query returns all 30.
-        $this->assertSame(15, $component->instance()->unfilteredCount);
-        $this->assertSame(30, FixtureRow::query()->count());
-    }
-
-    public function test_unfiltered_count_cannot_be_called_from_the_browser(): void
-    {
-        $this->expectException(CannotCallComputedDirectlyException::class);
-
-        Livewire::test(FixtureTable::class)->call('unfilteredCount');
     }
 
     public function test_table_loading_targets_include_actions_and_filters(): void

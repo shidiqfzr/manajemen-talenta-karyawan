@@ -160,7 +160,11 @@
             @foreach ($activeChips as $chip)
                 <button type="button" wire:key="{{ $tableId }}-active-{{ $chip['property'] }}" wire:click="$set('{{ $chip['property'] }}', '')" aria-label="Hapus filter {{ $chip['label'] }}"
                     class="{{ $chipClass }}">
-                    <span>{{ $chip['label'] }}@if ($chip['value'] !== null): <strong>{{ $chip['value'] }}</strong>@endif</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                    @if ($chip['value'] === null)
+                        <span>{{ $chip['label'] }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                    @else
+                        <span>{{ $chip['label'] }}: <strong>{{ $chip['value'] }}</strong></span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                    @endif
                 </button>
             @endforeach
             @if ($panelCount > 0)

@@ -14,14 +14,11 @@
         :table-id="$this->getId()"
         :filters="$this->filters()"
         :filter-values="$this->activeFilterValues()"
-        :export="$this->exportName() !== null"
         :has-active-filters="$this->hasActiveFilters()"
         :search="$search"
-        :result-count="$rows->total()"
-        :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
-        noun="riwayat"
         :search-shortcut="null"
         search-placeholder="Cari nama karyawan, NIK, jabatan, atau unit..." />
+    <x-admin.table.header title="Riwayat Mutasi" :paginator="$rows" noun="Riwayat" :export="$this->exportName() !== null" />
 
     <div class="overflow-x-auto">
         <table class="w-full table-fixed text-left border-collapse text-xs" wire:loading.attr="aria-busy" wire:target="{{ $loadingTargets }}">
