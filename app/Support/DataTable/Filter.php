@@ -93,13 +93,13 @@ final class Filter
         }
 
         if ($this->type === 'date_from') {
-            $query->where($this->column, '>=', $value.' 00:00:00');
+            $query->where($query->qualifyColumn($this->column), '>=', $value.' 00:00:00');
 
             return;
         }
 
         if ($this->type === 'date_to') {
-            $query->where($this->column, '<=', $value.' 23:59:59');
+            $query->where($query->qualifyColumn($this->column), '<=', $value.' 23:59:59');
 
             return;
         }
@@ -115,7 +115,8 @@ final class Filter
     /** Strict Y-m-d that is also a real calendar day (rejects 2026-02-30). */
     private function isRealDate(string $value): bool
     {
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts) !== 1) {
+        // The /D modifier stops `$` from also matching just before a trailing newline.
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts) !== 1) {
             return false;
         }
 
