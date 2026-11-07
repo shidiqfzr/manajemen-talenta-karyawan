@@ -524,6 +524,61 @@ class FormasiEditorTest extends TestCase
         $this->assertFalse($editor->instance()->hasSeatFilters());
     }
 
+    public function test_unit_list_uses_shared_toolbar_and_header(): void
+    {
+        Unit::create(['nama' => 'Kebun Kedua Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => true, 'urutan' => 2]);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
+            ->assertSee('Daftar Unit Kerja')
+            ->assertSee('2 Unit Kerja')
+            ->assertSee('Filter Lanjutan')
+            ->assertSeeHtml('formasi-units-search')
+            ->assertDontSee('Reset Filter');
+
+        $list->set('statusFilter', 'inactive')->assertSee('Reset Filter')->assertSee('0 Unit Kerja');
+    }
+
+    public function test_seat_list_uses_shared_toolbar_and_header(): void
+    {
+        $this->seat($this->position('Asisten Alfa', 'Karpim', 'RM-3'), 2, 'TAN');
+        $this->seat($this->position('Kepala Bravo', 'Karpim', 'RM-1'), 1, 'KEU');
+
+        $editor = $this->editor()
+            ->assertSee('Formasi Jabatan — Kebun Editor Uji')
+            ->assertSee('2 Jabatan')
+            ->assertSee('Filter Lanjutan')
+            ->assertSeeHtml('formasi-seats-search');
+
+        $editor->set('rmFilter', 'RM-1')->assertSee('1 Jabatan')->assertSee('Reset Filter')->assertSee('Hapus filter RM Band');
+    }
+
+    public function test_seat_reset_keeps_unit_filters(): void
+    {
+        $editor = $this->editor()
+            ->set('unitQuery', 'Kebun')
+            ->set('wilayahFilter', 'Wilayah Kalimantan Barat')
+            ->set('statusFilter', 'active')
+            ->set('seatQuery', 'alfa')
+            ->set('rmFilter', 'RM-3')
+            ->set('bidangFilter', 'TAN')
+            ->set('seatStatusFilter', 'full')
+            ->call('resetSeatFilters')
+            ->assertSet('seatQuery', '')
+            ->assertSet('rmFilter', '')
+            ->assertSet('bidangFilter', '')
+            ->assertSet('seatStatusFilter', '')
+            ->assertSet('unitQuery', 'Kebun')
+            ->assertSet('wilayahFilter', 'Wilayah Kalimantan Barat')
+            ->assertSet('statusFilter', 'active');
+
+        $editor->set('seatQuery', 'alfa')->set('rmFilter', 'RM-3')->call('resetUnitFilters')
+            ->assertSet('unitQuery', '')
+            ->assertSet('wilayahFilter', '')
+            ->assertSet('statusFilter', '')
+            ->assertSet('seatQuery', 'alfa')
+            ->assertSet('rmFilter', 'RM-3');
+    }
+
     public function test_over_quota_kpi_card_toggles_the_status_filter(): void
     {
         $over = $this->position('Asisten Berlebih');

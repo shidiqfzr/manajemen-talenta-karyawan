@@ -12,6 +12,7 @@ use App\Services\Formasi\FormasiDialogs;
 use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
 use App\Services\ManPowerPlanningService;
+use App\Support\DataTable\Filter;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -194,6 +195,68 @@ class FormasiEditor extends Component
     {
         $this->reset(['seatQuery', 'rmFilter', 'bidangFilter', 'seatStatusFilter']);
         $this->resetPage();
+    }
+
+    /**
+     * Filter definitions of the seat table toolbar; the options are the same lists the filters were validated against.
+     *
+     * @return array<int, Filter>
+     */
+    protected function seatFilters(): array
+    {
+        return [
+            Filter::select('rmFilter', 'RM Band', array_combine(array_keys(Position::RM_LEVEL_LIST), array_keys(Position::RM_LEVEL_LIST)))->icon('fas fa-layer-group'),
+            Filter::select('bidangFilter', 'Bidang', Position::BIDANG_LIST)->icon('fas fa-sitemap'),
+            Filter::select('seatStatusFilter', 'Status', self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'])->icon('fas fa-toggle-on'),
+        ];
+    }
+
+    /**
+     * @return array<string, string> [filter property => value] for seat filters that are set and allowed.
+     */
+    protected function seatFilterValues(): array
+    {
+        return $this->allowedFilterValues($this->seatFilters());
+    }
+
+    /**
+     * Filter definitions of the unit list toolbar.
+     *
+     * @return array<int, Filter>
+     */
+    protected function unitFilters(): array
+    {
+        return [
+            Filter::select('wilayahFilter', 'Wilayah', array_combine(Unit::WILAYAH_LIST, Unit::WILAYAH_LIST))->icon('fas fa-location-dot'),
+            Filter::select('statusFilter', 'Status', ['active' => 'Aktif', 'inactive' => 'Nonaktif'])->icon('fas fa-toggle-on'),
+        ];
+    }
+
+    /**
+     * @return array<string, string> [filter property => value] for unit filters that are set and allowed.
+     */
+    protected function unitFilterValues(): array
+    {
+        return $this->allowedFilterValues($this->unitFilters());
+    }
+
+    /**
+     * @param  array<int, Filter>  $filters
+     * @return array<string, string>
+     */
+    private function allowedFilterValues(array $filters): array
+    {
+        $values = [];
+
+        foreach ($filters as $filter) {
+            $value = $this->{$filter->property};
+
+            if ($value !== '' && $filter->allows($value)) {
+                $values[$filter->property] = $value;
+            }
+        }
+
+        return $values;
     }
 
     public function hasSeatFilters(): bool
@@ -739,10 +802,11 @@ class FormasiEditor extends Component
     {
         return view('livewire.admin.master.formasi-editor', [
             'bidangList' => Position::BIDANG_LIST,
-            'wilayahList' => Unit::WILAYAH_LIST,
-            'rmList' => Position::RM_LEVEL_LIST,
             'perPageOptions' => self::PER_PAGE_OPTIONS,
-            'seatStateOptions' => self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'],
+            'seatFilters' => $this->seatFilters(),
+            'seatFilterValues' => $this->seatFilterValues(),
+            'unitFilters' => $this->unitFilters(),
+            'unitFilterValues' => $this->unitFilterValues(),
             'dialogs' => app(FormasiDialogs::class),
         ]);
     }
