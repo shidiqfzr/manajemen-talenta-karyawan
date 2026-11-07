@@ -16,6 +16,8 @@
 
     page-keys : kunci baris halaman ini sebagai string (mis. $this->rows->getCollection()->map(fn ($r) => (string) $r->getAttribute($this->rowKey()))->all()).
     trailing  : slot opsional untuk header kolom tambahan milik modul (mis. kolom menu aksi).
+    leading   : slot opsional untuk header kolom paling kiri milik modul (mis. kolom centang pilihan baris yang dikelola
+                halaman sendiri), dirender sebelum kolom centang bawaan dan kolom data.
 --}}
 @props([
     'columns' => [],
@@ -37,6 +39,8 @@
 
 <thead class="bg-surface-50 sticky top-0 z-10">
     <tr class="border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+        {{ $leading ?? '' }}
+
         @if ($selectable)
             <th scope="col" class="w-10 px-4 py-3">
                 {{-- wire:key ikut status agar Alpine membaca ulang x-bind:indeterminate setiap kali status berubah. --}}

@@ -1,6 +1,7 @@
-@props(['employee'])
+{{-- term: kata kunci pencarian untuk penyorotan; wajib diisi dari komponen Livewire karena request pembaruan tidak membawa ?search. --}}
+@props(['employee', 'term' => null])
 
-<tr :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-surface-50/70 border-l-4 border-l-primary-600' : ''"
+<tr {{ $attributes->only('wire:key') }} :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-surface-50/70 border-l-4 border-l-primary-600' : ''"
     class="cursor-pointer hover:bg-surface-50/80 transition duration-150 group select-none"
     @click="handleRowClick('{{ $employee->nik }}', $event, '{{ route('admin.employees.show', $employee->nik) }}')">
     
@@ -32,11 +33,11 @@
                 <a href="{{ route('admin.employees.show', $employee->nik) }}"
                     class="font-semibold text-surface-900 group-hover:text-primary-700 transition block truncate max-w-[200px] sm:max-w-xs"
                     title="{{ $employee->nama }}">
-                    <x-highlight :text="$employee->nama" />
+                    <x-highlight :term="$term" :text="$employee->nama" />
                 </a>
                 <div class="flex items-center gap-1.5 mt-0.5">
                     <span class="font-mono text-xs text-surface-500 tabular-nums">
-                        <x-highlight :text="$employee->nik" />
+                        <x-highlight :term="$term" :text="$employee->nik" />
                     </span>
                     <button type="button" @click.stop="copyNik('{{ $employee->nik }}')"
                         class="text-surface-500 hover:text-surface-700 text-[11px] transition cursor-pointer"
@@ -51,7 +52,7 @@
     <!-- Jabatan & Unit Kerja -->
     <td class="py-3.5 px-5">
         <div class="font-medium text-surface-900 text-sm flex items-center gap-2 flex-wrap">
-            <span title="{{ $employee->jabatan }}"><x-highlight :text="$employee->jabatan" /></span>
+            <span title="{{ $employee->jabatan }}"><x-highlight :term="$term" :text="$employee->jabatan" /></span>
 
             {{-- Badge Kasus Spesial 1: Sanksi Indisipliner Aktif / Kedaluwarsa --}}
             @if($employee->isSanctionActive())
@@ -100,7 +101,7 @@
         </div>
         <div class="text-xs text-surface-500 flex items-center gap-1.5 mt-0.5 flex-wrap" title="{{ $employee->unit_kerja }}">
             <i class="fas fa-building text-[10px] text-surface-400 shrink-0" aria-hidden="true"></i>
-            <span class="truncate max-w-[240px] sm:max-w-md"><x-highlight :text="$employee->unit_kerja" /></span>
+            <span class="truncate max-w-[240px] sm:max-w-md"><x-highlight :term="$term" :text="$employee->unit_kerja" /></span>
             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border shadow-2xs {{ $employee->bidang_theme }}"
                 title="Bidang Fungsional: {{ $employee->bidang }}">
                 {{ $employee->bidang }}

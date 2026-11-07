@@ -25,7 +25,7 @@ class EmployeePeriodFilterTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('admin.employees.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('Daftar Karyawan');
+        $response->assertSee('Direktori Pegawai');
         $response->assertSee('Unit Kerja');
         $response->assertSee('Jabatan');
         $response->assertSee('Eselon / RM Band');
@@ -47,7 +47,7 @@ class EmployeePeriodFilterTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('TESTING RM LEADERSHIP');
-        $response->assertSee('Eselon: <strong>RM-1</strong>', false);
+        $response->assertSee('Eselon / RM Band: <strong>RM-1 (Pimpinan / Senior Management)</strong>', false);
     }
 
     public function test_employees_can_be_filtered_by_jabatan_and_unit_kerja(): void
@@ -66,7 +66,7 @@ class EmployeePeriodFilterTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('TESTING JABATAN FILTER');
         $response->assertSee('Jabatan: <strong>Asisten Tanaman Afdeling I</strong>', false);
-        $response->assertSee('Unit: <strong>Kebun Danau Salak</strong>', false);
+        $response->assertSee('Unit Kerja: <strong>Kebun Danau Salak</strong>', false);
     }
 
     public function test_employees_omnisearch_searches_nik_nama_jabatan_and_unit_kerja(): void
@@ -97,26 +97,30 @@ class EmployeePeriodFilterTest extends TestCase
 
     public function test_employees_can_be_filtered_by_year_and_month(): void
     {
-        // Fetch an existing employee to test with their tmt_bekerja year/month
-        $employee = Employee::whereNotNull('tmt_bekerja')->first();
+        $employee = Employee::factory()->create([
+            'nama' => 'PEGAWAI ANGKATAN TEST',
+            'tmt_bekerja' => '2014-03-17',
+        ]);
+        Employee::factory()->create([
+            'nama' => 'PEGAWAI ANGKATAN LAIN',
+            'tmt_bekerja' => '2019-11-04',
+        ]);
 
-        if ($employee) {
-            $tmt = Carbon::parse($employee->tmt_bekerja);
-            $year = $tmt->year;
-            $month = $tmt->month;
+        $tmt = Carbon::parse($employee->tmt_bekerja);
+        $year = $tmt->year;
+        $month = $tmt->month;
 
-            $response = $this->actingAs($this->user)->get(route('admin.employees.index', [
-                'tahun_masuk' => $year,
-                'bulan_masuk' => $month,
-            ]));
+        $response = $this->actingAs($this->user)->get(route('admin.employees.index', [
+            'tahun_masuk' => $year,
+            'bulan_masuk' => $month,
+        ]));
 
-            $response->assertStatus(200);
-            $response->assertSee((string) $year);
-            $response->assertSee('Periode: Tahun '.$year);
-            $response->assertSee('Tahun: <strong>'.$year.'</strong>', false);
-        } else {
-            $this->assertTrue(true);
-        }
+        $response->assertStatus(200);
+        $response->assertSee((string) $year);
+        $response->assertSee('PEGAWAI ANGKATAN TEST');
+        $response->assertDontSee('PEGAWAI ANGKATAN LAIN');
+        $response->assertSee('Tahun Masuk (TMT): <strong>Tahun '.$year.'</strong>', false);
+        $response->assertSee('Bulan Masuk (TMT): <strong>Maret</strong>', false);
     }
 
     public function test_legacy_statistics_url_redirects_to_employees_index(): void
@@ -220,12 +224,12 @@ class EmployeePeriodFilterTest extends TestCase
 
         // Verify table header sequence in HTML: Pegawai -> Jabatan & Unit Kerja -> Strata -> Eselon -> Golongan -> Aksi
         $content = $response->getContent();
-        $pegawaiPos = strpos($content, 'sort=nama');
-        $jabatanPos = strpos($content, 'sort=jabatan');
-        $strataPos = strpos($content, 'sort=level');
-        $eselonPos = strpos($content, 'sort=rm_level');
-        $golonganPos = strpos($content, 'sort=golongan');
-        $aksiPos = strpos($content, '>Aksi</th>');
+        $pegawaiPos = strpos($content, "sortBy('nama')");
+        $jabatanPos = strpos($content, "sortBy('jabatan')");
+        $strataPos = strpos($content, "sortBy('level')");
+        $eselonPos = strpos($content, "sortBy('rm_level')");
+        $golonganPos = strpos($content, "sortBy('golongan')");
+        $aksiPos = preg_match('/>\s*Aksi\s*<\/th>/', $content, $aksiMatch, PREG_OFFSET_CAPTURE) ? $aksiMatch[0][1] : false;
 
         $this->assertNotFalse($pegawaiPos, 'Header Pegawai (sort=nama) harus ada');
         $this->assertNotFalse($jabatanPos, 'Header Jabatan & Unit Kerja (sort=jabatan) harus ada');

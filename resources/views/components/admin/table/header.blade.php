@@ -9,6 +9,7 @@
     paginator : hasil paginasi saat ini ($rows); jumlah dan rentang diambil darinya.
     noun      : sebutan data berhuruf kapital awal (mis. Catatan, Riwayat) untuk lencana "339 Riwayat".
     export    : true menampilkan Ekspor Excel dengan lencana jumlah; tombolnya memanggil export() milik komponen.
+    actions   : slot opsional untuk tombol tambahan milik modul di sisi kanan (sebelum Ekspor Excel).
     Jumlah dan rentang berada dalam satu wilayah live permanen (role="status"), sehingga pembaca layar mendengar
     jumlah baru setiap pencarian atau filter berubah. Modul tidak boleh menambah wilayah pengumuman jumlah sendiri.
 --}}
@@ -33,9 +34,12 @@
         </p>
     </div>
 
-    @if ($export)
+    @if (isset($actions) || $export)
         <div class="flex items-center gap-2">
+            {{ $actions ?? '' }}
+            @if ($export)
             <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="export" target="export">Ekspor Excel <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-surface-100 text-surface-600 font-mono text-[10px]" aria-hidden="true">{{ $format($total) }}</span><span class="sr-only">untuk {{ $format($total) }} data</span></x-admin.button>
+            @endif
         </div>
     @endif
 </div>

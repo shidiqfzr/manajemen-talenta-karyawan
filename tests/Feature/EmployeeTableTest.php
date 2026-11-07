@@ -1,0 +1,283 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Livewire\Admin\Employees\EmployeeTable;
+use App\Models\Employee;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * SUT: App\Livewire\Admin\Employees\EmployeeTable (Employees directory list on the shared data table layer).
+ */
+class EmployeeTableTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($this->admin);
+    }
+
+    /**
+     * 25 employees in `Kebun Legacy` whose jabatan sorts with their number (PGW-A01 .. PGW-A25),
+     * plus one employee in another unit.
+     */
+    private function seedLegacyUnit(): void
+    {
+        foreach (range(1, 25) as $i) {
+            $n = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+            Employee::factory()->create([
+                'nama' => 'PGW-A'.$n,
+                'jabatan' => 'Jabatan '.$n,
+                'unit_kerja' => 'Kebun Legacy',
+            ]);
+        }
+
+        Employee::factory()->create(['nama' => 'PGW-LAIN', 'jabatan' => 'Jabatan 99', 'unit_kerja' => 'Kebun Lain']);
+    }
+
+    public function test_legacy_query_string_is_applied(): void
+    {
+        $this->seedLegacyUnit();
+
+        // An old bookmark of the controller-rendered directory opens with the same filter, sort and page.
+        $response = $this->get('/admin/employees?unit_kerja=Kebun%20Legacy&sort=jabatan&direction=desc&page=2')->assertOk();
+        $content = $response->getContent();
+
+        // jabatan desc: page 1 holds 25..06 (20 rows), page 2 holds 05..01.
+        foreach (['PGW-A05', 'PGW-A04', 'PGW-A03', 'PGW-A02', 'PGW-A01'] as $name) {
+            $response->assertSee($name);
+        }
+        $response->assertDontSee('PGW-A06')->assertDontSee('PGW-A25')->assertDontSee('PGW-LAIN');
+        $this->assertTrue(strpos($content, 'PGW-A05') < strpos($content, 'PGW-A01'), 'rows follow jabatan desc');
+
+        Livewire::withQueryParams(['unit_kerja' => 'Kebun Legacy', 'sort' => 'jabatan', 'direction' => 'desc', 'page' => 2])
+            ->test(EmployeeTable::class)
+            ->assertSet('unitKerja', 'Kebun Legacy')
+            ->assertSet('sortField', 'jabatan')
+            ->assertSet('sortDirection', 'desc')
+            ->assertSet('paginators.page', 2)
+            ->assertSee('PGW-A05')->assertDontSee('PGW-A06');
+    }
+
+    public function test_unknown_filter_values_are_ignored(): void
+    {
+        Employee::factory()->create(['nama' => 'PEGAWAI SATU', 'unit_kerja' => 'Kebun Satu']);
+        Employee::factory()->create(['nama' => 'PEGAWAI DUA', 'unit_kerja' => 'Kebun Dua']);
+
+        $tampered = [
+            'status_khusus' => 'drop',
+            'status_penugasan' => "x' OR 1=1 --",
+            'level' => 'Bogus',
+            'rm_level' => 'RM-9',
+            'unit_kerja' => 'Kebun Tidak Ada',
+            'jabatan' => 'Jabatan Tidak Ada',
+            'golongan' => 'ZZ/99',
+            'tahun_masuk' => 'abcd',
+            'bulan_masuk' => '13',
+        ];
+
+        DB::enableQueryLog();
+
+        Livewire::withQueryParams($tampered)
+            ->test(EmployeeTable::class)
+            ->assertSet('statusKhusus', '')
+            ->assertSet('statusPenugasan', '')
+            ->assertSet('level', '')
+            ->assertSet('rmLevel', '')
+            ->assertSet('unitKerja', '')
+            ->assertSet('jabatan', '')
+            ->assertSet('golongan', '')
+            ->assertSet('tahunMasuk', '')
+            ->assertSet('bulanMasuk', '')
+            ->assertSee('PEGAWAI SATU')
+            ->assertSee('PEGAWAI DUA')
+            ->set('statusKhusus', 'drop')
+            ->assertSet('statusKhusus', '')
+            ->assertSee('PEGAWAI SATU');
+
+        $bindings = collect(DB::getQueryLog())->pluck('bindings')->flatten()->map(fn ($b) => (string) $b);
+
+        foreach ($tampered as $value) {
+            $this->assertFalse($bindings->contains($value), "tampered value [{$value}] reached SQL");
+        }
+    }
+
+    public function test_tampered_sort_field_is_ignored(): void
+    {
+        Employee::factory()->create(['nama' => 'BUDI']);
+        Employee::factory()->create(['nama' => 'ANDI']);
+
+        $component = Livewire::withQueryParams(['sort' => 'tanggal_lahir; drop table employees', 'direction' => 'sideways'])
+            ->test(EmployeeTable::class)
+            ->assertSet('sortField', 'nama')
+            ->assertSet('sortDirection', 'asc')
+            ->assertSeeInOrder(['ANDI', 'BUDI']);
+
+        // Only the five whitelisted columns are sortable.
+        $component->call('sortBy', 'tanggal_lahir')->assertSet('sortField', 'nama');
+
+        foreach (['jabatan', 'rm_level', 'level', 'golongan', 'nama'] as $field) {
+            $component->call('sortBy', $field)->assertSet('sortField', $field);
+        }
+    }
+
+    public function test_level_is_a_chip_not_a_panel_field(): void
+    {
+        Employee::factory()->create(['nama' => 'PIMPINAN SATU', 'level' => 'Karpim']);
+        Employee::factory()->create(['nama' => 'PELAKSANA SATU', 'level' => 'Karpel']);
+
+        $html = Livewire::test(EmployeeTable::class)
+            ->set('level', 'Karpim')
+            ->assertSee('PIMPINAN SATU')
+            ->assertDontSee('PELAKSANA SATU')
+            ->html();
+
+        $this->assertStringContainsString('aria-label="Hapus filter Strata"', $html);
+        $this->assertStringNotContainsString('wire:model.live="level"', $html);
+        $this->assertStringContainsString('Filter Lanjutan', $html);
+
+        // The KPI cards link to ?level=..., which drives the component on page load.
+        $this->get(route('admin.employees.index', ['level' => 'Karpel']))
+            ->assertOk()
+            ->assertSee('PELAKSANA SATU')
+            ->assertDontSee('PIMPINAN SATU');
+    }
+
+    public function test_header_title_and_count(): void
+    {
+        Employee::factory()->count(3)->create();
+
+        $html = Livewire::test(EmployeeTable::class)->html();
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+
+        $this->assertStringContainsString('Direktori Pegawai', $html);
+        $this->assertStringStartsWith('3 Pegawai', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        // The selection count is announced by the page, not by a second count region inside the table.
+        $this->assertSame(1, substr_count($html, 'role="status"'), 'one count live region');
+    }
+
+    public function test_zero_results_show_reset(): void
+    {
+        Employee::factory()->create(['nama' => 'PEGAWAI ADA']);
+
+        Livewire::test(EmployeeTable::class)
+            ->set('search', 'tidak-ada-yang-cocok')
+            ->assertDontSee('PEGAWAI ADA')
+            ->assertSee('Tidak ada pegawai yang sesuai dengan pencarian atau filter.')
+            ->assertSee('wire:click="resetFilters"', false)
+            ->call('resetFilters')
+            ->assertSet('search', '')
+            ->assertSee('PEGAWAI ADA');
+    }
+
+    public function test_empty_directory_offers_first_employee_link(): void
+    {
+        Livewire::test(EmployeeTable::class)
+            ->assertSee('Belum ada data karyawan terdaftar di sistem.')
+            ->assertSee('Tambah Karyawan Pertama')
+            ->assertSee(route('admin.employees.create'), false);
+    }
+
+    public function test_pages_hold_twenty_rows(): void
+    {
+        Employee::factory()->count(21)->create();
+
+        $component = Livewire::test(EmployeeTable::class)->assertSet('perPage', 20);
+
+        $this->assertCount(20, $component->instance()->rows->items());
+        $this->assertSame(21, $component->instance()->rows->total());
+    }
+
+    public function test_search_uses_the_omnisearch_scope(): void
+    {
+        Employee::factory()->create(['nik' => '99887766', 'nama' => 'BAMBANG HERMANTO', 'jabatan' => 'Kepala Tata Usaha', 'unit_kerja' => 'PKS Rimba Belian']);
+        Employee::factory()->create(['nama' => 'CITRA LESTARI', 'jabatan' => 'Mandor Panen', 'unit_kerja' => 'Kebun Lain']);
+
+        $component = Livewire::test(EmployeeTable::class);
+
+        foreach (['99887766', 'HERMANTO', 'Tata Usaha', 'Rimba Belian'] as $term) {
+            $component->set('search', $term)->assertSee('BAMBANG')->assertDontSee('CITRA LESTARI');
+        }
+
+        // Matches are highlighted on Livewire updates too, not only on the first page load.
+        $component->set('search', 'HERMANTO')->assertSee('<mark', false);
+    }
+
+    public function test_filters_apply_like_the_old_controller(): void
+    {
+        $sanksi = Employee::factory()->create(['nama' => 'PEGAWAI SANKSI', 'tanggal_berakhir_sanksi' => now()->addDays(10)->toDateString(), 'tmt_bekerja' => '2015-03-10']);
+        $rangkap = Employee::factory()->create(['nama' => 'PEGAWAI RANGKAP', 'tmt_bekerja' => '2018-07-01']);
+        $rangkap->jobHistories()->create([
+            'jabatan' => 'Plt. Manajer',
+            'unit_kerja' => 'Kantor Regional',
+            'status_penugasan' => 'Plt',
+            'tmt_awal' => now()->subMonth(),
+            'status_riwayat' => 'Aktif',
+        ]);
+
+        Livewire::test(EmployeeTable::class)
+            ->set('statusKhusus', 'sanksi')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
+            ->set('statusKhusus', 'rangkap')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
+            ->set('statusKhusus', '')
+            ->set('statusPenugasan', 'sementara')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
+            ->set('statusPenugasan', 'definitif')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
+            ->set('statusPenugasan', 'Plt')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
+            ->set('statusPenugasan', '')
+            ->set('tahunMasuk', '2015')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
+            ->set('tahunMasuk', '')
+            ->set('bulanMasuk', '07')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI');
+
+        // Unpadded month values from older links keep working.
+        Livewire::withQueryParams(['bulan_masuk' => '3'])
+            ->test(EmployeeTable::class)
+            ->assertSet('bulanMasuk', '03')
+            ->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP');
+    }
+
+    public function test_row_actions_and_legacy_bulk_controls_are_kept(): void
+    {
+        $employee = Employee::factory()->create(['nik' => '12345678', 'nama' => 'PEGAWAI AKSI']);
+
+        $html = Livewire::test(EmployeeTable::class)->html();
+
+        $this->assertStringContainsString(route('admin.employees.show', $employee->nik), $html);
+        $this->assertStringContainsString(route('admin.employees.edit', $employee->nik), $html);
+        $this->assertStringContainsString(route('admin.mutasi.create', ['nik' => $employee->nik]), $html);
+        $this->assertStringContainsString(route('admin.employees.destroy', $employee->nik), $html);
+        $this->assertStringContainsString('aria-label="Pilih PEGAWAI AKSI"', $html);
+        $this->assertStringContainsString('aria-label="Pilih semua pegawai di halaman ini"', $html);
+        $this->assertStringContainsString('action="'.route('admin.employees.export').'"', $html);
+    }
+
+    public function test_legacy_export_form_carries_the_current_table_state(): void
+    {
+        Employee::factory()->create(['nama' => 'PEGAWAI EKSPOR', 'unit_kerja' => 'Kebun Ekspor', 'rm_level' => 'RM-2']);
+
+        $html = Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Ekspor')
+            ->set('rmLevel', 'RM-2')
+            ->set('search', 'EKSPOR')
+            ->html();
+
+        $this->assertStringContainsString('name="unit_kerja" value="Kebun Ekspor"', $html);
+        $this->assertStringContainsString('name="rm_level" value="RM-2"', $html);
+        $this->assertStringContainsString('name="search" value="EKSPOR"', $html);
+    }
+
+    public function test_non_admin_is_refused(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'user']));
+
+        Livewire::test(EmployeeTable::class)->assertForbidden();
+    }
+}
