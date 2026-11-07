@@ -35,35 +35,21 @@
         <!-- Formasi jabatan: judul, pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan daftar unit dan modul Pegawai) -->
         <div class="bg-white rounded-2xl border border-surface-200/80 shadow-xs overflow-hidden">
             <div wire:loading.delay wire:target="seatQuery,rmFilter,bidangFilter,seatStatusFilter,toggleOverQuotaFilter,resetSeatFilters,sortBy" class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
-            <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ $filteredSeats->count() }} jabatan ditemukan</div>
-
-            <div class="px-5 py-3 border-b border-surface-200 flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <h2 class="text-sm font-bold text-surface-900">Formasi Jabatan — {{ $unit->nama }}</h2>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-700">{{ $this->hasSeatFilters() ? $filteredSeats->count().' dari '.$seats->count() : $seats->count() }} Jabatan</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi">Ekspor</x-admin.button>
-                    <x-admin.button size="sm" icon="fas fa-plus" wire:click="openAddSeat">Tambah Jabatan</x-admin.button>
-                </div>
+            {{-- Shared toolbar and header; Tambah Jabatan and Ekspor stay with the list they act on. --}}
+            <div class="px-5 pt-3 flex flex-wrap items-center justify-end gap-2">
+                <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi">Ekspor</x-admin.button>
+                <x-admin.button size="sm" icon="fas fa-plus" wire:click="openAddSeat">Tambah Jabatan</x-admin.button>
             </div>
-
-            <div class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200">
-                <div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-                    <x-admin.search-input model="seatQuery" shortcut="/" placeholder="Cari nama jabatan..." containerClass="relative flex-1 min-w-[260px]" />
-                    <div class="flex flex-wrap items-center gap-2">
-                        <x-admin.filter-select id="formasi-filter-rm" model="rmFilter" label="RM Band" all-label="Semua RM Band" icon="fas fa-layer-group" :options="array_combine(array_keys($rmList), array_keys($rmList))" min-width="min-w-[160px]" />
-                        <x-admin.filter-select id="formasi-filter-bidang" model="bidangFilter" label="Bidang" all-label="Semua Bidang" icon="fas fa-sitemap" :options="$bidangList" min-width="min-w-[190px]" />
-                        <x-admin.filter-select id="formasi-filter-seat-status" model="seatStatusFilter" label="Status" all-label="Semua Status" icon="fas fa-toggle-on"
-                            :options="$seatStateOptions" min-width="min-w-[170px]" />
-                        @if ($this->hasSeatFilters())
-                            <button type="button" wire:click="resetSeatFilters" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-danger-50 hover:text-danger-700 text-surface-600 border border-surface-300 hover:border-danger-200 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap" title="Reset semua filter">
-                                <i class="fas fa-rotate-left text-[11px]" aria-hidden="true"></i><span class="hidden sm:inline">Reset</span>
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
+            <x-admin.table.toolbar
+                table-id="formasi-seats"
+                search-model="seatQuery"
+                reset-action="resetSeatFilters"
+                :filters="$seatFilters"
+                :filter-values="$seatFilterValues"
+                :has-active-filters="$this->hasSeatFilters()"
+                :search="$seatQuery"
+                search-placeholder="Cari nama jabatan..." />
+            <x-admin.table.header :title="'Formasi Jabatan — '.$unit->nama" :paginator="$pagedSeats" noun="Jabatan" />
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs">
@@ -178,24 +164,21 @@
 
         <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Pegawai) -->
         <div class="bg-white rounded-2xl border border-surface-200 shadow-xs overflow-hidden">
-            <div wire:loading.delay wire:target="unitQuery,wilayahFilter,statusFilter,sortBy" class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
-            <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ $this->filteredOverview->count() }} unit ditemukan</div>
-
-            <div class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200">
-                <div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-                    <x-admin.search-input model="unitQuery" shortcut="/" placeholder="Cari nama unit kerja..." containerClass="relative flex-1 min-w-[260px]" />
-                    <div class="flex flex-wrap items-center gap-2">
-                        <x-admin.filter-select id="formasi-filter-wilayah" model="wilayahFilter" label="Wilayah" all-label="Semua Wilayah" icon="fas fa-location-dot" :options="array_combine($wilayahList, $wilayahList)" min-width="min-w-[200px]" />
-                        <x-admin.filter-select id="formasi-filter-status" model="statusFilter" label="Status" all-label="Semua Status" icon="fas fa-toggle-on" :options="['active' => 'Aktif', 'inactive' => 'Nonaktif']" />
-                        @if ($this->hasUnitFilters())
-                            <button type="button" wire:click="resetUnitFilters" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-danger-50 hover:text-danger-700 text-surface-600 border border-surface-300 hover:border-danger-200 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap" title="Reset semua filter">
-                                <i class="fas fa-rotate-left text-[11px]" aria-hidden="true"></i><span class="hidden sm:inline">Reset</span>
-                            </button>
-                        @endif
-                    </div>
-                    <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi" class="lg:ml-auto">Ekspor</x-admin.button>
-                </div>
+            <div wire:loading.delay wire:target="unitQuery,wilayahFilter,statusFilter,resetUnitFilters,sortBy" class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
+            {{-- Shared toolbar and header; the Ekspor action stays with the list it exports. --}}
+            <div class="px-5 pt-3 flex justify-end">
+                <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi">Ekspor</x-admin.button>
             </div>
+            <x-admin.table.toolbar
+                table-id="formasi-units"
+                search-model="unitQuery"
+                reset-action="resetUnitFilters"
+                :filters="$unitFilters"
+                :filter-values="$unitFilterValues"
+                :has-active-filters="$this->hasUnitFilters()"
+                :search="$unitQuery"
+                search-placeholder="Cari nama unit kerja..." />
+            <x-admin.table.header title="Daftar Unit Kerja" :paginator="$this->pagedOverview" noun="Unit Kerja" />
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs">
