@@ -123,8 +123,10 @@ class MutasiHistory extends Component
             ))
                 ->icon('fas fa-tag')
                 ->apply(fn (Builder $query, string $value) => $query->where('jenis_mutasi', $value)),
+            // The KPI cards are the control for this filter; the toolbar only shows it as a removable chip.
             Filter::select('statusFilter', 'Status', $this->statusOptions())
                 ->icon('fas fa-flag')
+                ->withoutControl()
                 ->apply(fn (Builder $query, string $value) => $query->byStatus($value)),
             Filter::select('sumberFilter', 'Sumber Catatan', $sumberOptions)
                 ->icon('fas fa-layer-group')
