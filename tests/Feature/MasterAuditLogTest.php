@@ -234,6 +234,109 @@ class MasterAuditLogTest extends TestCase
             ->assertSee('Kebun Tajati — Manajer');
     }
 
+    public function test_history_keeps_its_url_keys(): void
+    {
+        $other = User::factory()->create(['role' => 'admin', 'name' => 'Admin Lain']);
+
+        foreach (range(1, 55) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, sprintf('Seat Nomor %02d', $i));
+        }
+        MasterAuditLog::record($this->admin, 'unit.created', 'unit', 100, 'Unit Bukan Seat');
+        MasterAuditLog::record($other, 'seat.added', 'seat', 101, 'Seat Dari Lain');
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index', [
+            'entity_type' => 'seat',
+            'user_id' => $this->admin->id,
+            'from' => '2000-01-01',
+            'to' => '2099-12-31',
+            'sort' => 'entity_label',
+            'direction' => 'asc',
+            'per_page' => 50,
+            'page' => 2,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Seat Nomor 51')->assertSee('Seat Nomor 55')
+            ->assertDontSee('Seat Nomor 50')
+            ->assertDontSee('Unit Bukan Seat')->assertDontSee('Seat Dari Lain');
+    }
+
+    public function test_history_ignores_tampered_url_state(): void
+    {
+        foreach (range(1, 30) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, "Unit Uji — Jabatan {$i}", null, ['kuota' => 1]);
+        }
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index', [
+            'sort' => 'password',
+            'direction' => 'sideways',
+            'per_page' => 999,
+            'entity_type' => 'zzz',
+            'user_id' => 'abc',
+            'from' => '2026-02-30',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Jabatan 30')->assertSee('Jabatan 6')->assertDontSee('Jabatan 5')
+            ->assertDontSee('Filter Aktif:');
+    }
+
+    public function test_history_date_range_includes_the_whole_end_day(): void
+    {
+        $last = MasterAuditLog::record($this->admin, 'unit.created', 'unit', 1, 'Hari Akhir Audit');
+        $next = MasterAuditLog::record($this->admin, 'unit.created', 'unit', 2, 'Hari Esok Audit');
+        DB::table('master_audit_logs')->where('id', $last->id)->update(['created_at' => '2026-01-31 23:59:00']);
+        DB::table('master_audit_logs')->where('id', $next->id)->update(['created_at' => '2026-02-01 00:00:00']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['from' => '2026-01-01', 'to' => '2026-01-31']))
+            ->assertSee('Hari Akhir Audit')
+            ->assertDontSee('Hari Esok Audit');
+    }
+
+    public function test_history_from_after_to_shows_the_filtered_empty_state(): void
+    {
+        $this->log();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['from' => '2020-02-01', 'to' => '2020-01-01']))
+            ->assertOk()
+            ->assertSee('Tidak ada data yang sesuai dengan pencarian atau filter.')
+            ->assertSee('Reset filter');
+    }
+
+    public function test_history_search_treats_wildcards_literally(): void
+    {
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Seat_1');
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 2, 'SeatX1');
+
+        Livewire::actingAs($this->admin)->test(AuditHistory::class)
+            ->set('search', 'Seat_1')
+            ->assertSee('Seat_1')
+            ->assertDontSee('SeatX1');
+    }
+
+    public function test_history_shows_active_filter_chips(): void
+    {
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Unit A — Seat Satu');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['entity_type' => 'seat']))
+            ->assertSee('Filter Aktif:')
+            ->assertSee('Jenis Data: Formasi Jabatan');
+    }
+
+    public function test_history_announces_the_result_count(): void
+    {
+        foreach (range(1, 3) as $i) {
+            MasterAuditLog::record($this->admin, 'unit.created', 'unit', $i, "Unit Hitung {$i}");
+        }
+
+        $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))
+            ->assertSee('3 catatan ditemukan')
+            ->assertSeeHtml('role="status"');
+    }
+
     public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void
     {
         $html = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))->getContent();
