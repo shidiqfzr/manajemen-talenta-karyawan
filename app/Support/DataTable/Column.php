@@ -27,6 +27,7 @@ final class Column
         private readonly ?string $exportHeading = null,
         private readonly ?Closure $exportValue = null,
         private readonly bool $exportOnly = false,
+        public readonly ?string $width = null,
     ) {}
 
     public static function make(string $key, string $label): self
@@ -53,6 +54,12 @@ final class Column
         }
 
         return $this->with(alignment: $align);
+    }
+
+    /** Developer-supplied class string added to this column's header cell (e.g. `w-[18%]`). */
+    public function width(string $classes): self
+    {
+        return $this->with(width: $classes);
     }
 
     public function mono(): self

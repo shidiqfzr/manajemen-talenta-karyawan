@@ -11,6 +11,7 @@ use Tests\Fixtures\DataTable\FixtureTable;
 use Tests\Fixtures\DataTable\FixtureTableBooleanFilter;
 use Tests\Fixtures\DataTable\FixtureTableDateFilter;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
+use Tests\Fixtures\DataTable\FixtureTableWidth;
 use Tests\TestCase;
 
 /**
@@ -47,6 +48,12 @@ class TableComponentsTest extends TestCase
             ->assertSeeHtmlInOrder(['aria-sort="descending"', "wire:click=\"sortBy('nama')\""])
             ->call('sortBy', 'nilai')
             ->assertSeeHtmlInOrder(["wire:click=\"sortBy('nama')\"", 'aria-sort="ascending"', "wire:click=\"sortBy('nilai')\""]);
+    }
+
+    public function test_header_applies_column_width_classes(): void
+    {
+        Livewire::test(FixtureTableWidth::class)->assertSeeHtml('w-[30%]');
+        Livewire::test(FixtureTable::class)->assertDontSeeHtml('w-[30%]');
     }
 
     public function test_toolbar_renders_labelled_date_inputs(): void
