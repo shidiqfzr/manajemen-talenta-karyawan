@@ -79,6 +79,15 @@ class MutasiHistory extends Component
             ->when($this->sumber() === 'resmi', fn (Builder $query) => $query->bySumber('resmi'));
     }
 
+    /**
+     * The summary total follows the chosen source scope (the same number the Total KPI card shows), so picking
+     * "Impor Excel" reads "12 dari 340 riwayat", not "12 dari" the count of every source.
+     */
+    protected function unfilteredQuery(): Builder
+    {
+        return JobHistory::query()->bySumber($this->sumber());
+    }
+
     protected function columns(): array
     {
         return [
