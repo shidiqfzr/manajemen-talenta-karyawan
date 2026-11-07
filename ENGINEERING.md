@@ -115,10 +115,12 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
    ```
 
 ### 2.3 Livewire Component Standards
-- Setiap komponen tabel Livewire (`App\Livewire\Tables\`) harus mendukung:
-  - Debounce pada input pencarian: `wire:model.live.debounce.300ms="search"`.
-  - Pagination dinamis (`WithPagination`) dengan URL query string persistence.
-  - State reset saat filter berubah: `public function updatingSearch() { $this->resetPage(); }`.
+- Setiap komponen tabel data Livewire **wajib** memakai trait `App\Livewire\Concerns\WithDataTable` dan komponen `x-admin.table.*` (DESIGN.md §6, §7.5). Modul hanya mendeklarasikan `baseQuery()`, `columns()` (`Column`), `filters()` (`Filter`), `bulkActions()` (`BulkAction`), `defaultSort()`, dan `tableLabel()`. **Dilarang** menulis ulang `sortBy`, `updatingSearch`, `updatingPerPage`, atau `orderBy($this->sortField)` di modul: urutan, pencarian, filter, dan jumlah baris per halaman divalidasi di trait.
+  - Debounce pencarian 300ms dan batas 100 karakter disediakan toolbar (`wire:model.live.debounce.300ms="search"`); jangan membuat kolom pencarian sendiri.
+  - URL query string: `search`, `sort`, `direction`, `per_page` dikelola trait; properti filter modul memakai `#[Url(as: '...', except: '')]`. Tabel sematan (beberapa tabel dalam satu halaman) menonaktifkan sinkronisasi URL (`syncsUrl()` false) dan memakai `paginationName()` yang unik.
+  - Aksi massal dan ekspor: izin Gate diperiksa pada setiap panggilan sebelum ada query, aksi massal dijalankan dalam `DB::transaction()` bersama catatan audit, dan keduanya tercatat lewat `MasterAuditLog` tanpa kata kunci pencarian. Ekspor hanya Excel dengan batas 10.000 baris; sel berawalan `=`, `+`, `-`, `@` dinetralkan.
+  - Properti publik Livewire dapat diubah klien: ID induk tabel (mis. `employeeId`) **wajib** `#[Locked]`, dan metode yang mengembalikan Builder atau penangan aksi massal (`bulk<Nama>`) **wajib** `protected`.
+  - Pengujian: perilaku trait di `WithDataTableTest`, komponen di `TableComponentsTest`, dan satu kelas uji per tabel modul.
 
 ### 2.4 Prinsip DRY (Don't Repeat Yourself) & Reusability
 Prinsip DRY adalah fondasi utama arsitektur aplikasi ini. Dilarang keras melakukan penyalinan (copy-paste) kode secara masif baik di Backend maupun Frontend.
