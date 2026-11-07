@@ -153,6 +153,84 @@ class TableComponentsTest extends TestCase
             ->assertDontSeeHtml('data-filter-count');
     }
 
+    /** Visible text of the rendered component with whitespace collapsed, for asserting on summary copy. */
+    private function plainText(string $html): string
+    {
+        return trim(preg_replace('/\s+/', ' ', strip_tags($html)));
+    }
+
+    public function test_summary_shows_the_total_when_nothing_is_filtered(): void
+    {
+        $html = Livewire::test(FixtureTable::class)->html();
+
+        $this->assertStringContainsString('30 data', $this->plainText($html));
+        $this->assertStringNotContainsString('sesuai filter', $html);
+        $this->assertStringNotContainsString('Filter Aktif:', $html);
+        $this->assertStringNotContainsString('Reset filter', $html);
+        $this->assertMatchesRegularExpression('/<strong class="font-semibold text-surface-900">30<\/strong> data/', $html);
+    }
+
+    public function test_summary_counts_results_against_the_unfiltered_total(): void
+    {
+        $html = Livewire::test(FixtureTableDateFilter::class)->set('bidang', 'KEU')->html();
+
+        $this->assertStringContainsString('15 dari 30 data sesuai filter', $this->plainText($html));
+        $this->assertMatchesRegularExpression('/<strong class="font-semibold text-surface-900">15<\/strong> dari 30 data sesuai filter/', $html);
+    }
+
+    public function test_summary_works_for_search_only_and_controlless_filters(): void
+    {
+        $searchOnly = Livewire::test(FixtureTable::class)->set('search', 'Pegawai 1')->html();
+        $this->assertStringContainsString('dari 30 data sesuai filter', $this->plainText($searchOnly));
+        $this->assertStringContainsString('Pencarian: Pegawai 1', $searchOnly);
+        $this->assertStringContainsString('Reset filter', $searchOnly);
+
+        $controlless = Livewire::test(FixtureTableControlless::class)->set('bidang', 'KEU')->html();
+        $this->assertStringContainsString('15 dari 30 data sesuai filter', $this->plainText($controlless));
+        $this->assertStringContainsString('Bidang: KEU', $controlless);
+        $this->assertStringContainsString('Reset filter', $controlless);
+        $this->assertStringNotContainsString('data-filter-count', $controlless);
+    }
+
+    public function test_summary_without_a_total_omits_the_dari_part(): void
+    {
+        $html = Livewire::test(FixtureToolbarOnly::class, ['resultCount' => 7])->set('search', 'x')->html();
+
+        $this->assertStringContainsString('7 catatan sesuai filter', $this->plainText($html));
+        $this->assertStringNotContainsString(' dari ', $this->plainText($html));
+    }
+
+    public function test_summary_bar_stays_visible_and_panel_has_no_reset(): void
+    {
+        $html = Livewire::test(FixtureTableDateFilter::class)->set('bidang', 'KEU')->html();
+
+        $this->assertStringNotContainsString('x-show="! open"', $html, 'the summary stays visible while the panel is open');
+        $this->assertSame(1, substr_count($html, 'Reset filter'), 'one Reset button, in the summary bar');
+        $this->assertGreaterThan(strpos($html, '15</strong>'), strpos($html, 'Reset filter'), 'Reset follows the count text');
+
+        preg_match('/aria-controls="([^"]+)"/', $html, $panelId);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+        $panel = (new \DOMXPath($dom))->query('//*[@id="'.$panelId[1].'"]')->item(0);
+        $this->assertNotNull($panel);
+        $this->assertStringNotContainsString('Reset filter', $panel->textContent, 'the panel no longer carries a Reset button');
+    }
+
+    public function test_summary_announces_the_count_in_one_live_region(): void
+    {
+        $html = Livewire::test(FixtureTable::class)->html();
+
+        $this->assertSame(1, substr_count($html, 'role="status"'));
+        $this->assertMatchesRegularExpression('/<p role="status" aria-live="polite" aria-atomic="true"[^>]*>.*?30.*?data.*?<\/p>/s', $html);
+    }
+
+    public function test_summary_formats_thousands_with_a_dot(): void
+    {
+        $html = Livewire::test(FixtureToolbarOnly::class, ['resultCount' => 1240])->html();
+
+        $this->assertStringContainsString('1.240 catatan', $this->plainText($html));
+    }
+
     public function test_export_sits_in_the_search_row_without_a_title(): void
     {
         $html = Livewire::test(FixtureToolbarOnly::class)->html();
@@ -372,10 +450,10 @@ class TableComponentsTest extends TestCase
     {
         Livewire::test(FixtureTable::class)
             ->assertDontSeeHtml('role="alert"')
-            ->assertDontSeeHtml('role="status"')
+            ->assertDontSeeHtml('<div role="status"')
             ->set('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal.'])
             ->assertSeeHtml('role="alert"')
-            ->assertDontSeeHtml('role="status"')
+            ->assertDontSeeHtml('<div role="status"')
             ->assertSee('Tindakan gagal.')
             ->assertSeeHtml('aria-label="Tutup pemberitahuan"')
             ->assertSeeHtml("wire:click=\"\$set('tableNotice', null)\"")
@@ -383,7 +461,7 @@ class TableComponentsTest extends TestCase
             ->assertSeeHtml('role="alert"')
             ->assertSeeHtml('bg-warning-50')
             ->set('tableNotice', ['type' => 'success', 'message' => '2 data berhasil diproses.'])
-            ->assertSeeHtml('role="status"')
+            ->assertSeeHtml('<div role="status"')
             ->assertDontSeeHtml('role="alert"')
             ->set('tableNotice', null)
             ->assertDontSee('2 data berhasil diproses.');
@@ -399,7 +477,7 @@ class TableComponentsTest extends TestCase
             ->assertDontSeeHtml('onclick="x')
             ->assertSee('<script>alert(1)</script>')
             ->set('tableNotice', ['type' => 'success', 'message' => ['not', 'a', 'string']])
-            ->assertDontSeeHtml('role="status"')
+            ->assertDontSeeHtml('<div role="status"')
             ->assertOk();
     }
 

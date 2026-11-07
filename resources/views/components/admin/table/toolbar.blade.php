@@ -25,7 +25,13 @@
     filter-values   : [properti => nilai] filter yang sedang aktif, untuk hitungan tombol Filter, saklar, dan chip.
     search          : kata kunci pencarian saat ini ($search), untuk chip "Pencarian".
     search-shortcut : tombol pintas fokus pencarian; null untuk tabel sematan agar tidak berebut pintasan.
+    result-count    : jumlah baris hasil saat ini ($rows->total()); bila diisi, bilah ringkasan menampilkan jumlah data.
+    total-count     : jumlah data tanpa pencarian/filter ($this->unfilteredCount) saat ada filter aktif, selain itu null;
+                      memunculkan "12 dari 339 ... sesuai filter".
+    noun            : sebutan data pada ringkasan (mis. catatan, riwayat); sama dengan noun penomoran.
     Tabel tanpa filter hanya menampilkan pencarian: tidak ada tombol Filter dan tidak ada panel.
+    Bilah ringkasan (di bawah panel, selalu terlihat): jumlah data pada wilayah live permanen (role="status"), chip
+    "Filter Aktif", dan tombol Reset filter di kanan. Modul tidak boleh menambah wilayah pengumuman jumlah sendiri.
 --}}
 @props([
     'tableId' => 'table',
@@ -36,6 +42,9 @@
     'search' => '',
     'searchPlaceholder' => 'Cari...',
     'searchShortcut' => '/',
+    'resultCount' => null,
+    'totalCount' => null,
+    'noun' => 'data',
 ])
 
 @php
@@ -44,6 +53,20 @@
     $selectFilters = $ofType($controlFilters, ['select']);
     $booleanFilters = $ofType($controlFilters, ['boolean']);
     $dateFilters = $ofType($controlFilters, ['date_from', 'date_to']);
+    $formatCount = fn (int $number) => number_format($number, 0, ',', '.');
+    // Count sentence built here (not with inline @if) so the live region stays one plain text node:
+    // "339 riwayat" when nothing is filtered, "12 dari 339 riwayat sesuai filter" otherwise.
+    $countLead = '';
+    $countRest = '';
+    if ($resultCount !== null) {
+        if ($hasActiveFilters) {
+            $countLead = $formatCount($resultCount);
+            $countRest = ($totalCount !== null ? ' dari '.$formatCount($totalCount) : '').' '.$noun.' sesuai filter';
+        } else {
+            $countLead = $formatCount($totalCount ?? $resultCount);
+            $countRest = ' '.$noun;
+        }
+    }
     $hasPanel = $controlFilters !== [];
     $panelId = $tableId.'-filter-panel';
     $panelCount = count(array_filter($controlFilters, fn ($filter) => (string) ($filterValues[$filter->property] ?? '') !== ''));
@@ -152,36 +175,38 @@
                 </div>
             @endif
 
-            @if ($hasActiveFilters)
-                <div class="mt-3 flex justify-end">
-                    <button type="button" wire:click="resetFilters" class="{{ $resetClass }}">
-                        <i class="fas fa-rotate-left text-[11px]" aria-hidden="true"></i>
-                        <span>Reset filter</span>
-                    </button>
-                </div>
-            @endif
         </div>
     @endif
 
-    @if ($hasActiveFilters && ($search !== '' || $activeChips !== []))
-        <div x-show="! open" class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-surface-500">Filter Aktif:</span>
-            @if ($search !== '')
-                <button type="button" wire:key="{{ $tableId }}-active-search" wire:click="$set('search', '')" aria-label="Hapus filter Pencarian"
-                    class="{{ $chipBase }} bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100">
-                    <span>Pencarian: {{ $search }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+    {{-- Summary bar: result count (permanent live region), active filter chips, and Reset on the right. Always visible, panel open or closed. --}}
+    @if ($resultCount !== null || $hasActiveFilters)
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            @if ($resultCount !== null)
+                <p role="status" aria-live="polite" aria-atomic="true" class="text-xs text-surface-600"><strong class="font-semibold text-surface-900">{{ $countLead }}</strong>{{ $countRest }}</p>
+            @endif
+
+            @if ($hasActiveFilters && ($search !== '' || $activeChips !== []))
+                <span class="text-xs font-medium text-surface-500">Filter Aktif:</span>
+                @if ($search !== '')
+                    <button type="button" wire:key="{{ $tableId }}-active-search" wire:click="$set('search', '')" aria-label="Hapus filter Pencarian"
+                        class="{{ $chipBase }} bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100">
+                        <span>Pencarian: {{ $search }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                    </button>
+                @endif
+                @foreach ($activeChips as $chip)
+                    <button type="button" wire:key="{{ $tableId }}-active-{{ $chip['property'] }}" wire:click="$set('{{ $chip['property'] }}', '')" aria-label="Hapus filter {{ $chip['label'] }}"
+                        class="{{ $chipClass }}">
+                        <span>{{ $chip['text'] }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
+                    </button>
+                @endforeach
+            @endif
+
+            @if ($hasActiveFilters)
+                <button type="button" wire:click="resetFilters" class="{{ $resetClass }} ml-auto">
+                    <i class="fas fa-rotate-left text-[11px]" aria-hidden="true"></i>
+                    <span>Reset filter</span>
                 </button>
             @endif
-            @foreach ($activeChips as $chip)
-                <button type="button" wire:key="{{ $tableId }}-active-{{ $chip['property'] }}" wire:click="$set('{{ $chip['property'] }}', '')" aria-label="Hapus filter {{ $chip['label'] }}"
-                    class="{{ $chipClass }}">
-                    <span>{{ $chip['text'] }}</span><i class="fas fa-times text-[10px]" aria-hidden="true"></i>
-                </button>
-            @endforeach
-            <button type="button" wire:click="resetFilters" class="{{ $chipBase }} bg-white text-surface-600 border-surface-300 hover:bg-danger-50 hover:text-danger-700 hover:border-danger-200">
-                <i class="fas fa-rotate-left text-[10px]" aria-hidden="true"></i>
-                <span>Reset filter</span>
-            </button>
         </div>
     @endif
 </div>
