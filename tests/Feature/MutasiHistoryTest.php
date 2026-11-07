@@ -85,6 +85,32 @@ class MutasiHistoryTest extends TestCase
         $this->assertSame(1, $semua);
     }
 
+    public function test_export_uses_a_given_query_instead_of_rebuilding_filters(): void
+    {
+        $emp = Employee::factory()->create(['jabatan' => 'Asisten', 'unit_kerja' => 'Kebun Danau Salak']);
+        foreach (['SK/101/2026', 'SK/102/2026'] as $sk) {
+            JobHistory::create([
+                'employee_nik' => $emp->nik, 'jabatan' => 'Manajer Kebun', 'unit_kerja' => 'Kebun Danau Salak',
+                'tmt_awal' => now()->subMonth()->toDateString(), 'jenis_mutasi' => 'PROMOSI', 'nomor_sk' => $sk,
+                'status_penugasan' => 'Definitif', 'is_applied' => true,
+            ]);
+        }
+
+        $given = JobHistory::query()->where('nomor_sk', 'SK/101/2026');
+        $export = new MutasiHistoryExport(['sumber' => 'resmi'], null, $given);
+
+        $this->assertSame(2, (new MutasiHistoryExport(['sumber' => 'resmi']))->query()->count());
+        $this->assertSame(1, $export->query()->count());
+    }
+
+    public function test_export_without_a_query_still_builds_from_filters(): void
+    {
+        Employee::factory()->create(['jabatan' => 'Asisten', 'unit_kerja' => 'Kebun Danau Salak']);
+
+        $this->assertSame(1, (new MutasiHistoryExport(['sumber' => 'semua'], null, null))->query()->count());
+        $this->assertSame(0, (new MutasiHistoryExport(['sumber' => 'resmi'], null, null))->query()->count());
+    }
+
     public function test_export_labels_the_source_of_every_row_and_states_its_scope(): void
     {
         $emp = Employee::factory()->create(['nama' => 'Siti Data Awal', 'jabatan' => 'Asisten', 'unit_kerja' => 'Kebun Danau Salak']);

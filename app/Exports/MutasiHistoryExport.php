@@ -6,6 +6,7 @@ use App\Models\JobHistory;
 use App\Models\User;
 use App\Services\MutasiService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -25,10 +26,13 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
 
     protected ?User $user;
 
+    protected ?Builder $query;
+
     protected int $rowNumber = 0;
 
-    public function __construct(array $filters = [], ?User $user = null)
+    public function __construct(array $filters = [], ?User $user = null, ?Builder $query = null)
     {
+        $this->query = $query;
         $this->filters = $filters;
         $this->user = $user;
     }
@@ -76,6 +80,11 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
      */
     public function query()
     {
+        // A prebuilt query (for example the shared table's filtered rows) takes precedence over $filters.
+        if ($this->query !== null) {
+            return $this->query;
+        }
+
         /** @var MutasiService $service */
         $service = app(MutasiService::class);
 

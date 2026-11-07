@@ -13,8 +13,11 @@ use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
 use RuntimeException;
+use Tests\Fixtures\DataTable\FixtureCustomExport;
 use Tests\Fixtures\DataTable\FixtureRow;
 use Tests\Fixtures\DataTable\FixtureTable;
+use Tests\Fixtures\DataTable\FixtureTableCustomExport;
+use Tests\Fixtures\DataTable\FixtureTableCustomExportSmallLimit;
 use Tests\Fixtures\DataTable\FixtureTableNoExport;
 use Tests\Fixtures\DataTable\FixtureTableNoUrl;
 use Tests\Fixtures\DataTable\FixtureTableOddPerPage;
@@ -478,6 +481,30 @@ class WithDataTableTest extends TestCase
             ['jumlah_baris' => 20, 'filter' => ['bidang' => 'KEU'], 'pencarian' => false],
             $log->new_values,
         );
+    }
+
+    public function test_export_uses_the_module_file_name_and_export_class(): void
+    {
+        Excel::fake();
+        FixtureRow::query()->where('nilai', '>', 20)->update(['bidang' => 'KEU']);
+
+        Livewire::test(FixtureTableCustomExport::class)->set('bidang', 'KEU')->call('export');
+
+        Excel::assertDownloaded('berkas-khusus.xlsx', fn ($e) => $e instanceof FixtureCustomExport && $e->query()->count() === 20);
+        $this->assertSame(1, MasterAuditLog::where('action', 'data_table.export')->count());
+
+        // Permission and limit checks still run before the module's workbook is built.
+        $this->actingAs(User::factory()->create(['role' => 'staff']));
+        Livewire::test(FixtureTableCustomExport::class)
+            ->call('export')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
+
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        Livewire::test(FixtureTableCustomExportSmallLimit::class)
+            ->call('export')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Data terlalu besar untuk diekspor. Persempit filter terlebih dahulu.']);
+
+        $this->assertSame(1, MasterAuditLog::where('action', 'data_table.export')->count());
     }
 
     public function test_export_respects_selection(): void
