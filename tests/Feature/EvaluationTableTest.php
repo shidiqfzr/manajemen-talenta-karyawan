@@ -64,15 +64,18 @@ class EvaluationTableTest extends TestCase
         return Livewire::test(EvaluationTable::class, ['employeeId' => $this->employee->nik]);
     }
 
-    public function test_summary_shows_the_row_count(): void
+    public function test_header_shows_the_row_count_without_title_or_export(): void
     {
         $total = $this->table()->instance()->rows->total();
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($this->table()->html())));
-        $this->assertStringContainsString($total.' evaluasi', $text);
-        $this->assertStringNotContainsString('sesuai filter', $text);
+        $html = $this->table()->html();
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
 
-        $filtered = trim(preg_replace('/\s+/', ' ', strip_tags($this->table()->set('search', 'Bidang 01')->html())));
-        $this->assertStringContainsString('1 dari '.$total.' evaluasi sesuai filter', $filtered);
+        $this->assertStringStartsWith($total.' Evaluasi', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringNotContainsString('Ekspor Excel', $html);
+        $this->assertStringNotContainsString('text-sm font-bold text-surface-900', $html, 'embedded tables have no header title');
+
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $this->table()->set('search', 'Bidang 01')->html(), $filtered);
+        $this->assertStringStartsWith('1 Evaluasi', trim(preg_replace('/\s+/', ' ', strip_tags($filtered[1]))));
     }
 
     public function test_lists_only_this_employees_records(): void

@@ -198,56 +198,53 @@ class MutasiHistoryTest extends TestCase
         $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class);
         $html = $component->html();
 
-        // One permanent live region, owned by the shared toolbar's summary bar.
+        // One permanent live region, owned by the shared table header (count badge + range).
         $this->assertSame(1, substr_count($html, 'role="status"'));
         $this->assertStringContainsString('<p role="status" aria-live="polite" aria-atomic="true"', $html);
-        $this->assertStringContainsString($component->instance()->rows->total().' riwayat', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertStringStartsWith($component->instance()->rows->total().' Riwayat', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringContainsString('Riwayat Mutasi', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        $this->assertStringContainsString('Ekspor Excel', $html, 'the compliance export sits in the table header');
         $this->assertStringNotContainsString('ditemukan', $html);
-    }
-
-    public function test_summary_total_follows_the_source_scope_like_the_kpi_card(): void
-    {
-        $this->official(Employee::factory()->create());
-        $this->official(Employee::factory()->create());
-        foreach (['Impor A', 'Impor B', 'Impor C'] as $jabatan) {
-            $this->official(Employee::factory()->create(), ['jabatan' => $jabatan, 'sumber' => JobHistory::SUMBER_IMPOR]);
-        }
-
-        $officialTotal = JobHistory::bySumber('resmi')->count();
-        $imporTotal = JobHistory::bySumber(JobHistory::SUMBER_IMPOR)->count();
-        $allTotal = JobHistory::count();
-        $this->assertGreaterThan($imporTotal, $allTotal, 'fixture must mix sources');
-        $this->assertGreaterThan($officialTotal, $allTotal);
-
-        $text = fn ($component) => trim(preg_replace('/\s+/', ' ', strip_tags($component->html())));
-
-        // Default (Mutasi Resmi): the total is the official total, the number the Total KPI card shows.
-        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class);
-        $this->assertStringContainsString($officialTotal.' riwayat', $text($component));
-        $this->assertSame($officialTotal, app(MutasiHistoryReader::class)->getMutasiHistoryKpis('resmi')['total']);
-
-        // A chosen source narrows the list and the total follows the same source, not every source.
-        $component->set('sumberFilter', JobHistory::SUMBER_IMPOR)->set('search', 'Impor A');
-        $this->assertStringContainsString('1 dari '.$imporTotal.' riwayat sesuai filter', $text($component));
-        $this->assertStringNotContainsString('dari '.$allTotal.' riwayat', $text($component));
-        $this->assertSame($imporTotal, app(MutasiHistoryReader::class)->getMutasiHistoryKpis(JobHistory::SUMBER_IMPOR)['total']);
-
-        // Every source: the total is everything.
-        $component->set('search', '')->set('sumberFilter', 'semua');
-        $this->assertStringContainsString($allTotal.' dari '.$allTotal.' riwayat sesuai filter', $text($component));
     }
 
     public function test_history_shows_the_filtered_count_above_the_empty_state(): void
     {
         $this->official(Employee::factory()->create());
 
-        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)->set('search', 'tidak-ada-yang-cocok');
-        $total = $component->instance()->unfilteredCount;
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($component->html())));
+        $html = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)->set('search', 'tidak-ada-yang-cocok')->html();
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
 
-        $this->assertStringContainsString('0 dari '.$total.' riwayat sesuai filter', $text);
-        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 dari '.$total.' riwayat sesuai filter'));
-        $this->assertStringContainsString('Reset filter', $component->html());
+        // Zero results: the header badge says 0, no range, and the filtered empty state follows below it.
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertSame('0 Riwayat', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 Riwayat'));
+        $this->assertStringContainsString('Reset Filter', $html);
+        $this->assertStringContainsString('Ekspor Excel', $html, 'export stays reachable (the shared gate and limit still apply)');
+    }
+
+    public function test_hapus_filter_tambahan_keeps_the_kpi_status_and_the_search(): void
+    {
+        $this->official(Employee::factory()->create(['nama' => 'Cari Saya']));
+
+        $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
+            ->call('toggleStatusFilter', 'applied')
+            ->set('search', 'Cari')
+            ->set('mutasiFilter', 'ROTASI');
+
+        $html = $component->html();
+        $this->assertStringContainsString('Hapus Filter Tambahan', $html);
+        $this->assertStringContainsString('Status: <strong>Sudah Diterapkan</strong>', $html);
+
+        // Only the panel filters go; the KPI-driven status and the search term stay.
+        $component->call('resetPanelFilters')
+            ->assertSet('mutasiFilter', '')
+            ->assertSet('statusFilter', 'applied')
+            ->assertSet('search', 'Cari');
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $component->html());
+
+        // "Reset Filter" clears everything.
+        $component->call('resetFilters')->assertSet('statusFilter', '')->assertSet('search', '');
     }
 
     public function test_can_filter_and_sort_mutasi_history(): void
@@ -657,8 +654,8 @@ class MutasiHistoryTest extends TestCase
             ->set('statusFilter', 'due')
             ->set('sumberFilter', 'semua')
             ->assertSee('Filter Aktif:')
-            ->assertSee('Status: Siap Diaktifkan')
-            ->assertSee('Sumber Catatan: Semua Catatan')
+            ->assertSeeHtml('Status: <strong>Siap Diaktifkan</strong>')
+            ->assertSeeHtml('Sumber Catatan: <strong>Semua Catatan</strong>')
             ->assertSeeHtml("wire:click=\"\$set('statusFilter', '')\"")
             ->assertSeeHtml("wire:click=\"\$set('sumberFilter', '')\"")
             // The old inline status pill is gone; the chip row replaces it.
@@ -750,7 +747,7 @@ class MutasiHistoryTest extends TestCase
             ->assertSeeHtml("wire:click=\"toggleStatusFilter('active')\"")
             ->call('toggleStatusFilter', 'active')
             ->assertSet('statusFilter', 'active')
-            ->assertSee('Status: Aktif Menjabat')
+            ->assertSeeHtml('Status: <strong>Aktif Menjabat</strong>')
             ->assertDontSee('Sudah Selesai')
             ->assertDontSee('Masih Terjadwal');
 
@@ -771,7 +768,7 @@ class MutasiHistoryTest extends TestCase
 
         $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)
             ->set('statusFilter', 'applied')
-            ->assertSee('Status: Sudah Diterapkan')
+            ->assertSeeHtml('Status: <strong>Sudah Diterapkan</strong>')
             ->assertSee('Sudah Selesai')
             ->assertDontSee('Masih Terjadwal');
 
@@ -885,7 +882,7 @@ class MutasiHistoryTest extends TestCase
             ->call('toggleStatusFilter', 'due')
             ->assertSet('statusFilter', 'due')
             ->assertDontSeeHtml('wire:model.live="statusFilter"')
-            ->assertSee('Status: Siap Diaktifkan')
+            ->assertSeeHtml('Status: <strong>Siap Diaktifkan</strong>')
             ->assertSeeHtml('aria-label="Hapus filter Status"')
             ->assertSeeHtml("wire:click=\"\$set('statusFilter', '')\"");
     }
@@ -894,8 +891,13 @@ class MutasiHistoryTest extends TestCase
     {
         $html = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class)->html();
 
+        // Employees-directory style labels: small, bold, with an icon, visible above each field.
         foreach (['Unit Kerja', 'Jenis Mutasi', 'Sumber Catatan'] as $label) {
-            $this->assertStringContainsString('class="mb-1 block text-xs font-medium text-surface-600">'.$label.'</label>', $html);
+            $this->assertMatchesRegularExpression(
+                '/<label for="[^"]+" class="block text-\[11px\] font-semibold text-surface-700 mb-1">\s*<i class="[^"]*" aria-hidden="true"><\/i>\s*'.preg_quote($label, '/').'\s*<\/label>/',
+                $html,
+                "label {$label} must be visible with an icon"
+            );
         }
     }
 }

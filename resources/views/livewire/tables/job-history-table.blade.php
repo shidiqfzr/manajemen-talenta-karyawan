@@ -15,14 +15,11 @@
             :table-id="$this->getId()"
             :filters="$this->filters()"
             :filter-values="$this->activeFilterValues()"
-            :export="$this->exportName() !== null"
             :has-active-filters="$this->hasActiveFilters()"
             :search="$search"
-            :result-count="$rows->total()"
-            :total-count="$this->hasActiveFilters() ? $this->unfilteredCount : null"
-            noun="riwayat jabatan"
             :search-shortcut="null"
             search-placeholder="Cari jabatan, unit, SK..." />
+        <x-admin.table.header :paginator="$rows" noun="Riwayat Jabatan" />
 
         @if ($selectable)
             <x-admin.table.bulk-bar

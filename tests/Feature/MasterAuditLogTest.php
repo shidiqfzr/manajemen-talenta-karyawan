@@ -323,7 +323,7 @@ class MasterAuditLogTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.master.riwayat.index', ['entity_type' => 'seat']))
             ->assertSee('Filter Aktif:')
-            ->assertSee('Jenis Data: Formasi Jabatan');
+            ->assertSeeHtml('Jenis Data: <strong>Formasi Jabatan</strong>');
     }
 
     public function test_history_announces_the_result_count(): void
@@ -334,11 +334,14 @@ class MasterAuditLogTest extends TestCase
 
         $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->html();
 
-        // One permanent live region, owned by the shared toolbar's summary bar.
+        // One permanent live region, owned by the shared table header (count badge + range).
         $this->assertSame(1, substr_count($html, 'role="status"'));
         $this->assertStringContainsString('<p role="status" aria-live="polite" aria-atomic="true"', $html);
-        $this->assertStringContainsString('3 catatan', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertSame('3 Catatan | Menampilkan 1 – 3 dari 3', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringContainsString('Riwayat Perubahan', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
         $this->assertStringNotContainsString('ditemukan', $html);
+        $this->assertStringNotContainsString('Ekspor Excel', $html, 'this screen has no export');
     }
 
     public function test_history_shows_the_filtered_count_above_the_empty_state(): void
@@ -350,9 +353,12 @@ class MasterAuditLogTest extends TestCase
         $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->set('entityType', 'position')->html();
         $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
 
-        $this->assertStringContainsString('0 dari 3 catatan sesuai filter', $text);
-        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 dari 3 catatan sesuai filter'));
-        $this->assertStringContainsString('Reset filter', $html);
+        // Zero results: the header badge says 0, no range, and the filtered empty state follows below it.
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertSame('0 Catatan', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 Catatan'));
+        $this->assertStringContainsString('Reset Filter', $html);
+        $this->assertStringContainsString('Hapus Filter Tambahan', $html);
     }
 
     public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void
