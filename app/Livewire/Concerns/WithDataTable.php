@@ -325,9 +325,7 @@ trait WithDataTable
      */
     public function toggleSelectPage(): void
     {
-        $pageKeys = $this->rows->getCollection()
-            ->map(fn ($row) => (string) $row->getAttribute($this->rowKey()))
-            ->all();
+        $pageKeys = $this->tablePageKeys();
 
         $this->selectAllMatching = false;
         $this->selected = $this->normaliseSelection(

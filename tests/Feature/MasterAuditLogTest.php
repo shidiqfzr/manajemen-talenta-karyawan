@@ -301,8 +301,8 @@ class MasterAuditLogTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.master.riwayat.index', ['from' => '2020-02-01', 'to' => '2020-01-01']))
             ->assertOk()
-            ->assertSee('Tidak ada data yang sesuai dengan pencarian atau filter.')
-            ->assertSee('Reset filter');
+            // The empty-state button comes after its message; the toolbar's own Reset button comes before it.
+            ->assertSeeInOrder(['Tidak ada data yang sesuai dengan pencarian atau filter.', 'Reset filter']);
     }
 
     public function test_history_search_treats_wildcards_literally(): void
@@ -310,10 +310,10 @@ class MasterAuditLogTest extends TestCase
         MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Seat_1');
         MasterAuditLog::record($this->admin, 'seat.added', 'seat', 2, 'SeatX1');
 
-        Livewire::actingAs($this->admin)->test(AuditHistory::class)
-            ->set('search', 'Seat_1')
-            ->assertSee('Seat_1')
-            ->assertDontSee('SeatX1');
+        $component = Livewire::actingAs($this->admin)->test(AuditHistory::class)->set('search', 'Seat_1');
+
+        // Assert on the listed rows, not the page text: the search chip also prints the term.
+        $this->assertSame(['Seat_1'], $component->instance()->rows->pluck('entity_label')->all());
     }
 
     public function test_history_shows_active_filter_chips(): void

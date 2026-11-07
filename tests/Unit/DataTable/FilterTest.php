@@ -48,6 +48,8 @@ class FilterTest extends TestCase
             $this->assertFalse($filter->allows('2026-13-01'));
             $this->assertFalse($filter->allows('31/01/2026'));
             $this->assertFalse($filter->allows('bukan-tanggal'));
+            $this->assertFalse($filter->allows("2026-01-31\n"));
+            $this->assertFalse($filter->allows(' 2026-01-31'));
             $this->assertFalse($filter->allows(['2026-11-07']));
         }
     }
@@ -57,13 +59,13 @@ class FilterTest extends TestCase
         $from = Employee::query();
         Filter::dateFrom('from', 'Dari Tanggal', 'created_at')->applyTo($from, '2026-11-01');
 
-        $this->assertStringContainsString('"created_at" >= ?', $from->toSql());
+        $this->assertStringContainsString('"employees"."created_at" >= ?', $from->toSql());
         $this->assertSame(['2026-11-01 00:00:00'], $from->getBindings());
 
         $to = Employee::query();
         Filter::dateTo('to', 'Sampai Tanggal', 'created_at')->applyTo($to, '2026-11-30');
 
-        $this->assertStringContainsString('"created_at" <= ?', $to->toSql());
+        $this->assertStringContainsString('"employees"."created_at" <= ?', $to->toSql());
         $this->assertSame(['2026-11-30 23:59:59'], $to->getBindings());
     }
 
