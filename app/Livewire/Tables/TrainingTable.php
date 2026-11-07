@@ -49,7 +49,7 @@ class TrainingTable extends Component
             Column::make('tanggal_mulai', 'Tanggal')->sortable(),
             Column::make('penyelenggara', 'Penyelenggara')->sortable()->searchable(),
             // One visible column shows both the training type and its method.
-            Column::make('jenis', 'Jenis / Metode')->searchable(fn (Builder $q, string $term) => $this->whereLikeAny($q, ['jenis', 'metode'], $term)),
+            Column::make('jenis', 'Jenis / Metode')->searchable(fn (Builder $q, string $term) => QueryPipeline::whereLikeAny($q, ['jenis', 'metode'], $term)),
             Column::make('sertifikat', 'Sertifikat')->align('center'),
             Column::make('aksi', 'Aksi')->align('center'),
         ];
@@ -88,17 +88,6 @@ class TrainingTable extends Component
     protected function paginationName(): string
     {
         return 'pelatihan_page';
-    }
-
-    /** @param array<int, string> $columns */
-    private function whereLikeAny(Builder $query, array $columns, string $term): void
-    {
-        $grammar = $query->getQuery()->getGrammar();
-        $pattern = '%'.QueryPipeline::escapeLike($term).'%';
-
-        foreach ($columns as $column) {
-            $query->orWhereRaw($grammar->wrap($query->qualifyColumn($column))." LIKE ? ESCAPE '!'", [$pattern]);
-        }
     }
 
     public function render(): View

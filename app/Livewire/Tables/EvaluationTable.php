@@ -48,7 +48,7 @@ class EvaluationTable extends Component
             Column::make('kategori_9box', '9-Box Performance')->searchable(),
             Column::make('bidang_tugas', 'Bidang Tugas')->sortable()->searchable(),
             // One visible column shows both the assessing institution and the assessment category.
-            Column::make('lembaga_asesmen', 'Lembaga & Tanggal')->searchable(fn (Builder $q, string $term) => $this->whereLikeAny($q, ['lembaga_asesmen', 'kategori_asesmen'], $term)),
+            Column::make('lembaga_asesmen', 'Lembaga & Tanggal')->searchable(fn (Builder $q, string $term) => QueryPipeline::whereLikeAny($q, ['lembaga_asesmen', 'kategori_asesmen'], $term)),
             Column::make('aksi', 'Aksi')->align('center'),
         ];
     }
@@ -86,17 +86,6 @@ class EvaluationTable extends Component
     protected function paginationName(): string
     {
         return 'evaluasi_page';
-    }
-
-    /** @param array<int, string> $columns */
-    private function whereLikeAny(Builder $query, array $columns, string $term): void
-    {
-        $grammar = $query->getQuery()->getGrammar();
-        $pattern = '%'.QueryPipeline::escapeLike($term).'%';
-
-        foreach ($columns as $column) {
-            $query->orWhereRaw($grammar->wrap($query->qualifyColumn($column))." LIKE ? ESCAPE '!'", [$pattern]);
-        }
     }
 
     public function render(): View
