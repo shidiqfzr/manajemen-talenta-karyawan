@@ -269,92 +269,14 @@
                 </div>
             </div>
 
-            <!-- Participant Table -->
+            {{-- Daftar peserta: tabel data bersama dengan paginasi sendiri --}}
             <div class="bg-white rounded-xl border border-surface-200 shadow-sm overflow-hidden">
-                <div
-                    class="px-6 py-4 bg-gradient-to-r from-warning-50 to-white border-b border-surface-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div class="px-6 py-4 bg-gradient-to-r from-warning-50 to-white border-b border-surface-200">
                     <h2 class="text-lg font-semibold text-surface-800 flex items-center">
                         <i class="fa-solid fa-clipboard-list text-warning-700 mr-2" aria-hidden="true"></i>Daftar Peserta
                     </h2>
-                    @if ($participants->isNotEmpty())
-                        <div class="mt-2 sm:mt-0 text-sm text-surface-500">
-                            Menampilkan {{ $participants->count() }} dari {{ $participants->total() }} data
-                        </div>
-                    @endif
                 </div>
 
-                <div class="overflow-x-auto bg-white shadow rounded-lg">
-                    <table
-                        class="min-w-full bg-white border divide-surface-200 rounded-lg overflow-hidden shadow-md table-auto">
-                        <thead class="bg-surface-100 text-sm text-surface-700">
-                            <tr>
-                                <th scope="col" class="p-3 text-left">NIK</th>
-                                <th scope="col" class="p-3 text-left">Nama</th>
-                                <th scope="col" class="p-3 text-left">Jabatan</th>
-                                <th scope="col" class="p-3 text-left">Unit</th>
-                                <th scope="col" class="p-3 text-left">Level</th>
-                                <th scope="col" class="p-3 text-left">Sertifikat</th>
-                                <th scope="col" class="p-3 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-sm text-surface-700">
-                            @forelse ($training->employees as $employee)
-                                <tr class="border-t hover:bg-surface-50 transition duration-150">
-                                    <td class="p-3">{{ $employee->nik }}</td>
-                                    <td class="p-3">{{ $employee->nama }}</td>
-                                    <td class="p-3">{{ $employee->jabatan }}</td>
-                                    <td class="p-3">{{ $employee->unit_kerja }}</td>
-                                    <td class="p-3">{{ $employee->level }}</td>
-                                    <td class="p-3">
-                                        @if ($employee->pivot->sertifikat)
-                                            <a href="{{ asset('storage/' . $employee->pivot->sertifikat) }}"
-                                                target="_blank" class="text-info underline">Unduh</a>
-                                        @else
-                                            <span class="text-surface-500">Tidak ada</span>
-                                        @endif
-                                    </td>
-                                    <td class="p-3">
-                                        <div class="flex items-center gap-2 justify-center">
-                                            <a href="{{ route('admin.trainings.participants.edit', ['training' => $training->id, 'employee' => $employee->nik]) }}"
-                                                class="p-2 bg-warning-700 text-white rounded-md hover:bg-warning-700 transition"
-                                                title="Edit Sertifikat">
-                                                <i class="fas fa-edit" aria-hidden="true"></i>
-                                            </a>
-                                            <form
-                                                action="{{ route('admin.trainings.participants.destroy', ['training' => $training->id, 'employee' => $employee->nik]) }}"
-                                                method="POST" onsubmit="return confirm('Yakin hapus peserta?')"
-                                                class="inline">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit"
-                                                    class="p-2 bg-danger text-white rounded-md hover:bg-danger transition"
-                                                    title="Hapus Peserta">
-                                                    <i class="fas fa-trash" aria-hidden="true"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center">
-                                        <div class="flex flex-col items-center">
-                                            <div class="bg-surface-100 rounded-full p-3 mb-4">
-                                                <i class="fas fa-inbox text-surface-400 text-5xl" aria-hidden="true"></i>
-                                            </div>
-                                            <h3 class="text-lg font-medium text-surface-900 mb-1">Tidak ada data peserta</h3>
-                                            <p class="text-surface-500 max-w-full text-center mb-4">
-                                                Belum ada data peserta pelatihan yang ditambahkan saat ini.
-                                            </p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
-                <x-pagination-ui :data="$participants" />
+                @livewire('admin.training-participant-table', ['trainingId' => $training->id], key('peserta-pelatihan-' . $training->id))
             </div>
         @endsection
