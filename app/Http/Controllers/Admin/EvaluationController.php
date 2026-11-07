@@ -18,13 +18,11 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Display a paginated listing of evaluations.
+     * Display the evaluations list (queried by the EvaluationIndexTable Livewire component).
      */
     public function index()
     {
-        $evaluations = Evaluation::with('employee')->latest()->paginate(20);
-
-        return view('admin.evaluations.index', compact('evaluations'));
+        return view('admin.evaluations.index');
     }
 
     /**
