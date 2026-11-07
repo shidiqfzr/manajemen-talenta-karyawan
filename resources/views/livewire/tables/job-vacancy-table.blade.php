@@ -14,58 +14,16 @@
         </div>
     @endif
 
-    <!-- Integrated Vacancies Table & Filter Card -->
-    <div class="bg-white rounded-xl border border-surface-200 shadow-sm overflow-hidden">
-        <!-- Livewire Loading Bar -->
-        <div wire:loading.delay class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
-
-        <!-- Tier 1: Search & Filter Control Bar -->
-        <div class="p-4 sm:px-5 sm:py-3.5 bg-white flex flex-col md:flex-row items-center justify-between gap-3">
-            <!-- Search Input -->
-            <div class="relative w-full md:max-w-md">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-500">
-                    <i class="fas fa-search text-xs" aria-hidden="true"></i>
-                </div>
-                <input type="text" wire:model.live.debounce.300ms="search"
-                    placeholder="Cari berdasarkan jabatan, unit kerja, nama, atau NIK..."
-                    class="w-full pl-9 pr-9 py-2 bg-surface-50 hover:bg-white focus:bg-white border border-surface-300 rounded-lg text-xs sm:text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition shadow-2xs">
-                @if ($search)
-                    <button aria-label="Hapus pencarian" wire:click="$set('search', '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-500 hover:text-surface-600 transition cursor-pointer">
-                        <i class="fas fa-times-circle text-xs" aria-hidden="true"></i>
-                    </button>
-                @endif
-            </div>
-
-            <!-- Filter Controls -->
-            <div class="flex items-center gap-2.5 w-full md:w-auto justify-end">
-                <!-- Unit Filter -->
-                <div class="relative w-full sm:w-auto min-w-[210px]">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-surface-500">
-                        <i class="fas fa-building text-xs" aria-hidden="true"></i>
-                    </div>
-                    <select wire:model.live="selectedUnit"
-                        class="w-full pl-8 pr-8 py-2 bg-white border border-surface-300 rounded-lg text-xs sm:text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-600 transition appearance-none cursor-pointer shadow-2xs">
-                        <option value="">Semua Unit Kerja ({{ count($units) }})</option>
-                        @foreach ($units as $u)
-                            <option value="{{ $u }}">{{ $u }}</option>
-                        @endforeach
-                    </select>
-                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-surface-500">
-                        <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
-                    </div>
-                </div>
-
-                <!-- Reset Button -->
-                @if ($search || $selectedUnit || $severityFilter)
-                    <button wire:click="resetFilters"
-                        title="Reset semua filter"
-                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold border border-surface-300 transition shadow-2xs shrink-0 cursor-pointer">
-                        <i class="fas fa-undo text-[10px]" aria-hidden="true"></i>
-                        <span>Reset</span>
-                    </button>
-                @endif
-            </div>
-        </div>
+    {{-- Vacancy list on the shared table components (collection-backed, so no WithDataTable). --}}
+    <x-admin.table.card>
+        <x-admin.table.toolbar
+            :table-id="$this->getId()"
+            :filters="$filters"
+            :filter-values="$filterValues"
+            :has-active-filters="$hasActiveFilters"
+            :search="$search"
+            search-placeholder="Cari jabatan, unit kerja, nama, atau NIK..." />
+        <x-admin.table.header title="Daftar Jabatan Lowong" :paginator="$vacancies" noun="Lowongan" />
 
         <!-- Tier 2: Sub-Header Urgency Status Strip -->
         <div class="px-5 py-2.5 bg-surface-50 border-t border-b border-surface-200 flex flex-wrap items-center justify-between gap-3">
@@ -114,22 +72,18 @@
                 </button>
             </div>
 
-            <!-- Summary counter -->
-            <div class="text-xs text-surface-500 font-medium" role="status" aria-live="polite" aria-atomic="true">
-                Total <span class="font-bold text-surface-900 font-mono">{{ $vacancies->total() }}</span> formasi lowong
-            </div>
         </div>
 
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-700 uppercase tracking-wider">
-                        <th scope="col" class="py-3.5 px-5">Unit Kerja</th>
-                        <th scope="col" class="py-3.5 px-5">Jabatan Lowong</th>
-                        <th scope="col" class="py-3.5 px-5">Pejabat Terakhir</th>
-                        <th scope="col" class="py-3.5 px-5">Kosong Sejak</th>
-                        <th scope="col" class="py-3.5 px-5 text-center">Durasi &amp; Urgensi</th>
-                        <th scope="col" class="py-3.5 px-5 text-center w-36">Opsi Pengisian</th>
+                        <x-admin.table.th class="py-3.5 px-5">Unit Kerja</x-admin.table.th>
+                        <x-admin.table.th class="py-3.5 px-5">Jabatan Lowong</x-admin.table.th>
+                        <x-admin.table.th class="py-3.5 px-5">Pejabat Terakhir</x-admin.table.th>
+                        <x-admin.table.th class="py-3.5 px-5">Kosong Sejak</x-admin.table.th>
+                        <x-admin.table.th align="center" class="py-3.5 px-5">Durasi &amp; Urgensi</x-admin.table.th>
+                        <x-admin.table.th align="center" class="py-3.5 px-5 w-36">Opsi Pengisian</x-admin.table.th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-surface-200 text-sm">
@@ -277,39 +231,17 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="6" class="px-6 py-14 text-center">
-                                <div class="max-w-sm mx-auto space-y-3">
-                                    <div class="w-16 h-16 mx-auto rounded-full bg-primary-50 text-primary-700 flex items-center justify-center text-2xl border border-primary-200">
-                                        <i class="fas fa-check-double" aria-hidden="true"></i>
-                                    </div>
-                                    <h4 class="text-base font-bold text-surface-900">Tidak Ada Formasi Kosong</h4>
-                                    <p class="text-xs text-surface-500 leading-relaxed">
-                                        @if ($search || $selectedUnit || $severityFilter)
-                                            Tidak ditemukan formasi dengan kriteria filter yang Anda pilih. Coba sesuaikan kata kunci atau reset filter.
-                                        @else
-                                            Semua formasi jabatan di seluruh unit kerja saat ini terisi aktif oleh karyawan.
-                                        @endif
-                                    </p>
-                                    @if ($search || $selectedUnit || $severityFilter)
-                                        <button wire:click="resetFilters"
-                                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-surface-100 hover:bg-surface-200 text-surface-800 text-xs font-semibold border border-surface-300 transition">
-                                            <i class="fas fa-undo text-[10px]" aria-hidden="true"></i>
-                                            Reset Filter
-                                        </button>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
+                        <x-admin.table.empty-state :colspan="6" icon="fas fa-check-double"
+                            :message="$hasActiveFilters ? 'Tidak ditemukan formasi dengan kriteria filter yang Anda pilih. Coba sesuaikan kata kunci atau reset filter.' : 'Semua formasi jabatan di seluruh unit kerja saat ini terisi aktif oleh karyawan.'">
+                            @if ($hasActiveFilters)
+                                <x-admin.button variant="secondary" size="sm" wire:click="resetFilters">Reset Filter</x-admin.button>
+                            @endif
+                        </x-admin.table.empty-state>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        @if ($vacancies->hasPages())
-            <div class="px-6 py-4 border-t border-surface-200 bg-surface-50">
-                {{ $vacancies->links() }}
-            </div>
-        @endif
-    </div>
+        <x-admin.table.pagination :paginator="$vacancies" noun="lowongan" :per-page-options="$perPageOptions" />
+    </x-admin.table.card>
 </div>
