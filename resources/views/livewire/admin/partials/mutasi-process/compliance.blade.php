@@ -145,7 +145,7 @@
                     <div class="text-xs text-warning-800 leading-relaxed flex-1">
                         <span class="font-bold text-warning-800 block">Formasi Telah Dipesan (Reserved)</span>
                         <p class="mt-0.5 text-warning-800">
-                            Posisi ini telah dipesan oleh mutasi terjadwal atas nama <strong>{{ $targetAnalysis['reserved_occupant']['nama'] ?? 'pegawai lain' }}</strong> (TMT Efektif: {{ $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-' }}). Pilih formasi lain yang tersedia.
+                            Posisi ini telah dipesan oleh mutasi terjadwal atas nama <strong>{{ $targetAnalysis['reserved_occupant']['nama'] ?? 'karyawan lain' }}</strong> (TMT Efektif: {{ $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-' }}). Pilih formasi lain yang tersedia.
                         </p>
                     </div>
                 </div>

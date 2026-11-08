@@ -80,7 +80,7 @@
                 <div class="text-xs text-warning-800 leading-relaxed space-y-1">
                     <p class="font-semibold text-warning-800">Peringatan Standar Regulasi Masa Dinas (2–3 Tahun):</p>
                     <p class="text-warning-700 text-xs">
-                        Pegawai baru bertugas <strong class="font-bold text-warning-800">{{ \App\Services\Mutasi\TalentProfileBuilder::formatMonths($tenureAnalysis['months'] ?? 0) }}</strong> di {{ $currentUnit }}. Standar regulasi rotasi unit minimal 2–3 tahun demi kestabilan operasional perkebunan.
+                        Karyawan baru bertugas <strong class="font-bold text-warning-800">{{ \App\Services\Mutasi\TalentProfileBuilder::formatMonths($tenureAnalysis['months'] ?? 0) }}</strong> di {{ $currentUnit }}. Standar regulasi rotasi unit minimal 2–3 tahun demi kestabilan operasional perkebunan.
                     </p>
                 </div>
 

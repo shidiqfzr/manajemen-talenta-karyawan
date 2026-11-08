@@ -14,7 +14,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 
 /**
  * Ekspor tabel Master Formasi (daftar unit atau formasi jabatan satu unit) sesuai pencarian dan filter yang sedang aktif.
- * Berkas memuat nama pengakses dan waktu unduh pada properti dokumen; tidak memuat data pribadi pegawai.
+ * Berkas memuat nama pengakses dan waktu unduh pada properti dokumen; tidak memuat data pribadi karyawan.
  */
 class FormasiExport implements FromCollection, WithEvents, WithHeadings, WithMapping, WithProperties, WithTitle
 {

@@ -13,7 +13,7 @@
                                 <h3 class="text-sm font-bold text-surface-900" id="supply-plan-title">Rencana Pasokan Talenta {{ $year }}</h3>
                             </div>
                             <p class="text-xs text-surface-500">CKP Internal, Talent Scouting, dan RBB mengurangi Kebutuhan. Jabatan Prioritas Diisi bersifat informasi.</p>
-                            <p class="text-xs text-surface-500">Terealisasi s.d. {{ $asOfLabel }}: pegawai jalur tersebut yang sudah ditempatkan sebagai Karpim tahun ini. Matriks hanya mengurangkan sisa rencana.</p>
+                            <p class="text-xs text-surface-500">Terealisasi s.d. {{ $asOfLabel }}: karyawan jalur tersebut yang sudah ditempatkan sebagai Karpim tahun ini. Matriks hanya mengurangkan sisa rencana.</p>
                         </div>
                         <button type="button" wire:click="requestClose" class="p-1.5 rounded-lg text-surface-500 hover:bg-surface-200 hover:text-surface-800 transition" aria-label="Tutup">
                             <i class="fas fa-xmark" aria-hidden="true"></i>

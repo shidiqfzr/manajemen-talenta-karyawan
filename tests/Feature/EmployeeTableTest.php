@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exports\EmployeesExport;
 use App\Livewire\Admin\Employees\EmployeeTable;
 use App\Models\Employee;
+use App\Models\EmployeeDeletionArchive;
 use App\Models\MasterAuditLog;
 use App\Models\User;
 use App\Services\EmployeeExportService;
@@ -79,8 +80,8 @@ class EmployeeTableTest extends TestCase
 
     public function test_unknown_filter_values_are_ignored(): void
     {
-        Employee::factory()->create(['nama' => 'PEGAWAI SATU', 'unit_kerja' => 'Kebun Satu']);
-        Employee::factory()->create(['nama' => 'PEGAWAI DUA', 'unit_kerja' => 'Kebun Dua']);
+        Employee::factory()->create(['nama' => 'KARYAWAN SATU', 'unit_kerja' => 'Kebun Satu']);
+        Employee::factory()->create(['nama' => 'KARYAWAN DUA', 'unit_kerja' => 'Kebun Dua']);
 
         $tampered = [
             'status_khusus' => 'drop',
@@ -88,7 +89,7 @@ class EmployeeTableTest extends TestCase
             'level' => 'Bogus',
             'rm_level' => 'RM-9',
             'unit_kerja' => 'Kebun Tidak Ada',
-            'jabatan' => 'Jabatan Tidak Ada',
+            'bidang' => 'XYZ',
             'golongan' => 'ZZ/99',
             'tahun_masuk' => 'abcd',
             'bulan_masuk' => '13',
@@ -103,15 +104,15 @@ class EmployeeTableTest extends TestCase
             ->assertSet('level', '')
             ->assertSet('rmLevel', '')
             ->assertSet('unitKerja', '')
-            ->assertSet('jabatan', '')
+            ->assertSet('bidang', '')
             ->assertSet('golongan', '')
             ->assertSet('tahunMasuk', '')
             ->assertSet('bulanMasuk', '')
-            ->assertSee('PEGAWAI SATU')
-            ->assertSee('PEGAWAI DUA')
+            ->assertSee('KARYAWAN SATU')
+            ->assertSee('KARYAWAN DUA')
             ->set('statusKhusus', 'drop')
             ->assertSet('statusKhusus', '')
-            ->assertSee('PEGAWAI SATU');
+            ->assertSee('KARYAWAN SATU');
 
         $bindings = collect(DB::getQueryLog())->pluck('bindings')->flatten()->map(fn ($b) => (string) $b);
 
@@ -131,12 +132,77 @@ class EmployeeTableTest extends TestCase
             ->assertSet('sortDirection', 'asc')
             ->assertSeeInOrder(['ANDI', 'BUDI']);
 
-        // Only the five whitelisted columns are sortable.
+        // Only the six whitelisted columns are sortable; Bidang is derived from the formasi, so it is not.
+        $component->call('sortBy', 'bidang')->assertSet('sortField', 'nama');
         $component->call('sortBy', 'tanggal_lahir')->assertSet('sortField', 'nama');
 
-        foreach (['jabatan', 'rm_level', 'level', 'golongan', 'nama'] as $field) {
+        foreach (['jabatan', 'rm_level', 'level', 'golongan', 'tmt_bekerja', 'nama'] as $field) {
             $component->call('sortBy', $field)->assertSet('sortField', $field);
         }
+    }
+
+    public function test_bidang_and_masa_kerja_are_columns_and_the_retirement_badge_stays_in_the_position_cell(): void
+    {
+        Employee::factory()->create([
+            'nama' => 'PGW-BUP',
+            'tanggal_lahir' => now()->subYears(57)->toDateString(),
+            'tanggal_pensiun' => now()->subYear()->startOfMonth()->toDateString(),
+            'tmt_bekerja' => now()->subYears(12)->subMonths(4)->toDateString(),
+        ]);
+
+        Livewire::test(EmployeeTable::class)
+            ->assertSeeInOrder(['Jabatan &amp; Unit Kerja', 'Bidang', 'Strata', 'Eselon', 'Golongan', 'Masa Kerja', 'Aksi'], false)
+            ->assertSeeInOrder(['PGW-BUP', 'Masa Pensiun (BUP)'])
+            ->assertSee('12 th 4 bln');
+    }
+
+    public function test_bidang_is_plain_text_with_the_full_name_in_the_tooltip(): void
+    {
+        Employee::factory()->create(['nama' => 'PGW-BIDANG', 'jabatan' => 'Kepala Sub Bagian Pajak & Asuransi', 'unit_kerja' => 'Bagian Akuntansi & Keuangan']);
+
+        $html = Livewire::test(EmployeeTable::class)->html();
+
+        // Same neutral treatment as Strata: no bordered chip, and the long name sits in the tooltip.
+        $this->assertStringContainsString('<span class="text-xs font-medium text-surface-700"', $html);
+        $this->assertStringContainsString('title="Bidang Fungsional: ', $html);
+        $this->assertStringNotContainsString('shadow-2xs bg-surface-100 text-surface-600', $html);
+    }
+
+    public function test_retirement_markers_are_short_chips_with_full_text_for_screen_readers(): void
+    {
+        Employee::factory()->create([
+            'nama' => 'PGW-BUP',
+            'tanggal_lahir' => now()->subYears(57)->toDateString(),
+            'tanggal_pensiun' => now()->subYear()->startOfMonth()->toDateString(),
+        ]);
+        Employee::factory()->create(['nama' => 'PGW-MBT', 'tanggal_lahir' => now()->subYears(55)->subMonths(8)->toDateString(), 'tanggal_pensiun' => null, 'tanggal_mbt' => null]);
+        Employee::factory()->create(['nama' => 'PGW-MENJELANG', 'tanggal_lahir' => now()->subYears(55)->subMonth()->toDateString(), 'tanggal_pensiun' => null, 'tanggal_mbt' => null]);
+        Employee::factory()->create(['nama' => 'PGW-BIASA', 'tanggal_lahir' => now()->subYears(35)->toDateString()]);
+
+        Livewire::test(EmployeeTable::class)
+            // Visible text is the short code; the full wording stays for screen readers and the tooltip.
+            ->assertSeeHtml('<span aria-hidden="true">BUP</span>')
+            ->assertSeeHtml('<span aria-hidden="true">MBT</span>')
+            ->assertSeeHtml('<span class="sr-only">Masa Pensiun (BUP)</span>')
+            ->assertSeeHtml('<span class="sr-only">Masa Bebas Tugas (MBT)</span>')
+            ->assertSeeHtml('title="Karyawan telah mencapai Batas Usia Pensiun')
+            ->assertSee('Menjelang MBT (')
+            ->assertSeeHtml('<span aria-hidden="true">MBT · ')
+            ->assertSee('PGW-BIASA');
+    }
+
+    public function test_masa_kerja_sorts_by_tenure_and_keeps_empty_dates_last(): void
+    {
+        Employee::factory()->create(['nama' => 'PGW-MUDA', 'tmt_bekerja' => '2020-01-01']);
+        Employee::factory()->create(['nama' => 'PGW-SENIOR', 'tmt_bekerja' => '2000-01-01']);
+        Employee::factory()->create(['nama' => 'PGW-KOSONG', 'tmt_bekerja' => null]);
+
+        // Ascending = shortest tenure first (latest hire date), descending = longest tenure first.
+        Livewire::test(EmployeeTable::class)
+            ->set('sortField', 'tmt_bekerja')->set('sortDirection', 'asc')
+            ->assertSeeInOrder(['PGW-MUDA', 'PGW-SENIOR', 'PGW-KOSONG'])
+            ->set('sortDirection', 'desc')
+            ->assertSeeInOrder(['PGW-SENIOR', 'PGW-MUDA', 'PGW-KOSONG']);
     }
 
     public function test_level_is_a_chip_not_a_panel_field(): void
@@ -168,24 +234,24 @@ class EmployeeTableTest extends TestCase
         $html = Livewire::test(EmployeeTable::class)->html();
         preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
 
-        $this->assertStringContainsString('Direktori Pegawai', $html);
-        $this->assertStringStartsWith('3 Pegawai', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringContainsString('Daftar Karyawan', $html);
+        $this->assertStringStartsWith('3 Karyawan', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
         // The selection count is announced by the page, not by a second count region inside the table.
         $this->assertSame(1, substr_count($html, 'role="status"'), 'one count live region');
     }
 
     public function test_zero_results_show_reset(): void
     {
-        Employee::factory()->create(['nama' => 'PEGAWAI ADA']);
+        Employee::factory()->create(['nama' => 'KARYAWAN ADA']);
 
         Livewire::test(EmployeeTable::class)
             ->set('search', 'tidak-ada-yang-cocok')
-            ->assertDontSee('PEGAWAI ADA')
-            ->assertSee('Tidak ada pegawai yang sesuai dengan pencarian atau filter.')
+            ->assertDontSee('KARYAWAN ADA')
+            ->assertSee('Tidak ada karyawan yang sesuai dengan pencarian atau filter.')
             ->assertSee('wire:click="resetFilters"', false)
             ->call('resetFilters')
             ->assertSet('search', '')
-            ->assertSee('PEGAWAI ADA');
+            ->assertSee('KARYAWAN ADA');
     }
 
     public function test_empty_directory_offers_first_employee_link(): void
@@ -223,8 +289,8 @@ class EmployeeTableTest extends TestCase
 
     public function test_filters_apply_like_the_old_controller(): void
     {
-        $sanksi = Employee::factory()->create(['nama' => 'PEGAWAI SANKSI', 'tanggal_berakhir_sanksi' => now()->addDays(10)->toDateString(), 'tmt_bekerja' => '2015-03-10']);
-        $rangkap = Employee::factory()->create(['nama' => 'PEGAWAI RANGKAP', 'tmt_bekerja' => '2018-07-01']);
+        $sanksi = Employee::factory()->create(['nama' => 'KARYAWAN SANKSI', 'tanggal_berakhir_sanksi' => now()->addDays(10)->toDateString(), 'tmt_bekerja' => '2015-03-10']);
+        $rangkap = Employee::factory()->create(['nama' => 'KARYAWAN RANGKAP', 'tmt_bekerja' => '2018-07-01']);
         $rangkap->jobHistories()->create([
             'jabatan' => 'Plt. Manajer',
             'unit_kerja' => 'Kantor Regional',
@@ -234,27 +300,27 @@ class EmployeeTableTest extends TestCase
         ]);
 
         Livewire::test(EmployeeTable::class)
-            ->set('statusKhusus', 'sanksi')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
-            ->set('statusKhusus', 'rangkap')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
+            ->set('statusKhusus', 'sanksi')->assertSee('KARYAWAN SANKSI')->assertDontSee('KARYAWAN RANGKAP')
+            ->set('statusKhusus', 'rangkap')->assertSee('KARYAWAN RANGKAP')->assertDontSee('KARYAWAN SANKSI')
             ->set('statusKhusus', '')
-            ->set('statusPenugasan', 'sementara')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
-            ->set('statusPenugasan', 'definitif')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
-            ->set('statusPenugasan', 'Plt')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI')
+            ->set('statusPenugasan', 'sementara')->assertSee('KARYAWAN RANGKAP')->assertDontSee('KARYAWAN SANKSI')
+            ->set('statusPenugasan', 'definitif')->assertSee('KARYAWAN SANKSI')->assertDontSee('KARYAWAN RANGKAP')
+            ->set('statusPenugasan', 'Plt')->assertSee('KARYAWAN RANGKAP')->assertDontSee('KARYAWAN SANKSI')
             ->set('statusPenugasan', '')
-            ->set('tahunMasuk', '2015')->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP')
+            ->set('tahunMasuk', '2015')->assertSee('KARYAWAN SANKSI')->assertDontSee('KARYAWAN RANGKAP')
             ->set('tahunMasuk', '')
-            ->set('bulanMasuk', '07')->assertSee('PEGAWAI RANGKAP')->assertDontSee('PEGAWAI SANKSI');
+            ->set('bulanMasuk', '07')->assertSee('KARYAWAN RANGKAP')->assertDontSee('KARYAWAN SANKSI');
 
         // Unpadded month values from older links keep working.
         Livewire::withQueryParams(['bulan_masuk' => '3'])
             ->test(EmployeeTable::class)
             ->assertSet('bulanMasuk', '03')
-            ->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP');
+            ->assertSee('KARYAWAN SANKSI')->assertDontSee('KARYAWAN RANGKAP');
     }
 
     public function test_row_actions_and_engine_selection_controls_are_rendered(): void
     {
-        $employee = Employee::factory()->create(['nik' => '12345678', 'nama' => 'PEGAWAI AKSI']);
+        $employee = Employee::factory()->create(['nik' => '12345678', 'nama' => 'KARYAWAN AKSI']);
 
         $html = Livewire::test(EmployeeTable::class)->html();
 
@@ -264,7 +330,7 @@ class EmployeeTableTest extends TestCase
         $this->assertStringContainsString(route('admin.employees.destroy', $employee->nik), $html);
 
         // Selection and export run through the shared engine, not through page-level forms.
-        $this->assertStringContainsString('aria-label="Pilih PEGAWAI AKSI"', $html);
+        $this->assertStringContainsString('aria-label="Pilih KARYAWAN AKSI"', $html);
         $this->assertStringContainsString('wire:model.live="selected" value="12345678"', $html);
         $this->assertStringContainsString('aria-label="Pilih semua di halaman ini"', $html);
         $this->assertStringContainsString('wire:click="toggleSelectPage"', $html);
@@ -293,9 +359,9 @@ class EmployeeTableTest extends TestCase
         }
 
         return [
-            Employee::factory()->create(['nik' => '11110001', 'nama' => 'PEGAWAI HAPUS SATU', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-1.jpg']),
-            Employee::factory()->create(['nik' => '11110002', 'nama' => 'PEGAWAI HAPUS DUA', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-2.jpg']),
-            Employee::factory()->create(['nik' => '11110003', 'nama' => 'PEGAWAI AMAN', 'unit_kerja' => 'Kebun Aman', 'foto' => 'photos/aman.jpg']),
+            Employee::factory()->create(['nik' => '11110001', 'nama' => 'KARYAWAN HAPUS SATU', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-1.jpg']),
+            Employee::factory()->create(['nik' => '11110002', 'nama' => 'KARYAWAN HAPUS DUA', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-2.jpg']),
+            Employee::factory()->create(['nik' => '11110003', 'nama' => 'KARYAWAN AMAN', 'unit_kerja' => 'Kebun Aman', 'foto' => 'photos/aman.jpg']),
         ];
     }
 
@@ -313,10 +379,11 @@ class EmployeeTableTest extends TestCase
         // The engine's bulk bar offers the delete with a confirmation naming the count.
         $html = $component->html();
         $this->assertStringContainsString('wire:click="runBulkAction(\'destroy\')"', $html);
-        $this->assertStringContainsString('Hapus 2 data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
+        $this->assertStringContainsString('Hapus 2 data karyawan terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
 
-        $component->call('runBulkAction', 'destroy')
-            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data pegawai terpilih berhasil dihapus.'])
+        $component->set('bulkReason', 'Data ganda hasil impor Excel')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data karyawan terpilih berhasil dihapus.'])
             ->assertSet('selected', [])
             ->assertSet('selectAllMatching', false);
 
@@ -334,6 +401,36 @@ class EmployeeTableTest extends TestCase
         $this->assertSame(['unitKerja' => 'Kebun Hapus'], $log->new_values['filter']);
     }
 
+    public function test_bulk_delete_requires_a_reason_and_records_it_with_the_archive(): void
+    {
+        [$first, $second] = $this->seedBulkTargets();
+
+        // Missing or too short reason: nothing is deleted, archived or audited.
+        Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('selectAllMatchingRows')
+            ->set('bulkReason', 'singkat')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Alasan wajib diisi (10–500 karakter).'])
+            ->assertSet('selectAllMatching', true);
+
+        $this->assertSame(3, Employee::count());
+        $this->assertSame(0, EmployeeDeletionArchive::count());
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.bulk')->count());
+
+        Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('selectAllMatchingRows')
+            ->set('bulkReason', 'Karyawan keluar sesuai SK Direksi')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('bulkReason', '');
+
+        $this->assertSame(2, EmployeeDeletionArchive::count());
+        $this->assertEqualsCanonicalizing([$first->nik, $second->nik], EmployeeDeletionArchive::pluck('employee_nik')->all());
+        $this->assertSame('Karyawan keluar sesuai SK Direksi', EmployeeDeletionArchive::first()->reason);
+        $this->assertSame('Karyawan keluar sesuai SK Direksi', MasterAuditLog::where('action', 'data_table.bulk')->sole()->reason);
+    }
+
     public function test_tampered_selection_cannot_widen_bulk_delete(): void
     {
         [$first, $second, $outside] = $this->seedBulkTargets();
@@ -342,8 +439,9 @@ class EmployeeTableTest extends TestCase
         Livewire::test(EmployeeTable::class)
             ->set('unitKerja', 'Kebun Hapus')
             ->set('selected', [$first->nik, $outside->nik, '99999999'])
+            ->set('bulkReason', 'Data ganda hasil impor Excel')
             ->call('runBulkAction', 'destroy')
-            ->assertSet('tableNotice', ['type' => 'success', 'message' => '1 data pegawai terpilih berhasil dihapus.']);
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '1 data karyawan terpilih berhasil dihapus.']);
 
         $this->assertDatabaseMissing('employees', ['nik' => $first->nik]);
         $this->assertDatabaseHas('employees', ['nik' => $second->nik]);
@@ -360,6 +458,7 @@ class EmployeeTableTest extends TestCase
 
         Livewire::test(EmployeeTable::class)
             ->set('selected', [$first->nik, $second->nik])
+            ->set('bulkReason', 'Data ganda hasil impor Excel')
             ->call('runBulkAction', 'destroy')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
 
@@ -388,7 +487,7 @@ class EmployeeTableTest extends TestCase
             ->call('toggleSelectPage')
             ->html();
 
-        $this->assertStringContainsString('Hapus 2 data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
+        $this->assertStringContainsString('Hapus 2 data karyawan terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
     }
 
     public function test_bulk_delete_over_the_limit_deletes_nothing(): void
@@ -398,6 +497,7 @@ class EmployeeTableTest extends TestCase
         // Limit 2 (fixture): three matching rows selected through "select all matching".
         Livewire::test(EmployeeTableSmallLimit::class)
             ->call('selectAllMatchingRows')
+            ->set('bulkReason', 'Data ganda hasil impor Excel')
             ->call('runBulkAction', 'destroy')
             ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Hapus massal dibatasi 2 data per proses. Persempit filter atau pilih lebih sedikit data.'])
             ->assertSet('selectAllMatching', true);
@@ -418,8 +518,9 @@ class EmployeeTableTest extends TestCase
         Livewire::test(EmployeeTableSmallLimit::class)
             ->set('unitKerja', 'Kebun Hapus')
             ->call('selectAllMatchingRows')
+            ->set('bulkReason', 'Data ganda hasil impor Excel')
             ->call('runBulkAction', 'destroy')
-            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data pegawai terpilih berhasil dihapus.']);
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data karyawan terpilih berhasil dihapus.']);
 
         $this->assertDatabaseMissing('employees', ['nik' => $first->nik]);
         $this->assertDatabaseMissing('employees', ['nik' => $second->nik]);
@@ -441,6 +542,7 @@ class EmployeeTableTest extends TestCase
         Livewire::test(EmployeeTable::class)
             ->set('unitKerja', 'Kebun Hapus')
             ->call('selectAllMatchingRows')
+            ->set('bulkReason', 'Data ganda hasil impor Excel')
             ->call('runBulkAction', 'destroy')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
 
@@ -501,9 +603,9 @@ class EmployeeTableTest extends TestCase
         Excel::fake();
         $this->travelTo('2026-11-08 09:30:00');
 
-        Employee::factory()->create(['nama' => 'PEGAWAI SATU', 'unit_kerja' => 'Kebun Batas']);
-        Employee::factory()->create(['nama' => 'PEGAWAI DUA', 'unit_kerja' => 'Kebun Batas']);
-        Employee::factory()->create(['nama' => 'PEGAWAI TIGA', 'unit_kerja' => 'Kebun Lain']);
+        Employee::factory()->create(['nama' => 'KARYAWAN SATU', 'unit_kerja' => 'Kebun Batas']);
+        Employee::factory()->create(['nama' => 'KARYAWAN DUA', 'unit_kerja' => 'Kebun Batas']);
+        Employee::factory()->create(['nama' => 'KARYAWAN TIGA', 'unit_kerja' => 'Kebun Lain']);
 
         // Same component with an export row limit of 2.
         $component = Livewire::test(EmployeeTableSmallLimit::class)
@@ -567,7 +669,7 @@ class EmployeeTableTest extends TestCase
             fn (EmployeesExport $export) => $export->query()->pluck('nama')->all() === ['PELAKSANA KPI']
         );
 
-        // "Total Pegawai" clears the card-driven filters but keeps the search.
+        // "Total Karyawan" clears the card-driven filters but keeps the search.
         $component->call('clearKpiFilters')
             ->assertSet('level', '')->assertSet('statusKhusus', '')->assertSet('statusPenugasan', '')
             ->assertSet('search', 'KPI')
@@ -576,20 +678,21 @@ class EmployeeTableTest extends TestCase
 
     public function test_governance_strip_follows_chip_changes(): void
     {
-        Employee::factory()->create(['nama' => 'PEGAWAI STRIP']);
+        Employee::factory()->create(['nama' => 'KARYAWAN STRIP']);
 
         $component = Livewire::test(EmployeeTable::class, ['kpi' => $this->kpi()])
             ->set('statusKhusus', 'sanksi');
 
         $html = $component->html();
         $this->assertStringContainsString('aria-pressed="true"', $html);
-        $this->assertStringContainsString('Reset Status Khusus', $html);
-        $this->assertStringContainsString('wire:click.prevent="$set(\'statusKhusus\', \'\')"', $html);
+        $this->assertStringNotContainsString('Reset Status Khusus', $html, 'the strip has no dedicated reset link; "Reset Filter" covers it');
 
-        // Removing the Tata Kelola chip inside the table un-highlights the strip and hides its reset link.
-        $html = $component->set('statusKhusus', '')->html();
+        // "Reset Filter" clears the Tata Kelola chip too.
+        $component->call('resetFilters')->assertSet('statusKhusus', '');
+
+        // Removing the Tata Kelola chip inside the table un-highlights the strip.
+        $html = $component->set('statusKhusus', 'sanksi')->set('statusKhusus', '')->html();
         $this->assertStringNotContainsString('aria-pressed="true"', $html);
-        $this->assertStringNotContainsString('Reset Status Khusus', $html);
         $this->assertStringContainsString('wire:click.prevent="$set(\'statusKhusus\', \'rangkap\')"', $html);
         $this->assertStringNotContainsString('status_khusus=sanksi', $html, 'a removed filter does not come back through a card link');
 

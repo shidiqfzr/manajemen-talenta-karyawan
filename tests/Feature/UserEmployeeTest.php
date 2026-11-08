@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * Halaman pegawai untuk peran user: avatar foto asli atau inisial (tanpa gambar bawaan).
+ * Halaman karyawan untuk peran user: avatar foto asli atau inisial (tanpa gambar bawaan).
  */
 class UserEmployeeTest extends TestCase
 {

@@ -435,8 +435,8 @@ class MutasiServiceTest extends TestCase
         Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
         Position::factory()->create(['nama' => 'Asisten Afdeling 2', 'rm_level' => 'RM-3']);
 
-        $empA = Employee::factory()->create(['nama' => 'PEGAWAI A', 'jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
-        $empB = Employee::factory()->create(['nama' => 'PEGAWAI B', 'jabatan' => 'Asisten Afdeling 2', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
+        $empA = Employee::factory()->create(['nama' => 'KARYAWAN A', 'jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
+        $empB = Employee::factory()->create(['nama' => 'KARYAWAN B', 'jabatan' => 'Asisten Afdeling 2', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
 
         // Target 'Askep Tanaman' in 'Kebun B' is currently VACANT!
         $nodes = [
@@ -461,8 +461,8 @@ class MutasiServiceTest extends TestCase
         Position::factory()->create(['nama' => 'Jabatan X', 'rm_level' => 'RM-3']);
         Position::factory()->create(['nama' => 'Jabatan Y', 'rm_level' => 'RM-3']);
 
-        $empA = Employee::factory()->create(['nama' => 'PEGAWAI A', 'jabatan' => 'Jabatan X', 'unit_kerja' => 'Kebun A']);
-        $empOutsider = Employee::factory()->create(['nama' => 'PEGAWAI LUAR', 'jabatan' => 'Jabatan Y', 'unit_kerja' => 'Kebun A']);
+        $empA = Employee::factory()->create(['nama' => 'KARYAWAN A', 'jabatan' => 'Jabatan X', 'unit_kerja' => 'Kebun A']);
+        $empOutsider = Employee::factory()->create(['nama' => 'KARYAWAN LUAR', 'jabatan' => 'Jabatan Y', 'unit_kerja' => 'Kebun A']);
 
         // empA tries to target Jabatan Y which is occupied by empOutsider, but empOutsider is not in chain
         $nodes = [

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Rekaman perubahan satu pegawai oleh satu impor, dipakai untuk membatalkan impor. Berisi data pribadi
+ * Rekaman perubahan satu karyawan oleh satu impor, dipakai untuk membatalkan impor. Berisi data pribadi
  * sehingga seluruh kolom sensitifnya terenkripsi.
  */
 class EmployeeImportChange extends Model

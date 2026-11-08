@@ -1,4 +1,4 @@
-// SUT: form Tambah Pegawai (admin/employees/create). Satu berkas uji per fitur (ENGINEERING.md §3.5).
+// SUT: form Tambah Karyawan (admin/employees/create). Satu berkas uji per fitur (ENGINEERING.md §3.5).
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -57,29 +57,29 @@ test('RM Band dan Bidang kosong sebelum jabatan dipilih, lalu mengikuti Master F
     await expect(form.getByText('Perkiraan', { exact: true }).locator('visible=true')).toHaveCount(0);
 });
 
-test('menyimpan pegawai, lalu NIK yang sama terdeteksi langsung', async ({ page }) => {
+test('menyimpan karyawan, lalu NIK yang sama terdeteksi langsung', async ({ page }) => {
     await page.locator('#nikInput').fill(NIK);
     await expect(page.getByText('NIK tersedia.')).toBeVisible();
 
-    await page.locator('#nama').fill('Pegawai Uji E2E');
+    await page.locator('#nama').fill('Karyawan Uji E2E');
     await pickUnitAndPosition(page, 'Kebun Tajati');
     await page.locator('#job_grade').fill('12');
     await page.locator('#personGradeInput').fill('12');
 
-    await Promise.all([page.waitForURL(/\/admin\/employees$/, { waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: 'Simpan Pegawai Baru' }).click()]);
+    await Promise.all([page.waitForURL(/\/admin\/employees$/, { waitUntil: 'domcontentloaded' }), page.getByRole('button', { name: 'Simpan Karyawan Baru' }).click()]);
 
     await page.goto('/admin/employees/create');
     await page.locator('#nikInput').fill(NIK);
     const taken = page.getByText('NIK sudah terdaftar.');
     await expect(taken).toBeVisible();
-    await expect(page.getByRole('link', { name: 'buka data pegawai tersebut' })).toHaveAttribute('href', new RegExp(`/admin/employees/${NIK}/detail`));
+    await expect(page.getByRole('link', { name: 'buka data karyawan tersebut' })).toHaveAttribute('href', new RegExp(`/admin/employees/${NIK}/detail`));
     await expect(page.locator('#nikInput')).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('menampilkan ringkasan error dengan fokus dan tautan ke isian', async ({ page }) => {
     await page.evaluate(() => { document.getElementById('employeeForm').noValidate = true; });
     await page.locator('#nikInput').fill('12');
-    await page.getByRole('button', { name: 'Simpan Pegawai Baru' }).click();
+    await page.getByRole('button', { name: 'Simpan Karyawan Baru' }).click();
 
     const summary = page.locator('#errorSummary');
     await expect(summary).toBeVisible();

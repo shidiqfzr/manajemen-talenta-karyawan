@@ -97,7 +97,7 @@ class MasterAuditLogTest extends TestCase
 
     public function test_history_shows_who_what_and_reason_but_no_employee_data(): void
     {
-        $employee = Employee::factory()->create(['nama' => 'Pegawai Rahasia Uji']);
+        $employee = Employee::factory()->create(['nama' => 'Karyawan Rahasia Uji']);
         MasterAuditLog::record(
             $this->admin, 'seat.removed', 'seat', 9, 'Kebun Uji — Manajer',
             ['kuota' => 1, 'bidang' => 'TAN', 'filled' => 0], null, 'Kursi dihapus karena restrukturisasi'

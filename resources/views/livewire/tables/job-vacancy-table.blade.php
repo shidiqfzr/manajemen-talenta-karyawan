@@ -77,7 +77,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-700 uppercase tracking-wider">
+                    <tr class="bg-surface-50 border-b border-surface-200">
                         <x-admin.table.th class="py-3.5 px-5">Unit Kerja</x-admin.table.th>
                         <x-admin.table.th class="py-3.5 px-5">Jabatan Lowong</x-admin.table.th>
                         <x-admin.table.th class="py-3.5 px-5">Pejabat Terakhir</x-admin.table.th>
@@ -219,10 +219,10 @@
                                             <span>Mutasi Internal</span>
                                         </a>
 
-                                        <!-- 2. Rekrut Pegawai Baru -->
+                                        <!-- 2. Rekrut Karyawan Baru -->
                                         <a href="{{ route('admin.employees.create', ['jabatan' => $item->jabatan, 'unit_kerja' => $item->unit_kerja, 'level' => $item->level, 'golongan' => $item->golongan]) }}"
                                             class="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 rounded-lg bg-white hover:bg-surface-50 text-surface-700 hover:text-surface-900 border border-surface-300 text-xs font-medium transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer text-center"
-                                            title="Rekrut pegawai baru dari luar untuk mengisi posisi ini">
+                                            title="Rekrut karyawan baru dari luar untuk mengisi posisi ini">
                                             <i class="fas fa-user-plus text-[10px] text-surface-400" aria-hidden="true"></i>
                                             <span>Rekrut Baru</span>
                                         </a>

@@ -53,7 +53,7 @@ class UpdateEmployeeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nama.required' => 'Nama lengkap pegawai wajib diisi.',
+            'nama.required' => 'Nama lengkap karyawan wajib diisi.',
             'level.in' => 'Level strata harus bernilai Karpim atau Karpel.',
             'rm_level.in' => 'RM Band harus bernilai RM-1 sampai RM-7.',
             'status_karyawan.required' => 'Status kepegawaian wajib dipilih.',

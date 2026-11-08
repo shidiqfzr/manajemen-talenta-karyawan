@@ -160,7 +160,7 @@ class PenugasanSementaraTest extends TestCase
 
         $emp1 = Employee::create([
             'nik' => '11112222',
-            'nama' => 'PEGAWAI PLT TEST',
+            'nama' => 'KARYAWAN PLT TEST',
             'level' => 'Karpim',
             'golongan' => 'IIIA/00',
             'jabatan' => 'Asisten Tanaman',
@@ -183,7 +183,7 @@ class PenugasanSementaraTest extends TestCase
 
         $emp2 = Employee::create([
             'nik' => '33334444',
-            'nama' => 'PEGAWAI DEFINITIF MURNI',
+            'nama' => 'KARYAWAN DEFINITIF MURNI',
             'level' => 'Karpim',
             'golongan' => 'IIIA/00',
             'jabatan' => 'Asisten Afdeling',
@@ -197,7 +197,7 @@ class PenugasanSementaraTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('admin.employees.index', ['status_penugasan' => 'sementara']));
         $response->assertStatus(200);
-        $response->assertSee('PEGAWAI PLT TEST');
-        $response->assertDontSee('PEGAWAI DEFINITIF MURNI');
+        $response->assertSee('KARYAWAN PLT TEST');
+        $response->assertDontSee('KARYAWAN DEFINITIF MURNI');
     }
 }

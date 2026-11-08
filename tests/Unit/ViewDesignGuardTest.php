@@ -74,6 +74,29 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_column_headers_use_the_shared_header_cell(): void
+    {
+        // Pengecualian: sel pembuat komponen, kolom centang, matriks MPP (header berkelompok), dan <th scope="row">.
+        $allowed = ['components/admin/table/', 'man-power-planning.blade.php', 'mpp-supply-plan-editor.blade.php'];
+        $violations = array_values(array_filter(
+            $this->tags('th', fn (string $tag) => ! str_contains($tag, 'scope="row"')),
+            fn (string $location) => collect($allowed)->every(fn (string $path) => ! str_contains(str_replace('\\', '/', $location), $path)),
+        ));
+
+        $this->assertNoViolations(
+            $violations,
+            'Header kolom tabel wajib memakai <x-admin.table.th> agar tipografi seragam di semua modul (DESIGN.md §7.5); jangan menulis <th> sendiri.'
+        );
+    }
+
+    public function test_table_header_typography_is_never_set_outside_the_shared_cell(): void
+    {
+        $this->assertNoViolations(
+            $this->scan('/<(?:thead|tr)(?=[\s>])(?:"[^"]*"|\'[^\']*\'|->|=>|[^>"\'])*\buppercase\b(?:"[^"]*"|\'[^\']*\'|->|=>|[^>"\'])*>/', fn () => true),
+            'Huruf kapital dan ukuran teks header diatur di x-admin.table.th, bukan pada <thead>/<tr> (DESIGN.md §7.5).'
+        );
+    }
+
     public function test_every_nav_landmark_is_labelled(): void
     {
         $this->assertNoViolations(
@@ -223,6 +246,35 @@ class ViewDesignGuardTest extends TestCase
         $this->assertNoViolations(
             $this->occurrences('/(?<![\w:-])animate-pulse(?![\w-])/'),
             'Gunakan motion-safe:animate-pulse agar hormat pada prefers-reduced-motion (DESIGN.md §3.7).'
+        );
+    }
+
+    public function test_module_index_pages_use_the_shared_header_and_flash(): void
+    {
+        // Halaman indeks modul Pelatihan dan Penilaian disejajarkan dengan modul Karyawan (DESIGN.md §6.1, §8.5).
+        $violations = [];
+        foreach (['admin/trainings/index.blade.php', 'admin/evaluations/index.blade.php'] as $path) {
+            $source = self::views()[$path] ?? '';
+
+            foreach ([
+                '<x-admin.module-header' => 'wajib memakai x-admin.module-header',
+                '<x-admin.flash' => 'wajib memakai x-admin.flash',
+            ] as $needle => $message) {
+                if (! str_contains($source, $needle)) {
+                    $violations[] = "{$path}: {$message}";
+                }
+            }
+
+            foreach (['<h1' => 'dilarang menulis <h1> sendiri', 'shadow-lg' => 'dilarang membungkus halaman dalam kartu putih', 'bg-info ' => 'tombol utama wajib x-admin.button variant primary'] as $needle => $message) {
+                if (str_contains($source, $needle)) {
+                    $violations[] = "{$path}: {$message}";
+                }
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Indeks Pelatihan dan Penilaian wajib memakai x-admin.module-header, x-admin.flash, dan tombol primer standar (DESIGN.md §6.1, §8.5).'
         );
     }
 

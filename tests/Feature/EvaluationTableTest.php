@@ -42,7 +42,7 @@ class EvaluationTableTest extends TestCase
             ]);
         }
 
-        $this->makeEvaluation($this->other, ['bidang_tugas' => 'Bidang Pegawai Lain', 'tanggal_pelaksanaan_asesmen' => '2024-12-01']);
+        $this->makeEvaluation($this->other, ['bidang_tugas' => 'Bidang Karyawan Lain', 'tanggal_pelaksanaan_asesmen' => '2024-12-01']);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -83,7 +83,7 @@ class EvaluationTableTest extends TestCase
         $component = $this->table()->set('perPage', 10)
             ->assertSee('Bidang 01')
             ->assertSee('Bidang 07')
-            ->assertDontSee('Bidang Pegawai Lain');
+            ->assertDontSee('Bidang Karyawan Lain');
 
         $this->assertSame(7, $component->instance()->rows->total());
     }
@@ -130,7 +130,7 @@ class EvaluationTableTest extends TestCase
 
         $component->set('search', 'Kata Tersembunyi');
         $this->assertSame(0, $component->instance()->rows->total());
-        $component->set('search', 'Pegawai Lain');
+        $component->set('search', 'Karyawan Lain');
         $this->assertSame(0, $component->instance()->rows->total());
     }
 

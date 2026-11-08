@@ -1,5 +1,5 @@
 {{--
-    Lencana status impor data pegawai. Label, warna, dan ikon mengikuti Tabel Status Induk (DESIGN.md §5.1);
+    Lencana status impor data karyawan. Label, warna, dan ikon mengikuti Tabel Status Induk (DESIGN.md §5.1);
     warna tidak menjadi satu-satunya penanda karena setiap status memiliki ikon dan label.
 
     <x-admin.import-status :status="$log->status" :skipped="$log->skipped_count" />

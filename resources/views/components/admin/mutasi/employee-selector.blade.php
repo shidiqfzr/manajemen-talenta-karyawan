@@ -8,7 +8,7 @@
         wire-model="nodes.{{ $index }}.employee_nik"
         :selected-nik="$node['employee_nik'] ?? ''"
         :selected-nama="$node['employee_nama'] ?? ''"
-        label="Pilih Pegawai yang Dimutasi"
+        label="Pilih Karyawan yang Dimutasi"
         placeholder="Ketik nama, NIK, atau formasi..."
         :exclude-index="$index"
         error-key="nodes.{{ $index }}.employee_nik"
@@ -19,6 +19,6 @@
         :nik="$node['employee_nik'] ?? ''"
         :show-readiness-metrics="true"
         :show-empty-state="true"
-        empty-message="Pilih pegawai pada pencarian di atas untuk melihat profil penempatan saat ini."
+        empty-message="Pilih karyawan pada pencarian di atas untuk melihat profil penempatan saat ini."
     />
 </div>

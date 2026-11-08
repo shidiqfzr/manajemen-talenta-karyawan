@@ -1,7 +1,7 @@
 {{--
     Toolbar pencarian dan filter tabel data Livewire (DESIGN.md §7.5, §8.4), dipakai di dalam x-admin.table.card bersama
-    trait WithDataTable. Tata letaknya mengikuti Direktori Pegawai supaya semua tabel terlihat dan terasa sama:
-    Baris pencarian: kolom pencarian ringkas (debounce 300ms, maks. 100 karakter), tombol "Filter Lanjutan" berhitungan,
+    trait WithDataTable. Tata letaknya mengikuti Daftar Karyawan supaya semua tabel terlihat dan terasa sama:
+    Baris pencarian: kolom pencarian selebar sisa baris (debounce 300ms, maks. 100 karakter), tombol "Filter Lanjutan" berhitungan,
     dan "Reset Filter" (tampil hanya bila ada pencarian atau filter aktif). Kedua tombol berukuran sama.
     Panel filter: kolom berlabel terlihat dengan ikon (pilihan, rentang tanggal, saklar ya-tidak); tertutup secara
     bawaan, Esc menutupnya dan mengembalikan fokus ke tombol. Filter langsung diterapkan saat kolom berubah.
@@ -14,7 +14,7 @@
         :filter-values="$this->activeFilterValues()"
         :has-active-filters="$this->hasActiveFilters()"
         :search="$search"
-        search-placeholder="Cari nama pegawai..." />
+        search-placeholder="Cari nama karyawan..." />
 
     table-id        : awalan id unik elemen form (beberapa tabel dapat tampil di satu halaman).
     filters         : list<App\Support\DataTable\Filter>; select -> x-admin.filter-select berlabel dan dapat dihapus,
@@ -81,7 +81,7 @@
 <div x-data="{ open: false }" @keydown.escape="if (open) { open = false; $nextTick(() => $refs.filterToggle?.focus()) }" class="p-3 sm:p-4 bg-surface-50/70 border-b border-surface-200 space-y-3">
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         <label for="{{ $searchId }}" class="sr-only">Pencarian</label>
-        <x-admin.search-input :model="$searchModel" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative w-full sm:w-60 lg:w-72 sm:flex-none min-w-0" />
+        <x-admin.search-input :model="$searchModel" :id="$searchId" :placeholder="$searchPlaceholder" :shortcut="$searchShortcut" maxlength="100" containerClass="relative w-full sm:flex-1 min-w-0" />
 
         @if ($hasPanel)
             <button type="button" x-ref="filterToggle" @click="open = ! open" aria-expanded="false" :aria-expanded="open" aria-controls="{{ $panelId }}"

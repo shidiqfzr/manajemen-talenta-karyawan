@@ -1,10 +1,10 @@
 {{--
-    Direktori Pegawai di atas lapisan tabel data bersama (referensi: livewire/admin/master/audit-history.blade.php).
+    Daftar Karyawan di atas lapisan tabel data bersama (referensi: livewire/admin/master/audit-history.blade.php).
     Kartu KPI dan strip tata kelola dirender di sini agar sorotan dan tautannya selalu mengikuti state tabel saat ini;
     klik kartu memanggil $set / clearKpiFilters (nilai divalidasi seperti filter lain), href tetap ada sebagai cadangan tanpa JS.
     Pilihan baris, Hapus massal (bilah aksi massal bersama) dan Ekspor Excel berjalan lewat lapisan tabel bersama:
     hapus massal hanya menyentuh baris terpilih di dalam hasil pencarian/filter saat ini, ekspor memakai format EmployeesExport.
-    Menu aksi baris dan modal hapus satu pegawai tetap memakai state Alpine halaman admin/employees/index (confirmDelete, copyNik).
+    Menu aksi baris dan modal hapus satu karyawan tetap memakai state Alpine halaman admin/employees/index (confirmDelete, copyNik).
 --}}
 @php
     $rows = $this->rows;
@@ -37,11 +37,11 @@
 
         {{-- Summary KPI Metrics Cards (Primary Interactive Navigation & Executive Headcount Overview) --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {{-- 1. Total Pegawai: clears the card-driven filters --}}
+            {{-- 1. Total Karyawan: clears the card-driven filters --}}
             <x-admin.kpi-card
-                title="Total Pegawai"
+                title="Total Karyawan"
                 :value="$kpiTotal"
-                subtitle="Pegawai aktif terdaftar"
+                subtitle="Karyawan aktif terdaftar"
                 icon="fas fa-users"
                 theme="primary"
                 :active="$noKpiFilter"
@@ -104,7 +104,7 @@
                         </span>
                         @if ($value === 'sanksi' && $expired > 0)
                             <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-warning-700 text-white shadow-2xs motion-safe:animate-pulse"
-                                  title="{{ $expired }} pegawai masa sanksinya telah habis/kedaluwarsa">
+                                  title="{{ $expired }} karyawan masa sanksinya telah habis/kedaluwarsa">
                                 {{ $expired }} kedaluwarsa
                             </span>
                         @endif
@@ -113,12 +113,6 @@
             </div>
 
             <div class="flex items-center gap-3">
-                @if ($statusKhusus !== '')
-                    <button type="button" wire:click.prevent="$set('statusKhusus', '')"
-                        class="text-[11px] text-surface-500 hover:text-danger font-medium inline-flex items-center gap-1 cursor-pointer">
-                        <i class="fas fa-times text-[10px]" aria-hidden="true"></i> Reset Status Khusus
-                    </button>
-                @endif
                 <a href="{{ route('admin.mutasi.index') }}" class="text-[11px] font-semibold text-primary-700 hover:text-primary-900 hover:underline inline-flex items-center gap-1">
                     <span>Kelola di Modul Mutasi</span>
                     <i class="fas fa-arrow-right text-[10px]" aria-hidden="true"></i>
@@ -136,7 +130,7 @@
             :search="$search"
             search-placeholder="Cari NIK, Nama, Jabatan, atau Unit Kerja..." />
 
-        <x-admin.table.header title="Direktori Pegawai" :paginator="$rows" noun="Pegawai" :export="$this->exportName() !== null" />
+        <x-admin.table.header title="Daftar Karyawan" :paginator="$rows" noun="Karyawan" :export="$this->exportName() !== null" />
 
         <x-admin.table.bulk-bar
             :actions="$bulkActions"
@@ -153,6 +147,7 @@
                     :sort-field="$sortField"
                     :sort-direction="$sortDirection"
                     :selectable="$bulkActions !== []"
+                    avatar-leading
                     :page-keys="$pageKeys"
                     :selected="$selected"
                     :select-all-matching="$selectAllMatching" />
@@ -165,7 +160,7 @@
                             wire:key="row-{{ $employee->nik }}" />
                     @empty
                         @if ($hasActiveFilters)
-                            <x-admin.table.empty-state :colspan="$columnCount" icon="fas fa-users-slash" message="Tidak ada pegawai yang sesuai dengan pencarian atau filter.">
+                            <x-admin.table.empty-state :colspan="$columnCount" icon="fas fa-users-slash" message="Tidak ada karyawan yang sesuai dengan pencarian atau filter.">
                                 <x-admin.button variant="secondary" size="sm" icon="fas fa-rotate-left" wire:click="resetFilters" target="resetFilters">Reset Filter</x-admin.button>
                             </x-admin.table.empty-state>
                         @else
@@ -184,6 +179,6 @@
             </table>
         </div>
 
-        <x-admin.table.pagination :paginator="$rows" noun="pegawai" :per-page-options="$this->perPageOptions()" />
+        <x-admin.table.pagination :paginator="$rows" noun="karyawan" :per-page-options="$this->perPageOptions()" />
     </x-admin.table.card>
 </div>

@@ -42,7 +42,7 @@ class MutasiChainProcessTest extends TestCase
 
         Livewire::actingAs($this->adminUser)
             ->test(MutasiChainProcess::class)
-            ->assertSee('Pilih pegawai pada slot ini terlebih dahulu')
+            ->assertSee('Pilih karyawan pada slot ini terlebih dahulu')
             ->set('nodes.0.employee_nik', $emp->nik)
             ->assertSeeHtml('id="unitKerjaInputMutasi_0"')
             ->assertSee('Filter Wilayah Kerja');
@@ -192,14 +192,14 @@ class MutasiChainProcessTest extends TestCase
         Position::factory()->create(['nama' => 'Asisten Belian', 'rm_level' => 'RM-3']);
 
         $activeEmp = Employee::factory()->create([
-            'nama' => 'Pegawai Aktif',
+            'nama' => 'Karyawan Aktif',
             'jabatan' => 'Asisten Meliau',
             'unit_kerja' => 'Kebun Meliau',
             'tanggal_pensiun' => now()->addYears(3),
         ]);
 
         $retiredEmp = Employee::factory()->create([
-            'nama' => 'Pegawai Pensiun',
+            'nama' => 'Karyawan Pensiun',
             'jabatan' => 'Asisten Belian',
             'unit_kerja' => 'Kebun Belian',
             'tanggal_pensiun' => now()->subMonth(),
@@ -327,7 +327,7 @@ class MutasiChainProcessTest extends TestCase
             ->call('openReviewModal')
             ->assertHasErrors(['chain_topology'])
             ->assertSee('Pemberitahuan Validasi Rantai Mutasi')
-            ->assertSee('Lengkapi minimal 2 pegawai beserta formasi dan unit kerja target')
+            ->assertSee('Lengkapi minimal 2 karyawan beserta formasi dan unit kerja target')
             ->assertSee('Tinjau Konfigurasi');
     }
 
@@ -490,8 +490,8 @@ class MutasiChainProcessTest extends TestCase
             ->set('nodes.3.target_jabatan', 'Kasubag Pengembangan SDM')
             ->set('nodes.3.is_dispensasi', true)
             ->assertSee('Rantai Multi-Siklis (2 Siklus Mandiri / Net Zero Vacancy)')
-            ->assertSee('Klaster #1 • Tukar Jabatan / Swap (2 Pegawai)')
-            ->assertSee('Klaster #2 • Tukar Jabatan / Swap (2 Pegawai)')
+            ->assertSee('Klaster #1 • Tukar Jabatan / Swap (2 Karyawan)')
+            ->assertSee('Klaster #2 • Tukar Jabatan / Swap (2 Karyawan)')
             ->assertSee('SEPTIAN ANANDA')
             ->assertSee('AHMAD RIFAI')
             ->assertSee('DJOKO PURWANTO')
@@ -503,8 +503,8 @@ class MutasiChainProcessTest extends TestCase
             ->call('openReviewModal')
             ->assertSet('showReviewModal', true)
             ->assertSee('Konfirmasi Eksekusi Mutasi Kolektif')
-            ->assertSeeHtml('Klaster #1 • Tukar Jabatan / Swap (2 Pegawai)')
-            ->assertSeeHtml('Klaster #2 • Tukar Jabatan / Swap (2 Pegawai)');
+            ->assertSeeHtml('Klaster #1 • Tukar Jabatan / Swap (2 Karyawan)')
+            ->assertSeeHtml('Klaster #2 • Tukar Jabatan / Swap (2 Karyawan)');
     }
 
     public function test_chain_node_renders_talent_readiness_metrics_strip_and_profile_card(): void
@@ -635,7 +635,7 @@ class MutasiChainProcessTest extends TestCase
         $this->assertTrue($initialVacancies->contains('jabatan', 'Kepala Sub Bagian Pengolahan'));
 
         // 4. Setup 3 Active Employees in the domino chain
-        // Pegawai 1: Ahmad Zaki in Kebun Danau Salak (Tenure 3.5 years -> Compliant)
+        // Karyawan 1: Ahmad Zaki in Kebun Danau Salak (Tenure 3.5 years -> Compliant)
         $empAhmad = Employee::factory()->create([
             'nik' => '10001001',
             'nama' => 'AHMAD ZAKI',
@@ -656,7 +656,7 @@ class MutasiChainProcessTest extends TestCase
             'is_applied' => true,
         ]);
 
-        // Pegawai 2: Bambang Prakoso in Kebun Pelaihari (Tenure 2.5 years, High Performer for Promotion)
+        // Karyawan 2: Bambang Prakoso in Kebun Pelaihari (Tenure 2.5 years, High Performer for Promotion)
         $empBambang = Employee::factory()->create([
             'nik' => '10002002',
             'nama' => 'BAMBANG PRAKOSO',
@@ -684,7 +684,7 @@ class MutasiChainProcessTest extends TestCase
             'box' => 8, // Top Performer
         ]);
 
-        // Pegawai 3: Candra Kusuma in PKS Ngabang (Tenure 0.8 years -> Requires Tenure Dispensation)
+        // Karyawan 3: Candra Kusuma in PKS Ngabang (Tenure 0.8 years -> Requires Tenure Dispensation)
         $empCandra = Employee::factory()->create([
             'nik' => '10003003',
             'nama' => 'CANDRA KUSUMA',

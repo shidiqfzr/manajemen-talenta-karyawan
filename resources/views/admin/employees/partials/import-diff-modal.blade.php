@@ -33,7 +33,7 @@
                                 </span>
                             </h3>
                             <p class="text-xs text-surface-500 mt-0.5">
-                                Pegawai: <strong class="text-surface-800" x-text="activeDiffRow?.nama"></strong> &bull; NIK: <strong class="font-mono text-surface-800" x-text="activeDiffRow?.nik"></strong>
+                                Karyawan: <strong class="text-surface-800" x-text="activeDiffRow?.nama"></strong> &bull; NIK: <strong class="font-mono text-surface-800" x-text="activeDiffRow?.nik"></strong>
                             </p>
                         </div>
                     </div>
@@ -46,11 +46,11 @@
                 <div class="p-6 max-h-[60vh] overflow-y-auto">
                     <div class="border border-surface-200 rounded-xl overflow-hidden shadow-2xs">
                         <table class="w-full text-left border-collapse text-xs">
-                            <thead class="bg-surface-100 border-b border-surface-200 text-surface-700 text-[11px] uppercase font-bold">
+                            <thead class="bg-surface-100 border-b border-surface-200">
                                 <tr>
-                                    <th scope="col" class="py-2.5 px-3.5 w-1/3">Atribut Kepegawaian</th>
-                                    <th scope="col" class="py-2.5 px-3.5 w-1/3 text-danger-700 bg-danger-50/50">Nilai Saat Ini (Database)</th>
-                                    <th scope="col" class="py-2.5 px-3.5 w-1/3 text-primary-700 bg-primary-50/50">Nilai Baru (Spreadsheet)</th>
+                                    <x-admin.table.th class="py-2.5 px-3.5 w-1/3">Atribut Kepegawaian</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-3.5 w-1/3 bg-danger-50/50">Nilai Saat Ini (Database)</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-3.5 w-1/3 bg-primary-50/50">Nilai Baru (Spreadsheet)</x-admin.table.th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-surface-100 text-[11px] bg-white">

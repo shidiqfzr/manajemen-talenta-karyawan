@@ -28,7 +28,7 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
     {
         return [
             'UNIT KERJA RESMI',
-            'STRATA PEGAWAI',
+            'STRATA KARYAWAN',
             'RM LEVEL',
             'STATUS KARYAWAN',
             'STATUS PENUGASAN',

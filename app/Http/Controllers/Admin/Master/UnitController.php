@@ -99,7 +99,7 @@ class UnitController extends Controller
     }
 
     /**
-     * Remove unit from database (hanya bila tidak dipakai pegawai, formasi jabatan, atau riwayat jabatan).
+     * Remove unit from database (hanya bila tidak dipakai karyawan, formasi jabatan, atau riwayat jabatan).
      */
     public function destroy(Request $request, Unit $unit, MasterFormasiService $service)
     {

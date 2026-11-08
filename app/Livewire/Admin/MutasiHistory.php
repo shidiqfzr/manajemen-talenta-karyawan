@@ -251,7 +251,7 @@ class MutasiHistory extends Component
         $item = collect($result['items'])->firstWhere('id', $jobHistoryId);
         $msg = "Sukses! Mutasi atas nama {$item['nama']} ke {$item['jabatan']} di {$item['unit_kerja']} berhasil diaktifkan.";
         if ($result['activated_count'] > 1) {
-            $msg .= " ({$result['activated_count']} pegawai dalam satu SK turut diaktifkan.)";
+            $msg .= " ({$result['activated_count']} karyawan dalam satu SK turut diaktifkan.)";
         }
         session()->flash('mutasi_success', $msg);
 
@@ -275,7 +275,7 @@ class MutasiHistory extends Component
     {
         try {
             $result = $service->cancelScheduledMutation($jobHistoryId, 'Dibatalkan oleh Administrator SDM');
-            session()->flash('mutasi_success', "Sukses! Jadwal mutasi ({$result['cancelled_count']} pegawai) berhasil dibatalkan dan formasi telah dilepaskan.");
+            session()->flash('mutasi_success', "Sukses! Jadwal mutasi ({$result['cancelled_count']} karyawan) berhasil dibatalkan dan formasi telah dilepaskan.");
             if ($this->selectedJobId === $jobHistoryId) {
                 $this->closeDetailModal();
             }

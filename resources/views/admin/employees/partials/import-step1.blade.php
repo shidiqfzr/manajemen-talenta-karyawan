@@ -12,7 +12,7 @@
                 <span>Unggah Berkas Spreadsheet</span>
             </h3>
             <p class="text-xs text-surface-500 mt-0.5 leading-relaxed">
-                Pilih berkas Excel (.xlsx / .xls) untuk penambahan pegawai baru atau pembaruan massal data formasi.
+                Pilih berkas Excel (.xlsx / .xls) untuk penambahan karyawan baru atau pembaruan massal data formasi.
             </p>
         </div>
 

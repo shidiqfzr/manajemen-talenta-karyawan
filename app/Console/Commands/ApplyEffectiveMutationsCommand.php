@@ -21,7 +21,7 @@ class ApplyEffectiveMutationsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Aktivasi otomatis mutasi pegawai terjadwal yang telah mencapai tanggal TMT efektif';
+    protected $description = 'Aktivasi otomatis mutasi karyawan terjadwal yang telah mencapai tanggal TMT efektif';
 
     /**
      * Execute the console command.
@@ -42,7 +42,7 @@ class ApplyEffectiveMutationsCommand extends Command
                 return self::SUCCESS;
             }
 
-            $this->info("Berhasil mengaktifkan {$result['activated_count']} mutasi pegawai:");
+            $this->info("Berhasil mengaktifkan {$result['activated_count']} mutasi karyawan:");
 
             $tableRows = array_map(function ($item) {
                 return [
@@ -56,7 +56,7 @@ class ApplyEffectiveMutationsCommand extends Command
             }, $result['items']);
 
             $this->table(
-                ['NIK', 'Nama Pegawai', 'Jabatan Baru', 'Unit Kerja Baru', 'TMT Efektif', 'Jenis Mutasi'],
+                ['NIK', 'Nama Karyawan', 'Jabatan Baru', 'Unit Kerja Baru', 'TMT Efektif', 'Jenis Mutasi'],
                 $tableRows
             );
 

@@ -46,7 +46,7 @@
                 <i class="fas fa-briefcase text-base" aria-hidden="true"></i>
             </div>
             <h4 class="text-xs font-bold text-surface-700 uppercase tracking-wider mb-1">Tidak Ada Penugasan Sementara</h4>
-            <p class="text-xs text-surface-500 mb-3">Pegawai ini tidak memiliki tugas rangkap (Plt/Pjs) yang sedang aktif saat ini.</p>
+            <p class="text-xs text-surface-500 mb-3">Karyawan ini tidak memiliki tugas rangkap (Plt/Pjs) yang sedang aktif saat ini.</p>
             <x-admin.button wire:click="openModal" size="sm" icon="fas fa-plus" target="openModal">Tambah Penugasan Sementara</x-admin.button>
         </div>
     @endif

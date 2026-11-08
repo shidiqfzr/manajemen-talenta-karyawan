@@ -14,7 +14,7 @@
                         <i class="fas fa-clipboard-check" aria-hidden="true"></i>
                     </div>
                     <div>
-                        <h3 class="text-base sm:text-lg font-black text-surface-900">Ringkasan Eksekutif Impor Pegawai</h3>
+                        <h3 class="text-base sm:text-lg font-black text-surface-900">Ringkasan Eksekutif Impor Karyawan</h3>
                         <p class="text-xs text-surface-500 mt-1 leading-relaxed">
                             Berita acara pemutakhiran master data kepegawaian dan pencatatan riwayat penugasan resmi.
                         </p>
@@ -72,7 +72,7 @@
                         theme="warning" />
 
                     <x-admin.kpi-card
-                        title="Pegawai Baru"
+                        title="Karyawan Baru"
                         x-text="commitSummary?.created ?? 0"
                         subtitle="Data ditambahkan"
                         icon="fas fa-user-plus"
@@ -133,7 +133,7 @@
                         <i class="fas fa-user-clock text-sm" aria-hidden="true"></i>
                     </div>
                     <div>
-                        <p class="font-bold">Pengajuan terkirim. Data pegawai belum diubah.</p>
+                        <p class="font-bold">Pengajuan terkirim. Data karyawan belum diubah.</p>
                         <p class="text-[11px] mt-0.5 leading-relaxed">
                             Admin lain perlu meninjau dan menyetujui sebelum data disimpan (persetujuan empat mata).
                             Pantau statusnya pada <a :href="batchUrl" class="font-bold underline">Riwayat &amp; Persetujuan Impor</a>.

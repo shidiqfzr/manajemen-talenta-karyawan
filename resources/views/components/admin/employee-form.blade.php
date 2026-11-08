@@ -90,7 +90,7 @@
             <div class="flex items-center gap-3 pb-4 border-b border-surface-100">
                 <span class="w-8 h-8 rounded-xl bg-primary-100 text-primary-800 text-xs font-extrabold flex items-center justify-center shrink-0">1</span>
                 <div>
-                    <h3 class="text-base font-extrabold text-surface-900">Identitas Pribadi &amp; Demografi Pegawai</h3>
+                    <h3 class="text-base font-extrabold text-surface-900">Identitas Pribadi &amp; Demografi Karyawan</h3>
                     <p class="text-xs text-surface-500">Foto resmi, Nomor Induk Karyawan, kependudukan, dan kualifikasi pendidikan formal</p>
                 </div>
                 <p class="ml-auto self-start text-[11px] text-surface-500 whitespace-nowrap hidden sm:block">Kolom bertanda <span class="text-danger font-bold" aria-hidden="true">*</span><span class="sr-only">bintang</span> wajib diisi</p>
@@ -117,7 +117,7 @@
 
                 <div class="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
                     <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <h4 class="text-xs font-bold text-surface-800">Foto Profil Pegawai</h4>
+                        <h4 class="text-xs font-bold text-surface-800">Foto Profil Karyawan</h4>
                     </div>
                     <p class="text-xs text-surface-500 leading-relaxed max-w-xl">
                         Unggah foto resmi berlatar belakang polos. Format <span class="font-semibold text-surface-700">JPG, PNG, atau WebP</span> (maks. 2 MB).
@@ -197,7 +197,7 @@
                     @if(!$employee)
                     <div id="nikStatusText" aria-live="polite">
                         <p x-show="nikStatus === 'checking'" x-cloak class="text-[11px] text-surface-500 mt-1">Memeriksa NIK...</p>
-                        <p x-show="nikStatus === 'taken'" x-cloak class="text-danger-700 text-sm mt-1">NIK sudah terdaftar. Periksa kembali atau <a :href="nikShowUrl" class="underline font-semibold rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">buka data pegawai tersebut</a>.</p>
+                        <p x-show="nikStatus === 'taken'" x-cloak class="text-danger-700 text-sm mt-1">NIK sudah terdaftar. Periksa kembali atau <a :href="nikShowUrl" class="underline font-semibold rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">buka data karyawan tersebut</a>.</p>
                         <p x-show="nikStatus === 'ok'" x-cloak class="text-[11px] text-primary-700 mt-1"><i class="fas fa-check-circle mr-1" aria-hidden="true"></i>NIK tersedia.</p>
                     </div>
                     @endif
@@ -273,7 +273,7 @@
                     <!-- Contextual Live Pill Badges for MBT & BUP -->
                     <div x-show="tanggalLahir" x-cloak class="mt-2 flex flex-wrap items-center gap-1.5">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning-50 text-warning-800 border border-warning-200 text-[10px] font-medium">
-                            <abbr title="Masa Bakti Terakhir: 55 tahun" class="font-bold no-underline cursor-help">MBT (55):</abbr>
+                            <abbr title="Masa Bebas Tugas: 6 bulan sebelum pensiun" class="font-bold no-underline cursor-help">MBT (H-6 bln):</abbr>
                             <span class="font-mono" x-text="calculateMbt()"></span>
                         </span>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-200 text-[10px] font-medium">
@@ -315,12 +315,12 @@
                 </div>
 
             <div class="space-y-5">
-                {{-- Level Pegawai & Jalur Masuk (DOMAIN.md Bab 2.1) --}}
+                {{-- Level Karyawan & Jalur Masuk (DOMAIN.md Bab 2.1) --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <!-- Level Pegawai -->
+                    <!-- Level Karyawan -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label id="levelLabel" class="block text-xs font-bold text-surface-700">Level Strata Pegawai <span class="text-danger">*</span></label>
+                            <label id="levelLabel" class="block text-xs font-bold text-surface-700">Level Strata Karyawan <span class="text-danger">*</span></label>
                             @if($employee)
                             <span class="text-[10px] text-surface-500"><i class="fas fa-lock text-[10px] mr-1" aria-hidden="true"></i>Terkunci</span>
                             @endif
@@ -355,7 +355,7 @@
                         @error('level') <p class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    {{-- Jalur Masuk / Rekrutmen Pegawai (DOMAIN.md Bab 2.1) --}}
+                    {{-- Jalur Masuk / Rekrutmen Karyawan (DOMAIN.md Bab 2.1) --}}
                     <div>
                         <x-admin.form.select 
                             name="jalur_masuk" 
@@ -674,7 +674,7 @@
                                 </label>
                                 <p class="text-[11px]" :class="level === 'Karpim' ? 'text-surface-500' : 'text-surface-500'">
                                     <template x-if="level === 'Karpim'">
-                                        <span>Tanggal resmi pegawai diangkat menjadi staf pimpinan PTPN (Wajib untuk Karpim).</span>
+                                        <span>Tanggal resmi karyawan diangkat menjadi staf pimpinan PTPN (Wajib untuk Karpim).</span>
                                     </template>
                                     <template x-if="level === 'Karpel'">
                                         <span><i class="fas fa-lock text-[10px] mr-1" aria-hidden="true"></i> Tidak berlaku untuk Karyawan Pelaksana (Karpel). Kosong secara otomatis.</span>
@@ -710,7 +710,7 @@
                     Batal
                 </x-admin.button>
                 <x-admin.button type="submit" once variant="primary" icon="fas fa-check-circle" class="shadow-primary-600/20 shadow-md">
-                    {{ $employee ? 'Simpan Perubahan' : 'Simpan Pegawai Baru' }}
+                    {{ $employee ? 'Simpan Perubahan' : 'Simpan Karyawan Baru' }}
                 </x-admin.button>
             </div>
         </div>
@@ -917,9 +917,11 @@
                     if (!this.tanggalLahir) return null;
                     let parts = this.tanggalLahir.split('-');
                     if (parts.length !== 3) return null;
-                    let year = parseInt(parts[0]) + 55;
-                    let month = parts[1];
-                    return `01-${month}-${year}`;
+                    // Pensiun = awal bulan lahir + 56 tahun; MBT = 6 bulan sebelumnya (KepegawaianPolicy::MBT_BULAN_SEBELUM_PENSIUN).
+                    let year = parseInt(parts[0]) + 56;
+                    let month = parseInt(parts[1]) - 6;
+                    if (month < 1) { month += 12; year -= 1; }
+                    return `01-${String(month).padStart(2, '0')}-${year}`;
                 },
 
                 get isJobGradeWarning() {

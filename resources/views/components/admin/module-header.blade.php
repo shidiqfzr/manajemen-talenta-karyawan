@@ -1,6 +1,6 @@
 {{--
     Kepala halaman modul (DESIGN.md §6.1, §8.5): breadcrumb, judul, subjudul, dan slot aksi utama.
-    Dipakai bersama oleh modul Pegawai, Mutasi, dan Master Formasi agar tampilannya identik.
+    Dipakai bersama oleh modul Karyawan, Mutasi, dan Master Formasi agar tampilannya identik.
     Item breadcrumb berupa teks atau ['label' => ..., 'url' => ...]; item terakhir adalah halaman aktif.
 
     <x-admin.module-header title="Manajemen Karyawan" subtitle="..." :breadcrumbs="['Core HR', 'Manajemen Karyawan']">

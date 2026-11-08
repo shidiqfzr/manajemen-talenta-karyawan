@@ -104,7 +104,7 @@ class FormasiDialogs
         return [
             'title' => $unit->is_active ? 'Nonaktifkan Unit Kerja' : 'Aktifkan Unit Kerja',
             'description' => $unit->is_active
-                ? $unit->nama.' tidak akan muncul pada pilihan penempatan baru. Unit yang masih memiliki pegawai tidak dapat dinonaktifkan.'
+                ? $unit->nama.' tidak akan muncul pada pilihan penempatan baru. Unit yang masih memiliki karyawan tidak dapat dinonaktifkan.'
                 : $unit->nama.' akan kembali muncul pada pilihan penempatan.',
             'url' => route('admin.master.units.toggle', $unit),
             'method' => 'POST',
@@ -121,7 +121,7 @@ class FormasiDialogs
     {
         return [
             'title' => 'Hapus Unit Kerja',
-            'description' => $unit->nama.' hanya dapat dihapus bila tidak dipakai pegawai, formasi jabatan, maupun riwayat jabatan. Bila masih dipakai, gunakan Nonaktifkan.',
+            'description' => $unit->nama.' hanya dapat dihapus bila tidak dipakai karyawan, formasi jabatan, maupun riwayat jabatan. Bila masih dipakai, gunakan Nonaktifkan.',
             'url' => route('admin.master.units.destroy', $unit),
             'method' => 'DELETE',
             'submit' => 'Hapus Unit',
@@ -159,7 +159,7 @@ class FormasiDialogs
         return [
             'title' => $seat->position_active ? 'Nonaktifkan Jabatan' : 'Aktifkan Jabatan',
             'description' => $seat->position_active
-                ? $seat->jabatan.' tidak akan muncul pada pilihan penempatan baru. Jabatan yang masih dipegang pegawai tidak dapat dinonaktifkan.'
+                ? $seat->jabatan.' tidak akan muncul pada pilihan penempatan baru. Jabatan yang masih dipegang karyawan tidak dapat dinonaktifkan.'
                 : $seat->jabatan.' akan kembali muncul pada pilihan penempatan.',
             'url' => route('admin.master.positions.toggle', $seat->position_id),
             'method' => 'POST',

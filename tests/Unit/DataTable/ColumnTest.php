@@ -23,9 +23,9 @@ class ColumnTest extends TestCase
 
     public function test_export_heading_defaults_to_label(): void
     {
-        $column = Column::make('nama', 'Nama Pegawai');
+        $column = Column::make('nama', 'Nama Karyawan');
 
-        $this->assertSame('Nama Pegawai', $column->exportHeading());
+        $this->assertSame('Nama Karyawan', $column->exportHeading());
         $this->assertSame('Nama', $column->exportable('Nama')->exportHeading());
         $this->assertTrue($column->exportable()->isExportable());
         $this->assertTrue($column->exportOnly()->isExportOnly());

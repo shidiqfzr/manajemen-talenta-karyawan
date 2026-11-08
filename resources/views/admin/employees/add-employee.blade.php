@@ -3,13 +3,13 @@
 @section('content')
 <div class="space-y-6 max-w-5xl mx-auto">
     <x-admin.page-header 
-        title="Tambah Pegawai Baru"
-        subtitle="Input data induk pegawai untuk penempatan baru atau pengisian formasi kosong PTPN IV Regional V"
+        title="Tambah Karyawan Baru"
+        subtitle="Input data induk karyawan untuk penempatan baru atau pengisian formasi kosong PTPN IV Regional V"
         icon="fas fa-user-plus"
         :breadcrumbs="[
             ['label' => 'Core HR'],
-            ['label' => 'Direktori Pegawai', 'url' => route('admin.employees.index')],
-            ['label' => 'Tambah Pegawai']
+            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
+            ['label' => 'Tambah Karyawan']
         ]"
         back-url="{{ route('admin.employees.index') }}"
         back-label="Kembali ke Direktori"
@@ -28,7 +28,7 @@
             <div class="text-xs text-primary-950 space-y-1">
                 <h4 class="font-extrabold text-primary-900 text-sm">Rekrutmen Penutup Rantai Formasi Kosong</h4>
                 <p class="leading-relaxed">
-                    Anda sedang mendaftarkan pegawai baru untuk mengisi lowongan posisi: <strong class="text-surface-900 font-bold">{{ $prefilledJabatan }}</strong> di <strong class="text-surface-900 font-bold">{{ $prefilledUnit }}</strong>.
+                    Anda sedang mendaftarkan karyawan baru untuk mengisi lowongan posisi: <strong class="text-surface-900 font-bold">{{ $prefilledJabatan }}</strong> di <strong class="text-surface-900 font-bold">{{ $prefilledUnit }}</strong>.
                 </p>
                 <p class="text-primary-700 flex items-center gap-1 font-semibold">
                     <i class="fas fa-check-circle text-xs" aria-hidden="true"></i> Setelah disimpan, lowongan ini otomatis terisi dan tuntas dari <strong>Monitoring Jabatan Kosong</strong>.

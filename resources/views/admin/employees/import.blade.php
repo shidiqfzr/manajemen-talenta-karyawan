@@ -12,12 +12,12 @@
 
     <!-- Header Standar Enterprise -->
     <x-admin.page-header 
-        title="Impor Data Pegawai"
-        subtitle="Alur unggah massal data induk pegawai dengan validasi multi-tahap, pratinjau analisis perubahan, dan mitigasi kesalahan."
+        title="Impor Data Karyawan"
+        subtitle="Alur unggah massal data induk karyawan dengan validasi multi-tahap, pratinjau analisis perubahan, dan mitigasi kesalahan."
         icon="fas fa-file-excel"
         :breadcrumbs="[
             ['label' => 'Core HR'],
-            ['label' => 'Direktori Pegawai', 'url' => route('admin.employees.index')],
+            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Impor Data Spreadsheet']
         ]"
         back-url="{{ route('admin.employees.index') }}"

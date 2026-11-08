@@ -6,7 +6,7 @@ use App\Models\Employee;
 use App\Models\Position;
 
 /**
- * Pegawai contoh untuk pengujian MPP.
+ * Karyawan contoh untuk pengujian MPP.
  */
 trait CreatesMppEmployees
 {

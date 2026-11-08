@@ -31,7 +31,7 @@
                             <div>
                                 <span class="font-bold text-xs">{{ $detailJob->is_applied ? 'Status: Aktif Menjabat (Telah Diterapkan)' : 'Status: Menunggu Jadwal TMT Efektif (Staging)' }}</span>
                                 <p class="text-[11px] {{ $detailJob->is_applied ? 'text-primary-700' : 'text-warning-700' }} mt-0.5">
-                                    {{ $detailJob->is_applied ? 'SK telah resmi berlaku dan tercatat sebagai riwayat jabatan aktif di data master.' : 'Formasi jabatan terkunci untuk pegawai ini dan menunggu aktivasi TMT.' }}
+                                    {{ $detailJob->is_applied ? 'SK telah resmi berlaku dan tercatat sebagai riwayat jabatan aktif di data master.' : 'Formasi jabatan terkunci untuk karyawan ini dan menunggu aktivasi TMT.' }}
                                 </p>
                             </div>
                         </div>
@@ -43,9 +43,9 @@
                     <!-- Profil Karyawan & Penugasan Grid -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div class="p-3 bg-surface-50 rounded-xl border border-surface-200 space-y-2">
-                            <h4 class="text-[11px] font-bold text-surface-500 uppercase tracking-wide">Data Pegawai</h4>
+                            <h4 class="text-[11px] font-bold text-surface-500 uppercase tracking-wide">Data Karyawan</h4>
                             <div>
-                                <div class="font-bold text-surface-900 text-sm">{{ $detailJob->employee?->nama ?? 'Pegawai' }}</div>
+                                <div class="font-bold text-surface-900 text-sm">{{ $detailJob->employee?->nama ?? 'Karyawan' }}</div>
                                 <div class="text-surface-500 font-mono text-[11px]">NIK: {{ $detailJob->employee_nik }}</div>
                             </div>
                             <div class="pt-2 border-t border-surface-200 flex items-center justify-between text-[11px]">

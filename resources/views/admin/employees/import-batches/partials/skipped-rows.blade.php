@@ -45,10 +45,10 @@
             </summary>
             <div class="overflow-x-auto border-t border-surface-100">
                 <table class="min-w-full text-left text-sm">
-                    <thead class="bg-surface-50 text-xs font-semibold text-surface-600">
+                    <thead class="bg-surface-50 border-b border-surface-200">
                         <tr>
-                            <th scope="col" class="px-5 py-2.5 w-24">Baris</th>
-                            <th scope="col" class="px-5 py-2.5">Alasan</th>
+                            <x-admin.table.th class="px-5 py-2.5 w-24">Baris</x-admin.table.th>
+                            <x-admin.table.th class="px-5 py-2.5">Alasan</x-admin.table.th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-100">

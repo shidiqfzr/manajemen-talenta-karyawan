@@ -58,7 +58,7 @@
                 @else
                     <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-surface-100 text-surface-700 border border-surface-200">
                         <i class="fas fa-circle-notch fa-spin text-[10px]" aria-hidden="true"></i>
-                        <span>Menunggu Input Pegawai</span>
+                        <span>Menunggu Input Karyawan</span>
                     </span>
                 @endif
             </div>
@@ -68,7 +68,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div class="p-3.5 rounded-xl border border-surface-200 bg-surface-50/60 flex items-center justify-between">
                 <div>
-                    <span class="text-xs text-surface-500 font-medium block">Total Pegawai Terlibat</span>
+                    <span class="text-xs text-surface-500 font-medium block">Total Karyawan Terlibat</span>
                     <span class="text-xl font-bold text-surface-900 mt-0.5 block">{{ count($nodes) }} Orang</span>
                 </div>
                 <div class="w-9 h-9 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
@@ -139,7 +139,7 @@
                                 </span>
                             @endif
                             <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-surface-100 text-surface-700 border border-surface-200">
-                                {{ count($cluster['nodes']) }} Pegawai
+                                {{ count($cluster['nodes']) }} Karyawan
                             </span>
                         </div>
                     </div>
@@ -394,7 +394,7 @@
                 </div>
             @empty
                 <div class="p-8 text-center bg-white rounded-2xl border border-surface-200">
-                    <p class="text-xs text-surface-500">Pilih minimal 2 pegawai untuk melihat visualisasi topologi alur mutasi.</p>
+                    <p class="text-xs text-surface-500">Pilih minimal 2 karyawan untuk melihat visualisasi topologi alur mutasi.</p>
                 </div>
             @endforelse
         </div>

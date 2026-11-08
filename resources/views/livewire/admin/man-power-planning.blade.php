@@ -334,7 +334,7 @@
                     <span class="font-semibold text-surface-900">Kebutuhan = (Formasi − Realisasi + Pensiun) − Sisa Pasokan (CKP + Scouting + RBB)</span>.
                     Angka bertanda minus (<span class="text-primary-700 font-bold">–</span>) menandakan kondisi <strong>surplus pasokan talenta</strong> di atas batas kebutuhan minimal.
                     Realisasi dihitung pada akhir bulan <strong>Posisi per</strong>; kursi dihitung kosong sejak <strong>Masa Bebas Tugas (MBT)</strong>, satu tahun sebelum tanggal pensiun.
-                    Sisa pasokan = rencana tahun berjalan dikurangi pegawai jalur tersebut yang sudah masuk hingga tanggal posisi.
+                    Sisa pasokan = rencana tahun berjalan dikurangi karyawan jalur tersebut yang sudah masuk hingga tanggal posisi.
                 </p>
             </section>
         </div>
@@ -372,7 +372,7 @@
                         if ($over > 0) {
                             $supplyNotes[] = ['text' => "Terealisasi melebihi rencana: {$over}. Sisa dihitung 0; kelebihannya sudah tercatat di Realisasi.", 'class' => 'font-semibold text-warning-800'];
                         }
-                        $supplyNotes[] = ['text' => "Daftar di bawah: pegawai jalur ini yang ditempatkan sebagai Karpim pada {$planningYear} s.d. akhir {$stats['as_of_label']}. Mereka sudah tercatat di Realisasi, sehingga hanya sisa rencana yang mengurangi Kebutuhan.", 'class' => 'text-warning-800/80'];
+                        $supplyNotes[] = ['text' => "Daftar di bawah: karyawan jalur ini yang ditempatkan sebagai Karpim pada {$planningYear} s.d. akhir {$stats['as_of_label']}. Mereka sudah tercatat di Realisasi, sehingga hanya sisa rencana yang mengurangi Kebutuhan.", 'class' => 'text-warning-800/80'];
                     @endphp
                     @include('livewire.admin.partials.mpp-breakdown-card', [
                         'kind' => 'supply',

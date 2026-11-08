@@ -6,7 +6,7 @@ use App\Models\Employee;
 use App\Models\Unit;
 
 /**
- * Position control untuk penambahan pegawai manual: jabatan wajib menempati kursi aktif pada Master Formasi
+ * Position control untuk penambahan karyawan manual: jabatan wajib menempati kursi aktif pada Master Formasi
  * dan jumlah pemangku definitif tidak boleh melebihi kuota (DOMAIN.md §3.5, §3.6).
  */
 class FormasiSeatGuard
@@ -28,7 +28,7 @@ class FormasiSeatGuard
             ->first();
 
         if (! $seat) {
-            return 'Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Pegawai yang dipilih.';
+            return 'Jabatan Formasi tidak valid untuk Unit Kerja dan Level Strata Karyawan yang dipilih.';
         }
 
         if ($statusPenugasan !== 'Definitif' || $seat->is_overflow || $seat->is_diperban) {

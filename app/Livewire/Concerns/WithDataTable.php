@@ -53,6 +53,9 @@ trait WithDataTable
 
     public bool $selectAllMatching = false;
 
+    /** Written reason for a bulk action that requires one (BulkAction::requiresReason()). */
+    public string $bulkReason = '';
+
     /** @var ?array{type: 'success'|'error'|'warning', message: string} */
     public ?array $tableNotice = null;
 
@@ -345,6 +348,7 @@ trait WithDataTable
     {
         $this->selected = [];
         $this->selectAllMatching = false;
+        $this->bulkReason = '';
     }
 
     public function runBulkAction(string $name): void
@@ -373,11 +377,23 @@ trait WithDataTable
             return;
         }
 
+        $reason = null;
+
+        if ($action->needsReason()) {
+            $reason = trim($this->bulkReason);
+
+            if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
+                $this->tableNotice = ['type' => 'warning', 'message' => 'Alasan wajib diisi (10–500 karakter).'];
+
+                return;
+            }
+        }
+
         $targets = $this->bulkTargets();
 
         // The audit entry is written in the same transaction: no audit entry, no change.
         try {
-            $count = DB::transaction(function () use ($action, $targets): int {
+            $count = DB::transaction(function () use ($action, $targets, $reason): int {
                 $count = (int) $this->{$action->handlerMethod()}($targets);
 
                 $this->auditTable('data_table.bulk', [
@@ -385,7 +401,7 @@ trait WithDataTable
                     'jumlah_baris' => $count,
                     'filter' => $this->activeFilterValues(),
                     'pencarian' => $this->search !== '',
-                ]);
+                ], $reason);
 
                 return $count;
             });
@@ -491,9 +507,9 @@ trait WithDataTable
     }
 
     /** @param array<string, mixed> $detail Never include the raw search term (it may contain personal data). */
-    protected function auditTable(string $action, array $detail): void
+    protected function auditTable(string $action, array $detail, ?string $reason = null): void
     {
-        MasterAuditLog::record(auth()->user(), $action, 'data_table', null, $this->tableLabel(), null, $detail, null);
+        MasterAuditLog::record(auth()->user(), $action, 'data_table', null, $this->tableLabel(), null, $detail, $reason);
     }
 
     /** @return array<string, Column> */

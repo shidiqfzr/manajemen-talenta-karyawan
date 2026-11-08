@@ -6,6 +6,7 @@
     deleteNik: '',
     deleteNama: '',
     deleteAction: '',
+    deleteReason: '',
     copiedNik: null,
     // Row selection, bulk delete and export are handled by the employee table component (shared table layer).
     copyNik(nik) {
@@ -17,6 +18,7 @@
         this.deleteNik = nik;
         this.deleteNama = nama;
         this.deleteAction = deleteUrl;
+        this.deleteReason = '';
         this.deleteModalOpen = true;
     }
 }" class="space-y-6">
@@ -170,7 +172,7 @@
         </div>
     @endif
 
-    {{-- Direktori Pegawai: kartu KPI, strip tata kelola, pencarian, filter, urutan, dan paginasi ada di komponen tabel bersama
+    {{-- Daftar Karyawan: kartu KPI, strip tata kelola, pencarian, filter, urutan, dan paginasi ada di komponen tabel bersama
          (App\Livewire\Admin\Employees\EmployeeTable). Kartu dan strip mengubah filter tabel secara langsung; angka KPI dihitung di controller. --}}
     <livewire:admin.employees.employee-table :kpi="$kpi" />
 
@@ -209,7 +211,7 @@
                         <div class="space-y-1.5 flex-1">
                             <h3 class="text-lg font-bold text-surface-900" id="delete-dialog-title">Hapus Data Karyawan</h3>
                             <p class="text-xs sm:text-sm text-surface-600 leading-relaxed">
-                                Apakah Anda yakin ingin menghapus data pegawai <strong class="text-surface-900 font-semibold" x-text="deleteNama"></strong> (NIK: <span class="font-mono text-surface-700 font-semibold" x-text="deleteNik"></span>)?
+                                Apakah Anda yakin ingin menghapus data karyawan <strong class="text-surface-900 font-semibold" x-text="deleteNama"></strong> (NIK: <span class="font-mono text-surface-700 font-semibold" x-text="deleteNik"></span>)?
                             </p>
                             <p class="text-xs text-danger font-medium mt-2">
                                 <i class="fas fa-circle-exclamation mr-1" aria-hidden="true"></i> Data riwayat mutasi, pelatihan, dan evaluasi terkait akan ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan.
@@ -218,21 +220,28 @@
                     </div>
                 </div>
 
-                <div class="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-end gap-2.5">
+                <form :action="deleteAction" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <div class="px-6 pb-4">
+                        <label for="delete-reason" class="block text-xs font-semibold text-surface-700 mb-1">Alasan penghapusan <span class="text-danger">*</span></label>
+                        <textarea id="delete-reason" name="reason" rows="3" minlength="10" maxlength="500" required x-model="deleteReason"
+                            placeholder="Contoh: data ganda hasil impor, karyawan keluar sesuai SK Direksi (minimal 10 karakter)"
+                            class="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                        <p class="mt-1 text-[11px] text-surface-500">Alasan dicatat bersama arsip data karyawan yang dihapus.</p>
+                    </div>
+                    <div class="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-end gap-2.5">
                     <button type="button" autofocus @click="deleteModalOpen = false"
                         class="px-4 py-2.5 rounded-lg border border-surface-300 bg-white text-surface-700 hover:bg-surface-100 text-xs sm:text-sm font-medium transition shadow-xs">
                         Batal
                     </button>
-                    <form :action="deleteAction" method="POST" class="inline">
-                        @csrf
-                        @method('DELETE')
                         <button type="submit"
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-danger hover:bg-danger-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">
                             <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
                             <span>Ya, Hapus Data</span>
                         </button>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

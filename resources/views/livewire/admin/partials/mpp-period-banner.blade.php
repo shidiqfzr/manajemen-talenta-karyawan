@@ -23,7 +23,7 @@
                     @elseif($periodState === 'draft')
                         Draf periode {{ $periodLabel }} direkam oleh {{ $period->capturer?->name ?? 'sistem' }} · {{ $periodStamps['captured'] }}. Belum ditutup.
                     @else
-                        Periode {{ $periodLabel }} belum pernah ditutup: angka dihitung dari data pegawai saat ini.
+                        Periode {{ $periodLabel }} belum pernah ditutup: angka dihitung dari data karyawan saat ini.
                     @endif
                 </span>
             </p>
@@ -65,7 +65,7 @@
         <div role="alertdialog" aria-labelledby="period-action-title" class="px-5 py-3 border-b border-warning-200 bg-warning-50 text-xs text-warning-800 space-y-2.5">
             @if($periodAction === 'close')
                 <p id="period-action-title" class="font-bold">Tutup periode {{ $periodLabel }}?</p>
-                <p>Angka matriks dan daftar personil periode ini dibekukan sesuai draf. Perubahan data pegawai berikutnya tidak memengaruhinya.</p>
+                <p>Angka matriks dan daftar personil periode ini dibekukan sesuai draf. Perubahan data karyawan berikutnya tidak memengaruhinya.</p>
                 <div>
                     <label for="period-note" class="block font-semibold mb-1">Catatan penutupan (opsional)</label>
                     <textarea id="period-note" wire:model="periodNote" rows="2" maxlength="500"

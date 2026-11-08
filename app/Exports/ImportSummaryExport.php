@@ -39,8 +39,8 @@ class ImportSummaryExport implements WithMultipleSheets
                     $skipped = $summary['skipped'] ?? 0;
 
                     return [
-                        ['DOKUMEN BERITA ACARA & REKAPITULASI IMPOR DATA PEGAWAI'],
-                        ['Sistem Informasi Manajemen Talenta & Formasi Pegawai - PTPN IV Regional V'],
+                        ['DOKUMEN BERITA ACARA & REKAPITULASI IMPOR DATA KARYAWAN'],
+                        ['Sistem Informasi Manajemen Talenta & Formasi Karyawan - PTPN IV Regional V'],
                         ['PARAMETER SISTEM', 'NILAI / KETERANGAN'],
                         ['Waktu Eksekusi (WIB)', $this->data['timestamp'] ?? now()->toIso8601String()],
                         ['Administrator Pelaksana', $this->data['user_name'] ?? 'System Administrator'],
@@ -52,9 +52,9 @@ class ImportSummaryExport implements WithMultipleSheets
                         [''],
                         ['RINGKASAN METRIK HASIL IMPOR', 'JUMLAH BARIS', 'PERSENTASE'],
                         ['Total Baris Diproses', $total, '100%'],
-                        ['Data Pegawai Baru Ditambahkan', $created, $total > 0 ? round(($created / $total) * 100, 1).'%' : '0%'],
-                        ['Data Pegawai Diperbarui (Update Atribut)', $updated, $total > 0 ? round(($updated / $total) * 100, 1).'%' : '0%'],
-                        ['Data Pegawai Tetap / Identik (Unchanged)', $unchanged, $total > 0 ? round(($unchanged / $total) * 100, 1).'%' : '0%'],
+                        ['Data Karyawan Baru Ditambahkan', $created, $total > 0 ? round(($created / $total) * 100, 1).'%' : '0%'],
+                        ['Data Karyawan Diperbarui (Update Atribut)', $updated, $total > 0 ? round(($updated / $total) * 100, 1).'%' : '0%'],
+                        ['Data Karyawan Tetap / Identik (Unchanged)', $unchanged, $total > 0 ? round(($unchanged / $total) * 100, 1).'%' : '0%'],
                         ['Data Ditolak / Tidak Memenuhi Validasi', $skipped, $total > 0 ? round(($skipped / $total) * 100, 1).'%' : '0%'],
                         [''],
                         ['CATATAN INTEGRITAS & TATA KELOLA HR:'],

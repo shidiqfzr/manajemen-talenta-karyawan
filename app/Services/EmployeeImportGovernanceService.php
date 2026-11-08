@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Tata kelola impor data pegawai di atas EmployeeImportService:
+ * Tata kelola impor data karyawan di atas EmployeeImportService:
  *  - kebijakan empat mata (maker-checker): pengaju mengajukan hasil pratinjau, admin LAIN menyetujui/menolak;
  *  - pembatalan (undo) impor yang sudah tersimpan, atomik dan hanya bila tidak ada perubahan susulan;
  *  - pembersihan pengajuan kedaluwarsa dan rekaman data sebelum impor (UU PDP No. 27/2022).
@@ -45,7 +45,7 @@ class EmployeeImportGovernanceService
 
     /**
      * Mengajukan hasil pratinjau untuk persetujuan. Berkas dipindahkan ke penyimpanan pengajuan di disk privat
-     * dan tidak ada data pegawai yang berubah sampai admin lain menyetujui.
+     * dan tidak ada data karyawan yang berubah sampai admin lain menyetujui.
      *
      * @param  array<string, mixed>  $cached  Sesi pratinjau (berkas, hash, ringkasan)
      */
@@ -101,7 +101,7 @@ class EmployeeImportGovernanceService
         $disk->delete($source);
         Cache::forget("import_preview_{$token}");
 
-        Log::info('HRIS Impor Data Pegawai diajukan untuk persetujuan', [
+        Log::info('HRIS Impor Data Karyawan diajukan untuk persetujuan', [
             'batch_id' => $log->id, 'maker_id' => $maker->id, 'ip_address' => $ip, 'file_sha256' => $hash,
         ]);
 
@@ -187,7 +187,7 @@ class EmployeeImportGovernanceService
                 throw $e;
             }
 
-            Log::error('Persetujuan impor pegawai gagal dieksekusi: '.$e->getMessage(), ['batch_id' => $log->id, 'exception' => $e::class]);
+            Log::error('Persetujuan impor karyawan gagal dieksekusi: '.$e->getMessage(), ['batch_id' => $log->id, 'exception' => $e::class]);
 
             throw new ImportAbortedException('Persetujuan gagal diproses karena kendala sistem. Tidak ada data yang tersimpan, silakan coba lagi atau hubungi administrator sistem.', 0, $e);
         }
@@ -217,7 +217,7 @@ class EmployeeImportGovernanceService
         });
 
         Cache::forget("import_review_{$log->token}");
-        Log::info('HRIS Pengajuan impor pegawai ditolak', ['batch_id' => $log->id, 'actor_id' => $actor->id]);
+        Log::info('HRIS Pengajuan impor karyawan ditolak', ['batch_id' => $log->id, 'actor_id' => $actor->id]);
     }
 
     /**
@@ -237,9 +237,9 @@ class EmployeeImportGovernanceService
     /* ------------------------------------------------------------------ pembatalan (undo) */
 
     /**
-     * Membatalkan impor yang sudah tersimpan: pegawai baru dihapus, pegawai yang diperbarui dikembalikan ke kondisi
+     * Membatalkan impor yang sudah tersimpan: karyawan baru dihapus, karyawan yang diperbarui dikembalikan ke kondisi
      * sebelum impor, tugas rangkap hasil impor dibatalkan (soft delete beserta pelaku dan alasan, riwayat tidak
-     * dihapus). Atomik: bila satu pegawai sudah berubah setelah impor, tidak ada data yang diubah.
+     * dihapus). Atomik: bila satu karyawan sudah berubah setelah impor, tidak ada data yang diubah.
      *
      * @return array{deleted: int, restored: int}
      */
@@ -248,7 +248,7 @@ class EmployeeImportGovernanceService
         $reason = $this->requireReason($reason);
 
         if ($this->requiresTypedConfirmation($log) && strcasecmp(trim((string) $confirmation), self::CONFIRMATION_WORD) !== 0) {
-            throw new ImportAbortedException('Pembatalan ini menyentuh '.($log->created_count + $log->updated_count).' pegawai. Ketik kata '.self::CONFIRMATION_WORD.' untuk mengonfirmasi.');
+            throw new ImportAbortedException('Pembatalan ini menyentuh '.($log->created_count + $log->updated_count).' karyawan. Ketik kata '.self::CONFIRMATION_WORD.' untuk mengonfirmasi.');
         }
 
         try {
@@ -268,7 +268,7 @@ class EmployeeImportGovernanceService
                 $conflicts = $this->findConflicts($changes);
                 if ($conflicts !== []) {
                     throw new ImportAbortedException(sprintf(
-                        'Pembatalan dihentikan: %d pegawai sudah berubah atau memiliki data turunan setelah impor (%s). Tidak ada data yang diubah.',
+                        'Pembatalan dihentikan: %d karyawan sudah berubah atau memiliki data turunan setelah impor (%s). Tidak ada data yang diubah.',
                         count($conflicts),
                         implode(', ', array_slice($conflicts, 0, 5)).(count($conflicts) > 5 ? ', ...' : '')
                     ));
@@ -307,18 +307,18 @@ class EmployeeImportGovernanceService
         } catch (ImportAbortedException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            Log::error('Pembatalan impor pegawai gagal dan di-rollback: '.$e->getMessage(), ['batch_id' => $log->id, 'exception' => $e::class]);
+            Log::error('Pembatalan impor karyawan gagal dan di-rollback: '.$e->getMessage(), ['batch_id' => $log->id, 'exception' => $e::class]);
 
             throw new ImportAbortedException('Pembatalan gagal diproses karena kendala sistem. Tidak ada data yang diubah, silakan coba lagi atau hubungi administrator sistem.', 0, $e);
         }
 
-        Log::info('HRIS Impor data pegawai dibatalkan', ['batch_id' => $log->id, 'actor_id' => $actor->id, 'ip_address' => $ip] + $result);
+        Log::info('HRIS Impor data karyawan dibatalkan', ['batch_id' => $log->id, 'actor_id' => $actor->id, 'ip_address' => $ip] + $result);
 
         return $result;
     }
 
     /**
-     * Pemeriksaan kesiapan pembatalan tanpa mengubah data: berapa pegawai yang belum berubah sejak impor.
+     * Pemeriksaan kesiapan pembatalan tanpa mengubah data: berapa karyawan yang belum berubah sejak impor.
      *
      * @return array{total: int, conflicts: list<string>, ready: bool}
      */
@@ -331,7 +331,7 @@ class EmployeeImportGovernanceService
     }
 
     /**
-     * Pembatalan yang menyentuh banyak pegawai wajib dikonfirmasi dengan mengetik kata kunci.
+     * Pembatalan yang menyentuh banyak karyawan wajib dikonfirmasi dengan mengetik kata kunci.
      */
     public function requiresTypedConfirmation(EmployeeImportLog $log): bool
     {
@@ -394,7 +394,7 @@ class EmployeeImportGovernanceService
 
     /**
      * @param  Collection<int, EmployeeImportChange>  $changes
-     * @return list<string> NIK tersamar pegawai yang berkonflik
+     * @return list<string> NIK tersamar karyawan yang berkonflik
      */
     private function findConflicts($changes): array
     {
@@ -406,7 +406,7 @@ class EmployeeImportGovernanceService
             $conflict = $employee === null || ! hash_equals($change->after_hash, Employee::stateHash($employee));
 
             if (! $conflict && $change->action === 'CREATE') {
-                // Pegawai baru hanya boleh dihapus bila belum memiliki data turunan setelah impor.
+                // Karyawan baru hanya boleh dihapus bila belum memiliki data turunan setelah impor.
                 $conflict = $employee->evaluations()->exists()
                     || $employee->trainings()->exists()
                     || JobHistory::withTrashed()->where('employee_nik', $employee->nik)->where('created_at', '>', $change->created_at)->exists();

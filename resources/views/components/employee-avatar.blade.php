@@ -1,5 +1,5 @@
 {{--
-    Avatar pegawai: foto asli bila berkas tersedia, selain itu lingkaran inisial (DESIGN.md: tanpa foto → inisial).
+    Avatar karyawan: foto asli bila berkas tersedia, selain itu lingkaran inisial (DESIGN.md: tanpa foto → inisial).
     Tidak memakai gambar bawaan agar tidak ada tautan gambar rusak.
 --}}
 @props(['employee', 'size' => 'w-full h-full', 'text' => 'text-4xl'])

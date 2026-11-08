@@ -39,7 +39,7 @@ class WithDataTableTest extends TestCase
 
         for ($i = 1; $i <= 30; $i++) {
             FixtureRow::create([
-                'nama' => sprintf('Pegawai %02d', $i),
+                'nama' => sprintf('Karyawan %02d', $i),
                 'kode' => sprintf('K%02d', $i),
                 'bidang' => $i % 2 === 0 ? 'KEU' : 'TAN',
                 'nilai' => $i,
@@ -58,7 +58,7 @@ class WithDataTableTest extends TestCase
             ->assertOk();
 
         $this->assertCount(25, $component->instance()->rows->items());
-        $component->assertSee('Pegawai 01')->assertSee('Pegawai 25')->assertDontSee('Pegawai 26');
+        $component->assertSee('Karyawan 01')->assertSee('Karyawan 25')->assertDontSee('Karyawan 26');
     }
 
     public function test_tampered_url_state_falls_back_to_defaults(): void
@@ -87,18 +87,18 @@ class WithDataTableTest extends TestCase
     public function test_valid_url_state_is_applied_and_search_is_normalised(): void
     {
         Livewire::withQueryParams([
-            'search' => '  Pegawai 0  ',
+            'search' => '  Karyawan 0  ',
             'sort' => 'nilai',
             'direction' => 'desc',
             'per_page' => 10,
             'bidang' => 'KEU',
         ])->test(FixtureTable::class)
-            ->assertSet('search', 'Pegawai 0')
+            ->assertSet('search', 'Karyawan 0')
             ->assertSet('sortField', 'nilai')
             ->assertSet('sortDirection', 'desc')
             ->assertSet('perPage', 10)
             ->assertSet('bidang', 'KEU')
-            ->assertSeeInOrder(['Pegawai 08', 'Pegawai 06', 'Pegawai 04', 'Pegawai 02']);
+            ->assertSeeInOrder(['Karyawan 08', 'Karyawan 06', 'Karyawan 04', 'Karyawan 02']);
     }
 
     public function test_sort_by_ignores_non_sortable_columns(): void
@@ -143,10 +143,10 @@ class WithDataTableTest extends TestCase
 
         $this->assertSame(str_repeat('a', 100), $component->get('search'));
 
-        $component->set('search', '  Pegawai 07  ')
-            ->assertSet('search', 'Pegawai 07')
-            ->assertSee('Pegawai 07')
-            ->assertDontSee('Pegawai 08');
+        $component->set('search', '  Karyawan 07  ')
+            ->assertSet('search', 'Karyawan 07')
+            ->assertSee('Karyawan 07')
+            ->assertDontSee('Karyawan 08');
     }
 
     public function test_invalid_filter_value_is_cleared(): void
@@ -158,8 +158,8 @@ class WithDataTableTest extends TestCase
             ->assertSet('paginators.page', 1)
             ->set('bidang', 'KEU')
             ->assertSet('bidang', 'KEU')
-            ->assertSee('Pegawai 02')
-            ->assertDontSee('Pegawai 01');
+            ->assertSee('Karyawan 02')
+            ->assertDontSee('Karyawan 01');
     }
 
     public function test_per_page_is_clamped(): void
@@ -171,8 +171,8 @@ class WithDataTableTest extends TestCase
             ->assertSet('paginators.page', 1)
             ->set('perPage', 10)
             ->assertSet('perPage', 10)
-            ->assertSee('Pegawai 10')
-            ->assertDontSee('Pegawai 11');
+            ->assertSee('Karyawan 10')
+            ->assertDontSee('Karyawan 11');
     }
 
     public function test_default_per_page_outside_the_options_falls_back_to_an_allowed_size(): void
@@ -199,7 +199,7 @@ class WithDataTableTest extends TestCase
     public function test_reset_filters_clears_search_and_filters_and_returns_to_page_one(): void
     {
         $component = Livewire::test(FixtureTable::class)
-            ->set('search', 'Pegawai')
+            ->set('search', 'Karyawan')
             ->set('bidang', 'KEU')
             ->call('gotoPage', 2);
 
@@ -219,7 +219,7 @@ class WithDataTableTest extends TestCase
         $this->assertSame([], invade(new FixtureTableNoUrl)->queryStringWithDataTable());
         $this->assertNotSame([], invade(new FixtureTable)->queryStringWithDataTable());
 
-        $component = Livewire::withQueryParams(['search' => 'Pegawai 07', 'sort' => 'nilai', 'bidang' => 'KEU'])
+        $component = Livewire::withQueryParams(['search' => 'Karyawan 07', 'sort' => 'nilai', 'bidang' => 'KEU'])
             ->test(FixtureTableNoUrl::class)
             ->assertSet('search', '')
             ->assertSet('sortField', 'nama')
@@ -249,16 +249,16 @@ class WithDataTableTest extends TestCase
         $component = Livewire::test(FixtureTable::class)->set('perPage', 10)->call('toggleSelectPage');
 
         $this->assertCount(10, $component->get('selected'));
-        $this->assertContains($this->idOf('Pegawai 01'), $component->get('selected'));
-        $this->assertNotContains($this->idOf('Pegawai 11'), $component->get('selected'));
+        $this->assertContains($this->idOf('Karyawan 01'), $component->get('selected'));
+        $this->assertNotContains($this->idOf('Karyawan 11'), $component->get('selected'));
 
         $component->call('toggleSelectPage')->assertSet('selected', []);
     }
 
     public function test_toggle_select_page_keeps_selections_from_other_pages(): void
     {
-        $pageOne = array_map(fn (int $i) => $this->idOf(sprintf('Pegawai %02d', $i)), range(1, 10));
-        $pageTwo = array_map(fn (int $i) => $this->idOf(sprintf('Pegawai %02d', $i)), range(11, 20));
+        $pageOne = array_map(fn (int $i) => $this->idOf(sprintf('Karyawan %02d', $i)), range(1, 10));
+        $pageTwo = array_map(fn (int $i) => $this->idOf(sprintf('Karyawan %02d', $i)), range(11, 20));
 
         $component = Livewire::test(FixtureTable::class)
             ->set('perPage', 10)
@@ -281,7 +281,7 @@ class WithDataTableTest extends TestCase
             ->set('selected', ['1', '2'])
             ->call('gotoPage', 2)
             ->assertSet('selected', ['1', '2'])
-            ->set('search', 'Pegawai')
+            ->set('search', 'Karyawan')
             ->assertSet('selected', [])
             ->set('selected', ['1'])
             ->set('selectAllMatching', true)
@@ -326,7 +326,7 @@ class WithDataTableTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'staff']));
 
         Livewire::test(FixtureTable::class)
-            ->set('selected', [$this->idOf('Pegawai 01')])
+            ->set('selected', [$this->idOf('Karyawan 01')])
             ->call('runBulkAction', 'nonaktifkan')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
 
@@ -348,10 +348,10 @@ class WithDataTableTest extends TestCase
     public function test_bulk_action_on_selected_rows_updates_only_those_and_audits(): void
     {
         $this->defineManageFixture();
-        $ids = [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')];
+        $ids = [$this->idOf('Karyawan 01'), $this->idOf('Karyawan 02')];
 
         Livewire::test(FixtureTable::class)
-            ->set('search', 'Pegawai')
+            ->set('search', 'Karyawan')
             ->set('selected', $ids)
             ->call('runBulkAction', 'nonaktifkan')
             ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data berhasil diproses.'])
@@ -367,14 +367,14 @@ class WithDataTableTest extends TestCase
             ['aksi' => 'nonaktifkan', 'jumlah_baris' => 2, 'filter' => [], 'pencarian' => true],
             $log->new_values,
         );
-        $this->assertStringNotContainsString('Pegawai', json_encode($log->new_values));
+        $this->assertStringNotContainsString('Karyawan', json_encode($log->new_values));
     }
 
     public function test_bulk_action_ignores_keys_outside_current_filter(): void
     {
         $this->defineManageFixture();
-        $keu = $this->idOf('Pegawai 02');
-        $tan = $this->idOf('Pegawai 01');
+        $keu = $this->idOf('Karyawan 02');
+        $tan = $this->idOf('Karyawan 01');
 
         Livewire::test(FixtureTable::class)
             ->set('bidang', 'KEU')
@@ -412,7 +412,7 @@ class WithDataTableTest extends TestCase
     public function test_failed_bulk_handler_rolls_back(): void
     {
         Livewire::test(FixtureTable::class)
-            ->set('selected', [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')])
+            ->set('selected', [$this->idOf('Karyawan 01'), $this->idOf('Karyawan 02')])
             ->call('runBulkAction', 'gagal')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
 
@@ -428,7 +428,7 @@ class WithDataTableTest extends TestCase
         });
 
         Livewire::test(FixtureTable::class)
-            ->set('selected', [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')])
+            ->set('selected', [$this->idOf('Karyawan 01'), $this->idOf('Karyawan 02')])
             ->call('runBulkAction', 'nonaktifkan')
             ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
 
@@ -440,7 +440,7 @@ class WithDataTableTest extends TestCase
     public function test_forged_selection_is_normalised_and_bulk_action_still_works(): void
     {
         $this->defineManageFixture();
-        $id = $this->idOf('Pegawai 02');
+        $id = $this->idOf('Karyawan 02');
 
         Livewire::test(FixtureTable::class)
             ->set('selected', [['1'], $id, null, $id, ''])
@@ -461,7 +461,7 @@ class WithDataTableTest extends TestCase
     public function test_bulk_handler_returning_nothing_counts_zero(): void
     {
         Livewire::test(FixtureTable::class)
-            ->set('selected', [$this->idOf('Pegawai 01')])
+            ->set('selected', [$this->idOf('Karyawan 01')])
             ->call('runBulkAction', 'diam')
             ->assertSet('tableNotice', ['type' => 'success', 'message' => '0 data berhasil diproses.']);
     }
@@ -511,7 +511,7 @@ class WithDataTableTest extends TestCase
     {
         Excel::fake();
         $this->travelTo('2026-11-06 10:00:00');
-        $ids = [$this->idOf('Pegawai 01'), $this->idOf('Pegawai 02')];
+        $ids = [$this->idOf('Karyawan 01'), $this->idOf('Karyawan 02')];
 
         Livewire::test(FixtureTable::class)->set('selected', $ids)->call('export');
 
@@ -522,8 +522,8 @@ class WithDataTableTest extends TestCase
     {
         Excel::fake();
         $this->travelTo('2026-11-06 10:00:00');
-        $keu = $this->idOf('Pegawai 02');
-        $tan = $this->idOf('Pegawai 01');
+        $keu = $this->idOf('Karyawan 02');
+        $tan = $this->idOf('Karyawan 01');
 
         Livewire::test(FixtureTable::class)->set('bidang', 'KEU')->set('selected', [$keu, $tan])->call('export');
 

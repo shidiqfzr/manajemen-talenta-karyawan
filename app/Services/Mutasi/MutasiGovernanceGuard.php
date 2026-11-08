@@ -24,7 +24,7 @@ class MutasiGovernanceGuard
 
     /**
      * Check tenure compliance in the current unit kerja based on DOMAIN.md §5.2.1
-     * (Pegawai minimal menjabat 2-3 tahun di unit kerja sebelum diperbolehkan rotasi unit).
+     * (Karyawan minimal menjabat 2-3 tahun di unit kerja sebelum diperbolehkan rotasi unit).
      */
     public function checkTenureCompliance(Employee $emp, string $targetUnitKerja): array
     {
@@ -68,7 +68,7 @@ class MutasiGovernanceGuard
             'tmt_unit_kerja' => $carbonTmt->toDateString(),
             'message' => $isCompliant
                 ? 'Masa dinas di unit saat ini ('.TalentProfileBuilder::formatMonths($months).") telah memenuhi standar minimal {$minYears} tahun."
-                : 'Pegawai baru bertugas '.TalentProfileBuilder::formatMonths($months)." di {$emp->unit_kerja} (standar minimal 2-3 tahun sesuai Regulasi Masa Kerja/Tenure PTPN IV Regional V). Memerlukan Dispensasi Khusus Direksi.",
+                : 'Karyawan baru bertugas '.TalentProfileBuilder::formatMonths($months)." di {$emp->unit_kerja} (standar minimal 2-3 tahun sesuai Regulasi Masa Kerja/Tenure PTPN IV Regional V). Memerlukan Dispensasi Khusus Direksi.",
         ];
     }
 
@@ -211,7 +211,7 @@ class MutasiGovernanceGuard
 
         if ($this->isRetired($employee)) {
             throw new MutasiRuleViolationException(
-                "Pegawai {$employee->nama} telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi."
+                "Karyawan {$employee->nama} telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi."
             );
         }
 
@@ -241,7 +241,7 @@ class MutasiGovernanceGuard
         $tenure = $this->checkTenureCompliance($employee, $targetUnitKerja);
         if ($tenure['is_applicable'] && ! $tenure['is_compliant'] && ! $hasDispensasi) {
             throw new MutasiRuleViolationException(
-                "Pegawai {$employee->nama} belum memenuhi masa dinas minimal 2 tahun di {$employee->unit_kerja}. Wajib melampirkan persetujuan Dispensasi Khusus Direksi beserta alasannya."
+                "Karyawan {$employee->nama} belum memenuhi masa dinas minimal 2 tahun di {$employee->unit_kerja}. Wajib melampirkan persetujuan Dispensasi Khusus Direksi beserta alasannya."
             );
         }
 
@@ -249,7 +249,7 @@ class MutasiGovernanceGuard
             $promo = $this->checkPromotionEligibility($employee, $targetJabatan);
             if ($promo['is_applicable'] && ! $promo['is_eligible'] && ! $hasDispensasi) {
                 throw new MutasiRuleViolationException(
-                    "Pegawai {$employee->nama} belum memenuhi kriteria formal promosi ke {$targetJabatan}. Wajib melampirkan persetujuan Dispensasi Promosi beserta alasannya."
+                    "Karyawan {$employee->nama} belum memenuhi kriteria formal promosi ke {$targetJabatan}. Wajib melampirkan persetujuan Dispensasi Promosi beserta alasannya."
                 );
             }
         }

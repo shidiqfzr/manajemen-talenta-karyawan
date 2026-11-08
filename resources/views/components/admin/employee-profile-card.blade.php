@@ -5,7 +5,7 @@
     'showReadinessMetrics' => false,
     'showGradeBadge' => true,
     'unitTenure' => null,
-    'emptyMessage' => 'Pilih pegawai pada pencarian di atas untuk melihat profil penempatan saat ini.',
+    'emptyMessage' => 'Pilih karyawan pada pencarian di atas untuk melihat profil penempatan saat ini.',
 ])
 
 @php
@@ -57,7 +57,7 @@
                 @endif
                 @if (!empty($level))
                     <div class="flex items-center justify-between pt-1 border-t border-surface-200/60">
-                        <span class="text-surface-600">Klasifikasi Pegawai:</span>
+                        <span class="text-surface-600">Klasifikasi Karyawan:</span>
                         <span class="font-bold text-primary-800">{{ $level }}</span>
                     </div>
                 @endif
@@ -152,7 +152,7 @@
             <i class="fas fa-id-card-clip" aria-hidden="true"></i>
         </div>
         <div class="space-y-1">
-            <h5 class="text-xs font-bold text-surface-700">Belum Ada Pegawai Dipilih</h5>
+            <h5 class="text-xs font-bold text-surface-700">Belum Ada Karyawan Dipilih</h5>
             <p class="text-[11px] text-surface-500 max-w-xs mx-auto leading-relaxed">
                 {{ $emptyMessage }}
             </p>

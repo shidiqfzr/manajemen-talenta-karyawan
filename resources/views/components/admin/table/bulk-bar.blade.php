@@ -56,7 +56,45 @@
                             $action->confirmText() ?? 'Jalankan tindakan ":label" untuk :count data terpilih?'
                         );
                     @endphp
-                    @if ($action->isDanger())
+                    @if ($action->needsReason())
+                        {{-- Aksi yang wajib beralasan: modal dengan kolom alasan (10–500 karakter) menggantikan wire:confirm. --}}
+                        <div x-data="{ open: false }" @keydown.escape.window="open = false" wire:key="bulk-{{ $action->name }}">
+                            <x-admin.button variant="danger" size="sm" :icon="$action->icon" type="button" @click="open = true">{{ $action->label }}</x-admin.button>
+
+                            <div x-show="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto text-left"
+                                role="dialog" aria-modal="true" aria-labelledby="bulk-reason-title-{{ $action->name }}" x-trap.noscroll="open" tabindex="-1">
+                                <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs" @click="open = false"></div>
+                                <div class="flex min-h-full items-center justify-center p-4 sm:p-0">
+                                    <div class="relative w-full sm:max-w-md transform overflow-hidden rounded-2xl bg-white shadow-xl border border-surface-200">
+                                        <div class="p-6 space-y-3">
+                                            <div class="flex items-start gap-4">
+                                                <div class="w-12 h-12 rounded-2xl bg-danger-100 text-danger flex items-center justify-center text-xl shrink-0 border border-danger-200">
+                                                    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                                </div>
+                                                <div class="space-y-1.5 flex-1">
+                                                    <h3 class="text-lg font-bold text-surface-900" id="bulk-reason-title-{{ $action->name }}">{{ $action->label }} {{ $formatCount($selectedCount) }} Data</h3>
+                                                    <p class="text-xs sm:text-sm text-surface-600 leading-relaxed">{{ $confirm }}</p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label for="bulk-reason-{{ $action->name }}" class="block text-xs font-semibold text-surface-700 mb-1">Alasan penghapusan <span class="text-danger">*</span></label>
+                                                <textarea id="bulk-reason-{{ $action->name }}" rows="3" maxlength="500" wire:model="bulkReason"
+                                                    placeholder="Contoh: data ganda hasil impor, karyawan keluar sesuai SK Direksi (minimal 10 karakter)"
+                                                    class="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                                                <p class="mt-1 text-[11px] text-surface-500">Alasan dicatat pada riwayat bersama arsip data karyawan yang dihapus.</p>
+                                            </div>
+                                        </div>
+                                        <div class="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-end gap-2.5">
+                                            <x-admin.button variant="secondary" type="button" @click="open = false">Batal</x-admin.button>
+                                            <x-admin.button variant="danger" type="button" :icon="$action->icon"
+                                                wire:click="runBulkAction({{ \Illuminate\Support\Js::from($action->name) }})" target="runBulkAction"
+                                                @click="open = false">Ya, {{ $action->label }}</x-admin.button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @elseif ($action->isDanger())
                         <x-admin.button variant="danger" size="sm" :icon="$action->icon"
                             wire:click="runBulkAction({{ \Illuminate\Support\Js::from($action->name) }})" target="runBulkAction"
                             wire:confirm="{{ $confirm }}"

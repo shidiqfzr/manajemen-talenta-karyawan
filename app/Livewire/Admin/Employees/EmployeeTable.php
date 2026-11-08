@@ -7,10 +7,12 @@ use App\Exports\EmployeesExport;
 use App\Livewire\Concerns\WithDataTable;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\MppSupplyPlan;
 use App\Models\Position;
 use App\Models\User;
 use App\Services\EmployeeDeletionService;
 use App\Services\EmployeeExportService;
+use App\Services\ManPowerPlanningService;
 use App\Support\DataTable\BulkAction;
 use App\Support\DataTable\Column;
 use App\Support\DataTable\Filter;
@@ -22,7 +24,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Direktori Pegawai (admin employees index) on the shared data table layer (WithDataTable).
+ * Daftar Karyawan (admin employees index) on the shared data table layer (WithDataTable).
  *
  * Every filter keeps its URL key from the former GET form, so old bookmarks open with the same
  * filters, sort and page. The KPI cards (rendered here so they follow the live state) drive `level`
@@ -65,7 +67,7 @@ class EmployeeTable extends Component
     ];
 
     #[Url(except: '')]
-    public string $jabatan = '';
+    public string $bidang = '';
 
     #[Url(except: '')]
     public string $level = '';
@@ -115,7 +117,7 @@ class EmployeeTable extends Component
         $this->bulanMasuk = $this->padMonth($this->bulanMasuk);
     }
 
-    /** "Total Pegawai" card: clears the filters the KPI cards and governance strip drive, keeps search and panel filters. */
+    /** "Total Karyawan" card: clears the filters the KPI cards and governance strip drive, keeps search and panel filters. */
     public function clearKpiFilters(): void
     {
         $this->level = '';
@@ -137,13 +139,6 @@ class EmployeeTable extends Component
         $query = array_filter(array_merge($this->exportQuery(), $changes), fn ($value) => $value !== '');
 
         return route('admin.employees.index', $query);
-    }
-
-    /** @return array<string, string> */
-    #[Computed]
-    public function jabatanOptions(): array
-    {
-        return $this->distinctOptions('jabatan');
     }
 
     /** @return array<string, string> */
@@ -217,7 +212,7 @@ class EmployeeTable extends Component
     public function exportQuery(): array
     {
         $keys = [
-            'jabatan' => 'jabatan',
+            'bidang' => 'bidang',
             'level' => 'level',
             'unitKerja' => 'unit_kerja',
             'rmLevel' => 'rm_level',
@@ -251,14 +246,23 @@ class EmployeeTable extends Component
     {
         return [
             // Keyed `nama` so the sort URL key stays `sort=nama`; the search runs the Omnisearch scope (NIK, nama, jabatan, unit kerja).
-            Column::make('nama', 'Pegawai')
+            Column::make('nama', 'Karyawan')
                 ->sortable()
                 ->searchable(fn (Builder $q, string $term) => $q->search($term))
                 ->width('min-w-[200px]'),
-            Column::make('jabatan', 'Jabatan & Unit Kerja')->sortable()->width('min-w-[260px]'),
-            Column::make('level', 'Strata')->sortable()->align('center')->width('w-28'),
-            Column::make('rm_level', 'Eselon')->sortable()->align('center')->width('w-28'),
+            Column::make('jabatan', 'Jabatan & Unit Kerja')->sortable()->width('min-w-[240px]'),
+            // Bidang is derived from the master formasi (ManPowerPlanningService), not a stored column: a dedicated column and a filter, but not sortable.
+            Column::make('bidang', 'Bidang')->align('center')->width('w-16'),
+            Column::make('level', 'Strata')->sortable()->align('center')->width('w-24'),
+            Column::make('rm_level', 'Eselon')->sortable()->align('center')->width('w-24'),
             Column::make('golongan', 'Golongan')->sortable()->align('center')->width('w-28'),
+            // Masa Kerja: lama bekerja sejak TMT bekerja; terlama = TMT paling awal, jadi arah urut dibalik.
+            Column::make('tmt_bekerja', 'Masa Kerja')
+                ->sortable(function (Builder $query, string $direction) {
+                    $query->orderByRaw('tmt_bekerja IS NULL')->orderBy('tmt_bekerja', $direction === 'asc' ? 'desc' : 'asc');
+                })
+                ->align('center')
+                ->width('w-28'),
             Column::make('aksi', 'Aksi')->align('right')->width('w-16'),
         ];
     }
@@ -271,28 +275,26 @@ class EmployeeTable extends Component
                 ->icon('fas fa-building')
                 ->allLabel('Semua Unit Kerja')
                 ->apply(fn (Builder $query, string $value) => $query->where('unit_kerja', $value)),
-            Filter::select('jabatan', 'Jabatan', $this->jabatanOptions)
-                ->icon('fas fa-briefcase')
-                ->allLabel('Semua Jabatan')
-                ->apply(fn (Builder $query, string $value) => $query->where('jabatan', $value)),
+            // Bidang Fungsional: same ManPowerPlanningService rule as the Bidang column (formasi seat first, text fallback).
+            Filter::select('bidang', 'Bidang', array_combine(MppSupplyPlan::BIDANG, MppSupplyPlan::BIDANG))
+                ->icon('fas fa-sitemap')
+                ->allLabel('Semua Bidang')
+                ->apply(fn (Builder $query, string $value) => $query->whereIn('nik', app(ManPowerPlanningService::class)->employeeNiksByBidang($value))),
             Filter::select('rmLevel', 'Eselon / RM Band', Position::RM_LEVEL_LIST)
                 ->icon('fas fa-layer-group')
                 ->allLabel('Semua Eselon / RM Band')
                 ->apply(fn (Builder $query, string $value) => $query->where('rm_level', $value)),
-            Filter::select('tahunMasuk', 'Tahun Masuk (TMT)', $this->yearOptions)
-                ->icon('fas fa-calendar-alt')
-                ->allLabel('Semua Angkatan')
-                // Period filter: Tahun Masuk (TMT Bekerja)
-                ->apply(fn (Builder $query, string $value) => $query->whereYear('tmt_bekerja', $value)),
-            Filter::select('bulanMasuk', 'Bulan Masuk (TMT)', self::MONTHS)
-                ->icon('fas fa-calendar-day')
-                ->allLabel('Semua Bulan')
-                // Period filter: Bulan Masuk (TMT Bekerja)
-                ->apply(fn (Builder $query, string $value) => $query->whereMonth('tmt_bekerja', $value)),
             Filter::select('golongan', 'Golongan', $this->golonganOptions)
                 ->icon('fas fa-signal')
                 ->allLabel('Semua Golongan')
                 ->apply(fn (Builder $query, string $value) => $query->where('golongan', $value)),
+            // Period filters (TMT Bekerja) stay reachable through links and the export; the panel shows four primary filters.
+            Filter::select('tahunMasuk', 'Tahun Masuk (TMT)', $this->yearOptions)
+                ->withoutControl()
+                ->apply(fn (Builder $query, string $value) => $query->whereYear('tmt_bekerja', $value)),
+            Filter::select('bulanMasuk', 'Bulan Masuk (TMT)', self::MONTHS)
+                ->withoutControl()
+                ->apply(fn (Builder $query, string $value) => $query->whereMonth('tmt_bekerja', $value)),
             // Driven by the KPI cards above the table.
             Filter::select('level', 'Strata', $this->levelOptions)
                 ->withoutControl()
@@ -333,7 +335,7 @@ class EmployeeTable extends Component
 
     protected function tableLabel(): string
     {
-        return 'Direktori Pegawai';
+        return 'Daftar Karyawan';
     }
 
     /** @return array<int, int> */
@@ -354,8 +356,9 @@ class EmployeeTable extends Component
             BulkAction::make('destroy', 'Hapus')
                 ->icon('fas fa-trash')
                 ->ability('delete-employee')
-                ->danger('Hapus :count data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.')
-                ->successMessage(':count data pegawai terpilih berhasil dihapus.'),
+                ->danger('Hapus :count data karyawan terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.')
+                ->requiresReason()
+                ->successMessage(':count data karyawan terpilih berhasil dihapus.'),
         ];
     }
 
@@ -394,12 +397,13 @@ class EmployeeTable extends Component
             throw new BulkActionRefusedException($this->bulkRefusal);
         }
 
-        return app(EmployeeDeletionService::class)->deleteMany($targets);
+        // Each employee is archived (master data, placement history, actor, reason) before it is deleted.
+        return app(EmployeeDeletionService::class)->deleteMany($targets, auth()->user(), $this->bulkReason);
     }
 
     protected function exportName(): ?string
     {
-        return 'data_pegawai';
+        return 'data_karyawan';
     }
 
     /** Keeps the file name of the former export route (data_karyawan_ptpn4_reg5_<timestamp>.xlsx). */

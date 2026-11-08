@@ -32,7 +32,7 @@ class ManPowerPlanning extends Component
 
     private ?int $previousMonth = null;
 
-    /** Satu instance service per permintaan agar pembacaan pegawai dipakai bersama (lihat ManPowerPlanningService). */
+    /** Satu instance service per permintaan agar pembacaan karyawan dipakai bersama (lihat ManPowerPlanningService). */
     private ?ManPowerPlanningService $mppService = null;
 
     private function mpp(): ManPowerPlanningService
@@ -213,7 +213,7 @@ class ManPowerPlanning extends Component
             $this->drilldownTitle = 'Rincian Formula Kebutuhan';
         } else {
             $this->drilldownFormula = null;
-            // Bulan berisi snapshot: personil dibaca dari salinan periode, bukan dari data pegawai terkini.
+            // Bulan berisi snapshot: personil dibaca dari salinan periode, bukan dari data karyawan terkini.
             $this->drilldownEmployees = $period
                 ? app(MppPeriodService::class)->membersFor($period, $drill, $rm, $bidang)
                 : $this->mpp()->getDrilldownEmployees($rm, $bidang, $drill, $this->planningYear, $this->asOfMonth);
@@ -265,7 +265,7 @@ class ManPowerPlanning extends Component
 
         $employees = $this->drilldownEmployees;
 
-        // Berkas memuat NIK & nama pegawai (UU PDP): catat siapa yang mengunduh, tanpa data pribadinya.
+        // Berkas memuat NIK & nama karyawan (UU PDP): catat siapa yang mengunduh, tanpa data pribadinya.
         Log::info('Ekspor rincian personil MPP', [
             'user_id' => auth()->id(),
             'rm' => $this->drilldownRm,
@@ -310,7 +310,7 @@ class ManPowerPlanning extends Component
         return Excel::download(new MppMatrixExport($matrix, $periodLabel, auth()->user()), $fileName);
     }
 
-    /** Data matriks: salinan periode bila bulan ini sudah direkam, selain itu dihitung dari data pegawai. */
+    /** Data matriks: salinan periode bila bulan ini sudah direkam, selain itu dihitung dari data karyawan. */
     private function mppData(): array
     {
         $snapshot = $this->period()?->snapshot;
@@ -363,7 +363,7 @@ class ManPowerPlanning extends Component
 
     /**
      * Catat akses data MPP pada master_audit_logs (UU PDP): siapa, kapan, sel mana, dan berapa baris. NIK dan
-     * nama pegawai tidak ikut dicatat. Rincian personil menyebut RM Band, bidang, dan indikator selnya.
+     * nama karyawan tidak ikut dicatat. Rincian personil menyebut RM Band, bidang, dan indikator selnya.
      */
     private function auditAccess(string $action, string $label, int $rows): void
     {

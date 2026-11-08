@@ -678,7 +678,7 @@ class FormasiEditor extends Component
     #[Computed]
     public function unitOverview(): Collection
     {
-        // Pemegang per formasi jabatan: pegawai dicocokkan dengan (nama unit, nama jabatan), sama seperti layar unit.
+        // Pemegang per formasi jabatan: karyawan dicocokkan dengan (nama unit, nama jabatan), sama seperti layar unit.
         $occupied = DB::table('position_unit')
             ->join('units', 'units.id', '=', 'position_unit.unit_id')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
@@ -706,8 +706,8 @@ class FormasiEditor extends Component
     }
 
     /**
-     * Pegawai yang tercatat pada nama unit yang tidak ada di Master Unit. Formasi mencocokkan pegawai dengan nama unit,
-     * sehingga pegawai ini tidak terhitung pada kolom Terisi; daftar ini membuat selisih tersebut terlihat.
+     * Karyawan yang tercatat pada nama unit yang tidak ada di Master Unit. Formasi mencocokkan karyawan dengan nama unit,
+     * sehingga karyawan ini tidak terhitung pada kolom Terisi; daftar ini membuat selisih tersebut terlihat.
      *
      * @return Collection<int, object{unit_kerja: string, total: int}>
      */
@@ -756,7 +756,7 @@ class FormasiEditor extends Component
     }
 
     /**
-     * Pegawai yang menempati formasi jabatan terbuka, dalam bentuk baris untuk `x-admin.personnel-drawer`.
+     * Karyawan yang menempati formasi jabatan terbuka, dalam bentuk baris untuk `x-admin.personnel-drawer`.
      * Hanya nama, status, golongan, tanggal MBT/pensiun, dan NIK (khusus untuk tautan profil) yang dimuat; NIK tidak
      * tampil sebagai teks. Tanggal dihitung model Employee (efektif) dan diformat oleh ManPowerPlanningService.
      *

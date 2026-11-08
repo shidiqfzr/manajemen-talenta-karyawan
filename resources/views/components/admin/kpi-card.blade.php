@@ -1,7 +1,7 @@
 {{--
     Kartu KPI/statistik (DESIGN.md §5.3, §6.1).
 
-    <x-admin.kpi-card title="Total Pegawai" :value="$total" icon="fas fa-users" theme="primary" subtitle="Pegawai aktif" />
+    <x-admin.kpi-card title="Total Karyawan" :value="$total" icon="fas fa-users" theme="primary" subtitle="Karyawan aktif" />
 
     theme dipilih menurut arti data: primary · info · earth · teal · warning · danger · neutral.
     Alias lama (sky, blue, rose, red, amber, slate, gray, emerald) hanya untuk kompatibilitas.

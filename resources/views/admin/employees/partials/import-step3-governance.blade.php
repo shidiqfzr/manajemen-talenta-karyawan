@@ -43,7 +43,7 @@
                 <div class="min-w-0">
                     <strong class="text-surface-800 font-bold block text-xs">Kepatuhan Batas Usia Kerja</strong>
                     <span class="text-surface-500 text-[11px] block mt-0.5 leading-snug">
-                        Perhitungan otomatis Batas Usia Pensiun (56 tahun) dan MBT (55 tahun) aktif sesuai regulasi kepegawaian.
+                        Perhitungan otomatis Batas Usia Pensiun (56 tahun) dan MBT (6 bulan sebelum pensiun) aktif sesuai regulasi kepegawaian.
                     </span>
                 </div>
             </li>
@@ -63,11 +63,11 @@
 
     <!-- TOMBOL TINDAKAN OPERASIONAL UTAMA -->
     <div class="pt-4 border-t border-surface-100 space-y-2.5">
-        <!-- 1. Primary CTA: Buka Direktori Pegawai -->
+        <!-- 1. Primary CTA: Buka Daftar Karyawan -->
         <a href="{{ route('admin.employees.index') }}"
             class="w-full py-3 px-4 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white text-xs sm:text-sm font-extrabold transition shadow-md shadow-primary-600/20 flex items-center justify-center gap-2 cursor-pointer">
             <i class="fas fa-users text-sm" aria-hidden="true"></i>
-            <span>Buka Direktori Pegawai</span>
+            <span>Buka Daftar Karyawan</span>
             <i class="fas fa-arrow-right text-xs" aria-hidden="true"></i>
         </a>
 

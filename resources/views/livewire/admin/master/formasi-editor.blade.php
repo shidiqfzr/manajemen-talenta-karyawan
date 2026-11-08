@@ -23,7 +23,7 @@
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
             <x-admin.kpi-card title="Jumlah Jabatan" :value="$seats->count()" subtitle="Jabatan pada formasi unit ini" icon="fas fa-briefcase" theme="primary" />
             <x-admin.kpi-card title="Total Kuota" :value="$seats->sum('kuota')" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
-            <x-admin.kpi-card title="Terisi" :value="$seats->sum('filled')" subtitle="Pegawai menempati formasi" icon="fas fa-user-check" theme="teal" />
+            <x-admin.kpi-card title="Terisi" :value="$seats->sum('filled')" subtitle="Karyawan menempati formasi" icon="fas fa-user-check" theme="teal" />
             @if ($overQuota > 0 || $seatStatusFilter === 'over')
                 <x-admin.kpi-card title="Melebihi Kuota" :value="$overQuota" :subtitle="$seatStatusFilter === 'over' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk menampilkan yang perlu ditinjau'" icon="fas fa-triangle-exclamation" theme="danger" :active="$seatStatusFilter === 'over'"
                     role="button" tabindex="0" aria-pressed="{{ $seatStatusFilter === 'over' ? 'true' : 'false' }}" wire:click="toggleOverQuotaFilter" wire:keydown.enter="toggleOverQuotaFilter" wire:keydown.space.prevent="toggleOverQuotaFilter" />
@@ -32,14 +32,10 @@
             @endif
         </div>
 
-        <!-- Formasi jabatan: judul, pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan daftar unit dan modul Pegawai) -->
+        <!-- Formasi jabatan: judul, pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan daftar unit dan modul Karyawan) -->
         <div class="bg-white rounded-2xl border border-surface-200/80 shadow-xs overflow-hidden">
             <div wire:loading.delay wire:target="seatQuery,rmFilter,bidangFilter,seatStatusFilter,toggleOverQuotaFilter,resetSeatFilters,sortBy" class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
-            {{-- Shared toolbar and header; Tambah Jabatan and Ekspor stay with the list they act on. --}}
-            <div class="px-5 pt-3 flex flex-wrap items-center justify-end gap-2">
-                <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi">Ekspor</x-admin.button>
-                <x-admin.button size="sm" icon="fas fa-plus" wire:click="openAddSeat">Tambah Jabatan</x-admin.button>
-            </div>
+            {{-- Shared toolbar and header; Tambah Jabatan and Ekspor Excel sit in the header with the list they act on. --}}
             <x-admin.table.toolbar
                 table-id="formasi-seats"
                 search-model="seatQuery"
@@ -49,12 +45,16 @@
                 :has-active-filters="$this->hasSeatFilters()"
                 :search="$seatQuery"
                 search-placeholder="Cari nama jabatan..." />
-            <x-admin.table.header :title="'Formasi Jabatan — '.$unit->nama" :paginator="$pagedSeats" noun="Jabatan" />
+            <x-admin.table.header :title="'Formasi Jabatan — '.$unit->nama" :paginator="$pagedSeats" noun="Jabatan" :export="true" export-action="exportFormasi">
+                <x-slot:actions>
+                    <x-admin.button size="sm" icon="fas fa-plus" wire:click="openAddSeat">Tambah Jabatan</x-admin.button>
+                </x-slot:actions>
+            </x-admin.table.header>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
-                        <tr class="bg-surface-50 border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+                        <tr class="bg-surface-50 border-b border-surface-200">
                             <x-admin.table.th sortable field="jabatan" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Jabatan</x-admin.table.th>
                             <x-admin.table.th sortable field="rm_level" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">RM Band</x-admin.table.th>
                             <x-admin.table.th sortable field="bidang" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Bidang</x-admin.table.th>
@@ -80,7 +80,7 @@
                                 <td class="py-3.5 px-5 tabular-nums">{{ $seat->kuota }}</td>
                                 <td class="py-3.5 px-5 tabular-nums">
                                     @if ($seat->filled > 0)
-                                        <button type="button" wire:click="viewOccupants({{ $seat->id }})" wire:loading.attr="disabled" wire:loading.class="opacity-50 cursor-wait" wire:target="viewOccupants({{ $seat->id }})" aria-label="Lihat {{ $seat->filled }} pegawai pada formasi {{ $seat->jabatan }}"
+                                        <button type="button" wire:click="viewOccupants({{ $seat->id }})" wire:loading.attr="disabled" wire:loading.class="opacity-50 cursor-wait" wire:target="viewOccupants({{ $seat->id }})" aria-label="Lihat {{ $seat->filled }} karyawan pada formasi {{ $seat->jabatan }}"
                                             class="font-semibold text-primary-700 underline decoration-dotted underline-offset-2 hover:text-primary-900 cursor-pointer rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{{ $seat->filled }}</button>
                                     @else
                                         {{ $seat->filled }}
@@ -145,10 +145,10 @@
             <div role="status" class="flex items-start gap-2.5 p-4 bg-warning-50 text-warning-800 border border-warning-200 rounded-xl shadow-xs text-sm">
                 <i class="fas fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
                 <div class="space-y-1">
-                    <p class="font-semibold">{{ number_format($unregistered->sum('total')) }} pegawai tercatat pada {{ $unregistered->count() }} unit kerja yang belum terdaftar di Master Unit, sehingga tidak terhitung pada kolom Terisi.</p>
+                    <p class="font-semibold">{{ number_format($unregistered->sum('total')) }} karyawan tercatat pada {{ $unregistered->count() }} unit kerja yang belum terdaftar di Master Unit, sehingga tidak terhitung pada kolom Terisi.</p>
                     <p class="text-xs">
                         {{ $unregistered->take(3)->map(fn ($row) => $row->unit_kerja.' ('.$row->total.')')->join(', ') }}{{ $unregistered->count() > 3 ? ', dan '.($unregistered->count() - 3).' unit lainnya' : '' }}.
-                        Samakan penulisan nama unit pada data pegawai dengan Master Unit, atau daftarkan unitnya.
+                        Samakan penulisan nama unit pada data karyawan dengan Master Unit, atau daftarkan unitnya.
                     </p>
                 </div>
             </div>
@@ -162,13 +162,10 @@
             <x-admin.kpi-card title="Terisi" :value="$stats['filled']" :badge="$stats['kuota'] > 0 ? round($stats['filled'] / $stats['kuota'] * 100).'%' : null" :subtitle="$stats['over'].' formasi melebihi kuota'" icon="fas fa-user-check" theme="primary" />
         </div>
 
-        <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Pegawai) -->
+        <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Karyawan) -->
         <div class="bg-white rounded-2xl border border-surface-200 shadow-xs overflow-hidden">
             <div wire:loading.delay wire:target="unitQuery,wilayahFilter,statusFilter,resetUnitFilters,sortBy" class="w-full h-1 bg-gradient-to-r from-primary-600 via-primary-400 to-primary-600 motion-safe:animate-pulse"></div>
-            {{-- Shared toolbar and header; the Ekspor action stays with the list it exports. --}}
-            <div class="px-5 pt-3 flex justify-end">
-                <x-admin.button variant="secondary" size="sm" icon="fas fa-file-excel" wire:click="exportFormasi" target="exportFormasi">Ekspor</x-admin.button>
-            </div>
+            {{-- Shared toolbar and header; Ekspor Excel sits in the header like every other table (exportFormasi). --}}
             <x-admin.table.toolbar
                 table-id="formasi-units"
                 search-model="unitQuery"
@@ -178,12 +175,12 @@
                 :has-active-filters="$this->hasUnitFilters()"
                 :search="$unitQuery"
                 search-placeholder="Cari nama unit kerja..." />
-            <x-admin.table.header title="Daftar Unit Kerja" :paginator="$this->pagedOverview" noun="Unit Kerja" />
+            <x-admin.table.header title="Daftar Unit Kerja" :paginator="$this->pagedOverview" noun="Unit Kerja" :export="true" export-action="exportFormasi" />
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
-                        <tr class="bg-surface-50 border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+                        <tr class="bg-surface-50 border-b border-surface-200">
                             <x-admin.table.th sortable field="nama" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Unit Kerja</x-admin.table.th>
                             <x-admin.table.th sortable field="wilayah" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Wilayah</x-admin.table.th>
                             <x-admin.table.th sortable field="seats" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Jabatan</x-admin.table.th>
@@ -262,10 +259,10 @@
                             </div>
                         @endif
                         @if (! $impact->blockers && ! $impact->warnings)
-                            <p class="text-xs text-surface-600">Tidak ada dampak pada pegawai. Perubahan siap diterapkan.</p>
+                            <p class="text-xs text-surface-600">Tidak ada dampak pada karyawan. Perubahan siap diterapkan.</p>
                         @endif
                         @if ($impact->affectedEmployees > 0)
-                            <p class="text-[11px] text-surface-500">Pegawai terkait: {{ $impact->affectedEmployees }}</p>
+                            <p class="text-[11px] text-surface-500">Karyawan terkait: {{ $impact->affectedEmployees }}</p>
                         @endif
                     @endif
 
@@ -436,7 +433,7 @@
             :employees="$this->occupants"
             :count="count($this->occupants)"
             :subtitle="$occupantSeat->jabatan.' — '.$occupantSeat->filled.' dari '.$occupantSeat->kuota.' kuota terisi'"
-            empty-text="Belum ada pegawai pada jabatan ini">
+            empty-text="Belum ada karyawan pada jabatan ini">
             <x-slot:badges>
                 <span class="inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold border {{ \App\Models\Position::rmTheme($occupantSeat->rm_level) }}">{{ $occupantSeat->rm_level ?? '-' }}</span>
                 @if ($occupantSeat->bidang)
@@ -446,7 +443,7 @@
             @if ($occupantSeat->filled > count($this->occupants))
                 <x-slot:header>
                     <p class="text-[11px] text-warning-800 bg-warning-50 border border-warning-200/80 rounded-lg px-3 py-2" role="status">
-                        Menampilkan {{ count($this->occupants) }} dari {{ $occupantSeat->filled }} pegawai. Gunakan Daftar Pegawai untuk melihat seluruhnya.
+                        Menampilkan {{ count($this->occupants) }} dari {{ $occupantSeat->filled }} karyawan. Gunakan Daftar Karyawan untuk melihat seluruhnya.
                     </p>
                 </x-slot:header>
             @endif

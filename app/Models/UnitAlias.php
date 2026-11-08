@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Nama lama atau variasi penulisan sebuah unit kerja. Dipakai impor pegawai untuk memetakan
+ * Nama lama atau variasi penulisan sebuah unit kerja. Dipakai impor karyawan untuk memetakan
  * berkas lama ke nama unit master saat ini, sehingga tidak ada pemetaan nama yang tertanam di kode.
  */
 class UnitAlias extends Model

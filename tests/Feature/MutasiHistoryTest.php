@@ -74,7 +74,7 @@ class MutasiHistoryTest extends TestCase
             ->call('resetFilters')
             ->assertSet('sumberFilter', '');
 
-        // Tidak ada baris yang hilang: dua baris data awal pegawai dan satu mutasi resmi tetap tersimpan.
+        // Tidak ada baris yang hilang: dua baris data awal karyawan dan satu mutasi resmi tetap tersimpan.
         $this->assertSame(3, JobHistory::count());
         $this->assertSame(2, JobHistory::where('sumber', JobHistory::SUMBER_DATA_AWAL)->count());
     }
@@ -358,8 +358,8 @@ class MutasiHistoryTest extends TestCase
         Unit::factory()->create(['nama' => 'Kebun B']);
         Position::factory()->create(['nama' => 'Asisten Afdeling', 'rm_level' => 'RM-3']);
 
-        $empA = Employee::factory()->create(['nama' => 'Pegawai Dipilih', 'jabatan' => 'Asisten Gudang', 'unit_kerja' => 'Kebun A']);
-        $empB = Employee::factory()->create(['nama' => 'Pegawai Lain', 'jabatan' => 'Asisten Gudang', 'unit_kerja' => 'Kebun B']);
+        $empA = Employee::factory()->create(['nama' => 'Karyawan Dipilih', 'jabatan' => 'Asisten Gudang', 'unit_kerja' => 'Kebun A']);
+        $empB = Employee::factory()->create(['nama' => 'Karyawan Lain', 'jabatan' => 'Asisten Gudang', 'unit_kerja' => 'Kebun B']);
 
         $selected = JobHistory::create([
             'employee_nik' => $empA->nik,
@@ -526,19 +526,19 @@ class MutasiHistoryTest extends TestCase
 
     public function test_history_keeps_filter_urls_and_ignores_old_sort_keys(): void
     {
-        $older = $this->official(Employee::factory()->create(['nama' => 'Pegawai Jatuh Tempo Lama']), [
+        $older = $this->official(Employee::factory()->create(['nama' => 'Karyawan Jatuh Tempo Lama']), [
             'jabatan' => 'Asisten Teknik', 'tmt_awal' => now()->subDays(10)->toDateString(), 'is_applied' => false,
         ]);
-        $newer = $this->official(Employee::factory()->create(['nama' => 'Pegawai Jatuh Tempo Baru']), [
+        $newer = $this->official(Employee::factory()->create(['nama' => 'Karyawan Jatuh Tempo Baru']), [
             'jabatan' => 'Zeta Asisten', 'tmt_awal' => now()->subDays(2)->toDateString(), 'is_applied' => false,
         ]);
-        $this->official(Employee::factory()->create(['nama' => 'Pegawai Unit Lain']), [
+        $this->official(Employee::factory()->create(['nama' => 'Karyawan Unit Lain']), [
             'unit_kerja' => 'Kebun B', 'tmt_awal' => now()->subDay()->toDateString(), 'is_applied' => false,
         ]);
-        $this->official(Employee::factory()->create(['nama' => 'Pegawai Belum Tempo']), [
+        $this->official(Employee::factory()->create(['nama' => 'Karyawan Belum Tempo']), [
             'tmt_awal' => now()->addDays(10)->toDateString(), 'is_applied' => false,
         ]);
-        Employee::factory()->create(['nama' => 'Pegawai Data Awal', 'unit_kerja' => 'Kebun A']);
+        Employee::factory()->create(['nama' => 'Karyawan Data Awal', 'unit_kerja' => 'Kebun A']);
 
         // The old sortField/sortDirection keys would order by jabatan asc (older first); they are ignored.
         $this->actingAs($this->adminUser)->get(route('admin.mutasi.index', ['tab' => 'history',
@@ -549,10 +549,10 @@ class MutasiHistoryTest extends TestCase
             'sortDirection' => 'asc',
         ]))
             ->assertOk()
-            ->assertSeeInOrder(['Pegawai Jatuh Tempo Baru', 'Pegawai Jatuh Tempo Lama'])
-            ->assertDontSee('Pegawai Unit Lain')
-            ->assertDontSee('Pegawai Belum Tempo')
-            ->assertDontSee('Pegawai Data Awal');
+            ->assertSeeInOrder(['Karyawan Jatuh Tempo Baru', 'Karyawan Jatuh Tempo Lama'])
+            ->assertDontSee('Karyawan Unit Lain')
+            ->assertDontSee('Karyawan Belum Tempo')
+            ->assertDontSee('Karyawan Data Awal');
 
         $component = Livewire::withQueryParams([
             'sumberFilter' => 'resmi', 'statusFilter' => 'due', 'unitFilter' => 'Kebun A',
@@ -567,14 +567,14 @@ class MutasiHistoryTest extends TestCase
 
         $this->actingAs($this->adminUser)->get(route('admin.mutasi.index', ['tab' => 'history', 'sumberFilter' => 'semua', 'unitFilter' => 'Kebun A']))
             ->assertOk()
-            ->assertSee('Pegawai Data Awal')
-            ->assertSee('Pegawai Belum Tempo');
+            ->assertSee('Karyawan Data Awal')
+            ->assertSee('Karyawan Belum Tempo');
     }
 
     public function test_history_ignores_tampered_url_state(): void
     {
-        $this->official(Employee::factory()->create(['nama' => 'Pegawai Resmi Aman']));
-        Employee::factory()->create(['nama' => 'Pegawai Data Awal Saja']);
+        $this->official(Employee::factory()->create(['nama' => 'Karyawan Resmi Aman']));
+        Employee::factory()->create(['nama' => 'Karyawan Data Awal Saja']);
 
         $params = [
             'sumberFilter' => 'zzz',
@@ -588,8 +588,8 @@ class MutasiHistoryTest extends TestCase
 
         $this->actingAs($this->adminUser)->get(route('admin.mutasi.index', ['tab' => 'history', ...$params]))
             ->assertOk()
-            ->assertSee('Pegawai Resmi Aman')
-            ->assertDontSee('Pegawai Data Awal Saja')
+            ->assertSee('Karyawan Resmi Aman')
+            ->assertDontSee('Karyawan Data Awal Saja')
             ->assertDontSee('Filter Aktif:');
 
         Livewire::withQueryParams($params)->actingAs($this->adminUser)->test(MutasiHistory::class)
@@ -605,11 +605,11 @@ class MutasiHistoryTest extends TestCase
     public function test_search_matches_name_nik_jabatan_unit_literally(): void
     {
         $byName = $this->official(Employee::factory()->create(['nik' => '11110001', 'nama' => 'Sulastri Wardhani']));
-        $byNik = $this->official(Employee::factory()->create(['nik' => '98765432', 'nama' => 'Pegawai Kedua']));
-        $percent = $this->official(Employee::factory()->create(['nik' => '11110003', 'nama' => 'Pegawai Ketiga']), ['jabatan' => 'Asisten 100%']);
-        $plain = $this->official(Employee::factory()->create(['nik' => '11110004', 'nama' => 'Pegawai Keempat']), ['jabatan' => 'Asisten 1000']);
-        $unit = $this->official(Employee::factory()->create(['nik' => '11110005', 'nama' => 'Pegawai Kelima']), ['unit_kerja' => 'Kebun Ujung_Batu']);
-        $this->official(Employee::factory()->create(['nik' => '11110006', 'nama' => 'Pegawai Keenam']), ['unit_kerja' => 'Kebun UjungXBatu']);
+        $byNik = $this->official(Employee::factory()->create(['nik' => '98765432', 'nama' => 'Karyawan Kedua']));
+        $percent = $this->official(Employee::factory()->create(['nik' => '11110003', 'nama' => 'Karyawan Ketiga']), ['jabatan' => 'Asisten 100%']);
+        $plain = $this->official(Employee::factory()->create(['nik' => '11110004', 'nama' => 'Karyawan Keempat']), ['jabatan' => 'Asisten 1000']);
+        $unit = $this->official(Employee::factory()->create(['nik' => '11110005', 'nama' => 'Karyawan Kelima']), ['unit_kerja' => 'Kebun Ujung_Batu']);
+        $this->official(Employee::factory()->create(['nik' => '11110006', 'nama' => 'Karyawan Keenam']), ['unit_kerja' => 'Kebun UjungXBatu']);
 
         $component = Livewire::actingAs($this->adminUser)->test(MutasiHistory::class);
         $ids = fn (string $term) => $component->set('search', $term)->instance()->rows->pluck('id')->sort()->values()->all();

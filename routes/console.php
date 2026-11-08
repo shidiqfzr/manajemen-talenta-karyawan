@@ -18,7 +18,7 @@ Artisan::command('hris:purge-import-files {--hours=2 : Batas jam kedaluwarsa ber
     $hours = (int) $this->option('hours');
     $deleted = $importService->purgeExpiredFiles($hours);
     $this->info("Berhasil membersihkan {$deleted} berkas spreadsheet impor sementara yang kedaluwarsa (> {$hours} jam).");
-})->purpose('Membersihkan berkas sementara impor pegawai yang terbengkalai (UU PDP Compliance)');
+})->purpose('Membersihkan berkas sementara impor karyawan yang terbengkalai (UU PDP Compliance)');
 
 Artisan::command('hris:purge-import-governance', function (EmployeeImportGovernanceService $governance) {
     $result = $governance->purgeExpired();

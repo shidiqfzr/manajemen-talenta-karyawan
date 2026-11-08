@@ -41,7 +41,7 @@ class MppPeriodService
 
     /**
      * Status bulan pada layar MPP: closed/draft (ada salinan tersimpan), unclosed (bulan lampau belum pernah
-     * direkam), atau live (bulan berjalan/mendatang, dihitung dari data pegawai).
+     * direkam), atau live (bulan berjalan/mendatang, dihitung dari data karyawan).
      *
      * @return 'closed'|'draft'|'unclosed'|'live'
      */
@@ -65,7 +65,7 @@ class MppPeriodService
     {
         $this->assertClosable($year, $month);
 
-        // Instans baru: ManPowerPlanningService menyimpan pembacaan pegawai selama hidupnya, sedangkan
+        // Instans baru: ManPowerPlanningService menyimpan pembacaan karyawan selama hidupnya, sedangkan
         // perekaman harus selalu membaca data terkini (juga bila layanan ini dipakai berulang kali).
         $planning = app(ManPowerPlanningService::class);
         $matrix = $planning->getMppMatrix($year, $month);
@@ -182,7 +182,7 @@ class MppPeriodService
     /**
      * Personil satu sel pada periode, berbentuk sama dengan ManPowerPlanningService::getDrilldownEmployees().
      * Jabatan, unit, golongan, dan tanggal berasal dari snapshot (golongan memakai data terkini hanya untuk
-     * baris lama yang belum membekukannya); nama, pensiun, dan status dari data pegawai saat ini
+     * baris lama yang belum membekukannya); nama, pensiun, dan status dari data karyawan saat ini
      * ("tidak lagi terdaftar" bila NIK sudah tidak ada).
      *
      * @return list<array<string, mixed>>

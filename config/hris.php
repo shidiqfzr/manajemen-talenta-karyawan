@@ -4,7 +4,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Tata Kelola Impor Data Pegawai
+    | Tata Kelola Impor Data Karyawan
     |--------------------------------------------------------------------------
     |
     | require_approval  : kebijakan empat mata (maker-checker). Bila aktif, impor tidak langsung disimpan:
@@ -12,7 +12,7 @@ return [
     | approval_ttl_days : pengajuan yang tidak diputuskan dalam batas hari ini kedaluwarsa otomatis.
     | undo_window_days  : batas hari pembatalan (undo) impor setelah disimpan. Rekaman data sebelum impor
     |                     (terenkripsi) dihapus setelah batas ini sebagai minimisasi data pribadi.
-    | typed_confirmation_threshold : pembatalan impor yang menyentuh sekian pegawai atau lebih wajib
+    | typed_confirmation_threshold : pembatalan impor yang menyentuh sekian karyawan atau lebih wajib
     |                     dikonfirmasi dengan mengetik kata BATALKAN (mencegah penghapusan massal tak sengaja).
     |
     */

@@ -74,7 +74,7 @@
                         </div>
                         <div>
                             <div class="font-bold text-surface-900">Mutasi Tunggal &amp; Swap</div>
-                            <div class="text-[11px] text-surface-500">Pemindahan satu pegawai ke formasi kosong atau tukar posisi 2 arah</div>
+                            <div class="text-[11px] text-surface-500">Pemindahan satu karyawan ke formasi kosong atau tukar posisi 2 arah</div>
                         </div>
                     </a>
                     <div class="border-t border-surface-100 my-1"></div>
@@ -85,7 +85,7 @@
                         </div>
                         <div>
                             <div class="font-bold text-primary-950 group-hover:text-primary-800">Mutasi Berantai (Kolektif)</div>
-                            <div class="text-[11px] text-surface-500">Penyusunan rotasi gerbong (siklis/domino) multi-pegawai dalam 1 SK bersama</div>
+                            <div class="text-[11px] text-surface-500">Penyusunan rotasi gerbong (siklis/domino) multi-karyawan dalam 1 SK bersama</div>
                         </div>
                     </a>
                 </div>

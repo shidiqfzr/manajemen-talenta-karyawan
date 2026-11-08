@@ -6,7 +6,7 @@ use App\Models\EmployeeImportLog;
 
 $errors = [];
 $templates = [
-    [44, 'Jabatan pegawai wajib diisi.'],
+    [44, 'Jabatan karyawan wajib diisi.'],
     [18, "Kuota formasi jabatan 'Asisten Kepala' pada Unit Kerja 'Kebun Tajati' sudah terpenuhi (3 formasi)."],
     [1, 'NIK wajib diisi.'],
     [1, 'TMT Bekerja minimal 15 tahun setelah Tanggal Lahir.'],

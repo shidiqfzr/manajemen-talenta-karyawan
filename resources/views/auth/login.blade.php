@@ -52,7 +52,7 @@
 
                             <!-- Header Section -->
                             <h1 class="text-3xl short:text-2xl font-bold text-surface-900 mb-2 tracking-tight text-center">Selamat Datang</h1>
-                            <p class="text-surface-600 text-sm leading-relaxed {{ $loginError ? 'mb-4' : 'mb-8' }} short:mb-4 text-center">Sistem Informasi Manajemen Talenta &amp; Formasi Pegawai</p>
+                            <p class="text-surface-600 text-sm leading-relaxed {{ $loginError ? 'mb-4' : 'mb-8' }} short:mb-4 text-center">Sistem Informasi Manajemen Talenta &amp; Formasi Karyawan</p>
 
                             <!-- Error Alert -->
                             @if ($loginError)
@@ -125,7 +125,7 @@
                     <div class="relative z-10 text-white max-w-md">
                         <h2 class="text-4xl short:text-3xl font-bold leading-tight tracking-tight text-balance mb-3">Pengelolaan Talenta yang Terpadu dan Akuntabel</h2>
                         <p class="text-base leading-relaxed">
-                            Satu platform untuk mengelola data pegawai, formasi jabatan, mutasi, pelatihan, penilaian kinerja, dan pemetaan talenta di lingkungan PTPN IV Regional V.
+                            Satu platform untuk mengelola data karyawan, formasi jabatan, mutasi, pelatihan, penilaian kinerja, dan pemetaan talenta di lingkungan PTPN IV Regional V.
                         </p>
                     </div>
                 </aside>

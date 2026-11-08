@@ -374,10 +374,10 @@ function employeeImportWizard() {
                         document.getElementById('admin-main')?.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 } else {
-                    this.showError(data.message || 'Gagal menyimpan data pegawai.');
+                    this.showError(data.message || 'Gagal menyimpan data karyawan.');
                 }
             } catch (e) {
-                this.showError('Terjadi kesalahan saat memproses penyimpanan data pegawai.');
+                this.showError('Terjadi kesalahan saat memproses penyimpanan data karyawan.');
             } finally {
                 if (!this.isAsync) {
                     this.isCommitting = false;

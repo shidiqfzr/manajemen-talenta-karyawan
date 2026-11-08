@@ -30,7 +30,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead class="bg-surface-50 sticky top-0 z-10">
-                    <tr class="border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
+                    <tr class="border-b border-surface-200">
                         <x-admin.table.th>Nama</x-admin.table.th>
                         <x-admin.table.th>Jabatan</x-admin.table.th>
                         <x-admin.table.th>Level</x-admin.table.th>
