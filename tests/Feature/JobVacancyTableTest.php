@@ -130,4 +130,19 @@ class JobVacancyTableTest extends TestCase
             ->set('perPage', 25)
             ->assertSet('perPage', 25);
     }
+
+    public function test_reserved_vacancy_shows_the_reserved_employee_name(): void
+    {
+        $successor = Employee::factory()->create(['nama' => 'Sari Pengganti']);
+
+        JobHistory::create([
+            'employee_nik' => $successor->nik,
+            'jabatan' => 'Jabatan Kritis Alfa',
+            'unit_kerja' => 'Unit Alfa',
+            'tmt_awal' => now()->addMonth()->toDateString(),
+            'is_applied' => false,
+        ]);
+
+        Livewire::test(JobVacancyTable::class)->assertSeeHtml('Dipesan oleh Sari Pengganti');
+    }
 }

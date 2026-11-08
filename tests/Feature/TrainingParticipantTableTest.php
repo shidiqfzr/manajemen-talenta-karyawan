@@ -134,4 +134,11 @@ class TrainingParticipantTableTest extends TestCase
 
         $this->assertSame('peserta', (new \ReflectionMethod(TrainingParticipantTable::class, 'paginationName'))->invoke($this->table()->instance()));
     }
+
+    public function test_non_admin_is_refused(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'user']));
+
+        Livewire::test(TrainingParticipantTable::class, ['trainingId' => $this->training->id])->assertForbidden();
+    }
 }

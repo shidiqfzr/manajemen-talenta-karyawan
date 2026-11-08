@@ -157,10 +157,8 @@ class TrainingIndexTableTest extends TestCase
         $this->makeTraining(['judul' => 'Lainnya']);
 
         $viewer = User::factory()->create(['role' => 'user']);
-        Livewire::actingAs($viewer)->test(TrainingIndexTable::class)
-            ->call('export')
-            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.'])
-            ->assertNoFileDownloaded();
+        // Non-admins are now refused outright by the component's boot() guard, before any export action.
+        Livewire::actingAs($viewer)->test(TrainingIndexTable::class)->assertForbidden();
         $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
 
         Livewire::actingAs($this->admin)->test(TrainingIndexTable::class)
@@ -260,5 +258,12 @@ class TrainingIndexTableTest extends TestCase
         foreach (['AGENTS.md', 'DOMAIN.md', 'DESIGN.md', 'ENGINEERING.md', 'SECURITY.md', 'SSOT'] as $name) {
             $this->assertStringNotContainsString($name, $html);
         }
+    }
+
+    public function test_non_admin_is_refused(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'user']));
+
+        Livewire::test(TrainingIndexTable::class)->assertForbidden();
     }
 }

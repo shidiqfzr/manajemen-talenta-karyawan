@@ -119,7 +119,7 @@
                                         Gol: {{ $item->golongan ?: '—' }}
                                     </span>
                                     @if ($item->is_reserved)
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-warning-100 text-warning-800 border border-warning-200" title="Dipesan oleh {{ $item->reserved_by_name }} (TMT: {{ $item->reserved_tmt }})">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-warning-100 text-warning-800 border border-warning-200" title="Dipesan oleh {{ $item->reserved_occupant_name }} (TMT: {{ $item->reserved_tmt }})">
                                             <i class="fas fa-lock text-[10px] text-warning-700" aria-hidden="true"></i> Dipesan: {{ $item->reserved_tmt }}
                                         </span>
                                     @endif
@@ -202,8 +202,8 @@
                                             <i class="fas fa-lock text-warning-700 text-xs" aria-hidden="true"></i>
                                             <span>Terjadwal (SK)</span>
                                         </div>
-                                        <div class="text-[11px] font-semibold text-surface-900 truncate mt-1" title="{{ $item->reserved_by_name }}">
-                                            {{ $item->reserved_by_name }}
+                                        <div class="text-[11px] font-semibold text-surface-900 truncate mt-1" title="{{ $item->reserved_occupant_name }}">
+                                            {{ $item->reserved_occupant_name }}
                                         </div>
                                         <div class="text-[10px] text-warning-700 font-mono mt-0.5">
                                             TMT: {{ $item->reserved_tmt }}

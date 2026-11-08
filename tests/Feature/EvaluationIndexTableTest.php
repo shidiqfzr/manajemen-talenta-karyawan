@@ -182,4 +182,18 @@ class EvaluationIndexTableTest extends TestCase
             $this->assertStringNotContainsString($name, $html);
         }
     }
+
+    public function test_non_admin_is_refused(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'user']));
+
+        Livewire::test(EvaluationIndexTable::class)->assertForbidden();
+    }
+
+    public function test_evaluations_index_view_has_no_utf8_bom(): void
+    {
+        $head = substr(file_get_contents(resource_path('views/admin/evaluations/index.blade.php')), 0, 3);
+
+        $this->assertNotSame('efbbbf', bin2hex($head));
+    }
 }
