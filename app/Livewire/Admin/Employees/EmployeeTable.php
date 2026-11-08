@@ -2,10 +2,15 @@
 
 namespace App\Livewire\Admin\Employees;
 
+use App\Exports\EmployeesExport;
 use App\Livewire\Concerns\WithDataTable;
 use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\Position;
+use App\Models\User;
+use App\Services\EmployeeDeletionService;
+use App\Services\EmployeeExportService;
+use App\Support\DataTable\BulkAction;
 use App\Support\DataTable\Column;
 use App\Support\DataTable\Filter;
 use Illuminate\Contracts\View\View;
@@ -22,8 +27,10 @@ use Livewire\Component;
  * filters, sort and page. The KPI cards (rendered here so they follow the live state) drive `level`
  * and the governance strip drives `status_khusus` through `$set`, which the shared layer validates
  * like any filter value; the toolbar shows them only as removable chips.
- * Row actions stay plain links and the CSRF-protected DELETE form handled by EmployeeController;
- * row selection, bulk delete and the export button still post to their existing routes.
+ * Row actions stay plain links and the CSRF-protected DELETE form handled by EmployeeController.
+ * Row selection, bulk delete and the Excel export run through the shared layer: the bulk delete only
+ * touches selected rows within the current search and filters (ability `delete-employee`), and the
+ * export (gate, row limit, audit entry) keeps the business workbook EmployeesExport.
  */
 class EmployeeTable extends Component
 {
@@ -189,7 +196,8 @@ class EmployeeTable extends Component
     }
 
     /**
-     * Query keys and values of the current search, sort and filters for the existing GET export route.
+     * Query keys and values of the current search, sort and filters, named like the former GET form
+     * (and the `admin.employees.export` route): used by the KPI card fallback links and the export.
      *
      * @return array<string, string>
      */
@@ -324,6 +332,53 @@ class EmployeeTable extends Component
     protected function defaultPerPage(): int
     {
         return 20;
+    }
+
+    /** @return array<int, BulkAction> */
+    protected function bulkActions(): array
+    {
+        return [
+            BulkAction::make('destroy', 'Hapus')
+                ->icon('fas fa-trash')
+                ->ability('delete-employee')
+                ->danger('Hapus :count data pegawai terpilih? Tindakan ini tidak dapat dibatalkan.')
+                ->successMessage(':count data pegawai terpilih berhasil dihapus.'),
+        ];
+    }
+
+    /**
+     * Deletes the bulk targets (selected rows within the current search and filters) and their stored
+     * photos. Runs inside runBulkAction()'s transaction; must stay protected (not client-callable).
+     */
+    protected function bulkDestroy(Builder $targets): int
+    {
+        return app(EmployeeDeletionService::class)->deleteMany($targets);
+    }
+
+    protected function exportName(): ?string
+    {
+        return 'data_pegawai';
+    }
+
+    /** Keeps the file name of the former export route (data_karyawan_ptpn4_reg5_<timestamp>.xlsx). */
+    protected function exportFileName(): string
+    {
+        return app(EmployeeExportService::class)->generateFilename();
+    }
+
+    /**
+     * The business workbook (26 columns, document metadata naming the user) with the same filter keys
+     * as the former export route, plus the table sort. A selection narrows it like the shared count.
+     */
+    protected function buildExport(Builder $query, ?User $user): object
+    {
+        $filters = $this->exportQuery();
+
+        if ($this->selected !== [] && ! $this->selectAllMatching) {
+            $filters['niks'] = $this->selected;
+        }
+
+        return new EmployeesExport($filters, $user);
     }
 
     public function render(): View

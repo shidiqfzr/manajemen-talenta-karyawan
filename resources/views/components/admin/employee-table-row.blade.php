@@ -1,21 +1,23 @@
-{{-- term: kata kunci pencarian untuk penyorotan; wajib diisi dari komponen Livewire karena request pembaruan tidak membawa ?search. --}}
-@props(['employee', 'term' => null])
+{{--
+    term             : kata kunci pencarian untuk penyorotan; wajib diisi dari komponen Livewire karena request pembaruan tidak membawa ?search.
+    selected         : baris ini termasuk pilihan (atau "pilih semua yang sesuai" aktif) — hanya untuk sorotan baris.
+    selection-active : ada pilihan aktif; klik baris lalu memilih/melepas baris alih-alih membuka profil.
+    Kotak centang terikat ke properti $selected milik lapisan tabel bersama (wire:model.live).
+--}}
+@props(['employee', 'term' => null, 'selected' => false, 'selectionActive' => false])
 
-<tr {{ $attributes->only('wire:key') }} :class="selectedNiks.includes('{{ $employee->nik }}') ? 'bg-surface-50/70 border-l-4 border-l-primary-600' : ''"
-    class="cursor-pointer hover:bg-surface-50/80 transition duration-150 group select-none"
-    @click="handleRowClick('{{ $employee->nik }}', $event, '{{ route('admin.employees.show', $employee->nik) }}')">
-    
+<tr {{ $attributes->only('wire:key') }}
+    @class(['cursor-pointer hover:bg-surface-50/80 transition duration-150 group select-none', 'bg-surface-50/70 border-l-4 border-l-primary-600' => $selected])
+    @click="if ($event.ctrlKey || $event.metaKey || $event.shiftKey || {{ $selectionActive ? 'true' : 'false' }}) { $event.preventDefault(); $el.querySelector('input[type=checkbox]').click(); } else { window.location.href = '{{ route('admin.employees.show', $employee->nik) }}'; }">
+
     <!-- Checkbox Kolom Tunggal Rapi -->
-    {{-- Area klik seluruh sel memperbesar target mouse; kotak centang asli melayani keyboard & pembaca layar.
-         Spasi = pilih/lepas, Shift+Spasi atau Shift+klik = pilih rentang (browser mengirim Spasi sebagai klik). --}}
+    {{-- Area klik seluruh sel memperbesar target mouse; kotak centang asli melayani keyboard & pembaca layar (Spasi = pilih/lepas). --}}
     <td class="py-3.5 pl-5 pr-2 w-10 text-center whitespace-nowrap"
-        @click.stop="$event.target === $el && toggleSelect('{{ $employee->nik }}', $event)">
-        <input type="checkbox"
+        @click.stop="$event.target === $el && $el.querySelector('input[type=checkbox]').click()">
+        <input type="checkbox" wire:model.live="selected" value="{{ $employee->nik }}"
                class="block mx-auto w-4 h-4 cursor-pointer accent-primary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                aria-label="Pilih {{ $employee->nama }}"
-               title="{{ $employee->nama }} (Klik atau Spasi untuk memilih, Shift untuk rentang)"
-               :checked="selectedNiks.includes('{{ $employee->nik }}')"
-               @click="toggleSelect('{{ $employee->nik }}', $event); $nextTick(() => $el.checked = selectedNiks.includes('{{ $employee->nik }}'))">
+               title="{{ $employee->nama }} (Klik atau Spasi untuk memilih)">
     </td>
 
     <!-- Pegawai (Nama, Foto Profil jika ada, NIK) -->

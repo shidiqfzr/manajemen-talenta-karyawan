@@ -33,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
         $this->configureLoginRateLimit();
 
         Gate::define('export-data', fn (User $user) => $user->role === 'admin');
+
+        // Permanent deletion of employee master records (directory bulk action); admin only, like the admin route group.
+        Gate::define('delete-employee', fn (User $user) => $user->role === 'admin');
     }
 
     /**

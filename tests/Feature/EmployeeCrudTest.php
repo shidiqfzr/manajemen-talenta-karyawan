@@ -162,8 +162,9 @@ class EmployeeCrudTest extends TestCase
             ->assertSee('type="checkbox"', false)
             ->assertSee('aria-label="Pilih PEGAWAI SATU"', false)
             ->assertSee('aria-label="Pilih PEGAWAI DUA"', false)
-            ->assertSee('aria-label="Pilih semua pegawai di halaman ini"', false)
-            ->assertSee('x-effect="$el.indeterminate', false)
+            // Page selection is the shared table checkbox (with an indeterminate state for a partial page).
+            ->assertSee('aria-label="Pilih semua di halaman ini"', false)
+            ->assertSee('x-bind:indeterminate=', false)
             ->assertSee('role="status"', false)
             ->assertDontSee('Pilih Semua Pegawai di Halaman Ini (Tips');
     }

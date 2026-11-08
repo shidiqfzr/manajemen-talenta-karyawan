@@ -19,6 +19,9 @@ use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
 class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithProperties, WithTitle
 {
+    /** Columns the optional `sort` filter may order by (the directory's sortable columns). */
+    private const SORTABLE = ['nama', 'jabatan', 'level', 'rm_level', 'golongan'];
+
     protected array $filters;
 
     protected ?User $user;
@@ -125,7 +128,17 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->whereMonth('tmt_bekerja', $this->filters['bulan_masuk']);
         }
 
-        return $query->orderBy('nama', 'asc');
+        // Optional table sort (Direktori Pegawai export); whitelisted, defaults to nama ascending.
+        $sort = in_array($this->filters['sort'] ?? null, self::SORTABLE, true) ? $this->filters['sort'] : 'nama';
+        $direction = ($this->filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+
+        $query->orderBy($sort, $direction);
+
+        if ($sort !== 'nama') {
+            $query->orderBy('nama', 'asc');
+        }
+
+        return $query;
     }
 
     /**

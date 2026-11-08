@@ -16,6 +16,7 @@ use App\Models\Employee;
 use App\Models\EmployeeImportLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\EmployeeDeletionService;
 use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
 use App\Services\FormasiSeatGuard;
@@ -457,24 +458,15 @@ class EmployeeController extends Controller
     /**
      * Hapus massal data pegawai terpilih secara transaksional.
      */
-    public function bulkDestroy(Request $request)
+    public function bulkDestroy(Request $request, EmployeeDeletionService $deletion)
     {
         $validated = $request->validate([
             'niks' => 'required|array|min:1',
             'niks.*' => 'required|string|size:8',
         ]);
 
-        $count = count($validated['niks']);
-
-        DB::transaction(function () use ($validated) {
-            $employees = Employee::whereIn('nik', $validated['niks'])->get();
-            foreach ($employees as $employee) {
-                if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
-                    Storage::disk('public')->delete($employee->foto);
-                }
-                $employee->delete();
-            }
-        });
+        // Same photo-and-row deletion (one transaction) as the Direktori Pegawai bulk action.
+        $count = $deletion->deleteMany(Employee::whereIn('nik', $validated['niks']));
 
         return redirect()->route('admin.employees.index')->with('success', "{$count} data pegawai terpilih berhasil dihapus.");
     }
