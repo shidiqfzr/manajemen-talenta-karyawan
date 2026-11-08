@@ -313,7 +313,7 @@ class EmployeeTableTest extends TestCase
         // The engine's bulk bar offers the delete with a confirmation naming the count.
         $html = $component->html();
         $this->assertStringContainsString('wire:click="runBulkAction(\'destroy\')"', $html);
-        $this->assertStringContainsString('Hapus 2 data pegawai terpilih? Tindakan ini tidak dapat dibatalkan.', $html);
+        $this->assertStringContainsString('Hapus 2 data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
 
         $component->call('runBulkAction', 'destroy')
             ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data pegawai terpilih berhasil dihapus.'])
@@ -373,6 +373,57 @@ class EmployeeTableTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'user']));
         Livewire::test(EmployeeTable::class)->assertForbidden();
         $this->assertSame(3, Employee::count());
+    }
+
+    public function test_bulk_delete_confirmation_names_count_and_consequences(): void
+    {
+        $this->seedBulkTargets();
+
+        $action = collect((fn () => $this->bulkActions())->call(new EmployeeTable))->firstWhere('name', 'destroy');
+        $this->assertStringContainsString(':count', $action->confirmText());
+        $this->assertStringContainsString('riwayat penempatan', $action->confirmText());
+
+        $html = Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('toggleSelectPage')
+            ->html();
+
+        $this->assertStringContainsString('Hapus 2 data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.', $html);
+    }
+
+    public function test_bulk_delete_over_the_limit_deletes_nothing(): void
+    {
+        $this->seedBulkTargets();
+
+        // Limit 2 (fixture): three matching rows selected through "select all matching".
+        Livewire::test(EmployeeTableSmallLimit::class)
+            ->call('selectAllMatchingRows')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Hapus massal dibatasi 2 data per proses. Persempit filter atau pilih lebih sedikit data.'])
+            ->assertSet('selectAllMatching', true);
+
+        $this->assertSame(3, Employee::count());
+        Storage::disk('public')->assertExists('photos/hapus-1.jpg');
+        Storage::disk('public')->assertExists('photos/aman.jpg');
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.bulk')->count());
+
+        // The production limit is 100 rows per run.
+        $this->assertSame(100, EmployeeTable::BULK_DELETE_LIMIT);
+    }
+
+    public function test_bulk_delete_at_the_limit_deletes(): void
+    {
+        [$first, $second, $outside] = $this->seedBulkTargets();
+
+        Livewire::test(EmployeeTableSmallLimit::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('selectAllMatchingRows')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data pegawai terpilih berhasil dihapus.']);
+
+        $this->assertDatabaseMissing('employees', ['nik' => $first->nik]);
+        $this->assertDatabaseMissing('employees', ['nik' => $second->nik]);
+        $this->assertDatabaseHas('employees', ['nik' => $outside->nik]);
     }
 
     public function test_bulk_delete_rolls_back_on_failure(): void

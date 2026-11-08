@@ -12,6 +12,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
 
 class EmployeeCrudTest extends TestCase
@@ -564,6 +565,19 @@ class EmployeeCrudTest extends TestCase
 
         $this->assertDatabaseMissing('employees', ['nik' => '77112233']);
         $this->assertDatabaseMissing('employees', ['nik' => '77112244']);
+    }
+
+    public function test_legacy_bulk_delete_route_requires_the_delete_ability(): void
+    {
+        $employee = Employee::factory()->create(['nik' => '77112255']);
+
+        Gate::define('delete-employee', fn () => false);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.employees.bulkDestroy'), ['niks' => [$employee->nik]])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('employees', ['nik' => $employee->nik]);
     }
 
     public function test_employee_mbt_and_pension_lifecycle_helpers(): void
