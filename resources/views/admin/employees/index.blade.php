@@ -3,75 +3,11 @@
 @section('content')
 <div x-data="{
     deleteModalOpen: false,
-    bulkDeleteModalOpen: false,
     deleteNik: '',
     deleteNama: '',
     deleteAction: '',
     copiedNik: null,
-    isExporting: false,
-    triggerExport(formId) {
-        this.isExporting = true;
-        const form = document.getElementById(formId);
-        if (form) form.submit();
-        setTimeout(() => {
-            this.isExporting = false;
-        }, 2500);
-    },
-    selectedNiks: [],
-    // Keys of the visible table page, kept in sync by the employee table component on every render.
-    pageNiks: [],
-    lastSelectedNik: null,
-    get isAllSelected() {
-        return this.pageNiks.length > 0 && this.pageNiks.every(nik => this.selectedNiks.includes(nik));
-    },
-    toggleSelectAll(checked) {
-        if (checked) {
-            this.selectedNiks = Array.from(new Set([...this.selectedNiks, ...this.pageNiks]));
-        } else {
-            this.selectedNiks = this.selectedNiks.filter(nik => !this.pageNiks.includes(nik));
-        }
-        this.lastSelectedNik = null;
-    },
-    toggleSelect(nik, event = null) {
-        if (event && event.shiftKey && this.lastSelectedNik && this.pageNiks.includes(this.lastSelectedNik)) {
-            const startIdx = this.pageNiks.indexOf(this.lastSelectedNik);
-            const endIdx = this.pageNiks.indexOf(nik);
-            const minIdx = Math.min(startIdx, endIdx);
-            const maxIdx = Math.max(startIdx, endIdx);
-            const rangeNiks = this.pageNiks.slice(minIdx, maxIdx + 1);
-            this.selectedNiks = Array.from(new Set([...this.selectedNiks, ...rangeNiks]));
-            this.lastSelectedNik = nik;
-            return;
-        }
-
-        if (this.selectedNiks.includes(nik)) {
-            this.selectedNiks = this.selectedNiks.filter(n => n !== nik);
-        } else {
-            this.selectedNiks.push(nik);
-        }
-        this.lastSelectedNik = nik;
-    },
-    handleRowClick(nik, event, showUrl) {
-        // 1. Modifier keys (Ctrl/Cmd or Shift): toggle or range-select
-        if (event.ctrlKey || event.metaKey || event.shiftKey) {
-            event.preventDefault();
-            this.toggleSelect(nik, event);
-            return;
-        }
-
-        // 2. Selection mode is active (>= 1 items): click anywhere toggles this row
-        if (this.selectedNiks.length > 0) {
-            this.toggleSelect(nik, event);
-            return;
-        }
-
-        // 3. Normal mode: navigate to profile
-        window.location.href = showUrl;
-    },
-    deselectAll() {
-        this.selectedNiks = [];
-        this.lastSelectedNik = null;
-    },
+    // Row selection, bulk delete and export are handled by the employee table component (shared table layer).
     copyNik(nik) {
         navigator.clipboard.writeText(nik);
         this.copiedNik = nik;
@@ -238,9 +174,6 @@
          (App\Livewire\Admin\Employees\EmployeeTable). Kartu dan strip mengubah filter tabel secara langsung; angka KPI dihitung di controller. --}}
     <livewire:admin.employees.employee-table :kpi="$kpi" />
 
-    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true"
-         x-text="selectedNiks.length > 0 ? selectedNiks.length + ' pegawai terpilih' : ''"></div>
-
     {{-- MODAL: Delete Confirmation Modal (Destructive Action - DESIGN.md 6.5) --}}
     <div x-show="deleteModalOpen"
         x-cloak
@@ -297,131 +230,6 @@
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-danger hover:bg-danger-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">
                             <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
                             <span>Ya, Hapus Data</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Floating Bulk Action Bar (Linear / Stripe Standard - Dark Slate Glassmorphism) -->
-    <div x-show="selectedNiks.length > 0" x-cloak
-        x-transition:enter="transition cubic-bezier(0.16, 1, 0.3, 1) duration-300"
-        x-transition:enter-start="opacity-0 translate-y-8 scale-95"
-        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-        x-transition:leave-end="opacity-0 translate-y-8 scale-95"
-        @keydown.window.escape="if (selectedNiks.length > 0 && !bulkDeleteModalOpen) deselectAll()"
-        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-surface-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3.5 border border-surface-700/80 max-w-[95vw]">
-        
-        <!-- Counter Badge & Deselect -->
-        <div class="flex items-center gap-2.5 pr-2 border-r border-surface-700/80">
-            <span class="w-6 h-6 rounded-full bg-primary-500 text-surface-950 font-bold font-mono text-xs flex items-center justify-center shrink-0 shadow-xs"
-                x-text="selectedNiks.length"></span>
-            <span class="text-xs font-semibold text-surface-200 whitespace-nowrap"><span x-text="selectedNiks.length"></span> Dipilih</span>
-            <button type="button" @click="deselectAll()"
-                class="text-xs text-surface-500 hover:text-white transition px-1.5 py-0.5 rounded-md hover:bg-surface-800 cursor-pointer flex items-center gap-1"
-                title="Batalkan Pilihan (Esc)">
-                <i class="fas fa-times text-[11px]" aria-hidden="true"></i>
-                <kbd class="text-[10px] bg-surface-800 text-surface-500 px-1 py-0.2 rounded font-mono border border-surface-700 hidden sm:inline">Esc</kbd>
-            </button>
-        </div>
-
-        <!-- Action: Export Selected to Excel -->
-        <form action="{{ route('admin.employees.export') }}" method="GET" id="bottomExportSelectedForm" class="inline">
-            <template x-for="nik in selectedNiks" :key="'export-' + nik">
-                <input type="hidden" name="niks[]" :value="nik">
-            </template>
-            <button type="button" @click="triggerExport('bottomExportSelectedForm')" :disabled="isExporting"
-                class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-wait">
-                <template x-if="!isExporting">
-                    <i class="fas fa-file-excel text-xs" aria-hidden="true"></i>
-                </template>
-                <template x-if="isExporting">
-                    <i class="fas fa-circle-notch fa-spin text-xs" aria-hidden="true"></i>
-                </template>
-                <span>Export Excel</span>
-            </button>
-        </form>
-
-        <!-- Action: Bulk Delete Modal Trigger (Protected Dangerous State) -->
-        <button type="button" @click="bulkDeleteModalOpen = true"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-danger-800/40 text-danger hover:text-danger-200 border border-surface-700 hover:border-danger-800/60 text-xs font-semibold transition active:scale-95 cursor-pointer">
-            <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
-            <span>Hapus</span>
-        </button>
-    </div>
-
-    <!-- Bulk Delete Confirmation Modal (Enterprise Destructive Safety) -->
-    <div x-show="bulkDeleteModalOpen" x-cloak
-        class="fixed inset-0 z-50 overflow-y-auto"
-        aria-labelledby="bulk-delete-dialog-title" role="dialog" aria-modal="true" x-trap.noscroll="bulkDeleteModalOpen" tabindex="-1">
-        
-        <div x-show="bulkDeleteModalOpen"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 bg-surface-900/60 backdrop-blur-xs transition-opacity"
-            @click="bulkDeleteModalOpen = false"></div>
-
-        <div class="flex min-h-screen items-center justify-center p-4">
-            <div x-show="bulkDeleteModalOpen"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-surface-200 overflow-hidden text-left"
-                @click.stop>
-                
-                <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-danger-50 text-danger border border-danger-200 flex items-center justify-center text-xl shrink-0">
-                        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        <h3 class="text-lg font-bold text-surface-900" id="bulk-delete-dialog-title">
-                            Hapus Massal Pegawai Terpilih
-                        </h3>
-                        <p class="text-xs sm:text-sm text-surface-600 leading-relaxed">
-                            Anda akan menghapus <strong class="text-surface-900 font-semibold" x-text="selectedNiks.length"></strong> data pegawai yang dicentang. Seluruh berkas foto profil, data riwayat penempatan, evaluasi, dan pelatihan yang melekat akan ikut terhapus secara permanen.
-                        </p>
-                        
-                        <!-- Selected NIK list preview -->
-                        <div class="mt-3 p-2.5 bg-surface-50 rounded-xl border border-surface-200 max-h-28 overflow-y-auto">
-                            <span class="text-[11px] font-semibold text-surface-500 block mb-1">NIK Terpilih:</span>
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="nik in selectedNiks" :key="'badge-' + nik">
-                                    <span class="px-2 py-0.5 rounded-md bg-white border border-surface-200 font-mono text-[11px] text-surface-700 shadow-2xs"
-                                        x-text="nik"></span>
-                                </template>
-                            </div>
-                        </div>
-
-                        <p class="text-xs text-danger font-medium mt-2">
-                            <i class="fas fa-circle-exclamation mr-1" aria-hidden="true"></i> Tindakan penghapusan massal ini tidak dapat dibatalkan (Irreversible).
-                        </p>
-                    </div>
-                </div>
-
-                <div class="mt-6 pt-4 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <button type="button" autofocus @click="bulkDeleteModalOpen = false"
-                        class="px-4 py-2 rounded-xl border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 text-xs font-semibold transition cursor-pointer shadow-2xs">
-                        Batal
-                    </button>
-                    <form action="{{ route('admin.employees.bulkDestroy') }}" method="POST" class="inline">
-                        @csrf
-                        <template x-for="nik in selectedNiks" :key="'delete-' + nik">
-                            <input type="hidden" name="niks[]" :value="nik">
-                        </template>
-                        <button type="submit"
-                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-danger hover:bg-danger-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer">
-                            <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
-                            <span>Ya, Hapus <span x-text="selectedNiks.length"></span> Pegawai</span>
                         </button>
                     </form>
                 </div>

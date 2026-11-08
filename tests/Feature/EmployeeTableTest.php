@@ -2,12 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Exports\EmployeesExport;
 use App\Livewire\Admin\Employees\EmployeeTable;
 use App\Models\Employee;
+use App\Models\MasterAuditLog;
 use App\Models\User;
+use App\Services\EmployeeExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
+use Tests\Fixtures\DataTable\EmployeeTableSmallLimit;
 use Tests\TestCase;
 
 /**
@@ -244,7 +252,7 @@ class EmployeeTableTest extends TestCase
             ->assertSee('PEGAWAI SANKSI')->assertDontSee('PEGAWAI RANGKAP');
     }
 
-    public function test_row_actions_and_legacy_bulk_controls_are_kept(): void
+    public function test_row_actions_and_engine_selection_controls_are_rendered(): void
     {
         $employee = Employee::factory()->create(['nik' => '12345678', 'nama' => 'PEGAWAI AKSI']);
 
@@ -254,24 +262,210 @@ class EmployeeTableTest extends TestCase
         $this->assertStringContainsString(route('admin.employees.edit', $employee->nik), $html);
         $this->assertStringContainsString(route('admin.mutasi.create', ['nik' => $employee->nik]), $html);
         $this->assertStringContainsString(route('admin.employees.destroy', $employee->nik), $html);
+
+        // Selection and export run through the shared engine, not through page-level forms.
         $this->assertStringContainsString('aria-label="Pilih PEGAWAI AKSI"', $html);
-        $this->assertStringContainsString('aria-label="Pilih semua pegawai di halaman ini"', $html);
-        $this->assertStringContainsString('action="'.route('admin.employees.export').'"', $html);
+        $this->assertStringContainsString('wire:model.live="selected" value="12345678"', $html);
+        $this->assertStringContainsString('aria-label="Pilih semua di halaman ini"', $html);
+        $this->assertStringContainsString('wire:click="toggleSelectPage"', $html);
+        $this->assertStringContainsString('wire:click="export"', $html);
+        $this->assertStringNotContainsString(route('admin.employees.export'), $html);
+        $this->assertStringNotContainsString(route('admin.employees.bulkDestroy'), $html);
+        $this->assertStringNotContainsString('selectedNiks', $html);
+
+        // The page no longer carries the Alpine selection state, the floating bar or the bulk-delete form.
+        $page = $this->get(route('admin.employees.index'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('selectedNiks', $page);
+        $this->assertStringNotContainsString(route('admin.employees.bulkDestroy'), $page);
     }
 
-    public function test_legacy_export_form_carries_the_current_table_state(): void
+    /**
+     * Three employees with stored photos: two in `Kebun Hapus`, one in `Kebun Aman`.
+     *
+     * @return array{0: Employee, 1: Employee, 2: Employee}
+     */
+    private function seedBulkTargets(): array
     {
-        Employee::factory()->create(['nama' => 'PEGAWAI EKSPOR', 'unit_kerja' => 'Kebun Ekspor', 'rm_level' => 'RM-2']);
+        Storage::fake('public');
 
-        $html = Livewire::test(EmployeeTable::class)
+        foreach (['hapus-1', 'hapus-2', 'aman'] as $file) {
+            Storage::disk('public')->put("photos/{$file}.jpg", 'foto');
+        }
+
+        return [
+            Employee::factory()->create(['nik' => '11110001', 'nama' => 'PEGAWAI HAPUS SATU', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-1.jpg']),
+            Employee::factory()->create(['nik' => '11110002', 'nama' => 'PEGAWAI HAPUS DUA', 'unit_kerja' => 'Kebun Hapus', 'foto' => 'photos/hapus-2.jpg']),
+            Employee::factory()->create(['nik' => '11110003', 'nama' => 'PEGAWAI AMAN', 'unit_kerja' => 'Kebun Aman', 'foto' => 'photos/aman.jpg']),
+        ];
+    }
+
+    public function test_bulk_delete_is_limited_to_matching_selection(): void
+    {
+        [$first, $second, $outside] = $this->seedBulkTargets();
+
+        $component = Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('toggleSelectPage')
+            ->assertSet('selected', ['11110002', '11110001'])
+            ->call('selectAllMatchingRows')
+            ->assertSet('selectAllMatching', true);
+
+        // The engine's bulk bar offers the delete with a confirmation naming the count.
+        $html = $component->html();
+        $this->assertStringContainsString('wire:click="runBulkAction(\'destroy\')"', $html);
+        $this->assertStringContainsString('Hapus 2 data pegawai terpilih? Tindakan ini tidak dapat dibatalkan.', $html);
+
+        $component->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '2 data pegawai terpilih berhasil dihapus.'])
+            ->assertSet('selected', [])
+            ->assertSet('selectAllMatching', false);
+
+        $this->assertDatabaseMissing('employees', ['nik' => $first->nik]);
+        $this->assertDatabaseMissing('employees', ['nik' => $second->nik]);
+        $this->assertDatabaseHas('employees', ['nik' => $outside->nik]);
+
+        Storage::disk('public')->assertMissing('photos/hapus-1.jpg');
+        Storage::disk('public')->assertMissing('photos/hapus-2.jpg');
+        Storage::disk('public')->assertExists('photos/aman.jpg');
+
+        $log = MasterAuditLog::where('action', 'data_table.bulk')->sole();
+        $this->assertSame('destroy', $log->new_values['aksi']);
+        $this->assertSame(2, $log->new_values['jumlah_baris']);
+        $this->assertSame(['unitKerja' => 'Kebun Hapus'], $log->new_values['filter']);
+    }
+
+    public function test_tampered_selection_cannot_widen_bulk_delete(): void
+    {
+        [$first, $second, $outside] = $this->seedBulkTargets();
+
+        // A NIK outside the current filter result (and one that does not exist) is sent with the selection.
+        Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->set('selected', [$first->nik, $outside->nik, '99999999'])
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'success', 'message' => '1 data pegawai terpilih berhasil dihapus.']);
+
+        $this->assertDatabaseMissing('employees', ['nik' => $first->nik]);
+        $this->assertDatabaseHas('employees', ['nik' => $second->nik]);
+        $this->assertDatabaseHas('employees', ['nik' => $outside->nik]);
+        Storage::disk('public')->assertExists('photos/aman.jpg');
+        Storage::disk('public')->assertExists('photos/hapus-2.jpg');
+    }
+
+    public function test_bulk_delete_requires_permission(): void
+    {
+        [$first, $second, $outside] = $this->seedBulkTargets();
+
+        Gate::define('delete-employee', fn () => false);
+
+        Livewire::test(EmployeeTable::class)
+            ->set('selected', [$first->nik, $second->nik])
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Anda tidak memiliki akses untuk tindakan ini.']);
+
+        $this->assertSame(3, Employee::count());
+        Storage::disk('public')->assertExists('photos/hapus-1.jpg');
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.bulk')->count());
+
+        // The handler is not client-callable, and non-admins never reach the component.
+        $this->assertFalse((new \ReflectionMethod(EmployeeTable::class, 'bulkDestroy'))->isPublic());
+
+        $this->actingAs(User::factory()->create(['role' => 'user']));
+        Livewire::test(EmployeeTable::class)->assertForbidden();
+        $this->assertSame(3, Employee::count());
+    }
+
+    public function test_bulk_delete_rolls_back_on_failure(): void
+    {
+        [$first, $second] = $this->seedBulkTargets();
+
+        // The second deletion fails after the first one already ran.
+        $deletions = 0;
+        Employee::deleting(function () use (&$deletions) {
+            if (++$deletions === 2) {
+                throw new RuntimeException('Simulated deletion failure.');
+            }
+        });
+
+        Livewire::test(EmployeeTable::class)
+            ->set('unitKerja', 'Kebun Hapus')
+            ->call('selectAllMatchingRows')
+            ->call('runBulkAction', 'destroy')
+            ->assertSet('tableNotice', ['type' => 'error', 'message' => 'Tindakan gagal, tidak ada data yang berubah.']);
+
+        $this->assertSame(2, $deletions);
+        $this->assertDatabaseHas('employees', ['nik' => $first->nik]);
+        $this->assertDatabaseHas('employees', ['nik' => $second->nik]);
+        Storage::disk('public')->assertExists('photos/hapus-1.jpg');
+        Storage::disk('public')->assertExists('photos/hapus-2.jpg');
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.bulk')->count());
+    }
+
+    public function test_export_uses_current_filters_and_is_audited(): void
+    {
+        Excel::fake();
+        $this->travelTo('2026-11-08 09:30:00');
+
+        $budi = Employee::factory()->create(['nik' => '22220001', 'nama' => 'BUDI EKSPOR', 'jabatan' => 'Asisten A', 'unit_kerja' => 'Kebun Ekspor']);
+        $andi = Employee::factory()->create(['nik' => '22220002', 'nama' => 'ANDI EKSPOR', 'jabatan' => 'Asisten B', 'unit_kerja' => 'Kebun Ekspor']);
+        Employee::factory()->create(['nik' => '22220003', 'nama' => 'CITRA EKSPOR', 'unit_kerja' => 'Kebun Lain']);
+        Employee::factory()->create(['nik' => '22220004', 'nama' => 'DEWI LAINNYA', 'jabatan' => 'Mandor Panen', 'unit_kerja' => 'Kebun Ekspor']);
+
+        $component = Livewire::test(EmployeeTable::class)
             ->set('unitKerja', 'Kebun Ekspor')
-            ->set('rmLevel', 'RM-2')
-            ->set('search', 'EKSPOR')
-            ->html();
+            ->set('search', 'Asisten')
+            ->call('sortBy', 'jabatan')
+            ->call('sortBy', 'jabatan')
+            ->call('export');
 
-        $this->assertStringContainsString('name="unit_kerja" value="Kebun Ekspor"', $html);
-        $this->assertStringContainsString('name="rm_level" value="RM-2"', $html);
-        $this->assertStringContainsString('name="search" value="EKSPOR"', $html);
+        // Old route file name pattern and the business workbook (26 columns, document metadata naming the user).
+        $legacy = new EmployeesExport(['unit_kerja' => 'Kebun Ekspor', 'search' => 'Asisten'], $this->admin);
+        Excel::assertDownloaded('data_karyawan_ptpn4_reg5_20261108_093000.xlsx', function (EmployeesExport $export) use ($legacy, $andi, $budi) {
+            $niks = $export->query()->pluck('nik')->all();
+
+            return $niks === [$andi->nik, $budi->nik] // jabatan desc
+                && $export->query()->count() === $legacy->query()->count()
+                && $export->headings() === $legacy->headings()
+                && count($export->headings()) === 26
+                && $export->properties() === $legacy->properties()
+                && str_contains($export->properties()['creator'], $this->admin->name);
+        });
+
+        $log = MasterAuditLog::where('action', 'data_table.export')->sole();
+        $this->assertSame(2, $log->new_values['jumlah_baris']);
+        $this->assertSame(['unitKerja' => 'Kebun Ekspor'], $log->new_values['filter']);
+        $this->assertTrue($log->new_values['pencarian']);
+        $this->assertStringNotContainsString('Asisten', json_encode($log->new_values), 'the raw search term is not audited');
+
+        // A selection narrows the export to the selected rows within the filter result.
+        $this->travelTo('2026-11-08 09:31:00');
+        $component->set('selected', [$budi->nik, '22220003'])->call('export');
+        Excel::assertDownloaded('data_karyawan_ptpn4_reg5_20261108_093100.xlsx',
+            fn (EmployeesExport $export) => $export->query()->pluck('nik')->all() === [$budi->nik]);
+        $this->assertSame(1, MasterAuditLog::where('action', 'data_table.export')->latest('id')->first()->new_values['jumlah_baris']);
+    }
+
+    public function test_export_over_limit_shows_warning(): void
+    {
+        Excel::fake();
+        $this->travelTo('2026-11-08 09:30:00');
+
+        Employee::factory()->create(['nama' => 'PEGAWAI SATU', 'unit_kerja' => 'Kebun Batas']);
+        Employee::factory()->create(['nama' => 'PEGAWAI DUA', 'unit_kerja' => 'Kebun Batas']);
+        Employee::factory()->create(['nama' => 'PEGAWAI TIGA', 'unit_kerja' => 'Kebun Lain']);
+
+        // Same component with an export row limit of 2.
+        $component = Livewire::test(EmployeeTableSmallLimit::class)
+            ->call('export')
+            ->assertSet('tableNotice', ['type' => 'warning', 'message' => 'Data terlalu besar untuk diekspor. Persempit filter terlebih dahulu.'])
+            ->assertNoFileDownloaded();
+
+        $this->assertSame(0, MasterAuditLog::where('action', 'data_table.export')->count());
+
+        // Narrowing the filter brings the export within the limit.
+        $component->set('unitKerja', 'Kebun Batas')->call('export');
+        Excel::assertDownloaded('data_karyawan_ptpn4_reg5_20261108_093000.xlsx', fn (EmployeesExport $export) => $export->query()->count() === 2);
+        $this->assertSame(1, MasterAuditLog::where('action', 'data_table.export')->count());
     }
 
     /** KPI metrics as the controller passes them to the component. */
@@ -314,7 +508,13 @@ class EmployeeTableTest extends TestCase
         $activeCard = substr($activeCard, 0, strpos($activeCard, '</a>'));
         $this->assertStringContainsString('Karyawan Pelaksana', $activeCard);
         $this->assertStringContainsString('wire:click.prevent="$set(\'level\', \'\')"', $html, 'the active card toggles the filter off');
-        $this->assertStringContainsString('name="level" value="'.Employee::LEVEL_KARPEL.'"', $html);
+        Excel::fake();
+        $this->freezeTime();
+        $component->call('export');
+        Excel::assertDownloaded(
+            app(EmployeeExportService::class)->generateFilename(),
+            fn (EmployeesExport $export) => $export->query()->pluck('nama')->all() === ['PELAKSANA KPI']
+        );
 
         // "Total Pegawai" clears the card-driven filters but keeps the search.
         $component->call('clearKpiFilters')

@@ -30,7 +30,8 @@ class EmployeePeriodFilterTest extends TestCase
         $response->assertSee('Jabatan');
         $response->assertSee('Eselon / RM Band');
         $response->assertSee('Tahun Masuk (TMT)');
-        $response->assertSee('Export Data');
+        // The shared table header's export button (runs the component's export()).
+        $response->assertSee('Ekspor Excel');
     }
 
     public function test_employees_can_be_filtered_by_rm_level(): void
