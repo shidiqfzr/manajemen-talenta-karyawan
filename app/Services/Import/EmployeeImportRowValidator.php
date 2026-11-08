@@ -43,10 +43,10 @@ class EmployeeImportRowValidator
     public const CUSTOM_MESSAGES = [
         'nik.required' => 'NIK wajib diisi.',
         'nik.regex' => 'Format NIK harus berupa 8 digit angka numerik (contoh: 13009988).',
-        'nama.required' => 'Nama pegawai wajib diisi.',
-        'jabatan.required' => 'Jabatan pegawai wajib diisi.',
-        'level.required' => 'Level strata pegawai wajib diisi.',
-        'level.in' => 'Level strata pegawai harus Karpim atau Karpel.',
+        'nama.required' => 'Nama karyawan wajib diisi.',
+        'jabatan.required' => 'Jabatan karyawan wajib diisi.',
+        'level.required' => 'Level strata karyawan wajib diisi.',
+        'level.in' => 'Level strata karyawan harus Karpim atau Karpel.',
         'unit_kerja.required' => 'Unit kerja wajib diisi.',
         'status_karyawan.required' => 'Status karyawan wajib diisi.',
         'golongan.regex' => 'Format Golongan tidak valid (Format baku: [Gol]/[Berkala], contoh: IIIA/00 atau IVA/02).',
@@ -68,7 +68,7 @@ class EmployeeImportRowValidator
 
     /**
      * Saat komit nyata, baris unit dikunci (`FOR UPDATE`) sampai transaksi komit selesai, sehingga penambahan
-     * pegawai lain pada unit yang sama menunggu dan kuota formasi tidak dapat terlampaui (sama dengan FormasiSeatGuard).
+     * karyawan lain pada unit yang sama menunggu dan kuota formasi tidak dapat terlampaui (sama dengan FormasiSeatGuard).
      */
     public bool $lockSeats = false;
 
@@ -133,7 +133,7 @@ class EmployeeImportRowValidator
             }
         }
 
-        // 3. Cek Perlindungan Mutasi untuk Pegawai Eksisting (DOMAIN.md Bab 5.2)
+        // 3. Cek Perlindungan Mutasi untuk Karyawan Eksisting (DOMAIN.md Bab 5.2)
         $existingEmployee = $existingEmployeesCache[$data['nik']] ?? null;
         if ($existingEmployee) {
             $existingJabatan = $existingEmployee['jabatan'] ?? ($existingEmployee instanceof Employee ? $existingEmployee->jabatan : '');
@@ -156,7 +156,7 @@ class EmployeeImportRowValidator
                 }
             }
         } else {
-            // Pegawai Baru: wajib menempati formasi jabatan aktif pada Master Formasi (unit, level, RM Band, kuota)
+            // Karyawan Baru: wajib menempati formasi jabatan aktif pada Master Formasi (unit, level, RM Band, kuota)
             [$unitExists, $validPositions] = $this->getUnitPositionData($data['unit_kerja'], $data['level']);
 
             if (! $unitExists) {
@@ -198,8 +198,8 @@ class EmployeeImportRowValidator
     }
 
     /**
-     * Mengisi Strata dari Master Formasi bila kolom Level kosong: pegawai eksisting memakai strata tercatatnya,
-     * pegawai baru memakai strata Formasi Jabatan yang cocok pada unit. Mengembalikan false bila tidak dapat ditentukan.
+     * Mengisi Strata dari Master Formasi bila kolom Level kosong: karyawan eksisting memakai strata tercatatnya,
+     * karyawan baru memakai strata Formasi Jabatan yang cocok pada unit. Mengembalikan false bila tidak dapat ditentukan.
      */
     private function deriveLevel(array &$data, array $existingEmployeesCache): bool
     {
@@ -329,7 +329,7 @@ class EmployeeImportRowValidator
     }
 
     /**
-     * Peringatan tinjauan untuk pegawai eksisting yang lolos validasi: formasinya (unit, strata, jabatan, kuota)
+     * Peringatan tinjauan untuk karyawan eksisting yang lolos validasi: formasinya (unit, strata, jabatan, kuota)
      * sudah tidak sesuai Master Formasi. Bersifat informatif dan tidak pernah menolak baris; perubahan
      * penempatan tetap hanya melalui modul Mutasi, perubahan formasi melalui Master Formasi.
      * Strata yang belum memiliki formasi sama sekali pada unit tersebut (mis. Karpel) tidak dinilai.

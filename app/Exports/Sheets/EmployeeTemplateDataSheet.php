@@ -176,8 +176,8 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                         'prompt' => 'Format 8 digit angka (contoh: 13009988). Sel diformat teks agar nol di depan tidak hilang.',
                     ],
                     'B1' => [
-                        'title' => 'Panduan Nama Pegawai (Wajib)',
-                        'prompt' => 'Nama lengkap pegawai (akan otomatis distandarkan menjadi HURUF BESAR oleh sistem).',
+                        'title' => 'Panduan Nama Karyawan (Wajib)',
+                        'prompt' => 'Nama lengkap karyawan (akan otomatis distandarkan menjadi HURUF BESAR oleh sistem).',
                     ],
                     'C1' => [
                         'title' => 'Panduan Jenis Kelamin',
@@ -237,7 +237,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                     ],
                     'W1' => [
                         'title' => 'Panduan Tanggal MBT',
-                        'prompt' => 'Boleh dikosongkan! Sistem akan otomatis menghitung Masa Bebas Tugas (55 tahun).',
+                        'prompt' => 'Boleh dikosongkan! Sistem akan otomatis menghitung Masa Bebas Tugas (6 bulan sebelum pensiun).',
                     ],
                     'X1' => [
                         'title' => 'Panduan Tanggal Pensiun',

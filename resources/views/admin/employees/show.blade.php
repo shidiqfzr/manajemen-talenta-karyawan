@@ -61,7 +61,7 @@
                                 </div>
                             @endif
                         </div>
-                        <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-xs" title="Pegawai Aktif">
+                        <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-xs" title="Karyawan Aktif">
                             <i class="fas fa-check text-[10px] text-white" aria-hidden="true"></i>
                         </span>
                     </div>
@@ -145,7 +145,7 @@
 
         <!-- 2. HORIZONTAL NAVIGATION TABS (Anti-Boxitis) -->
         <div class="px-6 border-t border-surface-200/80 bg-surface-50/50">
-            <div role="tablist" aria-label="Bagian profil pegawai" @keydown="tabKeys($event)" class="flex space-x-1 sm:space-x-4 overflow-x-auto no-scrollbar">
+            <div role="tablist" aria-label="Bagian profil karyawan" @keydown="tabKeys($event)" class="flex space-x-1 sm:space-x-4 overflow-x-auto no-scrollbar">
                 <button type="button" role="tab" id="tab-biodata" aria-controls="panel-biodata" :aria-selected="(activeTab === 'biodata').toString()" :tabindex="activeTab === 'biodata' ? 0 : -1" @click="activeTab = 'biodata'"
                     :class="activeTab === 'biodata'
                         ? 'border-primary-600 text-primary-800 font-bold bg-white'
@@ -292,7 +292,7 @@
                 </div>
 
                 <div class="border-b border-surface-100 pb-4">
-                    <dt class="text-xs font-medium text-surface-500">Level Pegawai</dt>
+                    <dt class="text-xs font-medium text-surface-500">Level Karyawan</dt>
                     <dd class="mt-1 text-sm font-semibold text-surface-900">{{ $employee->level }}</dd>
                 </div>
 
@@ -359,7 +359,7 @@
             <div class="p-6 border-b border-surface-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h3 class="text-base font-bold text-surface-900">Rekam Jejak Mutasi &amp; Riwayat Jabatan</h3>
-                    <p class="text-xs text-surface-500 mt-0.5">Histori pergerakan rotasi, promosi, dan penempatan kerja pegawai</p>
+                    <p class="text-xs text-surface-500 mt-0.5">Histori pergerakan rotasi, promosi, dan penempatan kerja karyawan</p>
                 </div>
 
                 <a href="{{ route('admin.employees.job-history.create', $employee) }}"
@@ -508,7 +508,7 @@
                         </div>
                         <h4 class="text-sm font-bold text-surface-800">Belum Ada Riwayat Pelatihan</h4>
                         <p class="text-xs text-surface-500 mt-1 max-w-sm mx-auto">
-                            Pegawai ini belum memiliki catatan partisipasi pelatihan atau sertifikasi aktif di sistem.
+                            Karyawan ini belum memiliki catatan partisipasi pelatihan atau sertifikasi aktif di sistem.
                         </p>
                     </div>
                 @else

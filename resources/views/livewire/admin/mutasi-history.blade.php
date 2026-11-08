@@ -62,7 +62,7 @@
                         <span class="px-2 py-0.2 rounded-full text-[10px] font-bold bg-warning-200 text-warning-800 border border-warning-200">{{ $dueCount }} Antrean</span>
                     </h4>
                     <p class="text-xs text-warning-800 mt-0.5">
-                        Terdapat <strong>{{ $dueCount }}</strong> mutasi terjadwal yang telah mencapai tanggal TMT efektif dan siap diaktifkan ke data master pegawai.
+                        Terdapat <strong>{{ $dueCount }}</strong> mutasi terjadwal yang telah mencapai tanggal TMT efektif dan siap diaktifkan ke data master karyawan.
                     </p>
                 </div>
             </div>

@@ -50,7 +50,7 @@
                 <div class="w-5 h-5 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[10px] shrink-0 mt-0.5 font-bold">2</div>
                 <div class="min-w-0">
                     <strong class="text-surface-800 font-bold">Otomasi Pensiun &amp; MBT:</strong>
-                    <span class="text-surface-500 block text-[11px] mt-0.5">Tanggal Pensiun (56 tahun) dan MBT (55 tahun) otomatis dihitung sistem jika tidak diisi secara manual.</span>
+                    <span class="text-surface-500 block text-[11px] mt-0.5">Tanggal Pensiun (56 tahun) dan MBT (6 bulan sebelum pensiun) otomatis dihitung sistem jika tidak diisi secara manual.</span>
                 </div>
             </li>
             <li class="flex items-start gap-2.5">

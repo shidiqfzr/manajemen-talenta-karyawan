@@ -25,7 +25,7 @@ class MutasiForm extends Form
 
     public string $tmtAkhirEstimasi = '';
 
-    // ── Penyesuaian Profil Pegawai (DOMAIN.md §4 & §5.2.3) ────────────────
+    // ── Penyesuaian Profil Karyawan (DOMAIN.md §4 & §5.2.3) ────────────────
     public ?string $newGolongan = '';
 
     public ?string $newJobGrade = '';
@@ -101,7 +101,7 @@ class MutasiForm extends Form
     ): bool {
         // 1. Domain Rule: Cek Formasi Dipesan (Reserved Position Guard)
         if ($targetAnalysis && ($targetAnalysis['is_reserved'] ?? false)) {
-            $reservedName = $targetAnalysis['reserved_occupant']['nama'] ?? 'pegawai lain';
+            $reservedName = $targetAnalysis['reserved_occupant']['nama'] ?? 'karyawan lain';
             $reservedTmt = $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-';
             $msg = "Formasi ini telah dipesan oleh mutasi terjadwal atas nama {$reservedName} (TMT Efektif: {$reservedTmt}). Pilih formasi lain yang tersedia.";
             $this->addFormAndComponentError('targetJabatan', $msg);

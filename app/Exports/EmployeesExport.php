@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\ManPowerPlanningService;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -50,7 +51,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             'creator' => "{$userName} ({$userNik})",
             'lastModifiedBy' => 'PTPN IV Regional V HRIS System',
             'title' => 'Master Data Karyawan PTPN IV Regional V',
-            'description' => 'Dokumen Rahasia Data Pegawai diekspor sesuai UU PDP No. 27/2022',
+            'description' => 'Dokumen Rahasia Data Karyawan diekspor sesuai UU PDP No. 27/2022',
             'subject' => 'Data Karyawan & Formasi',
             'keywords' => 'ptpn4, hris, karyawan, formasi, confidential',
             'category' => 'HR Confidential Document',
@@ -60,7 +61,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
     }
 
     /**
-     * Membangun query data pegawai dengan dukungan filter pencarian dinamis,
+     * Membangun query data karyawan dengan dukungan filter pencarian dinamis,
      * eager loading tugas rangkap (concurrentJobs), dan efisiensi memori (chunked query streaming).
      */
     public function query()
@@ -78,6 +79,10 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
 
         if (! empty($this->filters['jabatan'])) {
             $query->where('jabatan', $this->filters['jabatan']);
+        }
+
+        if (! empty($this->filters['bidang'])) {
+            $query->whereIn('nik', app(ManPowerPlanningService::class)->employeeNiksByBidang((string) $this->filters['bidang']));
         }
 
         if (! empty($this->filters['level'])) {
@@ -128,7 +133,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->whereMonth('tmt_bekerja', $this->filters['bulan_masuk']);
         }
 
-        // Optional table sort (Direktori Pegawai export); whitelisted, defaults to nama ascending.
+        // Optional table sort (Daftar Karyawan export); whitelisted, defaults to nama ascending.
         $sort = in_array($this->filters['sort'] ?? null, self::SORTABLE, true) ? $this->filters['sort'] : 'nama';
         $direction = ($this->filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 

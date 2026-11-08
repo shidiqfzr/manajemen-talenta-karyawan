@@ -19,7 +19,7 @@ use InvalidArgumentException;
 /**
  * Satu-satunya jalur ubah master unit, jabatan, dan formasi jabatan (DOMAIN.md §3.5).
  * Setiap perubahan: dipratinjau dampaknya, diterapkan dalam satu transaksi, dan
- * dicatat pada master_audit_logs. Pemindahan pegawai tetap melalui modul Mutasi.
+ * dicatat pada master_audit_logs. Pemindahan karyawan tetap melalui modul Mutasi.
  */
 class MasterFormasiService
 {
@@ -138,7 +138,7 @@ class MasterFormasiService
     }
 
     /**
-     * Mengubah atribut unit. Perubahan nama (rename) menyelaraskan teks unit pada pegawai
+     * Mengubah atribut unit. Perubahan nama (rename) menyelaraskan teks unit pada karyawan
      * dalam transaksi yang sama; riwayat jabatan tetap memakai nama lama.
      *
      * @param  array{nama?: string, kode?: ?string, wilayah?: string, urutan?: ?int}  $data
@@ -166,7 +166,7 @@ class MasterFormasiService
             $unit->update($changes);
 
             if ($isRename) {
-                // Nama lama tetap dikenali impor pegawai; nama baru yang sebelumnya alias kini menjadi nama resmi.
+                // Nama lama tetap dikenali impor karyawan; nama baru yang sebelumnya alias kini menjadi nama resmi.
                 UnitAlias::remember($unit, $oldName, 'rename');
                 UnitAlias::where('alias_key', UnitAlias::keyFor($unit->nama))->delete();
 
@@ -256,7 +256,7 @@ class MasterFormasiService
     }
 
     /**
-     * Mengubah atribut jabatan. Perubahan nama menyelaraskan teks jabatan pada pegawai
+     * Mengubah atribut jabatan. Perubahan nama menyelaraskan teks jabatan pada karyawan
      * dalam transaksi yang sama; perubahan Level RM berlaku untuk seluruh unit pemakai jabatan.
      *
      * @param  array{nama?: string, bidang?: ?string, level?: string, rm_level?: ?string}  $data
@@ -380,7 +380,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih tercatat di unit ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$employees} karyawan masih tercatat di unit ini. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju unit ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -400,7 +400,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih tercatat di unit ini.";
+            $blockers[] = "{$employees} karyawan masih tercatat di unit ini.";
         }
         if ($seats > 0) {
             $blockers[] = "Unit ini masih memiliki {$seats} formasi jabatan.";
@@ -432,7 +432,7 @@ class MasterFormasiService
         $warnings = [];
 
         if ($employees > 0) {
-            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+            $warnings[] = "{$employees} karyawan akan ikut diperbarui nama unitnya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
         }
         if ($pending > 0) {
             $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama unit tujuannya.";
@@ -449,7 +449,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih memegang jabatan ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$employees} karyawan masih memegang jabatan ini. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju jabatan ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -469,7 +469,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih memegang jabatan ini.";
+            $blockers[] = "{$employees} karyawan masih memegang jabatan ini.";
         }
         if ($seats > 0) {
             $blockers[] = "Jabatan ini masih menjadi {$seats} formasi jabatan.";
@@ -501,7 +501,7 @@ class MasterFormasiService
         $warnings = [];
 
         if ($employees > 0) {
-            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama jabatannya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+            $warnings[] = "{$employees} karyawan akan ikut diperbarui nama jabatannya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
         }
         if ($pending > 0) {
             $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama jabatan tujuannya.";
@@ -547,7 +547,7 @@ class MasterFormasiService
 
         if ($kuota < $filled) {
             return ImpactResult::ok(
-                ["Kuota {$kuota} lebih kecil dari {$filled} pegawai yang menempati formasi ini; formasi ini akan ditandai melebihi kuota."],
+                ["Kuota {$kuota} lebih kecil dari {$filled} karyawan yang menempati formasi ini; formasi ini akan ditandai melebihi kuota."],
                 $filled
             );
         }
@@ -563,7 +563,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($filled > 0) {
-            $blockers[] = "{$filled} pegawai masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$filled} karyawan masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju formasi ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -720,7 +720,7 @@ class MasterFormasiService
 
     /**
      * Mutasi terjadwal (belum berlaku) yang menuju unit dan/atau jabatan tertentu.
-     * Saat TMT tiba, teks unit dan jabatan pada pegawai disalin dari baris ini.
+     * Saat TMT tiba, teks unit dan jabatan pada karyawan disalin dari baris ini.
      */
     private function pendingMutations(?string $unitNama, ?string $jabatan = null): int
     {

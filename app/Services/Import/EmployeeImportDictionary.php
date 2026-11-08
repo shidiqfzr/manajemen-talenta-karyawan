@@ -6,14 +6,14 @@ class EmployeeImportDictionary
 {
     /**
      * Mengembalikan daftar 4 kategori beserta seluruh spesifikasi 26 kolom
-     * sebagai Single Source of Truth (SSOT) format spreadsheet pegawai PTPN IV Regional V.
+     * sebagai Single Source of Truth (SSOT) format spreadsheet karyawan PTPN IV Regional V.
      */
     public static function getCategories(): array
     {
         return [
             [
                 'id' => 'cat1',
-                'title' => 'Kategori I • Identitas Pegawai & Pribadi (Kolom A – G)',
+                'title' => 'Kategori I • Identitas Karyawan & Pribadi (Kolom A – G)',
                 'icon' => 'fas fa-id-card',
                 'count_label' => '7 Kolom',
                 'columns' => [
@@ -37,9 +37,9 @@ class EmployeeImportDictionary
                         'type_label' => 'Teks Bebas',
                         'type_sub' => 'Nama Lengkap KTP',
                         'is_dropdown' => false,
-                        'description' => 'Nama lengkap pegawai sesuai KTP. Otomatis distandarkan menjadi UPPERCASE oleh sistem.',
+                        'description' => 'Nama lengkap karyawan sesuai KTP. Otomatis distandarkan menjadi UPPERCASE oleh sistem.',
                         'example' => 'BUDI SANTOSO',
-                        'search_tags' => 'nama lengkap pegawai uppercase ktp',
+                        'search_tags' => 'nama lengkap karyawan uppercase ktp',
                     ],
                     [
                         'letter' => 'C',
@@ -73,7 +73,7 @@ class EmployeeImportDictionary
                         'type_label' => 'Tanggal (Date)',
                         'type_sub' => 'YYYY-MM-DD / DD/MM/YYYY',
                         'is_dropdown' => false,
-                        'description' => 'Tanggal lahir pegawai. Digunakan untuk perhitungan otomatis Batas Usia Pensiun (56 thn) & MBT (55 thn).',
+                        'description' => 'Tanggal lahir karyawan. Digunakan untuk perhitungan otomatis Batas Usia Pensiun (56 thn) & MBT (6 bulan sebelum pensiun).',
                         'example' => '1985-05-15',
                         'search_tags' => 'tanggal lahir pensiun mbt date',
                     ],
@@ -269,7 +269,7 @@ class EmployeeImportDictionary
                         'type_label' => 'Angka (1 s.d. 16)',
                         'type_sub' => 'Grade Individu',
                         'is_dropdown' => false,
-                        'description' => 'Grade kompetensi pegawai. Wajib konsisten dengan Strata: Karpel rentang 1 – 10, Karpim rentang 11 – 16 (Standar Grade Karpim/Karpel).',
+                        'description' => 'Grade kompetensi karyawan. Wajib konsisten dengan Strata: Karpel rentang 1 – 10, Karpim rentang 11 – 16 (Standar Grade Karpim/Karpel).',
                         'example' => '11',
                         'search_tags' => 'person grade kompetensi individu 1 10 11 16 karpel karpim',
                     ],
@@ -311,11 +311,11 @@ class EmployeeImportDictionary
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal / Otomatis',
-                        'type_sub' => 'Masa Bebas Tugas (55 Thn)',
+                        'type_sub' => 'Masa Bebas Tugas (H-6 Bulan)',
                         'is_dropdown' => false,
-                        'description' => 'Tanggal Masa Bebas Tugas (1 tahun sebelum pensiun). Jika dikosongkan, dihitung otomatis dari tanggal lahir (Regulasi MBT 55 Tahun).',
+                        'description' => 'Tanggal Masa Bebas Tugas (6 bulan sebelum pensiun). Jika dikosongkan, dihitung otomatis dari tanggal lahir (Regulasi MBT H-6 Bulan).',
                         'example' => '2040-05-01',
-                        'search_tags' => 'tanggal mbt masa bebas tugas 55 tahun date',
+                        'search_tags' => 'tanggal mbt masa bebas tugas 6 bulan sebelum pensiun date',
                     ],
                     [
                         'letter' => 'X',

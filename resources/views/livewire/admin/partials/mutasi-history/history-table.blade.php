@@ -165,7 +165,7 @@
 
                                 @if ($isScheduled)
                                     <!-- Tombol Aktivasi Terjadwal -->
-                                    <button type="button" wire:click="applyNow({{ $record->id }})" wire:confirm="Aktifkan mutasi ini sekarang dan perbarui jabatan pegawai di master data?" wire:loading.attr="disabled" wire:target="applyNow"
+                                    <button type="button" wire:click="applyNow({{ $record->id }})" wire:confirm="Aktifkan mutasi ini sekarang dan perbarui jabatan karyawan di master data?" wire:loading.attr="disabled" wire:target="applyNow"
                                         class="inline-flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-bold bg-primary-600 hover:bg-primary-700 text-white transition shadow-2xs cursor-pointer"
                                         title="Aktivasi mutasi sekarang (mendahului TMT)">
                                         <i class="fas fa-bolt text-[10px]" aria-hidden="true"></i>

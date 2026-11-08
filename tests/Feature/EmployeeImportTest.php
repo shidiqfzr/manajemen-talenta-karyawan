@@ -146,7 +146,7 @@ class EmployeeImportTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('admin.employees.import');
         $response->assertViewHas('dictionaryCategories');
-        $response->assertSee('Impor Data Pegawai');
+        $response->assertSee('Impor Data Karyawan');
         $response->assertSee('Kamus Format Spreadsheet');
         $response->assertSeeText('Unggah & Panduan Kolom');
         $response->assertSee('Unduh Template Excel Resmi');
@@ -233,9 +233,9 @@ class EmployeeImportTest extends TestCase
         $emp = Employee::where('nik', '09911223')->first();
         $this->assertNotNull($emp);
 
-        // Verifikasi kalkulasi pensiun (56 tahun) & MBT (55 tahun)
+        // Verifikasi kalkulasi pensiun (56 tahun) & MBT (6 bulan sebelum pensiun)
         $expectedPensiun = Carbon::parse('1990-05-15')->addYears(56)->startOfMonth()->toDateString();
-        $expectedMbt = Carbon::parse($expectedPensiun)->subYear()->toDateString();
+        $expectedMbt = Carbon::parse($expectedPensiun)->subMonths(6)->toDateString();
         $this->assertEquals($expectedPensiun, $emp->tanggal_pensiun->toDateString());
         $this->assertEquals($expectedMbt, $emp->tanggal_mbt->toDateString());
 
@@ -250,7 +250,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_import_updates_existing_employee_when_job_information_unchanged(): void
     {
-        // Buat pegawai eksisting
+        // Buat karyawan eksisting
         Employee::create([
             'nik' => '12345678',
             'nama' => 'AGUS SALIM',
@@ -472,7 +472,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_import_rejects_invalid_chronological_dates(): void
     {
-        // Pegawai umur < 18 tahun saat mulai bekerja
+        // Karyawan umur < 18 tahun saat mulai bekerja
         $rows = [
             [
                 '99007788',
@@ -655,7 +655,7 @@ class EmployeeImportTest extends TestCase
 
         $valB1 = $activeSheet->getCell('B1')->getDataValidation();
         $this->assertTrue($valB1->getShowInputMessage(), 'Cell B1 harus memiliki Input Message aktif');
-        $this->assertSame('Panduan Nama Pegawai (Wajib)', $valB1->getPromptTitle());
+        $this->assertSame('Panduan Nama Karyawan (Wajib)', $valB1->getPromptTitle());
 
         $valM1 = $activeSheet->getCell('M1')->getDataValidation();
         $this->assertTrue($valM1->getShowInputMessage(), 'Cell M1 harus memiliki Input Message aktif');
@@ -716,7 +716,7 @@ class EmployeeImportTest extends TestCase
 
         Log::shouldHaveReceived('info')
             ->with(
-                'HRIS Import Data Pegawai dieksekusi',
+                'HRIS Import Data Karyawan dieksekusi',
                 \Mockery::on(function ($context) {
                     return isset($context['user_id'])
                         && $context['user_id'] === $this->admin->id
@@ -743,7 +743,7 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(1, $log->skipped_count);
         $this->assertArrayNotHasKey('sample_rows', $log->metadata['summary']);
         $this->assertSame(['row', 'errors'], array_keys($log->metadata['summary']['errors'][0]));
-        $this->assertStringNotContainsString('PEGAWAI UJI FORMASI', json_encode($log->metadata));
+        $this->assertStringNotContainsString('KARYAWAN UJI FORMASI', json_encode($log->metadata));
     }
 
     public function test_import_session_is_only_accessible_by_the_admin_who_uploaded_it(): void
@@ -834,11 +834,11 @@ class EmployeeImportTest extends TestCase
         $cached = Cache::get("import_failed_rows_{$token}");
         $this->assertIsString($cached);
         $this->assertStringNotContainsString('88009001', $cached);
-        $this->assertStringNotContainsString('PEGAWAI UJI FORMASI', $cached);
+        $this->assertStringNotContainsString('KARYAWAN UJI FORMASI', $cached);
 
         $this->actingAs($this->admin)->post(route('admin.employees.import.downloadFailed'), ['token' => $token])->assertOk();
 
-        Log::shouldHaveReceived('info')->with('HRIS Unduh Berkas Impor Pegawai', \Mockery::on(
+        Log::shouldHaveReceived('info')->with('HRIS Unduh Berkas Impor Karyawan', \Mockery::on(
             fn (array $context) => $context['kind'] === 'baris_gagal'
                 && $context['user_id'] === $this->admin->id
                 && $context['record_count'] === 1
@@ -1135,7 +1135,7 @@ class EmployeeImportTest extends TestCase
         $sheet2 = $spreadsheet->createSheet();
         $sheet2->setTitle('Referensi Master Data');
         $sheet2->fromArray([
-            ['UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA PEGAWAI'],
+            ['UNIT KERJA RESMI', 'JABATAN FORMASI AKTIF', 'STRATA KARYAWAN'],
             ['Kebun Inti Gunung Meliau', 'Asisten Afdeling', 'Karpim'],
             ['Kebun Gunung Emas', 'Mandor Panen', 'Karpel'],
             ['PKS Longpinang', 'Asisten Pengolahan', 'Karpim'],
@@ -1305,7 +1305,7 @@ class EmployeeImportTest extends TestCase
     private function karpimImportRow(string $nik, string $jabatan, string $unit): array
     {
         return [
-            $nik, 'PEGAWAI UJI FORMASI', 'L', 'Pontianak', '1985-03-10',
+            $nik, 'KARYAWAN UJI FORMASI', 'L', 'Pontianak', '1985-03-10',
             'Islam', 'K/1', 'Tetap (PKWTT)', $jabatan, 'Karpim', $unit,
             'IIID/05', 'RM-1', 'Definitif',
             '2008-03-01', '2010-01-01', '2022-01-01', '2022-01-01',
@@ -1524,7 +1524,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_reimport_identical_employee_detected_as_unchanged_and_skips_database_update(): void
     {
-        // 1. Buat pegawai definitif lengkap di database
+        // 1. Buat karyawan definitif lengkap di database
         $employee = Employee::create([
             'nik' => '13008888',
             'nama' => 'JOKO SUSILO',
@@ -1892,7 +1892,7 @@ class EmployeeImportTest extends TestCase
      */
     public function test_dry_run_preview_detects_attribute_diff_for_update_rows(): void
     {
-        // Siapkan pegawai eksisting
+        // Siapkan karyawan eksisting
         Employee::factory()->create([
             'nik' => '13008899',
             'nama' => 'HENDRA WIJAYA',
@@ -2236,7 +2236,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_preview_rejects_an_unreadable_file_cleanly_and_removes_it(): void
     {
-        $fake = UploadedFile::fake()->createWithContent('pegawai.xlsx', 'ini bukan spreadsheet');
+        $fake = UploadedFile::fake()->createWithContent('karyawan.xlsx', 'ini bukan spreadsheet');
         $before = Storage::disk('local')->files('imports');
 
         $this->actingAs($this->admin)
@@ -2680,7 +2680,7 @@ class EmployeeImportTest extends TestCase
             ->assertSeeText('3 baris dalam berkas');
     }
 
-    /** @return array{0: EmployeeImportLog, 1: string} impor tersimpan (kebijakan nonaktif) dan hash kondisi awal pegawai eksisting */
+    /** @return array{0: EmployeeImportLog, 1: string} impor tersimpan (kebijakan nonaktif) dan hash kondisi awal karyawan eksisting */
     private function committedImport(): array
     {
         $this->seedGovernanceUnit('Kebun Undo', 'Manajer Undo');
@@ -2747,7 +2747,7 @@ class EmployeeImportTest extends TestCase
         $checker = $this->otherAdmin();
 
         $page = $this->actingAs($checker)->get(route('admin.employees.import.batches.show', $log));
-        $page->assertOk()->assertSee('PEGAWAI UJI FORMASI')->assertSee('Pratinjau Terkini');
+        $page->assertOk()->assertSee('KARYAWAN UJI FORMASI')->assertSee('Pratinjau Terkini');
         $digest = $this->reviewDigest($log, $checker);
 
         $this->actingAs($checker)->post(route('admin.employees.import.batches.approve', $log), ['reviewed_digest' => $digest])
@@ -2927,13 +2927,13 @@ class EmployeeImportTest extends TestCase
     {
         [$log, $hashBefore] = $this->committedImport();
         $historyBefore = JobHistory::where('employee_nik', '88021001')->count();
-        $this->assertSame('PEGAWAI UJI FORMASI', Employee::find('88021001')->nama);
+        $this->assertSame('KARYAWAN UJI FORMASI', Employee::find('88021001')->nama);
 
         $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])
             ->assertRedirect()->assertSessionHas('success');
 
         $this->assertDatabaseMissing('employees', ['nik' => '88021002']);
-        $this->assertSame($hashBefore, Employee::stateHash(Employee::find('88021001')), 'Pegawai eksisting kembali persis ke kondisi sebelum impor.');
+        $this->assertSame($hashBefore, Employee::stateHash(Employee::find('88021001')), 'Karyawan eksisting kembali persis ke kondisi sebelum impor.');
         $this->assertSame('NAMA ASLI', Employee::find('88021001')->nama);
         $this->assertSame('IIIA/00', Employee::find('88021001')->golongan);
 
@@ -2959,7 +2959,7 @@ class EmployeeImportTest extends TestCase
         $this->assertStringContainsString('Pembatalan dihentikan', session('error'));
         $this->assertStringContainsString('88****02', session('error'), 'NIK ditampilkan tersamar.');
         $this->assertSame('completed', $log->fresh()->status);
-        $this->assertSame('PEGAWAI UJI FORMASI', Employee::find('88021001')->nama, 'Tidak ada pegawai yang dikembalikan sebagian.');
+        $this->assertSame('KARYAWAN UJI FORMASI', Employee::find('88021001')->nama, 'Tidak ada karyawan yang dikembalikan sebagian.');
         $this->assertDatabaseHas('employees', ['nik' => '88021002']);
         $this->assertSame(2, $log->changes()->count());
     }

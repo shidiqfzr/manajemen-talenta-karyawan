@@ -9,7 +9,7 @@
     </x-admin.personnel-drawer>
 
     subtitle: satu baris konteks di bawah judul (mis. jabatan dan kuota).
-    Nama pegawai menjadi tautan ke profil (tab baru) bila NIK ada dan pegawai masih terdaftar.
+    Nama karyawan menjadi tautan ke profil (tab baru) bila NIK ada dan karyawan masih terdaftar.
 
     employees: daftar array dengan kunci nama, nik (hanya untuk tautan profil), status_karyawan, jabatan, unit_kerja,
     golongan, tanggal_mbt, tanggal_pensiun, tanggal_penempatan, terdaftar. Kunci yang tidak ada tidak dirender.

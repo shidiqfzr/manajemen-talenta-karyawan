@@ -162,7 +162,7 @@ class EmployeeController extends Controller
             return back()->withErrors(['jabatan' => $seatError])->withInput();
         }
 
-        return redirect()->route('admin.employees.index')->with('success', "Pegawai baru ({$employee->nama}) berhasil ditambahkan dan formasi jabatan telah terisi.");
+        return redirect()->route('admin.employees.index')->with('success', "Karyawan baru ({$employee->nama}) berhasil ditambahkan dan formasi jabatan telah terisi.");
     }
 
     public function show($nik)
@@ -177,7 +177,7 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Tampilkan halaman khusus Wizard Impor Data Pegawai (Workday / SAP Multi-Step Standard).
+     * Tampilkan halaman khusus Wizard Impor Data Karyawan (Workday / SAP Multi-Step Standard).
      */
     public function importPage()
     {
@@ -436,42 +436,41 @@ class EmployeeController extends Controller
             $employee->update($validated);
         });
 
-        return redirect()->route('admin.employees.index')->with('success', 'Data pegawai berhasil diperbarui.');
+        return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil diperbarui.');
     }
 
     // Delete employee
-    public function destroy($nik)
+    public function destroy(Request $request, $nik, EmployeeDeletionService $deletion)
     {
+        Gate::authorize('delete-employee');
+
+        $validated = $request->validate(['reason' => EmployeeDeletionService::REASON_RULES]);
+
         $employee = Employee::findOrFail($nik);
 
-        DB::transaction(function () use ($employee) {
-            // Delete foto if exists
-            if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
-                Storage::disk('public')->delete($employee->foto);
-            }
+        // Archive (master data, placement history, actor, reason), delete, and remove the photo after commit.
+        $deletion->deleteMany(Employee::whereKey($employee->nik), $request->user(), $validated['reason']);
 
-            $employee->delete();
-        });
-
-        return redirect()->route('admin.employees.index')->with('success', 'Data pegawai berhasil dihapus.');
+        return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil dihapus.');
     }
 
     /**
-     * Hapus massal data pegawai terpilih secara transaksional.
+     * Hapus massal data karyawan terpilih secara transaksional.
      */
     public function bulkDestroy(Request $request, EmployeeDeletionService $deletion)
     {
-        // Same ability as the Direktori Pegawai bulk action.
+        // Same ability as the Daftar Karyawan bulk action.
         Gate::authorize('delete-employee');
 
         $validated = $request->validate([
             'niks' => 'required|array|min:1',
             'niks.*' => 'required|string|size:8',
+            'reason' => EmployeeDeletionService::REASON_RULES,
         ]);
 
-        // Same photo-and-row deletion (one transaction) as the Direktori Pegawai bulk action.
-        $count = $deletion->deleteMany(Employee::whereIn('nik', $validated['niks']));
+        // Same archive, photo-and-row deletion (one transaction) as the Daftar Karyawan bulk action.
+        $count = $deletion->deleteMany(Employee::whereIn('nik', $validated['niks']), $request->user(), $validated['reason']);
 
-        return redirect()->route('admin.employees.index')->with('success', "{$count} data pegawai terpilih berhasil dihapus.");
+        return redirect()->route('admin.employees.index')->with('success', "{$count} data karyawan terpilih berhasil dihapus.");
     }
 }

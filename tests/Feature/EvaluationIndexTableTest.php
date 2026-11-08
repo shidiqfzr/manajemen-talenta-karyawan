@@ -164,7 +164,12 @@ class EvaluationIndexTableTest extends TestCase
     {
         $evaluation = $this->makeEvaluation();
 
-        $this->table()->assertSeeHtml(route('admin.evaluations.destroy', $evaluation->id));
+        // Row actions live in the kebab menu; deleting goes through the confirmation modal.
+        $this->table()
+            ->assertSeeHtml('confirm-delete')
+            ->assertSeeHtml(route('admin.evaluations.show', $evaluation->id))
+            ->assertSeeHtml(route('admin.evaluations.edit', $evaluation->id))
+            ->assertSeeHtml('role="dialog"');
 
         $this->delete(route('admin.evaluations.destroy', $evaluation->id))
             ->assertRedirect(route('admin.evaluations.index'));
@@ -181,6 +186,76 @@ class EvaluationIndexTableTest extends TestCase
         foreach (['AGENTS.md', 'DOMAIN.md', 'DESIGN.md', 'ENGINEERING.md', 'SECURITY.md', 'SSOT'] as $name) {
             $this->assertStringNotContainsString($name, $html);
         }
+    }
+
+    public function test_kpi_cards_count_every_assessment_by_result_and_average_the_score(): void
+    {
+        $this->makeEvaluation(['kategori_asesmen' => 'Sangat Baik', 'nilai_tertimbang' => 90]);
+        $this->makeEvaluation(['kategori_asesmen' => 'Baik', 'nilai_tertimbang' => 80]);
+        $this->makeEvaluation(['kategori_asesmen' => 'Cukup', 'nilai_tertimbang' => 70]);
+        $this->makeEvaluation(['kategori_asesmen' => 'Kurang', 'nilai_tertimbang' => 60]);
+
+        $component = $this->table();
+
+        $this->assertEquals(
+            ['total' => 4, 'sangat_baik' => 1, 'baik' => 1, 'perlu_pembinaan' => 2, 'rata_rata' => 75.0],
+            $component->instance()->kpi()
+        );
+        $component->assertSee('Total Penilaian')->assertSee('Rata-rata nilai 75,00')->assertSee('Perlu Pembinaan');
+
+        // Cards are page-level: the figures do not move with the search.
+        $component->set('search', 'tidak ada yang cocok');
+        $this->assertSame(4, $component->instance()->kpi()['total']);
+    }
+
+    public function test_kpi_without_assessments_has_no_average(): void
+    {
+        $this->assertSame(0, $this->table()->instance()->kpi()['total']);
+        $this->assertNull($this->table()->instance()->kpi()['rata_rata']);
+        $this->table()->assertSee('Belum ada nilai tertimbang');
+    }
+
+    public function test_result_card_filters_the_table_and_total_card_clears_it(): void
+    {
+        $this->makeEvaluation(['kategori_asesmen' => 'Sangat Baik', 'bidang_tugas' => 'Bidang Sangat Baik']);
+        $this->makeEvaluation(['kategori_asesmen' => 'Baik', 'bidang_tugas' => 'Bidang Baik']);
+        $this->makeEvaluation(['kategori_asesmen' => 'Cukup', 'bidang_tugas' => 'Bidang Cukup']);
+        $this->makeEvaluation(['kategori_asesmen' => 'Kurang', 'bidang_tugas' => 'Bidang Kurang']);
+
+        $component = $this->table();
+        $fields = fn () => collect($component->instance()->rows->items())->pluck('bidang_tugas')->sort()->values()->all();
+
+        $component->set('hasil', EvaluationIndexTable::HASIL_SANGAT_BAIK);
+        $this->assertSame(['Bidang Sangat Baik'], $fields());
+
+        $component->set('hasil', EvaluationIndexTable::HASIL_BAIK);
+        $this->assertSame(['Bidang Baik'], $fields());
+
+        $component->set('hasil', EvaluationIndexTable::HASIL_PERLU_PEMBINAAN);
+        $this->assertSame(['Bidang Cukup', 'Bidang Kurang'], $fields());
+
+        $component->call('clearKpiFilters')->assertSet('hasil', '');
+        $this->assertSame(4, $component->instance()->rows->total());
+
+        $component->set('hasil', 'tidak-dikenal')->assertSet('hasil', '');
+    }
+
+    public function test_result_link_fallback_keeps_the_current_table_state(): void
+    {
+        $this->makeEvaluation(['kategori_9box' => 'Future Star']);
+
+        $url = $this->table()->set('kategori', 'Future Star')->instance()->kpiUrl(['hasil' => EvaluationIndexTable::HASIL_BAIK]);
+
+        $this->assertSame(route('admin.evaluations.index', ['kategori' => 'Future Star', 'hasil' => 'baik']), $url);
+    }
+
+    public function test_page_uses_the_shared_module_header(): void
+    {
+        $this->get(route('admin.evaluations.index'))
+            ->assertOk()
+            ->assertSee('Core HR')
+            ->assertSeeHtml('aria-label="Breadcrumb"')
+            ->assertSeeHtml('lg:text-3xl');
     }
 
     public function test_non_admin_is_refused(): void

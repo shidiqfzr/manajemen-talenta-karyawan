@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Satu personil di balik sel personil matriks pada periode MPP. employee_nik berupa nilai biasa tanpa
- * foreign key: snapshot harus tetap utuh walaupun data pegawai berubah kemudian.
+ * foreign key: snapshot harus tetap utuh walaupun data karyawan berubah kemudian.
  */
 class MppPeriodMember extends Model
 {

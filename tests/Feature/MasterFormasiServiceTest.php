@@ -329,7 +329,7 @@ class MasterFormasiServiceTest extends TestCase
         $this->seat($withSeat, $this->position('Manajer Seat'));
 
         $withEmployee = $this->unit('Kebun Berpegawai');
-        $this->employees($withEmployee, $this->position('Manajer Pegawai'), 1);
+        $this->employees($withEmployee, $this->position('Manajer Karyawan'), 1);
 
         $withHistory = $this->unit('Kebun Berriwayat');
         $this->history('Kebun Berriwayat', 'Manajer');
@@ -448,7 +448,7 @@ class MasterFormasiServiceTest extends TestCase
 
         try {
             $this->service->setPositionActive($position, false, 'Jabatan tidak dipakai lagi', $this->admin);
-            $this->fail('Menonaktifkan jabatan yang dipegang pegawai seharusnya ditolak.');
+            $this->fail('Menonaktifkan jabatan yang dipegang karyawan seharusnya ditolak.');
         } catch (FormasiRuleViolationException $e) {
             $this->assertStringContainsString('2', $e->getMessage());
             $this->assertStringContainsString('Mutasi', $e->getMessage());

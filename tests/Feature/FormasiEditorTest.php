@@ -105,7 +105,7 @@ class FormasiEditorTest extends TestCase
 
         $this->editor()
             ->call('startRemoveSeat', $seatId)
-            ->assertSee('2 pegawai')
+            ->assertSee('2 karyawan')
             ->assertSee('Mutasi')
             ->set('reason', 'Kursi dihapus karena restrukturisasi')
             ->call('confirm')
@@ -326,15 +326,15 @@ class FormasiEditorTest extends TestCase
     {
         $position = $this->position('Asisten Pemegang');
         $seatId = $this->seat($position, 2);
-        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Pegawai Pemegang Uji']);
+        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Karyawan Pemegang Uji']);
 
         $this->editor()
             ->call('viewOccupants', $seatId)
             ->assertSee('Pemegang Jabatan')
-            ->assertSee('Pegawai Pemegang Uji')
+            ->assertSee('Karyawan Pemegang Uji')
             ->assertDontSeeText($employee->nik)
             ->call('closeOccupants')
-            ->assertDontSee('Pegawai Pemegang Uji');
+            ->assertDontSee('Karyawan Pemegang Uji');
     }
 
     public function test_occupant_list_opens_as_a_right_drawer_with_profile_link_and_a_blur_free_overlay(): void
@@ -344,7 +344,7 @@ class FormasiEditorTest extends TestCase
         $employee = Employee::factory()->create([
             'unit_kerja' => $this->unit->nama,
             'jabatan' => $position->nama,
-            'nama' => 'Pegawai Drawer Uji',
+            'nama' => 'Karyawan Drawer Uji',
             'golongan' => 'IVB/06',
             'status_karyawan' => 'Tetap (PKWTT)',
             'tanggal_pensiun' => '2030-02-01',
@@ -366,8 +366,8 @@ class FormasiEditorTest extends TestCase
 
         $this->assertStringContainsString('inset-y-0 right-0', $html);
         $this->assertStringContainsString('fixed inset-0 bg-surface-950/30 transition-opacity', $html);
-        // Nama pegawai adalah tautan profil (tab baru), bukan tombol terpisah.
-        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('admin.employees.show', $employee->nik), '/').'"[^>]*target="_blank"[^>]*>\s*Pegawai Drawer Uji/', $html);
+        // Nama karyawan adalah tautan profil (tab baru), bukan tombol terpisah.
+        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('admin.employees.show', $employee->nik), '/').'"[^>]*target="_blank"[^>]*>\s*Karyawan Drawer Uji/', $html);
     }
 
     public function test_occupant_drawer_warns_when_the_seat_holds_more_people_than_the_list_limit(): void
@@ -377,14 +377,14 @@ class FormasiEditorTest extends TestCase
         Employee::factory()->count(FormasiEditor::OCCUPANT_LIMIT + 1)->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama]);
 
         $this->editor()->call('viewOccupants', $seatId)
-            ->assertSee('Menampilkan '.FormasiEditor::OCCUPANT_LIMIT.' dari '.(FormasiEditor::OCCUPANT_LIMIT + 1).' pegawai');
+            ->assertSee('Menampilkan '.FormasiEditor::OCCUPANT_LIMIT.' dari '.(FormasiEditor::OCCUPANT_LIMIT + 1).' karyawan');
     }
 
     public function test_opening_the_occupant_list_is_recorded_on_the_audit_log_without_personal_data(): void
     {
         $position = $this->position('Asisten Audit', 'Karpim', 'RM-3');
         $seatId = $this->seat($position, 2, 'TAN');
-        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Pegawai Audit Uji']);
+        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Karyawan Audit Uji']);
 
         $this->editor()->call('viewOccupants', $seatId)->call('closeOccupants');
 
@@ -396,7 +396,7 @@ class FormasiEditorTest extends TestCase
             $log->new_values
         );
         $this->assertStringNotContainsString($employee->nik, json_encode($log->new_values).$log->entity_label);
-        $this->assertStringNotContainsString('Pegawai Audit Uji', json_encode($log->new_values).$log->entity_label);
+        $this->assertStringNotContainsString('Karyawan Audit Uji', json_encode($log->new_values).$log->entity_label);
     }
 
     public function test_opening_an_empty_or_foreign_seat_is_not_recorded_as_personnel_access(): void
@@ -415,7 +415,7 @@ class FormasiEditorTest extends TestCase
         $seatId = $this->seat($this->position('Asisten Kosong'), 1);
 
         $this->editor()->call('viewOccupants', $seatId)
-            ->assertSee('Belum ada pegawai pada jabatan ini')
+            ->assertSee('Belum ada karyawan pada jabatan ini')
             ->assertSee('0 Personil');
     }
 
@@ -627,7 +627,7 @@ class FormasiEditorTest extends TestCase
         Employee::factory()->create(['unit_kerja' => 'BAGIAN LAMA']);
 
         $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
-            ->assertSee('3 pegawai tercatat pada 2 unit kerja yang belum terdaftar di Master Unit')
+            ->assertSee('3 karyawan tercatat pada 2 unit kerja yang belum terdaftar di Master Unit')
             ->assertSee('DISTRIK LAMA - KEBUN HILANG (2)')
             ->assertSee('BAGIAN LAMA (1)');
         $this->assertSame(['DISTRIK LAMA - KEBUN HILANG', 'BAGIAN LAMA'], $list->instance()->unregisteredEmployeeUnits->pluck('unit_kerja')->all());

@@ -197,7 +197,7 @@ class MutasiChainProcess extends Component
     public function removeNode(int $index): void
     {
         if (count($this->nodes) <= MutasiPolicy::MIN_CHAIN_PARTICIPANTS) {
-            $this->addError('nodes', 'Rantai mutasi kolektif memerlukan minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' pegawai.');
+            $this->addError('nodes', 'Rantai mutasi kolektif memerlukan minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' karyawan.');
 
             return;
         }
@@ -405,7 +405,7 @@ class MutasiChainProcess extends Component
                 'is_valid' => false,
                 'topology' => 'incomplete',
                 'topology_label' => 'Tahap Penyusunan (Belum Lengkap)',
-                'errors' => ['Lengkapi minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' pegawai beserta formasi dan unit kerja target.'],
+                'errors' => ['Lengkapi minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' karyawan beserta formasi dan unit kerja target.'],
                 'warnings' => [],
                 'closed_vacancies' => [],
                 'unfilled_vacancies' => [],
@@ -629,7 +629,7 @@ class MutasiChainProcess extends Component
         }
 
         $topologyText = $result['topology_label'] ?? ($result['topology'] === 'cyclic' ? 'Siklis Tertutup (Net Zero Vacancy)' : 'Rantai Domino Terbuka');
-        $msg = "Sukses! Rantai mutasi kolektif {$result['total_transfers']} pegawai berhasil diproses secara serentak [{$topologyText}]. Nomor SK: {$result['nomor_sk']}.";
+        $msg = "Sukses! Rantai mutasi kolektif {$result['total_transfers']} karyawan berhasil diproses secara serentak [{$topologyText}]. Nomor SK: {$result['nomor_sk']}.";
 
         session()->flash('mutasi_success', $msg);
         $this->redirect(route('admin.mutasi.index', ['tab' => 'history']), navigate: false);

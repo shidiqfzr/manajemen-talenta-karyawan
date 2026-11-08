@@ -72,7 +72,7 @@
                         {{ $node['current_jabatan'] }} &bull; {{ $node['current_unit'] }}
                     </div>
                 @else
-                    <p class="text-[11px] text-surface-500 mt-0.5">Pilih pegawai untuk memulai konfigurasi rantai</p>
+                    <p class="text-[11px] text-surface-500 mt-0.5">Pilih karyawan untuk memulai konfigurasi rantai</p>
                 @endif
             </div>
         </div>
@@ -83,7 +83,7 @@
                     wire:loading.attr="disabled"
                     wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200/80 transition cursor-pointer shadow-2xs"
-                    title="Buka panel rekam jejak talenta, matriks 9-box &amp; masa dinas pegawai ini">
+                    title="Buka panel rekam jejak talenta, matriks 9-box &amp; masa dinas karyawan ini">
                     <i wire:loading.remove wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')" class="fas fa-chart-line text-[11px]" aria-hidden="true"></i>
                     <i wire:loading wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')" class="fas fa-spinner fa-spin text-[11px]" aria-hidden="true"></i>
                     <span class="hidden sm:inline">Rekam Jejak &amp; 9-Box</span>
@@ -102,7 +102,7 @@
             @if ($totalNodes > 2)
                 <button type="button" wire:click="removeNode({{ $index }})"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-danger hover:bg-danger-50 transition cursor-pointer"
-                    title="Hapus slot pegawai ini dari rantai mutasi">
+                    title="Hapus slot karyawan ini dari rantai mutasi">
                     <i class="fas fa-trash-can text-xs" aria-hidden="true"></i>
                     <span class="hidden sm:inline">Hapus</span>
                 </button>
@@ -113,7 +113,7 @@
     <!-- Spacious 2-Column Responsive Layout (Collapsible Body) -->
     <div x-show="!isCollapsed" x-transition.opacity.duration.200ms class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
 
-        <!-- ── KOLOM KIRI: DATA PEGAWAI ASAL (Col 5) ── -->
+        <!-- ── KOLOM KIRI: DATA KARYAWAN ASAL (Col 5) ── -->
         <x-admin.mutasi.employee-selector 
             :node="$node"
             :index="$index"
@@ -177,13 +177,13 @@
                                 <i class="fas fa-building text-xs" aria-hidden="true"></i>
                             </div>
                             <select disabled class="w-full pl-9.5 pr-8 py-2.5 rounded-xl border border-surface-200 bg-surface-100 text-surface-500 cursor-not-allowed text-xs sm:text-sm font-medium appearance-none">
-                                <option value="">-- Pilih Pegawai Terlebih Dahulu --</option>
+                                <option value="">-- Pilih Karyawan Terlebih Dahulu --</option>
                             </select>
                             <div class="pointer-events-none absolute inset-y-0 right-0 pr-3.5 flex items-center text-surface-500">
                                 <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
                             </div>
                         </div>
-                        <p class="text-[11px] text-surface-500 mt-1">Pilih pegawai pada slot ini terlebih dahulu.</p>
+                        <p class="text-[11px] text-surface-500 mt-1">Pilih karyawan pada slot ini terlebih dahulu.</p>
                     @elseif ($node['jenis_mutasi'] === 'ROTASI')
                         <div class="p-2.5 bg-surface-50 border border-surface-300 rounded-xl flex items-center justify-between text-xs sm:text-sm">
                             <div class="flex items-center gap-2">

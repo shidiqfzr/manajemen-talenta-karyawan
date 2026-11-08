@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Traits\Searchable;
 use App\Services\KepegawaianPolicy;
 use App\Services\ManPowerPlanningService;
+use App\Services\Mutasi\TalentProfileBuilder;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -117,7 +118,7 @@ class Employee extends Model
     ];
 
     /**
-     * Sidik jari (SHA-256) atribut pegawai sebagaimana tersimpan di basis data. Dipakai pembatalan impor untuk
+     * Sidik jari (SHA-256) atribut karyawan sebagaimana tersimpan di basis data. Dipakai pembatalan impor untuk
      * memastikan baris belum berubah sejak impor (nilai dinormalkan ke teks agar stabil antar driver basis data).
      */
     public static function stateHash(self $employee): string
@@ -135,7 +136,7 @@ class Employee extends Model
     public const LEVEL_KARPEL = 'Karpel';
 
     /**
-     * Strata Pegawai (DOMAIN.md Bab 3).
+     * Strata Karyawan (DOMAIN.md Bab 3).
      */
     public const LEVELS = [
         self::LEVEL_KARPIM => 'Karyawan Pimpinan (Karpim)',
@@ -169,7 +170,7 @@ class Employee extends Model
     ];
 
     /**
-     * Jalur Rekrutmen / Pengadaan Pegawai (DOMAIN.md Bab 2.1).
+     * Jalur Rekrutmen / Pengadaan Karyawan (DOMAIN.md Bab 2.1).
      */
     public const ENTRY_CHANNELS = [
         'CKP' => 'CKP (Calon Karyawan Pimpinan / Talenta Internal)',
@@ -334,7 +335,7 @@ class Employee extends Model
     }
 
     /**
-     * Ambil tanggal MBT efektif (T-1 tahun sebelum tanggal pensiun / usia 55 thn).
+     * Ambil tanggal MBT efektif (H-6 bulan sebelum tanggal pensiun).
      */
     public function getEffectiveTanggalMbtAttribute(): ?Carbon
     {
@@ -343,14 +344,14 @@ class Employee extends Model
         }
 
         if ($pensiun = $this->effective_tanggal_pensiun) {
-            return (clone $pensiun)->subYears(KepegawaianPolicy::MBT_TAHUN_SEBELUM_PENSIUN);
+            return (clone $pensiun)->subMonthsNoOverflow(KepegawaianPolicy::MBT_BULAN_SEBELUM_PENSIUN);
         }
 
         return null;
     }
 
     /**
-     * Cek apakah pegawai telah mencapai atau melewati Batas Usia Pensiun (BUP 56 thn).
+     * Cek apakah karyawan telah mencapai atau melewati Batas Usia Pensiun (BUP 56 thn).
      */
     public function isPensionReached(): bool
     {
@@ -360,7 +361,7 @@ class Employee extends Model
     }
 
     /**
-     * Cek apakah pegawai sedang dalam Masa Bebas Tugas aktif (usia 55 s.d. 56 thn).
+     * Cek apakah karyawan sedang dalam Masa Bebas Tugas aktif (dari tanggal MBT hingga tanggal pensiun).
      */
     public function isMbtActive(): bool
     {
@@ -377,7 +378,7 @@ class Employee extends Model
     }
 
     /**
-     * Cek apakah pegawai menjelang MBT (sisa waktu <= 12 bulan menuju tanggal_mbt).
+     * Cek apakah karyawan menjelang MBT (sisa waktu <= MBT_PERINGATAN_BULAN menuju tanggal_mbt).
      */
     public function isApproachingMbt(): bool
     {
@@ -389,7 +390,7 @@ class Employee extends Model
 
         $today = Carbon::today();
 
-        return $today->lt($mbt) && $today->diffInDays($mbt) <= 365;
+        return $today->lt($mbt) && $today->gte($mbt->copy()->subMonthsNoOverflow(KepegawaianPolicy::MBT_PERINGATAN_BULAN));
     }
 
     /**
@@ -433,7 +434,7 @@ class Employee extends Model
     }
 
     /**
-     * Scope query untuk pegawai dalam masa sanksi indisipliner aktif.
+     * Scope query untuk karyawan dalam masa sanksi indisipliner aktif.
      */
     public function scopeSanctionActive($query)
     {
@@ -442,7 +443,7 @@ class Employee extends Model
     }
 
     /**
-     * Scope query untuk pegawai dengan masa sanksi kedaluwarsa.
+     * Scope query untuk karyawan dengan masa sanksi kedaluwarsa.
      */
     public function scopeSanctionExpired($query)
     {
@@ -451,7 +452,7 @@ class Employee extends Model
     }
 
     /**
-     * Scope query untuk semua pegawai yang memiliki riwayat/status sanksi.
+     * Scope query untuk semua karyawan yang memiliki riwayat/status sanksi.
      */
     public function scopeSanctionAll($query)
     {
@@ -459,7 +460,7 @@ class Employee extends Model
     }
 
     /**
-     * Scope query untuk pegawai pada posisi overflow fungsional (Advisor / Pool).
+     * Scope query untuk karyawan pada posisi overflow fungsional (Advisor / Pool).
      */
     public function scopeOverflow($query)
     {
@@ -496,7 +497,7 @@ class Employee extends Model
     }
 
     /**
-     * Accessor untuk mengecek apakah pegawai merupakan Karpim.
+     * Accessor untuk mengecek apakah karyawan merupakan Karpim.
      */
     public function getIsKarpimAttribute(): bool
     {
@@ -506,7 +507,7 @@ class Employee extends Model
     }
 
     /**
-     * Accessor untuk mengambil 2 huruf inisial nama pegawai.
+     * Accessor untuk mengambil 2 huruf inisial nama karyawan.
      */
     public function getInitialsAttribute(): string
     {
@@ -528,11 +529,15 @@ class Employee extends Model
     }
 
     /**
-     * Accessor untuk token CSS styling Bidang Fungsional (Neutral Subtle Tag untuk mencegah visual clutter).
+     * Masa kerja total sejak TMT bekerja, format "N th M bln"; null bila TMT kosong (kolom Masa Kerja pada Daftar Karyawan).
      */
-    public function getBidangThemeAttribute(): string
+    public function getMasaKerjaAttribute(): ?string
     {
-        return 'bg-surface-100 text-surface-600 border-surface-200';
+        if (! $this->tmt_bekerja) {
+            return null;
+        }
+
+        return TalentProfileBuilder::formatMonths((int) Carbon::parse($this->tmt_bekerja)->diffInMonths(now()));
     }
 
     /**
@@ -544,7 +549,7 @@ class Employee extends Model
     }
 
     /**
-     * Accessor untuk token CSS styling Strata Pegawai (Level) sesuai DOMAIN.md Bab 10.
+     * Accessor untuk token CSS styling Strata Karyawan (Level) sesuai DOMAIN.md Bab 10.
      */
     public function getLevelThemeAttribute(): string
     {

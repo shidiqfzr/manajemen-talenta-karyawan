@@ -48,7 +48,7 @@
             theme="warning" />
 
         <x-admin.kpi-card
-            title="Pegawai Baru"
+            title="Karyawan Baru"
             tab-key="created"
             x-text="validationSummary?.created ?? 0"
             subtitle="Akan ditambahkan"
@@ -83,7 +83,7 @@
         class="flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-800">
         <i class="fas fa-circle-info mt-0.5 text-warning-700" aria-hidden="true"></i>
         <p class="text-xs leading-relaxed">
-            <span class="font-bold" x-text="validationSummary?.warning_count"></span> pegawai tercatat pada formasi yang sudah tidak sesuai Master Formasi
+            <span class="font-bold" x-text="validationSummary?.warning_count"></span> karyawan tercatat pada formasi yang sudah tidak sesuai Master Formasi
             (unit tidak aktif, jabatan tidak lagi tercantum, atau melebihi kuota). Impor tetap dapat dilanjutkan; tinjau melalui Master Formasi atau modul Mutasi.
         </p>
     </div>
@@ -106,7 +106,7 @@
                         'bg-danger': activeFilterTab === 'errors'
                     }"></span>
                 <h4 class="text-xs font-black uppercase tracking-wider text-surface-800"
-                    x-text="activeFilterTab === 'all' ? 'Semua Data Pegawai' : (activeFilterTab === 'updated' ? 'Data Perubahan Atribut' : (activeFilterTab === 'created' ? 'Data Pegawai Baru' : (activeFilterTab === 'unchanged' ? 'Data Tetap / Sudah Mutakhir' : 'Daftar Baris Terkendala')))">
+                    x-text="activeFilterTab === 'all' ? 'Semua Data Karyawan' : (activeFilterTab === 'updated' ? 'Data Perubahan Atribut' : (activeFilterTab === 'created' ? 'Data Karyawan Baru' : (activeFilterTab === 'unchanged' ? 'Data Tetap / Sudah Mutakhir' : 'Daftar Baris Terkendala')))">
                 </h4>
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-mono font-extrabold bg-surface-200/80 text-surface-700"
                     x-text="filteredList.length + ' baris'"></span>
@@ -137,7 +137,7 @@
             </div>
         </div>
 
-        <!-- TABEL 1: DATA PEGAWAI VALID (FOKUS 5 KOLOM, PAS 100% VIEWPORT TANPA HORIZONTAL SCROLL) -->
+        <!-- TABEL 1: DATA KARYAWAN VALID (FOKUS 5 KOLOM, PAS 100% VIEWPORT TANPA HORIZONTAL SCROLL) -->
         <div x-show="activeFilterTab !== 'errors'" class="min-h-[380px] max-h-[540px] overflow-y-auto">
             <template x-if="paginatedRows.length === 0">
                 <div class="p-16 text-center space-y-3">
@@ -146,26 +146,26 @@
                     </div>
                     <h4 class="text-sm font-bold text-surface-800">Tidak Ada Data yang Cocok</h4>
                     <p class="text-xs text-surface-500 max-w-md mx-auto">
-                        Tidak ditemukan baris pegawai yang memenuhi kriteria filter atau kata kunci pencarian saat ini.
+                        Tidak ditemukan baris karyawan yang memenuhi kriteria filter atau kata kunci pencarian saat ini.
                     </p>
                 </div>
             </template>
 
             <template x-if="paginatedRows.length > 0">
                 <table class="w-full text-left border-collapse text-xs table-fixed">
-                    <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 text-surface-700 text-[11px] uppercase tracking-wider font-extrabold z-10 shadow-2xs">
+                    <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 z-10 shadow-2xs">
                         <tr>
-                            <th scope="col" class="py-3 px-4 font-bold w-[26%]">Pegawai</th>
-                            <th scope="col" class="py-3 px-4 font-bold w-[30%]">Formasi &amp; Penempatan</th>
-                            <th scope="col" class="py-3 px-4 font-bold w-[18%]">Strata &amp; Golongan</th>
-                            <th scope="col" class="py-3 px-4 font-bold w-[12%] text-center">Status Aksi</th>
-                            <th scope="col" class="py-3 px-4 font-bold w-[14%] text-right pr-6">Rincian Perubahan</th>
+                            <x-admin.table.th class="py-3 px-4 w-[26%]">Karyawan</x-admin.table.th>
+                            <x-admin.table.th class="py-3 px-4 w-[30%]">Formasi &amp; Penempatan</x-admin.table.th>
+                            <x-admin.table.th class="py-3 px-4 w-[18%]">Strata &amp; Golongan</x-admin.table.th>
+                            <x-admin.table.th align="center" class="py-3 px-4 w-[12%]">Status Aksi</x-admin.table.th>
+                            <x-admin.table.th align="right" class="py-3 px-4 w-[14%] pr-6">Rincian Perubahan</x-admin.table.th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-100 text-[11px] bg-white">
                         <template x-for="(row, idx) in paginatedRows" :key="'valid-' + (row.nik || idx)">
                             <tr class="hover:bg-surface-50/80 transition-colors">
-                                <!-- Kolom 1: Pegawai (Nama + NIK) -->
+                                <!-- Kolom 1: Karyawan (Nama + NIK) -->
                                 <td class="py-3 px-4 align-top">
                                     <div class="font-extrabold text-surface-900 text-xs tracking-tight" x-text="row.nama"></div>
                                     <div class="text-[11px] text-surface-500 font-mono mt-0.5 flex items-center gap-1.5">
@@ -297,13 +297,13 @@
 
                     <!-- TABEL ERROR BERSTANDAR ENTERPRISE SLATE DENGAN 5 KOLOM SEIMBANG -->
                     <table class="w-full text-left border-collapse text-xs table-fixed">
-                        <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 text-surface-700 text-[11px] uppercase tracking-wider font-extrabold z-10 shadow-2xs">
+                        <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 z-10 shadow-2xs">
                             <tr>
-                                <th scope="col" class="py-2.5 px-4 font-bold w-20">Baris</th>
-                                <th scope="col" class="py-2.5 px-4 font-bold w-[22%]">Pegawai Terkait</th>
-                                <th scope="col" class="py-2.5 px-4 font-bold w-[24%]">Formasi &amp; Penempatan</th>
-                                <th scope="col" class="py-2.5 px-4 font-bold w-[12%] text-center">Status</th>
-                                <th scope="col" class="py-2.5 px-4 font-bold w-[42%] pr-6">Penyebab Kendala</th>
+                                <x-admin.table.th class="py-2.5 px-4 w-20">Baris</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-4 w-[22%]">Karyawan Terkait</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-4 w-[24%]">Formasi &amp; Penempatan</x-admin.table.th>
+                                <x-admin.table.th align="center" class="py-2.5 px-4 w-[12%]">Status</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-4 w-[42%] pr-6">Penyebab Kendala</x-admin.table.th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-surface-100 text-[11px] bg-white">
@@ -314,7 +314,7 @@
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-100 text-surface-700 border border-surface-200 font-mono font-bold text-xs" x-text="err.row"></span>
                                     </td>
 
-                                    <!-- Kolom 2: Pegawai (Nama + NIK) -->
+                                    <!-- Kolom 2: Karyawan (Nama + NIK) -->
                                     <td class="py-2.5 px-4 align-top">
                                         <div class="font-extrabold text-surface-900 text-xs tracking-tight" x-text="err.nama || '-'"></div>
                                         <div class="text-[11px] text-surface-500 font-mono mt-0.5 flex items-center gap-1.5">
@@ -386,7 +386,7 @@
         <div class="p-4 bg-surface-50 border-t border-surface-200 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="text-xs text-surface-500">
                 <span x-show="sampleRows.length > 0">
-                    Siap mengimpor <strong class="text-primary-700 font-extrabold" x-text="sampleRows.length"></strong> data pegawai yang valid.
+                    Siap mengimpor <strong class="text-primary-700 font-extrabold" x-text="sampleRows.length"></strong> data karyawan yang valid.
                 </span>
                 <span x-show="sampleRows.length === 0" class="text-danger font-semibold">
                     Semua data ditolak. Silakan unduh baris terkendala untuk diperbaiki.
@@ -416,7 +416,7 @@
                     <template x-if="isCommitting">
                         <span class="inline-flex items-center gap-2">
                             <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
-                            <span>Menyimpan Data Pegawai...</span>
+                            <span>Menyimpan Data Karyawan...</span>
                         </span>
                     </template>
                 </button>

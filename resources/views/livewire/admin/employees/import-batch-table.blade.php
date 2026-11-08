@@ -84,7 +84,7 @@
                                 <x-admin.button variant="secondary" size="sm" icon="fas fa-rotate-left" wire:click="resetFilters" target="resetFilters">Reset Filter</x-admin.button>
                             </x-admin.table.empty-state>
                         @else
-                            <x-admin.table.empty-state :colspan="$columnCount" icon="fas fa-clipboard-list" message="Belum ada riwayat impor. Mulai dari Impor Data Pegawai." />
+                            <x-admin.table.empty-state :colspan="$columnCount" icon="fas fa-clipboard-list" message="Belum ada riwayat impor. Mulai dari Impor Data Karyawan." />
                         @endif
                     @endforelse
                 </tbody>

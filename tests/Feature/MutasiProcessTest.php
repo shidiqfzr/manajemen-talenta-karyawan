@@ -513,27 +513,27 @@ class MutasiProcessTest extends TestCase
         // Active employee
         $activeEmp = Employee::factory()->create([
             'nik' => '11111111',
-            'nama' => 'Pegawai Aktif',
+            'nama' => 'Karyawan Aktif',
             'tanggal_pensiun' => now()->addYears(5)->toDateString(),
         ]);
 
         // Retired employee (BUP passed)
         $retiredEmp = Employee::factory()->create([
             'nik' => '99999999',
-            'nama' => 'Pegawai Pensiun',
+            'nama' => 'Karyawan Pensiun',
             'tanggal_pensiun' => now()->subMonths(3)->toDateString(),
         ]);
 
         Livewire::test(MutasiProcess::class)
-            ->assertSeeHtml('Pegawai Aktif')
-            ->assertDontSeeHtml('Pegawai Pensiun');
+            ->assertSeeHtml('Karyawan Aktif')
+            ->assertDontSeeHtml('Karyawan Pensiun');
     }
 
     public function test_mutating_retired_employee_fails_validation(): void
     {
         $retiredEmp = Employee::factory()->create([
             'nik' => '88888888',
-            'nama' => 'Pegawai Sudah Pensiun',
+            'nama' => 'Karyawan Sudah Pensiun',
             'jabatan' => 'Asisten SDM',
             'unit_kerja' => 'Bagian SDM',
             'tanggal_pensiun' => now()->subMonth()->toDateString(),
@@ -549,7 +549,7 @@ class MutasiProcessTest extends TestCase
             ->set('form.tmtAwal', now()->toDateString())
             ->set('form.nomorSk', 'SK/999')
             ->set('form.tanggalSk', now()->toDateString())
-            ->set('form.catatan', 'Mencoba memutasi pegawai pensiun')
+            ->set('form.catatan', 'Mencoba memutasi karyawan pensiun')
             ->call('submitMutasi')
             ->assertHasErrors(['employeeNik']);
     }

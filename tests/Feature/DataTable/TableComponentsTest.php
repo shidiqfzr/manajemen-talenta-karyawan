@@ -34,7 +34,7 @@ class TableComponentsTest extends TestCase
 
         for ($i = 1; $i <= 30; $i++) {
             FixtureRow::create([
-                'nama' => sprintf('Pegawai %02d', $i),
+                'nama' => sprintf('Karyawan %02d', $i),
                 'kode' => sprintf('K%02d', $i),
                 'bidang' => $i % 2 === 0 ? 'KEU' : 'TAN',
                 'aktif' => $i <= 20,
@@ -273,14 +273,15 @@ class TableComponentsTest extends TestCase
         $this->assertStringNotContainsString('Hapus Filter Tambahan', $panel, 'Reset Filter already clears everything');
         $this->assertStringNotContainsString('resetPanelFilters', $panel);
 
-        // Filter Lanjutan and Reset Filter share one width and height; the search field is compact, not full-row.
+        // Filter Lanjutan and Reset Filter share one width and height; the search field takes the rest of the row.
         preg_match_all('/class="([^"]*)"[^>]*>\s*<i class="fas (?:fa-sliders|fa-rotate-left)/', $panel, $buttons);
         $this->assertCount(2, $buttons[1]);
         foreach ($buttons[1] as $class) {
             $this->assertStringContainsString('h-10', $class);
             $this->assertStringContainsString('sm:w-40', $class);
         }
-        $this->assertStringNotContainsString('sm:flex-1', $panel);
+        $this->assertStringContainsString('sm:flex-1', $panel);
+        $this->assertStringNotContainsString('lg:w-72', $panel);
     }
 
     public function test_toolbar_uses_custom_search_model_and_reset_action(): void
@@ -402,8 +403,8 @@ class TableComponentsTest extends TestCase
             ->set('aktif', '1')
             ->assertSeeHtml('aria-pressed="true"')
             ->assertSeeHtml("wire:click=\"\$set('aktif', '')\"")
-            ->assertSee('Pegawai 20')
-            ->assertDontSee('Pegawai 21');
+            ->assertSee('Karyawan 20')
+            ->assertDontSee('Karyawan 21');
     }
 
     public function test_bulk_bar_shows_count_and_select_all_link(): void
@@ -425,7 +426,7 @@ class TableComponentsTest extends TestCase
 
     public function test_bulk_bar_offers_select_all_only_when_the_whole_page_is_selected(): void
     {
-        $key = (string) FixtureRow::where('nama', 'Pegawai 01')->value('id');
+        $key = (string) FixtureRow::where('nama', 'Karyawan 01')->value('id');
 
         Livewire::test(FixtureTable::class)
             ->set('selected', [$key])
@@ -452,7 +453,7 @@ class TableComponentsTest extends TestCase
 
     public function test_header_checkbox_reflects_page_selection(): void
     {
-        $key = (string) FixtureRow::where('nama', 'Pegawai 01')->value('id');
+        $key = (string) FixtureRow::where('nama', 'Karyawan 01')->value('id');
 
         Livewire::test(FixtureTable::class)
             ->assertSeeHtml('aria-label="Pilih semua di halaman ini"')
@@ -466,13 +467,27 @@ class TableComponentsTest extends TestCase
 
     public function test_row_checkbox_is_a_real_labelled_checkbox_and_marks_selected_row(): void
     {
-        $key = (string) FixtureRow::where('nama', 'Pegawai 01')->value('id');
+        $key = (string) FixtureRow::where('nama', 'Karyawan 01')->value('id');
 
         Livewire::test(FixtureTable::class)
-            ->assertSeeHtml('wire:model.live="selected" value="'.$key.'" aria-label="Pilih Pegawai 01"')
+            ->assertSeeHtml('wire:model.live="selected" value="'.$key.'" aria-label="Pilih Karyawan 01"')
             ->assertDontSeeHtml('border-l-primary-600')
             ->set('selected', [$key])
             ->assertSeeHtml('border-l-primary-600');
+    }
+
+    public function test_row_checkbox_is_hidden_until_hover_focus_or_selection_but_stays_in_dom(): void
+    {
+        $key = (string) FixtureRow::where('nama', 'Karyawan 01')->value('id');
+
+        Livewire::test(FixtureTable::class)
+            ->assertSeeHtml('opacity-0')
+            ->assertSeeHtml('[tr:hover_&]:opacity-100')
+            ->assertSeeHtml('focus-visible:opacity-100')
+            ->assertSeeHtml('[tbody:has(:checked)_&]:opacity-100')
+            ->assertSeeHtml('[@media(hover:none)]:opacity-100')
+            ->assertSeeHtml('aria-label="Pilih Karyawan 01"')
+            ->assertSeeHtml('value="'.$key.'"');
     }
 
     public function test_tbody_and_skeleton_share_loading_targets(): void
@@ -501,7 +516,7 @@ class TableComponentsTest extends TestCase
             ->assertSee('Tidak ada data yang sesuai dengan pencarian atau filter.')
             ->assertSee('Reset filter')
             ->call('resetFilters')
-            ->assertSee('Pegawai 01');
+            ->assertSee('Karyawan 01');
     }
 
     public function test_notice_roles(): void

@@ -9,7 +9,7 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Data awal minimum: akun admin/pengguna dan master unit + formasi jabatan (database/data/master_formasi.json).
-     * Data pegawai tidak di-seed; masuk lewat impor Excel agar nama unit/jabatan mengikuti Master Unit.
+     * Data karyawan tidak di-seed; masuk lewat impor Excel agar nama unit/jabatan mengikuti Master Unit.
      */
     public function run(): void
     {

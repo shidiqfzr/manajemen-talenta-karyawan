@@ -79,12 +79,8 @@ Route::prefix('admin')
             Route::post('/bulk-destroy', [AdminEmployeeController::class, 'bulkDestroy'])->name('bulkDestroy');
             Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy'])->name('destroy');
 
-            // Employee Statistics (Legacy redirect to unified Employee Directory)
-            Route::prefix('statistics')->name('statistics.')->group(function () {
-                Route::get('/', function () {
-                    return redirect()->route('admin.employees.index');
-                })->name('index');
-            });
+            // Legacy Employee Statistics URL: kept as a redirect so old bookmarks reach the Employee Directory.
+            Route::get('statistics', fn () => redirect()->route('admin.employees.index'))->name('statistics.index');
 
             // Employee Job History
             Route::prefix('{employee}/job-history')->name('job-history.')->group(function () {

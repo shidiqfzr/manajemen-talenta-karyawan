@@ -136,7 +136,7 @@ class JobHistoryController extends Controller
         if ($employee->currentJob?->is($job_history)) {
             return redirect()
                 ->to(route('admin.employees.show', $employee->nik).'#riwayat-jabatan')
-                ->with('error', 'Riwayat jabatan aktif tidak dapat dihapus. Gunakan modul Mutasi & Penempatan untuk mengubah jabatan pegawai.');
+                ->with('error', 'Riwayat jabatan aktif tidak dapat dihapus. Gunakan modul Mutasi & Penempatan untuk mengubah jabatan karyawan.');
         }
 
         // Soft delete — the record is retained for audit trail purposes

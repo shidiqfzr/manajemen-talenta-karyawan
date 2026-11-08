@@ -114,7 +114,7 @@ class PositionController extends Controller
     }
 
     /**
-     * Remove position from database (hanya bila tidak dipakai pegawai, formasi jabatan, atau riwayat jabatan).
+     * Remove position from database (hanya bila tidak dipakai karyawan, formasi jabatan, atau riwayat jabatan).
      */
     public function destroy(Request $request, Position $position, MasterFormasiService $service)
     {

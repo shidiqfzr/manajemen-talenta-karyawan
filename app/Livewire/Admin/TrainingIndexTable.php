@@ -4,13 +4,12 @@ namespace App\Livewire\Admin;
 
 use App\Exports\TrainingsExport;
 use App\Livewire\Concerns\WithDataTable;
-use App\Models\EmployeeStatistic;
+use App\Models\Employee;
 use App\Models\Training;
 use App\Models\User;
 use App\Support\DataTable\Column;
 use App\Support\DataTable\Filter;
 use App\Support\DataTable\QueryPipeline;
-use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
@@ -39,6 +38,16 @@ class TrainingIndexTable extends Component
     #[Url(except: '')]
     public string $metode = '';
 
+    /** Implementation status, driven by the KPI cards above the table (no toolbar field). */
+    #[Url(except: '')]
+    public string $status = '';
+
+    public const STATUS_AKAN_DATANG = 'akan_datang';
+
+    public const STATUS_BERLANGSUNG = 'berlangsung';
+
+    public const STATUS_SELESAI = 'selesai';
+
     /**
      * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
      * non-admins on every request.
@@ -46,6 +55,61 @@ class TrainingIndexTable extends Component
     public function boot(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /** "Total Pelatihan" card: clears the status the KPI cards drive, keeps search and panel filters. */
+    public function clearKpiFilters(): void
+    {
+        $this->status = '';
+
+        $this->resetPage($this->paginationName());
+        $this->clearSelection();
+    }
+
+    /**
+     * No-JS fallback link of a KPI card: the current table state with the given changes
+     * (URL key => value, '' removes the key).
+     *
+     * @param  array<string, string>  $changes
+     */
+    public function kpiUrl(array $changes): string
+    {
+        $state = [
+            'search' => $this->search,
+            'jenis' => $this->jenis,
+            'metode' => $this->metode,
+            'start_date' => $this->startDate,
+            'end_date' => $this->endDate,
+            'status' => $this->status,
+        ];
+
+        return route('admin.trainings.index', array_filter(array_merge($state, $changes), fn ($value) => $value !== ''));
+    }
+
+    /**
+     * Page-level counts by implementation status over every training (independent of search and filters,
+     * like the Daftar Karyawan cards): the dates are compared by day against today.
+     *
+     * @return array{total: int, akan_datang: int, berlangsung: int, selesai: int}
+     */
+    public function statusCounts(): array
+    {
+        $today = now()->toDateString();
+
+        $counts = Training::query()
+            ->toBase()
+            ->selectRaw('count(*) as total')
+            ->selectRaw('sum(case when tanggal_mulai > ? then 1 else 0 end) as akan_datang', [$today])
+            ->selectRaw('sum(case when tanggal_mulai <= ? and tanggal_akhir >= ? then 1 else 0 end) as berlangsung', [$today, $today])
+            ->selectRaw('sum(case when tanggal_akhir < ? then 1 else 0 end) as selesai', [$today])
+            ->first();
+
+        return [
+            'total' => (int) $counts->total,
+            'akan_datang' => (int) $counts->akan_datang,
+            'berlangsung' => (int) $counts->berlangsung,
+            'selesai' => (int) $counts->selesai,
+        ];
     }
 
     /**
@@ -68,28 +132,15 @@ class TrainingIndexTable extends Component
 
     /**
      * Totals over every row matching the current search and filters (not just the visible page).
-     * `karyawan` is the employee headcount over the selected period and is only known when both dates are set.
+     * `karyawan` is the current employee headcount (the same population as the Daftar Karyawan), the basis of the JPL-per-employee average.
      *
-     * @return array{man_hours: float, tiket: float, biaya: float, karyawan: ?int}
+     * @return array{man_hours: float, tiket: float, biaya: float, karyawan: int}
      */
     public function summary(): array
     {
         $query = (clone $this->filteredQuery())->reorder();
 
-        $karyawan = null;
-
-        if ($this->startDate !== '' && $this->endDate !== '') {
-            $statistics = EmployeeStatistic::query()
-                ->whereBetween('periode', [
-                    Carbon::parse($this->startDate)->startOfMonth()->toDateString(),
-                    Carbon::parse($this->endDate)->endOfMonth()->toDateString(),
-                ])
-                ->get();
-
-            if ($statistics->count()) {
-                $karyawan = (int) $statistics->sum('total_karyawan');
-            }
-        }
+        $karyawan = Employee::query()->count();
 
         return [
             'man_hours' => (float) (clone $query)->sum('jumlah_man_hours'),
@@ -139,6 +190,22 @@ class TrainingIndexTable extends Component
                 ->apply(fn (Builder $query, string $value) => $query->whereDate('tanggal_mulai', '>=', $value)),
             Filter::dateTo('endDate', 'Sampai Tanggal', 'tanggal_mulai')
                 ->apply(fn (Builder $query, string $value) => $query->whereDate('tanggal_mulai', '<=', $value)),
+            // Status Pelaksanaan, driven by the KPI cards above the table.
+            Filter::select('status', 'Status Pelaksanaan', [
+                self::STATUS_AKAN_DATANG => 'Akan Datang',
+                self::STATUS_BERLANGSUNG => 'Sedang Berlangsung',
+                self::STATUS_SELESAI => 'Selesai',
+            ])
+                ->withoutControl()
+                ->apply(function (Builder $query, string $status) {
+                    $today = now()->toDateString();
+
+                    match ($status) {
+                        self::STATUS_AKAN_DATANG => $query->whereDate('tanggal_mulai', '>', $today),
+                        self::STATUS_BERLANGSUNG => $query->whereDate('tanggal_mulai', '<=', $today)->whereDate('tanggal_akhir', '>=', $today),
+                        self::STATUS_SELESAI => $query->whereDate('tanggal_akhir', '<', $today),
+                    };
+                }),
         ];
     }
 

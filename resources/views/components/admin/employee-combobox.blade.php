@@ -109,7 +109,7 @@
                 </div>
             </template>
             <div x-show="filtered.length === 0" class="p-4 text-center text-xs text-surface-500 italic">
-                Tidak ada pegawai yang cocok dengan kata kunci.
+                Tidak ada karyawan yang cocok dengan kata kunci.
             </div>
         </div>
     </div>

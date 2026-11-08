@@ -23,7 +23,7 @@ class FailedEmployeesWorkbook implements WithMultipleSheets
     public function sheets(): array
     {
         $info = [
-            ['Dokumen rahasia: berisi data pribadi pegawai (UU No. 27/2022). Dilarang disebarluaskan.'],
+            ['Dokumen rahasia: berisi data pribadi karyawan (UU No. 27/2022). Dilarang disebarluaskan.'],
             ['Diunduh oleh', $this->accessorName],
             ['Waktu unduh', $this->accessedAt],
             ['Jumlah baris gagal', count($this->failedRows)],

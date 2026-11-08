@@ -73,7 +73,7 @@ class EmployeeImportService
             Cache::put("import_job_{$token}", [
                 'status' => 'processing',
                 'progress' => 15,
-                'message' => 'Menganalisis '.number_format($dataRows).' baris data pegawai di antrean latar belakang...',
+                'message' => 'Menganalisis '.number_format($dataRows).' baris data karyawan di antrean latar belakang...',
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
                 'total_rows' => $dataRows,
@@ -276,7 +276,7 @@ class EmployeeImportService
             Cache::put("import_commit_job_{$token}", [
                 'status' => 'processing',
                 'progress' => 15,
-                'message' => 'Menyimpan '.number_format($totalProcessed).' data pegawai ke database di antrean latar belakang...',
+                'message' => 'Menyimpan '.number_format($totalProcessed).' data karyawan ke database di antrean latar belakang...',
                 'token' => $token,
                 'type' => 'commit',
             ], now()->addMinutes(self::CACHE_TTL_MINUTES));
@@ -292,7 +292,7 @@ class EmployeeImportService
                 'is_async' => true,
                 'status' => 'processing',
                 'token' => $token,
-                'message' => 'Penyimpanan data pegawai berukuran besar sedang dieksekusi di antrean latar belakang...',
+                'message' => 'Penyimpanan data karyawan berukuran besar sedang dieksekusi di antrean latar belakang...',
             ];
         }
 
@@ -303,7 +303,7 @@ class EmployeeImportService
     }
 
     /**
-     * Eksekusi inti penulisan database untuk komit impor pegawai.
+     * Eksekusi inti penulisan database untuk komit impor karyawan.
      */
     public function executeCommit(
         array $cached,
@@ -330,7 +330,7 @@ class EmployeeImportService
             $fullPath, $user, $ip, $userAgent, $cached['original_name'] ?? 'unknown.xlsx', (int) ($cached['file_size'] ?? 0), $token, $fileHash, $approvedLog
         );
 
-        Log::info('HRIS Import Data Pegawai dieksekusi (via Dry-Run Commit)', [
+        Log::info('HRIS Import Data Karyawan dieksekusi (via Dry-Run Commit)', [
             'user_id' => $user?->id,
             'user_name' => $user?->name ?? 'System',
             'ip_address' => $ip,
@@ -413,7 +413,7 @@ class EmployeeImportService
                 $summary = $import->getImportSummary();
                 $log = $this->recordAuditLog($summary, $user, $ip, $userAgent, $fileName, $fileSize, $token, $fileHash, $approvedLog);
 
-                // Rekaman perubahan per pegawai disimpan dalam transaksi yang sama agar impor dapat dibatalkan.
+                // Rekaman perubahan per karyawan disimpan dalam transaksi yang sama agar impor dapat dibatalkan.
                 foreach ($import->changes as $change) {
                     $log->changes()->create($change);
                 }
@@ -423,7 +423,7 @@ class EmployeeImportService
         } catch (ImportAbortedException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            Log::error('Komit impor pegawai dibatalkan dan di-rollback: '.$e->getMessage(), ['exception' => $e::class]);
+            Log::error('Komit impor karyawan dibatalkan dan di-rollback: '.$e->getMessage(), ['exception' => $e::class]);
 
             throw new ImportAbortedException('Komit dibatalkan karena kendala sistem. Tidak ada data yang tersimpan, silakan coba lagi atau hubungi administrator sistem.', 0, $e);
         }
@@ -437,14 +437,14 @@ class EmployeeImportService
         try {
             Excel::import($import, $source);
         } catch (SpreadsheetException|NoTypeDetectedException $e) {
-            Log::warning('Berkas impor pegawai tidak dapat dibaca: '.$e->getMessage());
+            Log::warning('Berkas impor karyawan tidak dapat dibaca: '.$e->getMessage());
 
-            throw new ImportAbortedException('Berkas tidak dapat dibaca sebagai spreadsheet Excel. Pastikan berkas berasal dari template impor pegawai dan tidak rusak.', 0, $e);
+            throw new ImportAbortedException('Berkas tidak dapat dibaca sebagai spreadsheet Excel. Pastikan berkas berasal dari template impor karyawan dan tidak rusak.', 0, $e);
         }
     }
 
     /**
-     * Audit Trail Pencatatan Impor Massal Pegawai (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
+     * Audit Trail Pencatatan Impor Massal Karyawan (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
      * Dipanggil di dalam transaksi komit; kegagalan mencatat membatalkan komit.
      */
     private function recordAuditLog(array $summary, ?User $user, ?string $ip, ?string $userAgent, string $fileName, int $fileSize, ?string $token, string $fileHash, ?EmployeeImportLog $approvedLog = null): EmployeeImportLog
@@ -560,7 +560,7 @@ class EmployeeImportService
             (string) hash_file('sha256', (string) $file->getRealPath())
         );
 
-        Log::info('HRIS Import Data Pegawai dieksekusi', [
+        Log::info('HRIS Import Data Karyawan dieksekusi', [
             'channel' => 'direct_import',
             'user_id' => $user?->id,
             'user_name' => $user?->name ?? 'System',
@@ -602,7 +602,7 @@ class EmployeeImportService
     }
 
     /**
-     * Mengambil data rekapitulasi komit impor pegawai untuk diunduh sebagai laporan Excel.
+     * Mengambil data rekapitulasi komit impor karyawan untuk diunduh sebagai laporan Excel.
      */
     public function getImportReport(string $token): ?array
     {
@@ -623,7 +623,7 @@ class EmployeeImportService
      */
     public function recordDownloadAudit(string $kind, string $token, ?User $user, ?string $ip, int $recordCount): void
     {
-        Log::info('HRIS Unduh Berkas Impor Pegawai', [
+        Log::info('HRIS Unduh Berkas Impor Karyawan', [
             'kind' => $kind,
             'token' => $token,
             'user_id' => $user?->id,

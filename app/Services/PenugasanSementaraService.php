@@ -10,7 +10,7 @@ use InvalidArgumentException;
 class PenugasanSementaraService
 {
     /**
-     * Tambah penugasan sementara (Plt/Pjs) untuk seorang pegawai.
+     * Tambah penugasan sementara (Plt/Pjs) untuk seorang karyawan.
      * Tidak mengubah tabel `employees` utama, hanya merekam ke `job_histories`.
      */
     public function tambahPenugasan(Employee $employee, array $data): JobHistory

@@ -17,6 +17,7 @@ final class BulkAction
         private readonly bool $danger = false,
         private readonly ?string $confirm = null,
         private readonly string $successTemplate = ':count data berhasil diproses.',
+        private readonly bool $reasonRequired = false,
     ) {}
 
     public static function make(string $name, string $label): self
@@ -42,6 +43,17 @@ final class BulkAction
     public function successMessage(string $template): self
     {
         return $this->with(successTemplate: $template);
+    }
+
+    /** The action asks for a written reason (modal with a text area) that is stored with its audit entry. */
+    public function requiresReason(): self
+    {
+        return $this->with(reasonRequired: true);
+    }
+
+    public function needsReason(): bool
+    {
+        return $this->reasonRequired;
     }
 
     public function isDanger(): bool

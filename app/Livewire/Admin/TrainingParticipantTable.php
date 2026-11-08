@@ -61,7 +61,7 @@ class TrainingParticipantTable extends Component
     {
         return [
             // One visible column shows both the NIK and the name.
-            Column::make('pegawai', 'Pegawai')->searchable(fn (Builder $q, string $term) => QueryPipeline::whereLikeAny($q, ['nik', 'nama'], $term)),
+            Column::make('pegawai', 'Karyawan')->searchable(fn (Builder $q, string $term) => QueryPipeline::whereLikeAny($q, ['nik', 'nama'], $term)),
             Column::make('jabatan', 'Jabatan')->searchable(),
             Column::make('unit_kerja', 'Unit')->searchable(),
             Column::make('level', 'Level')->sortable(),

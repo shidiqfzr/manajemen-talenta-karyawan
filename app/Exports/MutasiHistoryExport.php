@@ -66,8 +66,8 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
             'creator' => "{$userName} ({$userNik})",
             'lastModifiedBy' => 'PTPN IV Regional V HRIS System',
             'title' => 'Log Audit Riwayat Mutasi & Formasi Jabatan',
-            'description' => 'Dokumen Rekam Jejak Audit Mutasi Pegawai PTPN IV Regional V (Kepatuhan BPK / Inspektorat Holding)',
-            'subject' => 'Audit Trail Mutasi Pegawai — Cakupan: '.$this->scopeLabel(),
+            'description' => 'Dokumen Rekam Jejak Audit Mutasi Karyawan PTPN IV Regional V (Kepatuhan BPK / Inspektorat Holding)',
+            'subject' => 'Audit Trail Mutasi Karyawan — Cakupan: '.$this->scopeLabel(),
             'keywords' => 'ptpn4, hris, mutasi, audit log, bpk, inspektorat, confidential',
             'category' => 'HR Audit Confidential Document',
             'manager' => 'Bagian SDM & TI PTPN IV Regional V',
@@ -154,8 +154,8 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
         return [
             'NO',
             'ID LOG',
-            'NIK PEGAWAI',
-            'NAMA PEGAWAI',
+            'NIK KARYAWAN',
+            'NAMA KARYAWAN',
             'GOLONGAN',
             'LEVEL',
             'JABATAN BARU',
@@ -183,7 +183,7 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
     public function columnFormats(): array
     {
         return [
-            'C' => NumberFormat::FORMAT_TEXT, // NIK Pegawai
+            'C' => NumberFormat::FORMAT_TEXT, // NIK Karyawan
             'O' => NumberFormat::FORMAT_TEXT, // Nomor SK
             'S' => NumberFormat::FORMAT_TEXT, // ID Batch
         ];

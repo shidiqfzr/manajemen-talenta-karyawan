@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class EmployeeExportService
 {
     /**
-     * Mengekspor data pegawai ke format Excel (.xlsx) berstandar enterprise PTPN IV
+     * Mengekspor data karyawan ke format Excel (.xlsx) berstandar enterprise PTPN IV
      * dengan pencatatan Audit Trail sesuai UU No. 27/2022 (UU PDP).
      */
     public function exportExcel(Request|array $requestOrFilters = [], ?User $user = null): BinaryFileResponse
@@ -25,11 +25,11 @@ class EmployeeExportService
 
         $recordCount = $export->query()->count();
 
-        // Audit Trail Pencatatan Ekspor Data Pegawai (UU PDP No. 27/2022 & Tata Kelola BUMN)
+        // Audit Trail Pencatatan Ekspor Data Karyawan (UU PDP No. 27/2022 & Tata Kelola BUMN)
         $ipAddress = ($requestOrFilters instanceof Request) ? $requestOrFilters->ip() : request()->ip();
         $userAgent = ($requestOrFilters instanceof Request) ? $requestOrFilters->userAgent() : request()->userAgent();
 
-        Log::info('HRIS Export Data Pegawai dieksekusi', [
+        Log::info('HRIS Export Data Karyawan dieksekusi', [
             'user_id' => $currentUser?->id,
             'user_name' => $currentUser?->name ?? 'System',
             'ip_address' => $ipAddress,

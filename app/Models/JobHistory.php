@@ -84,7 +84,7 @@ class JobHistory extends Model
         'is_dispensasi' => 'boolean',
     ];
 
-    /** Baris yang bukan SK mutasi resmi: data awal, pembaruan data pegawai, dan tugas rangkap hasil impor. */
+    /** Baris yang bukan SK mutasi resmi: data awal, pembaruan data karyawan, dan tugas rangkap hasil impor. */
     public function isRecordOnly(): bool
     {
         return $this->sumber !== self::SUMBER_MUTASI;

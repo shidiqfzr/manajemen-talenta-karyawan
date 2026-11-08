@@ -82,11 +82,11 @@
                         <!-- Table Area dengan Scroll Penuh Drawer -->
                         <div class="overflow-y-auto flex-1 p-0">
                             <table class="w-full text-left border-collapse text-xs">
-                                <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 text-surface-600 text-[11px] uppercase tracking-wider font-bold z-10 shadow-2xs">
+                                <thead class="sticky top-0 bg-surface-100/95 backdrop-blur-xs border-b border-surface-200 z-10 shadow-2xs">
                                     <tr>
-                                        <th scope="col" class="py-2.5 px-3.5 font-bold w-[26%] bg-surface-100">Kolom &amp; Header</th>
-                                        <th scope="col" class="py-2.5 px-3.5 font-bold w-[26%] bg-surface-100">Tipe &amp; Validasi</th>
-                                        <th scope="col" class="py-2.5 px-3.5 font-bold w-[48%] bg-surface-100">Aturan &amp; Contoh Nilai</th>
+                                        <x-admin.table.th class="py-2.5 px-3.5 w-[26%] bg-surface-100">Kolom &amp; Header</x-admin.table.th>
+                                        <x-admin.table.th class="py-2.5 px-3.5 w-[26%] bg-surface-100">Tipe &amp; Validasi</x-admin.table.th>
+                                        <x-admin.table.th class="py-2.5 px-3.5 w-[48%] bg-surface-100">Aturan &amp; Contoh Nilai</x-admin.table.th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-surface-100 text-[11px] bg-white">

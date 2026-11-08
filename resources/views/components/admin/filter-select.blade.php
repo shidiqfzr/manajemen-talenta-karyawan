@@ -6,7 +6,7 @@
 
     show-label : true menampilkan label di atas kolom (untuk panel filter toolbar), sehingga pengguna tahu bidang
                  mana yang disaring; bawaan false (label hanya untuk pembaca layar, keluaran tidak berubah).
-    label-icon : bersama show-label, label bergaya Direktori Pegawai (kecil, tebal, dengan ikon di depan teks).
+    label-icon : bersama show-label, label bergaya Daftar Karyawan (kecil, tebal, dengan ikon di depan teks).
     clearable  : true menampilkan tombol "×" di dalam kolom bila ada pilihan, untuk menghapus pilihan itu saja.
     value      : nilai model saat ini; diperlukan oleh clearable (komponen anonim tidak membaca state Livewire).
 --}}

@@ -12,7 +12,7 @@
         subtitle="{{ $log->file_name }}"
         :breadcrumbs="[
             'Core HR',
-            ['label' => 'Direktori Pegawai', 'url' => route('admin.employees.index')],
+            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Riwayat & Persetujuan', 'url' => route('admin.employees.import.batches.index')],
             'Impor #'.$log->id,
         ]">
@@ -30,7 +30,7 @@
     @if ($log->status === 'completed' && $log->skipped_count > 0)
         <div role="status" class="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800">
             <i class="fas fa-triangle-exclamation mt-1" aria-hidden="true"></i>
-            <p><span class="font-semibold">{{ $log->created_count + $log->updated_count }} pegawai tersimpan, {{ $log->skipped_count }} baris dilewati.</span> Lihat alasannya pada panel di bawah untuk memperbaiki baris tersebut.</p>
+            <p><span class="font-semibold">{{ $log->created_count + $log->updated_count }} karyawan tersimpan, {{ $log->skipped_count }} baris dilewati.</span> Lihat alasannya pada panel di bawah untuk memperbaiki baris tersebut.</p>
         </div>
     @endif
 
@@ -86,8 +86,8 @@
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead class="bg-surface-50 sticky top-0 z-10">
-                                    <tr class="border-b border-surface-200 text-[11px] font-bold text-surface-700 uppercase tracking-wider">
-                                        <x-admin.table.th>Pegawai</x-admin.table.th>
+                                    <tr class="border-b border-surface-200">
+                                        <x-admin.table.th>Karyawan</x-admin.table.th>
                                         <x-admin.table.th>Formasi &amp; Penempatan</x-admin.table.th>
                                         <x-admin.table.th>Strata &amp; RM</x-admin.table.th>
                                         <x-admin.table.th>Aksi &amp; Perubahan</x-admin.table.th>
@@ -150,7 +150,7 @@
                     </div>
                     <div class="p-5 space-y-4">
                         <ul class="text-sm text-surface-700 space-y-1.5 list-disc pl-5">
-                            <li>Pegawai baru <strong>dihapus</strong> dan pegawai yang diperbarui <strong>dikembalikan</strong> ke kondisi sebelum impor, dalam satu proses.</li>
+                            <li>Karyawan baru <strong>dihapus</strong> dan karyawan yang diperbarui <strong>dikembalikan</strong> ke kondisi sebelum impor, dalam satu proses.</li>
                             @if ($log->skipped_count > 0)
                                 <li>Baris yang dilewati tidak pernah disimpan sehingga tidak terpengaruh.</li>
                             @endif
@@ -161,12 +161,12 @@
                             <div class="flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm {{ $readiness['ready'] ? 'border-primary-200 bg-primary-50 text-primary-900' : 'border-warning-200 bg-warning-50 text-warning-800' }}" role="status">
                                 @if ($readiness['ready'])
                                     <i class="fas fa-circle-check mt-1" aria-hidden="true"></i>
-                                    <p><span class="font-semibold">Siap dibatalkan.</span> <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> dari <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> pegawai belum berubah sejak impor.</p>
+                                    <p><span class="font-semibold">Siap dibatalkan.</span> <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> dari <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> karyawan belum berubah sejak impor.</p>
                                 @else
                                     <i class="fas fa-triangle-exclamation mt-1" aria-hidden="true"></i>
                                     <p>
                                         <span class="font-semibold">Belum dapat dibatalkan.</span>
-                                        <span class="font-mono tabular-nums">{{ count($readiness['conflicts']) }}</span> dari <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> pegawai sudah berubah atau memiliki data baru setelah impor
+                                        <span class="font-mono tabular-nums">{{ count($readiness['conflicts']) }}</span> dari <span class="font-mono tabular-nums">{{ $readiness['total'] }}</span> karyawan sudah berubah atau memiliki data baru setelah impor
                                         ({{ implode(', ', array_slice($readiness['conflicts'], 0, 5)) }}{{ count($readiness['conflicts']) > 5 ? ', ...' : '' }}).
                                         Rapikan data tersebut lebih dulu; pembatalan dilakukan seluruhnya atau tidak sama sekali.
                                     </p>
@@ -224,7 +224,7 @@
             <form method="POST" action="{{ route('admin.employees.import.batches.reject', $log) }}" @click.outside="rejectOpen = false" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
                 @csrf
                 <h3 id="reject-title" class="text-lg font-bold text-surface-900">{{ $isMaker ? 'Tarik pengajuan impor ini?' : 'Tolak pengajuan impor ini?' }}</h3>
-                <p class="text-sm text-surface-600 leading-relaxed">Data pegawai tidak akan berubah dan berkas pengajuan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
+                <p class="text-sm text-surface-600 leading-relaxed">Data karyawan tidak akan berubah dan berkas pengajuan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
                 <div>
                     <label for="reject-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan <span class="text-danger" aria-hidden="true">*</span></label>
                     <textarea id="reject-reason" name="reason" rows="3" minlength="10" required placeholder="Jelaskan alasan (minimal 10 karakter)" class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500"></textarea>
@@ -244,8 +244,8 @@
                 @csrf
                 <h3 id="rollback-title" class="text-lg font-bold text-surface-900">Batalkan impor #{{ $log->id }}?</h3>
                 <p class="text-sm text-surface-600 leading-relaxed">
-                    <strong>{{ $log->created_count }}</strong> pegawai baru akan dihapus dan <strong>{{ $log->updated_count }}</strong> pegawai dikembalikan ke kondisi sebelum impor.
-                    Pegawai baru yang dihapus tidak dapat dipulihkan dari layar ini.
+                    <strong>{{ $log->created_count }}</strong> karyawan baru akan dihapus dan <strong>{{ $log->updated_count }}</strong> karyawan dikembalikan ke kondisi sebelum impor.
+                    Karyawan baru yang dihapus tidak dapat dipulihkan dari layar ini.
                 </p>
                 <div>
                     <label for="rollback-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan pembatalan <span class="text-danger" aria-hidden="true">*</span></label>

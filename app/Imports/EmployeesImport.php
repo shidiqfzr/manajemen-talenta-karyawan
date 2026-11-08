@@ -35,14 +35,14 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     public int $processingFailures = 0;
 
     /**
-     * Peringatan tinjauan (tidak menghalangi impor): pegawai eksisting yang formasinya sudah tidak sesuai Master Formasi.
+     * Peringatan tinjauan (tidak menghalangi impor): karyawan eksisting yang formasinya sudah tidak sesuai Master Formasi.
      *
      * @var list<array{row: int, nik: string, nama: string, messages: list<string>}>
      */
     public array $warnings = [];
 
     /**
-     * Rekaman perubahan per pegawai pada komit nyata (untuk pembatalan impor): aksi, kondisi sebelum impor,
+     * Rekaman perubahan per karyawan pada komit nyata (untuk pembatalan impor): aksi, kondisi sebelum impor,
      * tugas rangkap yang disentuh, dan sidik jari kondisi sesudah impor.
      *
      * @var list<array{action: string, nik: string, before: ?array, jobs: list<array>, after_hash: string}>
@@ -74,7 +74,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
 
     /**
      * Membatasi pembacaan impor hanya pada Sheet pertama ('Data Karyawan').
-     * Sheet kedua ('Referensi Master Data') tidak diproses sebagai data pegawai.
+     * Sheet kedua ('Referensi Master Data') tidak diproses sebagai data karyawan.
      */
     public function sheets(): array
     {
@@ -84,7 +84,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     }
 
     /**
-     * Cache in-memory lookup pegawai eksisting: [nik => ['nik' => ..., 'jabatan' => ..., 'unit_kerja' => ..., 'level' => ...]]
+     * Cache in-memory lookup karyawan eksisting: [nik => ['nik' => ..., 'jabatan' => ..., 'unit_kerja' => ..., 'level' => ...]]
      */
     private array $existingEmployeesCache = [];
 
@@ -131,7 +131,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     ];
 
     /**
-     * Data keluarga hanya tampil di halaman detail pegawai (DESIGN.md §11, UU PDP): pratinjau impor
+     * Data keluarga hanya tampil di halaman detail karyawan (DESIGN.md §11, UU PDP): pratinjau impor
      * hanya menandai bahwa nilainya berubah tanpa menampilkan isi lama maupun baru.
      */
     private const HIDDEN_DIFF_FIELDS = ['susunan_keluarga'];
@@ -140,7 +140,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
 
     public function collection(Collection $rows): void
     {
-        // Pre-fetch seluruh NIK yang ada di batch rows untuk eliminasi N+1 query pegawai eksisting
+        // Pre-fetch seluruh NIK yang ada di batch rows untuk eliminasi N+1 query karyawan eksisting
         $rawNiks = [];
         foreach ($rows as $row) {
             foreach ($row as $k => $v) {
@@ -241,7 +241,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     }
 
     /**
-     * Membentuk struktur standar rekapitulasi baris data pegawai (DRY pattern).
+     * Membentuk struktur standar rekapitulasi baris data karyawan (DRY pattern).
      */
     private function formatRowSummary(array $data, string $action, ?string $statusLabel = null, array $diff = [], array $warnings = []): array
     {
@@ -289,7 +289,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
             $data[$field] = $this->normalizeDate($data[$field] ?? null);
         }
 
-        // 3. Auto-calculate Pensiun (56 thn) & MBT (55 thn) jika tanggal_lahir tersedia (DOMAIN.md Bab 5.1)
+        // 3. Auto-calculate Pensiun (56 thn) & MBT (H-6 bulan) jika tanggal_lahir tersedia (DOMAIN.md Bab 5.1)
         if (! empty($data['tanggal_lahir'])) {
             if (empty($data['tanggal_pensiun'])) {
                 $data['tanggal_pensiun'] = KepegawaianPolicy::tanggalPensiun($data['tanggal_lahir']);
@@ -431,7 +431,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
             'tanggal_lahir' => 'Tanggal Lahir',
             'agama' => 'Agama',
             'susunan_keluarga' => 'Susunan Keluarga / PTKP',
-            'status_karyawan' => 'Status Pegawai',
+            'status_karyawan' => 'Status Karyawan',
             'status_penugasan' => 'Status Penugasan',
             'pendidikan_terakhir' => 'Pendidikan Terakhir',
             'sekolah' => 'Sekolah / Universitas',
@@ -487,7 +487,7 @@ class EmployeesImport implements ToCollection, WithChunkReading, WithHeadingRow,
     }
 
     /**
-     * Memeriksa apakah data pegawai dari Excel sama persis (identik) dengan data di database.
+     * Memeriksa apakah data karyawan dari Excel sama persis (identik) dengan data di database.
      */
     private function isEmployeeIdentical(Employee $existing, array $newData): bool
     {

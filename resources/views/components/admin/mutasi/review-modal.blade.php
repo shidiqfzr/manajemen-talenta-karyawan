@@ -52,7 +52,7 @@
                                         </span>
                                     @endif
                                     <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-200/80 text-surface-700">
-                                        {{ count($cluster['nodes']) }} Pegawai
+                                        {{ count($cluster['nodes']) }} Karyawan
                                     </span>
                                 </div>
                             </div>
@@ -60,13 +60,13 @@
                             <!-- Cluster Table -->
                             <div class="overflow-x-auto text-xs">
                                 <table class="w-full border-collapse">
-                                    <thead class="bg-surface-50/50 text-surface-600 font-semibold border-b border-surface-100 text-[11px]">
+                                    <thead class="bg-surface-50 border-b border-surface-200">
                                         <tr>
-                                            <th scope="col" class="py-2 px-3 text-left w-12">Slot</th>
-                                            <th scope="col" class="py-2 px-3 text-left">Nama Pegawai &amp; NIK</th>
-                                            <th scope="col" class="py-2 px-3 text-left">Posisi Asal</th>
-                                            <th scope="col" class="py-2 px-3 text-left">Penempatan Baru</th>
-                                            <th scope="col" class="py-2 px-3 text-left">Status Alur</th>
+                                            <x-admin.table.th class="py-2 px-3 w-12">Slot</x-admin.table.th>
+                                            <x-admin.table.th class="py-2 px-3">Nama Karyawan &amp; NIK</x-admin.table.th>
+                                            <x-admin.table.th class="py-2 px-3">Posisi Asal</x-admin.table.th>
+                                            <x-admin.table.th class="py-2 px-3">Penempatan Baru</x-admin.table.th>
+                                            <x-admin.table.th class="py-2 px-3">Status Alur</x-admin.table.th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-surface-100 text-surface-800">
@@ -91,7 +91,7 @@
                                                 <td class="py-2.5 px-3">
                                                     @if ($n['link_type'] === 'chain')
                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-primary-100 text-primary-800">
-                                                            <i class="fas fa-arrows-rotate text-[10px]" aria-hidden="true"></i> Mengisi {{ !empty($n['occupant_nama']) ? explode(' ', $n['occupant_nama'])[0] : 'Pegawai' }}
+                                                            <i class="fas fa-arrows-rotate text-[10px]" aria-hidden="true"></i> Mengisi {{ !empty($n['occupant_nama']) ? explode(' ', $n['occupant_nama'])[0] : 'Karyawan' }}
                                                         </span>
                                                     @elseif ($n['link_type'] === 'vacant')
                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-info-100 text-info-800">
@@ -119,13 +119,13 @@
                 <!-- Fallback Flat Matrix Table -->
                 <div class="border border-surface-200 rounded-xl overflow-hidden text-xs">
                     <table class="w-full border-collapse">
-                        <thead class="bg-surface-50 text-surface-700 font-bold border-b border-surface-200">
+                        <thead class="bg-surface-50 border-b border-surface-200">
                             <tr>
-                                <th scope="col" class="py-2.5 px-3 text-left">No</th>
-                                <th scope="col" class="py-2.5 px-3 text-left">Nama Pegawai &amp; NIK</th>
-                                <th scope="col" class="py-2.5 px-3 text-left">Posisi Asal</th>
-                                <th scope="col" class="py-2.5 px-3 text-left">Penempatan Baru</th>
-                                <th scope="col" class="py-2.5 px-3 text-left">Status Alur</th>
+                                <x-admin.table.th class="py-2.5 px-3">No</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-3">Nama Karyawan &amp; NIK</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-3">Posisi Asal</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-3">Penempatan Baru</x-admin.table.th>
+                                <x-admin.table.th class="py-2.5 px-3">Status Alur</x-admin.table.th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-surface-100 text-surface-800">
@@ -150,7 +150,7 @@
                                     <td class="py-2.5 px-3">
                                         @if ($n['link_type'] === 'chain')
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-primary-100 text-primary-800">
-                                                <i class="fas fa-arrows-rotate text-[10px]" aria-hidden="true"></i> Mengisi {{ !empty($n['occupant_nama']) ? explode(' ', $n['occupant_nama'])[0] : 'Pegawai' }}
+                                                <i class="fas fa-arrows-rotate text-[10px]" aria-hidden="true"></i> Mengisi {{ !empty($n['occupant_nama']) ? explode(' ', $n['occupant_nama'])[0] : 'Karyawan' }}
                                             </span>
                                         @elseif ($n['link_type'] === 'vacant')
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-info-100 text-info-800">

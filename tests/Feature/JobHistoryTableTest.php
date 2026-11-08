@@ -44,7 +44,7 @@ class JobHistoryTableTest extends TestCase
             ]);
         }
 
-        $this->makeHistory($this->other, ['jabatan' => 'Jabatan Pegawai Lain', 'tmt_awal' => '2021-01-01']);
+        $this->makeHistory($this->other, ['jabatan' => 'Jabatan Karyawan Lain', 'tmt_awal' => '2021-01-01']);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -85,7 +85,7 @@ class JobHistoryTableTest extends TestCase
         $component = $this->table()->set('perPage', 10)
             ->assertSee('Jabatan 01')
             ->assertSee('Jabatan 07')
-            ->assertDontSee('Jabatan Pegawai Lain');
+            ->assertDontSee('Jabatan Karyawan Lain');
 
         $this->assertSame(7, $component->instance()->rows->total());
     }
@@ -129,7 +129,7 @@ class JobHistoryTableTest extends TestCase
 
         $component->set('search', 'Kata Tersembunyi');
         $this->assertSame(0, $component->instance()->rows->total());
-        $component->set('search', 'Pegawai Lain');
+        $component->set('search', 'Karyawan Lain');
         $this->assertSame(0, $component->instance()->rows->total());
     }
 

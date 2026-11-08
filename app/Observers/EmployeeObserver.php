@@ -27,7 +27,7 @@ class EmployeeObserver
             $employee->rm_level = app(ManPowerPlanningService::class)->determineRmLevel($employee);
         }
 
-        // 2. Auto-calculate Pensiun (56 tahun) & MBT (55 tahun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
+        // 2. Auto-calculate Pensiun (56 tahun) & MBT (6 bulan sebelum pensiun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
         if (! empty($employee->tanggal_lahir)) {
             $tglLahirStr = $employee->tanggal_lahir instanceof Carbon
                 ? $employee->tanggal_lahir->toDateString()
@@ -77,7 +77,7 @@ class EmployeeObserver
             'sumber' => JobHistory::SUMBER_DATA_AWAL,
             'nomor_sk' => null,
             'tanggal_sk' => null,
-            'catatan' => 'Data awal penempatan pegawai (bukan SK mutasi)',
+            'catatan' => 'Data awal penempatan karyawan (bukan SK mutasi)',
         ]);
     }
 

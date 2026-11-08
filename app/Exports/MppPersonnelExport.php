@@ -45,7 +45,7 @@ class MppPersonnelExport implements FromArray, WithColumnFormatting, WithEvents,
             'creator' => "{$userName} ({$userNik})",
             'lastModifiedBy' => 'PTPN IV Regional V HRIS System',
             'title' => 'Rincian Personil MPP — '.$this->cellLabel,
-            'description' => 'Dokumen Rahasia Data Pegawai diekspor sesuai UU PDP No. 27/2022',
+            'description' => 'Dokumen Rahasia Data Karyawan diekspor sesuai UU PDP No. 27/2022',
             'subject' => 'Man Power Planning',
             'keywords' => 'ptpn4, hris, mpp, personil, confidential',
             'category' => 'HR Confidential Document',
@@ -86,7 +86,7 @@ class MppPersonnelExport implements FromArray, WithColumnFormatting, WithEvents,
         return ['B' => NumberFormat::FORMAT_TEXT];
     }
 
-    /** Cegah formula injection pada sel yang berasal dari data pegawai. */
+    /** Cegah formula injection pada sel yang berasal dari data karyawan. */
     private function clean(mixed $value): string
     {
         $str = (string) ($value ?? '');

@@ -14,7 +14,7 @@
                         </div>
                         <div>
                             <h3 id="modal-batch-title" class="text-sm font-bold text-surface-900">Rantai Mutasi Kolektif (Gerbong)</h3>
-                            <p class="text-[11px] text-surface-500 font-mono">Batch ID: {{ substr($selectedBatchId, 0, 8) }}... | Total {{ count($batchItems) }} Pegawai Terlibat</p>
+                            <p class="text-[11px] text-surface-500 font-mono">Batch ID: {{ substr($selectedBatchId, 0, 8) }}... | Total {{ count($batchItems) }} Karyawan Terlibat</p>
                         </div>
                     </div>
                     <button type="button" wire:click="closeBatchModal" class="text-surface-500 hover:text-surface-700 transition p-1 cursor-pointer" title="Tutup jendela (Esc)">

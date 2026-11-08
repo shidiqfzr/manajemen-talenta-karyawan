@@ -29,7 +29,7 @@ class ManPowerPlanningService
         7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
     ];
 
-    /** Jalur masuk pegawai (DOMAIN.md §2) yang merealisasikan sumber pasokan rencana. */
+    /** Jalur masuk karyawan (DOMAIN.md §2) yang merealisasikan sumber pasokan rencana. */
     private const SUPPLY_CHANNELS = [
         'CKP' => 'ckp',
         'Talent Scouting' => 'talent_scouting',
@@ -56,8 +56,8 @@ class ManPowerPlanningService
     ];
 
     /**
-     * Hasil pembacaan pegawai per tanggal posisi, untuk satu instance (satu permintaan). Matriks, drilldown,
-     * dan render ulang pada permintaan yang sama memakai satu pembacaan tabel pegawai.
+     * Hasil pembacaan karyawan per tanggal posisi, untuk satu instance (satu permintaan). Matriks, drilldown,
+     * dan render ulang pada permintaan yang sama memakai satu pembacaan tabel karyawan.
      *
      * @var array<string, list<array<string, mixed>>>
      */
@@ -244,7 +244,7 @@ class ManPowerPlanningService
     public function determineBidang(Employee $emp): string
     {
         // Kursi pada master formasi menentukan bidang; heuristik teks hanya cadangan
-        // untuk pegawai tanpa kursi (jabatan pool, Karpel, atau data lama).
+        // untuk karyawan tanpa kursi (jabatan pool, Karpel, atau data lama).
         if (filled($emp->jabatan) && filled($emp->unit_kerja)) {
             $seatBidang = $this->catalog()->seatBidang((string) $emp->unit_kerja, (string) $emp->jabatan);
             if ($seatBidang !== null) {
@@ -271,13 +271,35 @@ class ManPowerPlanningService
     }
 
     /**
-     * Pegawai yang menjabat pada tanggal posisi, lengkap dengan klasifikasi RM/bidang, tanggal kursi kosong,
+     * NIK karyawan pada satu Bidang Fungsional, memakai determineBidang() yang sama dengan kolom Bidang
+     * di Daftar Karyawan agar hasil filter dan nilai kolom tidak pernah berbeda. Bidang tidak dikenal
+     * menghasilkan daftar kosong.
+     *
+     * @return array<int, string>
+     */
+    public function employeeNiksByBidang(string $bidang): array
+    {
+        if (! in_array($bidang, MppSupplyPlan::BIDANG, true)) {
+            return [];
+        }
+
+        return Employee::query()
+            ->select(['nik', 'jabatan', 'unit_kerja'])
+            ->cursor()
+            ->filter(fn (Employee $emp) => $this->determineBidang($emp) === $bidang)
+            ->map(fn (Employee $emp) => (string) $emp->nik)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Karyawan yang menjabat pada tanggal posisi, lengkap dengan klasifikasi RM/bidang, tanggal kursi kosong,
      * dan sumber pasokan yang direalisasikannya. Dipakai bersama oleh agregasi matriks dan drilldown agar
      * angka sel selalu sama dengan daftar personilnya.
      *
-     * Kursi dianggap kosong sejak Masa Bebas Tugas (MBT, T-1 sebelum pensiun): pejabat sudah dibebaskan
+     * Kursi dianggap kosong sejak Masa Bebas Tugas (MBT, 6 bulan sebelum pensiun): pejabat sudah dibebaskan
      * dari tugas sehingga formasi harus diisi pengganti (DOMAIN.md Bab 5.1 & Bab 8).
-     * Dikecualikan: pegawai yang mulai bekerja setelah tanggal posisi, yang kontraknya berakhir sebelum
+     * Dikecualikan: karyawan yang mulai bekerja setelah tanggal posisi, yang kontraknya berakhir sebelum
      * tanggal posisi, dan yang sudah memasuki MBT pada atau sebelum tanggal posisi.
      *
      * @return list<array{employee: Employee, rm: string, bidang: string, vacancy: ?Carbon, overflow: bool, hired_source: ?string, realised_on: ?Carbon}>
@@ -313,7 +335,7 @@ class ManPowerPlanningService
                 continue; // Sudah bebas tugas pada tanggal posisi
             }
 
-            // Pasokan terealisasi saat pegawai jalur CKP/Talent Scouting/RBB pertama kali ditempatkan sebagai
+            // Pasokan terealisasi saat karyawan jalur CKP/Talent Scouting/RBB pertama kali ditempatkan sebagai
             // Karpim (CKP = promosi dari Karpel, bukan tanggal mulai bekerja); tanpa riwayat, tanggal mulai bekerja.
             $rm = $this->determineRmLevel($emp);
             $channel = self::SUPPLY_CHANNELS[$emp->jalur_masuk ?? ''] ?? null;
@@ -336,7 +358,7 @@ class ManPowerPlanningService
 
     /**
      * Tanggal penempatan Karpim pertama yang sah (sudah diterapkan, tidak dibatalkan) per NIK, hanya untuk
-     * pegawai jalur CKP/Talent Scouting/RBB. Satu kueri agregat, bukan per pegawai.
+     * karyawan jalur CKP/Talent Scouting/RBB. Satu kueri agregat, bukan per karyawan.
      *
      * @param  Collection<int, Employee>  $employees
      * @return array<string, string>
@@ -359,7 +381,7 @@ class ManPowerPlanningService
     }
 
     /**
-     * Agregasi data pegawai pada posisi akhir bulan $month tahun $year (T):
+     * Agregasi data karyawan pada posisi akhir bulan $month tahun $year (T):
      * Realisasi dan jabatan penampungan pada tanggal posisi, Pensiun T = kursi kosong (MBT) setelah tanggal
      * posisi s.d. Desember T, Pensiun T+1 = sepanjang T+1, dan pasokan yang sudah direalisasikan tahun T.
      */
@@ -389,7 +411,7 @@ class ManPowerPlanningService
                 $realisasi[$rm][$bidang]++;
             }
 
-            // Pegawai overflow tetap pensiun, sehingga proyeksi pensiun berlaku untuk semuanya
+            // Karyawan overflow tetap pensiun, sehingga proyeksi pensiun berlaku untuk semuanya
             if ($vacancy !== null && $vacancy->lte($yearEnd)) {
                 $pensiunT[$rm][$bidang]++;
             } elseif ($vacancy !== null && $vacancy->year === $year + 1) {
@@ -416,7 +438,7 @@ class ManPowerPlanningService
      *
      * @param  string  $scope  baris yang dirinci: 'realisasi' (struktural), 'advisor', 'diperban',
      *                         'pensiun_t' (kursi kosong setelah posisi s.d. Desember T), 'pensiun_t1' (sepanjang T+1),
-     *                         'supply_{sumber}' (pegawai jalur itu yang sudah ditempatkan sebagai Karpim tahun T s.d. posisi)
+     *                         'supply_{sumber}' (karyawan jalur itu yang sudah ditempatkan sebagai Karpim tahun T s.d. posisi)
      * @return list<array<string, mixed>>
      */
     public function getDrilldownEmployees(string $rm, string $bidang, string $scope, int $year, int $month): array
@@ -453,7 +475,7 @@ class ManPowerPlanningService
 
     /**
      * Seluruh personil di balik sel personil matriks pada posisi akhir bulan $month tahun $year, satu entri per
-     * scope drilldown yang diikuti pegawai. Memakai aturan scope yang sama dengan getDrilldownEmployees(),
+     * scope drilldown yang diikuti karyawan. Memakai aturan scope yang sama dengan getDrilldownEmployees(),
      * sehingga jumlah anggota selalu sama dengan angka sel.
      *
      * @return list<array{scope: string, rm_level: string, bidang: string, employee_nik: string, jabatan: ?string, unit_kerja: ?string, golongan: ?string, jalur_masuk: ?string, tanggal_penempatan: ?string, tanggal_mbt: ?string}>
@@ -484,7 +506,7 @@ class ManPowerPlanningService
     }
 
     /**
-     * Scope drilldown yang diikuti satu pegawai: realisasi/advisor/diperban, pensiun_t atau pensiun_t1, dan
+     * Scope drilldown yang diikuti satu karyawan: realisasi/advisor/diperban, pensiun_t atau pensiun_t1, dan
      * supply_{sumber}. Hanya RM-1 s.d. RM-3 yang dihitung pada MPP.
      *
      * @param  array{employee: Employee, rm: string, bidang: string, vacancy: ?Carbon, overflow: bool, hired_source: ?string, realised_on: ?Carbon}  $row
@@ -529,7 +551,7 @@ class ManPowerPlanningService
 
     /**
      * Matriks MPP lengkap (12 baris, subtotal, total) untuk tahun perencanaan T pada posisi akhir bulan
-     * $asOfMonth. Seluruh angka aktual berasal dari data pegawai; standar formasi dari kursi master dan
+     * $asOfMonth. Seluruh angka aktual berasal dari data karyawan; standar formasi dari kursi master dan
      * pasokan dari rencana pasokan per tahun.
      *
      * @param  int  $planningYear  Tahun perencanaan (T)
@@ -555,7 +577,7 @@ class ManPowerPlanningService
         $standarFormasi = $this->standarFormasi();
 
         // Pasokan berasal dari rencana pasokan per tahun (DOMAIN.md Bab 8); tahun tanpa rencana dihitung 0.
-        // Pasokan T = sisa rencana: pegawai jalur tersebut yang sudah masuk tahun T s.d. tanggal posisi sudah
+        // Pasokan T = sisa rencana: karyawan jalur tersebut yang sudah masuk tahun T s.d. tanggal posisi sudah
         // tercatat di Realisasi, sehingga tidak boleh dikurangkan dua kali.
         $planT = $this->supplyPlan()->matrixFor($yearT);
         $planT1 = $this->supplyPlan()->matrixFor($yearT1);

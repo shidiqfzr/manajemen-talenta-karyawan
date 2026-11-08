@@ -73,7 +73,7 @@ class TalentProfileBuilder
             $totalMasaKerjaFormatted = self::formatMonths((int) Carbon::parse($emp->tmt_bekerja)->diffInMonths(now()));
         }
 
-        // 4. Usia & Proyeksi Pensiun (56 Th) / MBT (55 Th)
+        // 4. Usia & Proyeksi Pensiun (56 Th) / MBT (H-6 bulan)
         $usiaFormatted = $emp->tanggal_lahir ? Carbon::parse($emp->tanggal_lahir)->age.' th' : '—';
         $sisaPensiunFormatted = '—';
         $isMendekatiPensiun = false;

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 /**
- * Riwayat dan tata kelola impor data pegawai: persetujuan empat mata (maker-checker) dan pembatalan (undo).
+ * Riwayat dan tata kelola impor data karyawan: persetujuan empat mata (maker-checker) dan pembatalan (undo).
  * Seluruh aturan berada di EmployeeImportGovernanceService; controller hanya menerjemahkan HTTP.
  */
 class EmployeeImportBatchController extends Controller
@@ -92,7 +92,7 @@ class EmployeeImportBatchController extends Controller
         }
 
         $message = ($result['is_async'] ?? false)
-            ? 'Persetujuan diterima. Data pegawai sedang disimpan di antrean latar belakang.'
+            ? 'Persetujuan diterima. Data karyawan sedang disimpan di antrean latar belakang.'
             : "Impor disetujui dan disimpan: {$result['created']} data baru, {$result['updated']} data diperbarui, ".($result['unchanged'] ?? 0).' data tetap.';
 
         return redirect()->route('admin.employees.import.batches.show', $log)->with('success', $message);
@@ -111,7 +111,7 @@ class EmployeeImportBatchController extends Controller
             return redirect()->route('admin.employees.import.batches.show', $log)->with('error', $e->getMessage());
         }
 
-        return redirect()->route('admin.employees.import.batches.index')->with('success', 'Pengajuan impor ditolak. Data pegawai tidak berubah.');
+        return redirect()->route('admin.employees.import.batches.index')->with('success', 'Pengajuan impor ditolak. Data karyawan tidak berubah.');
     }
 
     public function rollback(Request $request, EmployeeImportLog $log): RedirectResponse
@@ -131,7 +131,7 @@ class EmployeeImportBatchController extends Controller
         }
 
         return redirect()->route('admin.employees.import.batches.show', $log)
-            ->with('success', "Impor dibatalkan: {$result['deleted']} pegawai baru dihapus dan {$result['restored']} pegawai dikembalikan ke kondisi sebelum impor.");
+            ->with('success', "Impor dibatalkan: {$result['deleted']} karyawan baru dihapus dan {$result['restored']} karyawan dikembalikan ke kondisi sebelum impor.");
     }
 
     /**

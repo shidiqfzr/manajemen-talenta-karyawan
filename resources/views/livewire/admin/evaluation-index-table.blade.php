@@ -5,8 +5,16 @@
     $selectable = $this->bulkActions() !== [];
     $rowKey = $this->rowKey();
     $pageKeys = $this->tablePageKeys();
-    $loadingTargets = $this->tableLoadingTargets();
+    $loadingTargets = $this->tableLoadingTargets('clearKpiFilters');
     $columnCount = $this->tableColumnCount();
+    $kpi = $this->kpi();
+    $share = fn (int $count) => $kpi['total'] > 0 ? round(($count / $kpi['total']) * 100).'%' : null;
+    $noKpiFilter = $hasil === '';
+    $hasilCards = [
+        ['key' => \App\Livewire\Admin\EvaluationIndexTable::HASIL_SANGAT_BAIK, 'title' => 'Sangat Baik', 'subtitle' => 'Kinerja melampaui standar', 'icon' => 'fas fa-star', 'theme' => 'primary', 'count' => $kpi['sangat_baik']],
+        ['key' => \App\Livewire\Admin\EvaluationIndexTable::HASIL_BAIK, 'title' => 'Baik', 'subtitle' => 'Kinerja sesuai standar', 'icon' => 'fas fa-thumbs-up', 'theme' => 'info', 'count' => $kpi['baik']],
+        ['key' => \App\Livewire\Admin\EvaluationIndexTable::HASIL_PERLU_PEMBINAAN, 'title' => 'Perlu Pembinaan', 'subtitle' => 'Kategori Cukup & Kurang', 'icon' => 'fas fa-triangle-exclamation', 'theme' => 'warning', 'count' => $kpi['perlu_pembinaan']],
+    ];
     $categoryColors = [
         'Sangat Baik' => 'bg-primary-100 text-primary-800 border-primary-200',
         'Baik' => 'bg-info-100 text-info-800 border-info-200',
@@ -14,7 +22,37 @@
         'Kurang' => 'bg-danger-100 text-danger-800 border-danger-200',
     ];
 @endphp
-<div>
+{{-- Kartu hasil penilaian mengubah filter hasil tabel lewat $set / clearKpiFilters; href menjadi cadangan tanpa JS.
+     Angka kartu dihitung dari seluruh penilaian, tidak mengikuti pencarian dan filter. --}}
+<div class="space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <x-admin.kpi-card
+            title="Total Penilaian"
+            :value="$kpi['total']"
+            :subtitle="$kpi['rata_rata'] === null ? 'Belum ada nilai tertimbang' : 'Rata-rata nilai '.number_format($kpi['rata_rata'], 2, ',', '.')"
+            icon="fas fa-clipboard-check"
+            theme="neutral"
+            :active="$noKpiFilter"
+            :aria-current="$noKpiFilter ? 'true' : null"
+            :href="$this->kpiUrl(['hasil' => ''])"
+            wire:click.prevent="clearKpiFilters" />
+
+        @foreach ($hasilCards as $card)
+            @php $isActive = $hasil === $card['key']; @endphp
+            <x-admin.kpi-card
+                :title="$card['title']"
+                :value="$card['count']"
+                :badge="$share($card['count'])"
+                :subtitle="$card['subtitle']"
+                :icon="$card['icon']"
+                :theme="$card['theme']"
+                :active="$isActive"
+                :aria-current="$isActive ? 'true' : null"
+                :href="$this->kpiUrl(['hasil' => $isActive ? '' : $card['key']])"
+                wire:click.prevent="$set('hasil', '{{ $isActive ? '' : $card['key'] }}')" />
+        @endforeach
+    </div>
+
     <x-admin.table.card :notice="$tableNotice">
         <x-admin.table.toolbar
             :table-id="$this->getId()"
@@ -64,30 +102,14 @@
                             <td class="px-4 py-3 whitespace-nowrap text-surface-700">
                                 {{ $eval->tanggal_pelaksanaan_asesmen ? $eval->tanggal_pelaksanaan_asesmen->format('d M Y') : '-' }}
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2 justify-center">
-                                    <a href="{{ route('admin.evaluations.show', $eval->id) }}"
-                                        class="p-2 bg-info text-white rounded-md hover:bg-info transition"
-                                        title="Lihat Detail">
-                                        <i class="fas fa-eye" aria-hidden="true"></i>
-                                    </a>
-                                    <a href="{{ route('admin.evaluations.edit', $eval->id) }}"
-                                        class="p-2 bg-warning-700 text-white rounded-md hover:bg-warning-700 transition"
-                                        title="Edit Data">
-                                        <i class="fas fa-edit" aria-hidden="true"></i>
-                                    </a>
-                                    <form action="{{ route('admin.evaluations.destroy', $eval->id) }}"
-                                        method="POST" onsubmit="return confirm('Hapus penilaian ini?')"
-                                        class="inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit"
-                                            class="p-2 bg-danger text-white rounded-md hover:bg-danger transition"
-                                            title="Hapus Penilaian">
-                                            <i class="fas fa-trash" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                            <td class="px-4 py-3 text-center">
+                                @php $evalName = $eval->employee->nama ?? $eval->employee_nik; @endphp
+                                <x-admin.row-menu :label="'penilaian '.$evalName">
+                                    <x-admin.master.menu-item icon="fas fa-eye" :href="route('admin.evaluations.show', $eval->id)">Lihat Detail</x-admin.master.menu-item>
+                                    <x-admin.master.menu-item icon="fas fa-pencil-alt" :href="route('admin.evaluations.edit', $eval->id)">Ubah Penilaian</x-admin.master.menu-item>
+                                    <x-admin.master.menu-item icon="fas fa-trash-can" tone="danger" separated
+                                        @click="$dispatch('confirm-delete', { action: {{ \Illuminate\Support\Js::from(route('admin.evaluations.destroy', $eval->id)) }}, name: {{ \Illuminate\Support\Js::from($evalName.' ('.($eval->tanggal_pelaksanaan_asesmen?->format('d M Y') ?? 'tanpa tanggal').')') }} })">Hapus Penilaian</x-admin.master.menu-item>
+                                </x-admin.row-menu>
                             </td>
                         </tr>
                     @empty
@@ -107,4 +129,6 @@
 
         <x-admin.table.pagination :paginator="$rows" noun="penilaian" :per-page-options="$this->perPageOptions()" />
     </x-admin.table.card>
+
+    <x-admin.confirm-delete-modal title="Hapus Penilaian" noun="penilaian" consequence="Skor dan kategori 9-Box pada penilaian ini ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan." />
 </div>

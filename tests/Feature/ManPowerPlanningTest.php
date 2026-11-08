@@ -80,7 +80,7 @@ class ManPowerPlanningTest extends TestCase
 
         return Employee::create(array_merge([
             'nik' => $nik,
-            'nama' => 'Pegawai '.$nik,
+            'nama' => 'Karyawan '.$nik,
             'jabatan' => 'Manajer Regulatif',
             'unit_kerja' => 'Kebun A',
             'level' => 'Karpim',
@@ -205,14 +205,14 @@ class ManPowerPlanningTest extends TestCase
         $this->assertSame(1, $service->defaultAsOfMonth(2027));
     }
 
-    // ───────────────────────── Data pegawai pada tanggal posisi ─────────────────────────
+    // ───────────────────────── Data karyawan pada tanggal posisi ─────────────────────────
 
     public function test_realisasi_and_pensiun_follow_the_mbt_date_relative_to_the_position(): void
     {
-        // Lahir 1971-09-02 -> pensiun 2027-09-01, MBT 2026-09-01.
-        $this->makeKarpim('77770001', '1971-09-02');
-        // Lahir 1972-05-14 -> pensiun 2028-05-01, MBT 2027-05-01.
-        $this->makeKarpim('77770002', '1972-05-14');
+        // Lahir 1971-03-02 -> pensiun 2027-03-01, MBT 2026-09-01 (6 bulan sebelum pensiun).
+        $this->makeKarpim('77770001', '1971-03-02');
+        // Lahir 1971-11-14 -> pensiun 2027-11-01, MBT 2027-05-01.
+        $this->makeKarpim('77770002', '1971-11-14');
         $service = new ManPowerPlanningService;
 
         $june = $service->getPositionCounts(2026, 6);
@@ -288,7 +288,7 @@ class ManPowerPlanningTest extends TestCase
 
     public function test_supply_already_hired_this_year_is_not_subtracted_twice(): void
     {
-        // Rencana RBB 2026 RM-3 KEU = 8; satu pegawai RBB masuk Maret 2026 dan kini tercatat di Realisasi.
+        // Rencana RBB 2026 RM-3 KEU = 8; satu karyawan RBB masuk Maret 2026 dan kini tercatat di Realisasi.
         $this->savePlan(2026, ['rbb.RM-3.KEU' => 8]);
         $this->makeAsistenKeuangan('88880001', ['jalur_masuk' => 'RBB', 'tmt_bekerja' => '2026-03-01']);
         $this->makeAsistenKeuangan('88880002', ['jalur_masuk' => 'Reguler', 'tmt_bekerja' => '2026-03-01']);
@@ -299,7 +299,7 @@ class ManPowerPlanningTest extends TestCase
         $this->assertSame(3, $october[2]['levels']['RM-3']['fields']['KEU']);
         $this->assertSame(7, $october[8]['levels']['RM-3']['fields']['KEU']);
 
-        // Sebelum pegawai itu masuk, seluruh rencana masih tersisa.
+        // Sebelum karyawan itu masuk, seluruh rencana masih tersisa.
         $february = $service->getMppMatrix(2026, 2)['matrix'];
         $this->assertSame(8, $february[8]['levels']['RM-3']['fields']['KEU']);
     }
@@ -316,7 +316,7 @@ class ManPowerPlanningTest extends TestCase
             'employee_nik' => $promoted->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
             'level' => 'Karpim', 'tmt_awal' => '2026-03-01', 'jenis_mutasi' => 'PROMOSI', 'is_applied' => true,
         ]);
-        // Penempatan pertama Karpim tercatat tanpa tanggal mulai bekerja pada master pegawai.
+        // Penempatan pertama Karpim tercatat tanpa tanggal mulai bekerja pada master karyawan.
         $placed = $this->makeAsistenKeuangan('88880032', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => null, 'tanggal_dalam_jabatan' => '2026-09-01']);
         JobHistory::create([
             'employee_nik' => $placed->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
@@ -477,8 +477,8 @@ class ManPowerPlanningTest extends TestCase
 
     public function test_every_personnel_cell_opens_exactly_its_count(): void
     {
-        $this->makeKarpim('77770011', '1972-05-14'); // MBT 2027-05
-        $this->makeKarpim('77770012', '1971-09-02'); // MBT 2026-09
+        $this->makeKarpim('77770011', '1972-05-14'); // MBT 2027-11
+        $this->makeKarpim('77770012', '1971-09-02'); // MBT 2027-03
         $this->makeKarpim('77770013', '1990-01-10');
         Position::create(['nama' => 'Advisor RM-1', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
         $this->makeKarpim('77770014', '1990-01-10', ['jabatan' => 'Advisor RM-1']);
@@ -636,7 +636,7 @@ class ManPowerPlanningTest extends TestCase
             ->count();
         DB::disableQueryLog();
 
-        // Matriks drawer, daftar personil, dan render ulang memakai satu pembacaan data pegawai.
+        // Matriks drawer, daftar personil, dan render ulang memakai satu pembacaan data karyawan.
         $this->assertSame(1, $employeeScans);
         $component->assertCount('drilldownEmployees', 1);
     }
@@ -965,7 +965,7 @@ class ManPowerPlanningTest extends TestCase
 
         $october()
             ->assertViewHas('periodState', 'unclosed')
-            ->assertSee('Periode Okt 2026 belum pernah ditutup: angka dihitung dari data pegawai saat ini.')
+            ->assertSee('Periode Okt 2026 belum pernah ditutup: angka dihitung dari data karyawan saat ini.')
             ->assertSee('Rekam Draf')
             ->assertDontSee('Tutup Periode');
 

@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Exports\TrainingsExport;
 use App\Livewire\Admin\TrainingIndexTable;
-use App\Models\EmployeeStatistic;
+use App\Models\Employee;
 use App\Models\MasterAuditLog;
 use App\Models\Training;
 use App\Models\User;
@@ -106,35 +106,90 @@ class TrainingIndexTableTest extends TestCase
         $this->makeTraining(['judul' => 'Keselamatan', 'tanggal_mulai' => '2026-02-15', 'jumlah_man_hours' => 40, 'biaya_tiket_peserta' => 400, 'biaya_pelatihan' => 4000]);
 
         $component = $this->table();
-        $this->assertEquals(['man_hours' => 70, 'tiket' => 700, 'biaya' => 7000, 'karyawan' => null], $this->summary($component));
+        $this->assertEquals(['man_hours' => 70, 'tiket' => 700, 'biaya' => 7000, 'karyawan' => 0], $this->summary($component));
 
         $component->set('search', 'Kepemimpinan');
-        $this->assertEquals(['man_hours' => 30, 'tiket' => 300, 'biaya' => 3000, 'karyawan' => null], $this->summary($component));
+        $this->assertEquals(['man_hours' => 30, 'tiket' => 300, 'biaya' => 3000, 'karyawan' => 0], $this->summary($component));
 
         $component->set('startDate', '2026-02-01');
-        $this->assertEquals(['man_hours' => 20, 'tiket' => 200, 'biaya' => 2000, 'karyawan' => null], $this->summary($component));
+        $this->assertEquals(['man_hours' => 20, 'tiket' => 200, 'biaya' => 2000, 'karyawan' => 0], $this->summary($component));
         $this->assertSame(1, $component->instance()->rows->total());
 
         $component->assertSee('Total Man Hours')->assertSee('Rp 2.000');
     }
 
-    public function test_total_karyawan_only_with_both_dates(): void
+    public function test_average_jpl_uses_the_current_employee_headcount_whatever_the_dates(): void
     {
         $this->makeTraining(['tanggal_mulai' => '2026-01-10', 'jumlah_man_hours' => 100]);
-        EmployeeStatistic::create(['periode' => '2026-01-01', 'jumlah_karpim' => 5, 'jumlah_karpel' => 45, 'total_karyawan' => 50]);
-        EmployeeStatistic::create(['periode' => '2026-02-01', 'jumlah_karpim' => 5, 'jumlah_karpel' => 45, 'total_karyawan' => 50]);
-        EmployeeStatistic::create(['periode' => '2026-06-01', 'jumlah_karpim' => 5, 'jumlah_karpel' => 45, 'total_karyawan' => 999]);
 
-        $component = $this->table()->set('startDate', '2026-01-01');
-        $this->assertNull($this->summary($component)['karyawan']);
-        $component->assertSee('Data Belum Lengkap');
+        $component = $this->table();
+        $this->assertSame(0, $this->summary($component)['karyawan']);
+        $component->assertSee('Rata-rata JPL / Karyawan')->assertSee('Belum ada data karyawan');
 
-        $component->set('endDate', '2026-02-20');
-        $this->assertSame(100, $this->summary($component)['karyawan']);
-        $component->assertSee('Rata-rata JPL / Karyawan')->assertSee('1,00');
+        Employee::factory()->count(4)->create();
 
-        $component->set('endDate', '')->assertSee('Data Belum Lengkap');
-        $this->assertNull($this->summary($component)['karyawan']);
+        $component = $this->table();
+        $this->assertSame(4, $this->summary($component)['karyawan']);
+        $component->assertSee('25,00')->assertDontSee('Belum ada data karyawan');
+
+        $component->set('startDate', '2026-01-01');
+        $this->assertSame(4, $this->summary($component)['karyawan']);
+        $component->assertSee('25,00');
+    }
+
+    public function test_status_cards_count_every_training_by_implementation_status(): void
+    {
+        $this->makeTraining(['judul' => 'Sudah Lewat', 'tanggal_mulai' => now()->subDays(10)->toDateString(), 'tanggal_akhir' => now()->subDays(8)->toDateString()]);
+        $this->makeTraining(['judul' => 'Sedang Jalan', 'tanggal_mulai' => now()->subDay()->toDateString(), 'tanggal_akhir' => now()->addDay()->toDateString()]);
+        $this->makeTraining(['judul' => 'Berakhir Hari Ini', 'tanggal_mulai' => now()->subDays(2)->toDateString(), 'tanggal_akhir' => now()->toDateString()]);
+        $this->makeTraining(['judul' => 'Nanti', 'tanggal_mulai' => now()->addDays(5)->toDateString(), 'tanggal_akhir' => now()->addDays(6)->toDateString()]);
+
+        $component = $this->table();
+
+        $this->assertSame(['total' => 4, 'akan_datang' => 1, 'berlangsung' => 2, 'selesai' => 1], $component->instance()->statusCounts());
+
+        // Cards are page-level: the figures do not move with the search, only the table does.
+        $component->set('search', 'Nanti');
+        $this->assertSame(4, $component->instance()->statusCounts()['total']);
+    }
+
+    public function test_status_card_filters_the_table_and_total_card_clears_it(): void
+    {
+        $this->makeTraining(['judul' => 'Sudah Lewat', 'tanggal_mulai' => now()->subDays(10)->toDateString(), 'tanggal_akhir' => now()->subDays(8)->toDateString()]);
+        $this->makeTraining(['judul' => 'Sedang Jalan', 'tanggal_mulai' => now()->subDay()->toDateString(), 'tanggal_akhir' => now()->addDay()->toDateString()]);
+        $this->makeTraining(['judul' => 'Nanti', 'tanggal_mulai' => now()->addDays(5)->toDateString(), 'tanggal_akhir' => now()->addDays(6)->toDateString()]);
+
+        $component = $this->table()->assertSee('Total Pelatihan')->assertSee('Sedang Berlangsung');
+
+        foreach ([
+            TrainingIndexTable::STATUS_SELESAI => 'Sudah Lewat',
+            TrainingIndexTable::STATUS_BERLANGSUNG => 'Sedang Jalan',
+            TrainingIndexTable::STATUS_AKAN_DATANG => 'Nanti',
+        ] as $status => $judul) {
+            $component->set('status', $status);
+            $this->assertSame([$judul], $this->titles($component), "Status [{$status}]");
+        }
+
+        $component->call('clearKpiFilters')->assertSet('status', '');
+        $this->assertSame(3, $component->instance()->rows->total());
+
+        $component->set('status', 'tidak-dikenal')->assertSet('status', '');
+    }
+
+    public function test_status_link_fallback_keeps_the_current_table_state(): void
+    {
+        $url = $this->table()->set('search', 'Dasar')->set('jenis', '')->instance()->kpiUrl(['status' => TrainingIndexTable::STATUS_SELESAI]);
+
+        $this->assertSame(route('admin.trainings.index', ['search' => 'Dasar', 'status' => 'selesai']), $url);
+    }
+
+    public function test_page_uses_the_shared_module_header(): void
+    {
+        $this->get(route('admin.trainings.index'))
+            ->assertOk()
+            ->assertSee('Core HR')
+            ->assertSeeHtml('aria-label="Breadcrumb"')
+            ->assertSeeHtml('lg:text-3xl');
     }
 
     public function test_header_title_count_and_export(): void

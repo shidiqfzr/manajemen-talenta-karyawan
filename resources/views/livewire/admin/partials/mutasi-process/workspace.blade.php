@@ -1,7 +1,7 @@
-    <!-- ── 1. WORKSPACE PENUGASAN: PEGAWAI ASAL, KONEKTOR & FORMASI TUJUAN (5-2-5) ── -->
+    <!-- ── 1. WORKSPACE PENUGASAN: KARYAWAN ASAL, KONEKTOR & FORMASI TUJUAN (5-2-5) ── -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
 
-        <!-- ── KOLOM KIRI (5 Cols): PEGAWAI YANG DIMUTASI ── -->
+        <!-- ── KOLOM KIRI (5 Cols): KARYAWAN YANG DIMUTASI ── -->
         <div class="lg:col-span-5 bg-white rounded-2xl border border-surface-200 shadow-xs p-5 sm:p-6 space-y-4 flex flex-col">
             <div class="space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-surface-100">

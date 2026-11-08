@@ -33,6 +33,16 @@ class EvaluationIndexTable extends Component
     #[Url(except: '')]
     public string $to = '';
 
+    /** Assessment result group, driven by the KPI cards above the table (no toolbar field). */
+    #[Url(except: '')]
+    public string $hasil = '';
+
+    public const HASIL_SANGAT_BAIK = 'sangat_baik';
+
+    public const HASIL_BAIK = 'baik';
+
+    public const HASIL_PERLU_PEMBINAAN = 'perlu_pembinaan';
+
     /**
      * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
      * non-admins on every request.
@@ -40,6 +50,61 @@ class EvaluationIndexTable extends Component
     public function boot(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /** "Total Penilaian" card: clears the result group the KPI cards drive, keeps search and panel filters. */
+    public function clearKpiFilters(): void
+    {
+        $this->hasil = '';
+
+        $this->resetPage($this->paginationName());
+        $this->clearSelection();
+    }
+
+    /**
+     * No-JS fallback link of a KPI card: the current table state with the given changes
+     * (URL key => value, '' removes the key).
+     *
+     * @param  array<string, string>  $changes
+     */
+    public function kpiUrl(array $changes): string
+    {
+        $state = [
+            'search' => $this->search,
+            'kategori' => $this->kategori,
+            'bidang' => $this->bidang,
+            'from' => $this->from,
+            'to' => $this->to,
+            'hasil' => $this->hasil,
+        ];
+
+        return route('admin.evaluations.index', array_filter(array_merge($state, $changes), fn ($value) => $value !== ''));
+    }
+
+    /**
+     * Page-level figures over every assessment (independent of search and filters, like the Daftar Karyawan cards):
+     * the count per result group and the average weighted score.
+     *
+     * @return array{total: int, sangat_baik: int, baik: int, perlu_pembinaan: int, rata_rata: ?float}
+     */
+    public function kpi(): array
+    {
+        $row = Evaluation::query()
+            ->toBase()
+            ->selectRaw('count(*) as total')
+            ->selectRaw('sum(case when kategori_asesmen = ? then 1 else 0 end) as sangat_baik', ['Sangat Baik'])
+            ->selectRaw('sum(case when kategori_asesmen = ? then 1 else 0 end) as baik', ['Baik'])
+            ->selectRaw('sum(case when kategori_asesmen in (?, ?) then 1 else 0 end) as perlu_pembinaan', ['Cukup', 'Kurang'])
+            ->selectRaw('avg(nilai_tertimbang) as rata_rata')
+            ->first();
+
+        return [
+            'total' => (int) $row->total,
+            'sangat_baik' => (int) $row->sangat_baik,
+            'baik' => (int) $row->baik,
+            'perlu_pembinaan' => (int) $row->perlu_pembinaan,
+            'rata_rata' => $row->rata_rata === null ? null : (float) $row->rata_rata,
+        ];
     }
 
     /**
@@ -72,7 +137,7 @@ class EvaluationIndexTable extends Component
     protected function columns(): array
     {
         return [
-            Column::make('pegawai', 'Pegawai')->searchable(function (Builder $q, string $term) {
+            Column::make('pegawai', 'Karyawan')->searchable(function (Builder $q, string $term) {
                 $q->where(function (Builder $group) use ($term) {
                     QueryPipeline::whereLikeAny($group, ['employee_nik'], $term);
                     $group->orWhereHas('employee', fn (Builder $employee) => QueryPipeline::whereLikeAny($employee, ['nama'], $term));
@@ -101,6 +166,18 @@ class EvaluationIndexTable extends Component
                 ->apply(fn (Builder $query, string $value) => $query->where('bidang_tugas', $value)),
             Filter::dateFrom('from', 'Dari Tanggal', 'tanggal_pelaksanaan_asesmen'),
             Filter::dateTo('to', 'Sampai Tanggal', 'tanggal_pelaksanaan_asesmen'),
+            // Hasil Penilaian, driven by the KPI cards above the table.
+            Filter::select('hasil', 'Hasil Penilaian', [
+                self::HASIL_SANGAT_BAIK => 'Sangat Baik',
+                self::HASIL_BAIK => 'Baik',
+                self::HASIL_PERLU_PEMBINAAN => 'Perlu Pembinaan',
+            ])
+                ->withoutControl()
+                ->apply(fn (Builder $query, string $value) => match ($value) {
+                    self::HASIL_SANGAT_BAIK => $query->where('kategori_asesmen', 'Sangat Baik'),
+                    self::HASIL_BAIK => $query->where('kategori_asesmen', 'Baik'),
+                    self::HASIL_PERLU_PEMBINAAN => $query->whereIn('kategori_asesmen', ['Cukup', 'Kurang']),
+                }),
         ];
     }
 

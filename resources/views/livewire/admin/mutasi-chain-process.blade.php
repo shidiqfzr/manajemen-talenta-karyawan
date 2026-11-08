@@ -11,7 +11,7 @@
     <div class="space-y-5">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex items-center gap-3">
-                <h3 class="text-base font-bold text-surface-900 tracking-tight">Daftar Mata Rantai Pegawai</h3>
+                <h3 class="text-base font-bold text-surface-900 tracking-tight">Daftar Mata Rantai Karyawan</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-50 text-primary-800 border border-primary-200">
                     {{ count($nodes) }} Orang
                 </span>
@@ -22,12 +22,12 @@
                 <div class="flex items-center bg-surface-100 p-0.5 rounded-xl border border-surface-200 text-xs text-surface-600">
                     <button type="button" @click="$dispatch('expand-all-nodes')"
                         class="px-2.5 py-1 rounded-lg hover:bg-white hover:text-surface-900 transition font-medium cursor-pointer"
-                        title="Buka semua kartu slot pegawai">
+                        title="Buka semua kartu slot karyawan">
                         <i class="fas fa-arrows-up-down text-[10px] mr-1 text-surface-400" aria-hidden="true"></i> Buka Semua
                     </button>
                     <button type="button" @click="$dispatch('collapse-all-nodes')"
                         class="px-2.5 py-1 rounded-lg hover:bg-white hover:text-surface-900 transition font-medium cursor-pointer"
-                        title="Lipat semua kartu slot pegawai agar halaman ringkas">
+                        title="Lipat semua kartu slot karyawan agar halaman ringkas">
                         <i class="fas fa-bars-staggered text-[10px] mr-1 text-surface-400" aria-hidden="true"></i> Lipat Semua
                     </button>
                 </div>
@@ -38,7 +38,7 @@
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                     <i wire:loading.remove wire:target="addNode" class="fas fa-user-plus text-xs" aria-hidden="true"></i>
                     <i wire:loading wire:target="addNode" class="fas fa-spinner fa-spin text-xs" aria-hidden="true"></i>
-                    <span>Tambah Slot Pegawai</span>
+                    <span>Tambah Slot Karyawan</span>
                 </button>
             </div>
         </div>

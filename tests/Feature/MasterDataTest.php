@@ -113,7 +113,7 @@ class MasterDataTest extends TestCase
 
         $employee = Employee::create([
             'nik' => $nik,
-            'nama' => 'PEGAWAI PROTEKSI UNIT',
+            'nama' => 'KARYAWAN PROTEKSI UNIT',
             'jabatan' => 'Mandor',
             'unit_kerja' => $unitName,
             'level' => 'Karpel',
@@ -266,7 +266,7 @@ class MasterDataTest extends TestCase
         $response = $this->actingAs($this->admin)->post(route('admin.master.units.toggle', $unit), ['reason' => 'Unit digabung ke unit lain']);
 
         $response->assertSessionHas('error');
-        $this->assertStringContainsString('2 pegawai', session('error'));
+        $this->assertStringContainsString('2 karyawan', session('error'));
         $this->assertTrue($unit->fresh()->is_active);
         $this->assertSame(0, MasterAuditLog::count());
     }
@@ -378,7 +378,7 @@ class MasterDataTest extends TestCase
             ->assertRedirect(route('admin.master.formasi.show', $unit));
 
         $this->actingAs($this->admin)->get(route('admin.master.formasi.show', $unit))
-            ->assertSee('1 pegawai', false)
+            ->assertSee('1 karyawan', false)
             ->assertSee('Mutasi');
     }
 

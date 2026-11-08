@@ -42,7 +42,7 @@ class TrainingTableTest extends TestCase
             ])->employees()->attach($this->employee->nik);
         }
 
-        $this->makeTraining(['judul' => 'Pelatihan Pegawai Lain'])->employees()->attach($this->other->nik);
+        $this->makeTraining(['judul' => 'Pelatihan Karyawan Lain'])->employees()->attach($this->other->nik);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -88,7 +88,7 @@ class TrainingTableTest extends TestCase
         $component = $this->table()->set('perPage', 10)
             ->assertSee('Pelatihan 01')
             ->assertSee('Pelatihan 07')
-            ->assertDontSee('Pelatihan Pegawai Lain');
+            ->assertDontSee('Pelatihan Karyawan Lain');
 
         $this->assertSame(7, $component->instance()->rows->total());
     }
@@ -137,7 +137,7 @@ class TrainingTableTest extends TestCase
         // Undeclared columns are not searched, and other employees' trainings never leak in.
         $component->set('search', 'Kata Tersembunyi');
         $this->assertSame(0, $component->instance()->rows->total());
-        $component->set('search', 'Pegawai Lain');
+        $component->set('search', 'Karyawan Lain');
         $this->assertSame(0, $component->instance()->rows->total());
     }
 
