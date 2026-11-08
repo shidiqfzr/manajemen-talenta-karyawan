@@ -1,13 +1,13 @@
 # Agent Instructions & Project Guidelines
-## PTPN IV Regional V — Sistem Informasi Manajemen Talenta & Formasi Pegawai
+## PTPN IV Regional V — Sistem Informasi Manajemen Talenta & Formasi Karyawan
 
 Repositori ini berpedoman pada **4 Pilar Single Source of Truth (SSOT)** yang **wajib dipatuhi** oleh setiap AI agent atau asisten coding sebelum melakukan analisis, modifikasi, atau penambahan fitur:
 
 ### 1. [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) — Business Domain & Enterprise Logic
 - **Kamus Data & Validasi**: Format baku NIK (8 digit string), format golongan (`[Gol]/[Berkala]`), relasi model Eloquent (`Employee`, `JobHistory`, `Evaluation`, `Training`).
 - **Hierarki Organisasi & Unit**: 45 unit kerja PTPN IV Regional V (Regional Office, Kalbar, Kalselteng, Kaltim).
-- **Klasifikasi Pegawai & Eselon**: Pembedaan Karpim vs Karpel, 7 RM Band (`RM-1`, `RM-2`, `RM-3` untuk Karpim; `RM-4` s.d. `RM-7` untuk Karpel), dan 4 Bidang Fungsional (`KEU`, `TAN`, `TEK`, `UMU`).
-- **Formula & Aturan Bisnis HR**: Perhitungan otomatis Batas Usia Pensiun (56 tahun) dan MBT (55 tahun), siklus mutasi (straight vs swap transfer, auto chain vacancy), serta matriks talenta 9-box.
+- **Klasifikasi Karyawan & Eselon**: Pembedaan Karpim vs Karpel, 7 RM Band (`RM-1`, `RM-2`, `RM-3` untuk Karpim; `RM-4` s.d. `RM-7` untuk Karpel), dan 4 Bidang Fungsional (`KEU`, `TAN`, `TEK`, `UMU`).
+- **Formula & Aturan Bisnis HR**: Perhitungan otomatis Batas Usia Pensiun (56 tahun) dan MBT (6 bulan sebelum pensiun), siklus mutasi (straight vs swap transfer, auto chain vacancy), serta matriks talenta 9-box.
 - **Service Layer**: Wajib menggunakan `ManPowerPlanningService`, `MutasiService`, dan `JobVacancyService`. Dilarang melakukan hardcode kalkulasi RM/bidang di Blade views atau controllers.
 
 ### 2. [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) — Design System & UI/UX
@@ -21,7 +21,7 @@ Repositori ini berpedoman pada **4 Pilar Single Source of Truth (SSOT)** yang **
 - **Testing & QA**: PHPUnit 11 untuk formula bisnis (Unit Test) dan alur mutasi/Livewire (Feature Test). Formatting wajib menggunakan Laravel Pint (`./vendor/bin/pint`).
 
 ### 4. [SECURITY.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/SECURITY.md) — Security Policy & Data Governance
-- **Privasi Data Pegawai**: Kepatuhan terhadap UU No. 27/2022 (UU PDP). Perlindungan kerahasiaan NIK, data keluarga, dan skor evaluasi 9-box.
+- **Privasi Data Karyawan**: Kepatuhan terhadap UU No. 27/2022 (UU PDP). Perlindungan kerahasiaan NIK, data keluarga, dan skor evaluasi 9-box.
 - **Mitigasi OWASP**: Parameter binding wajib (anti-SQLi), CSRF token pada setiap form, auto-escaping `{{ }}` pada Blade (anti-XSS), validasi MIME-type pada upload Excel/sertifikat.
 - **Audit Trail**: Seluruh transaksi mutasi dan pengangkatan jabatan wajib tercatat di tabel `job_histories`.
 
@@ -34,4 +34,4 @@ Repositori ini berpedoman pada **4 Pilar Single Source of Truth (SSOT)** yang **
 4. **Kerapihan & Validasi**: Jalankan formatting Laravel Pint dan pastikan pengujian passing jika menambahkan fitur baru.
 5. **SUT Testing Principle**: Patuhi prinsip *One Test Class per System Under Test (SUT)*. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan kuat. Semua skenario uji untuk satu fitur wajib disatukan dalam satu file uji utama miliknya.
 6. **Pemisahan Konteks Internal vs UI Pengguna (Clean Enterprise UI)**: Dilarang keras mengekspos nama file dokumentasi developer (`AGENTS.md`, `DOMAIN.md`, `DESIGN.md`, `ENGINEERING.md`, `SECURITY.md`) maupun akronim internal (`SSOT`) ke elemen teks yang terlihat oleh pengguna akhir (*end-user*) pada Blade views, modal, tooltip, alert, placeholder, label, atau pesan validasi/notifikasi. Seluruh teks antarmuka wajib menggunakan terminologi bisnis resmi PTPN IV Regional V (misalnya: gunakan *"Pedoman Tata Kelola SDM & Peraturan Kepegawaian"*, *"Aturan Batas Usia Kerja"*, *"Standar Grade Karpim/Karpel"*, atau *"Regulasi Masa Kerja/Tenure"* alih-alih merujuk nomor bab file markdown). Nama file dokumen internal hanya diperbolehkan pada komentar kode internal (`{{-- --}}` atau `//`).
-
+7. **Terminologi Baku**: Rujuk Glosarium DOMAIN.md §2.0. Gunakan **"Karyawan"** untuk orang yang bekerja di perusahaan (bukan "Pegawai"); "Karyawan Pimpinan/Pelaksana" dan "Nomor Induk Karyawan" adalah istilah resmi, sedangkan "Kepegawaian" hanya untuk nama fungsi/regulasi. Identifier kode tidak diubah.

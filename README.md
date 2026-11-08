@@ -1,4 +1,4 @@
-# Sistem Manajemen Talenta & Formasi Pegawai
+# Sistem Manajemen Talenta & Formasi Karyawan
 ## PT Perkebunan Nusantara IV Regional V (Kalimantan)
 
 Aplikasi Human Resources Information System (HRIS) dan perencanaan formasi talenta (*Man Power Planning*) berbasis web yang dirancang khusus untuk mengelola data kepegawaian, formasi jabatan pimpinan (RM Band), riwayat mutasi, evaluasi kinerja 9-box, serta monitoring pensiun di lingkungan PT Perkebunan Nusantara IV Regional V.
@@ -28,7 +28,7 @@ Proyek ini dipandu oleh empat pilar dokumentasi arsitektur utama:
    - Strategi pengujian otomatis: PHPUnit 11 (Unit Tests formula HR & Feature Tests alur mutasi) dan linter Laravel Pint.
 
 4. **[SECURITY.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/SECURITY.md)** — **Security Policy & Data Governance**
-   - Standar kepatuhan privasi data pegawai (UU No. 27/2022 UU PDP).
+   - Standar kepatuhan privasi data karyawan (UU No. 27/2022 UU PDP).
    - Mitigasi risiko keamanan OWASP Top 10 (SQL Injection, CSRF, XSS, proteksi unggah Excel/sertifikat).
    - Kontrol akses berbasis peran (RBAC) dan prosedur pelaporan kerentanan keamanan siber.
 

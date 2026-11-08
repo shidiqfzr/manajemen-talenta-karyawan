@@ -1,6 +1,6 @@
 # ENGINEERING.md — Engineering Standards, SDLC & Testing Strategy
 ## PT Perkebunan Nusantara IV Regional V (Kalimantan)
-### Sistem Informasi Manajemen Talenta & Formasi Pegawai
+### Sistem Informasi Manajemen Talenta & Formasi Karyawan
 
 > Dokumen ini adalah **acuan standar rekayasa perangkat lunak (Single Source of Truth for Engineering & QA)** yang memandu arsitektur teknis, standar implementasi kode, alur perencanaan (planning), dan strategi pengujian (testing) pada aplikasi HRIS & Formasi Talenta PTPN IV Regional V.
 >
@@ -110,7 +110,7 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
    use Illuminate\Support\Facades\DB;
 
    DB::transaction(function () use ($data) {
-       // Operasi mutasi pegawai + pencatatan riwayat + penyesuaian vacancy
+       // Operasi mutasi karyawan + pencatatan riwayat + penyesuaian vacancy
    });
    ```
 
@@ -143,7 +143,7 @@ tests/
 ### 3.1 Unit Testing (Formula & Business Logic)
 Setiap perubahan pada aturan bisnis HR wajib diverifikasi dengan Unit Test:
 1. **Uji Formula Pensiun & MBT**:
-   - Pastikan pegawai yang lahir pada tanggal tertentu memiliki `tanggal_pensiun` tepat pada awal bulan usia 56 tahun.
+   - Pastikan karyawan yang lahir pada tanggal tertentu memiliki `tanggal_pensiun` tepat pada awal bulan usia 56 tahun.
    - Pastikan `tanggal_mbt` jatuh tepat 1 tahun sebelum pensiun.
 2. **Uji Penentuan RM Band & Bidang**:
    - Memastikan klasifikasi `determineRmLevel()` dan `determineBidang()` menghasilkan nilai yang deterministik untuk berbagai kombinasi jabatan dan unit kerja.
@@ -169,9 +169,9 @@ Pengujian alur kerja mencakup:
    - Admin dapat mengakses direktori dan dashboard formasi.
 2. **Alur Mutasi Atomik (`MutasiServiceTest`)**:
    - Pengujian **Straight Transfer**: Memastikan lowongan terbuka di posisi lama.
-   - Pengujian **Swap Transfer**: Memastikan dua pegawai bertukar jabatan secara simultan tanpa meninggalkan formasi bocor (*zero net vacancy*).
+   - Pengujian **Swap Transfer**: Memastikan dua karyawan bertukar jabatan secara simultan tanpa meninggalkan formasi bocor (*zero net vacancy*).
 3. **Import & Export Excel**:
-   - Pengujian unggah template Excel data pegawai dengan validasi baris gagal/berhasil.
+   - Pengujian unggah template Excel data karyawan dengan validasi baris gagal/berhasil.
 
 ### 3.3 Menjalankan Pengujian
 ```bash
