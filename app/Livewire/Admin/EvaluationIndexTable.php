@@ -34,6 +34,15 @@ class EvaluationIndexTable extends Component
     public string $to = '';
 
     /**
+     * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
+     * non-admins on every request.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /**
      * Distinct non-empty 9-box categories, as [value => value] filter options.
      *
      * @return array<string, string>

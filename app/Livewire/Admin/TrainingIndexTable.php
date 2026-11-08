@@ -40,6 +40,15 @@ class TrainingIndexTable extends Component
     public string $metode = '';
 
     /**
+     * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
+     * non-admins on every request.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /**
      * @return array<string, string>
      */
     #[Computed]

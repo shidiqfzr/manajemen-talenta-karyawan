@@ -27,6 +27,15 @@ class TrainingParticipantTable extends Component
     /** Level filter value; not synced to the URL because the table is embedded in another page. */
     public string $level = '';
 
+    /**
+     * Admin-only screen: route middleware is not re-applied to Livewire update requests, so refuse
+     * non-admins on every request.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
     public function mount(int $trainingId): void
     {
         $this->trainingId = $trainingId;
