@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Employees;
 
+use App\Exceptions\BulkActionRefusedException;
 use App\Exports\EmployeesExport;
 use App\Livewire\Concerns\WithDataTable;
 use App\Models\Employee;
@@ -34,7 +35,19 @@ use Livewire\Component;
  */
 class EmployeeTable extends Component
 {
-    use WithDataTable;
+    use WithDataTable {
+        runBulkAction as private runSharedBulkAction;
+    }
+
+    /**
+     * Most employees one bulk delete may remove (each deletion cascades to placement history, evaluations
+     * and trainings). Larger target sets are refused as a whole; the former page flow never went beyond
+     * one visible page (at most 100 rows).
+     */
+    public const BULK_DELETE_LIMIT = 100;
+
+    /** User message of a bulk handler that refused to run in this request (see bulkDestroy()). */
+    private ?string $bulkRefusal = null;
 
     /** Month number => Indonesian month name, as the former directory offered it. */
     public const MONTHS = [
@@ -341,17 +354,46 @@ class EmployeeTable extends Component
             BulkAction::make('destroy', 'Hapus')
                 ->icon('fas fa-trash')
                 ->ability('delete-employee')
-                ->danger('Hapus :count data pegawai terpilih? Tindakan ini tidak dapat dibatalkan.')
+                ->danger('Hapus :count data pegawai terpilih beserta foto, riwayat penempatan, evaluasi, dan pelatihannya? Tindakan ini tidak dapat dibatalkan.')
                 ->successMessage(':count data pegawai terpilih berhasil dihapus.'),
         ];
     }
 
     /**
+     * The shared bulk action flow (permission check, transaction, audit entry); a refusal raised by the
+     * handler replaces the shared failure notice with its own message. The selection is kept.
+     */
+    public function runBulkAction(string $name): void
+    {
+        $this->bulkRefusal = null;
+
+        $this->runSharedBulkAction($name);
+
+        if ($this->bulkRefusal !== null) {
+            $this->tableNotice = ['type' => 'warning', 'message' => $this->bulkRefusal];
+        }
+    }
+
+    protected function bulkDeleteLimit(): int
+    {
+        return self::BULK_DELETE_LIMIT;
+    }
+
+    /**
      * Deletes the bulk targets (selected rows within the current search and filters) and their stored
-     * photos. Runs inside runBulkAction()'s transaction; must stay protected (not client-callable).
+     * photos. Runs inside runBulkAction()'s transaction, after its permission check; must stay protected
+     * (not client-callable). More targets than bulkDeleteLimit(): nothing is deleted.
      */
     protected function bulkDestroy(Builder $targets): int
     {
+        $limit = $this->bulkDeleteLimit();
+
+        if ((clone $targets)->count() > $limit) {
+            $this->bulkRefusal = "Hapus massal dibatasi {$limit} data per proses. Persempit filter atau pilih lebih sedikit data.";
+
+            throw new BulkActionRefusedException($this->bulkRefusal);
+        }
+
         return app(EmployeeDeletionService::class)->deleteMany($targets);
     }
 

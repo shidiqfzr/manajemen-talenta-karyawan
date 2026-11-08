@@ -23,6 +23,7 @@ use App\Services\FormasiSeatGuard;
 use App\Services\Import\EmployeeImportDictionary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -460,6 +461,9 @@ class EmployeeController extends Controller
      */
     public function bulkDestroy(Request $request, EmployeeDeletionService $deletion)
     {
+        // Same ability as the Direktori Pegawai bulk action.
+        Gate::authorize('delete-employee');
+
         $validated = $request->validate([
             'niks' => 'required|array|min:1',
             'niks.*' => 'required|string|size:8',
