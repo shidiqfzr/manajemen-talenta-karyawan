@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Services\Mutasi\ChainTopologyAnalyzer;
@@ -17,7 +18,7 @@ class ChainTopologyAnalyzerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const CONFLICT = 'ditargetkan oleh lebih dari satu karyawan';
+    private const CONFLICT = 'melebihi sisa kuota';
 
     private Unit $unit;
 
@@ -66,6 +67,46 @@ class ChainTopologyAnalyzerTest extends TestCase
         $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 2, holders: 1);
 
         $this->assertStringContainsString(self::CONFLICT, $this->errorsFor($nodes));
+    }
+
+    public function test_a_booking_outside_the_chain_takes_one_of_the_free_seats(): void
+    {
+        $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 3, holders: 1);
+        $outsider = Employee::factory()->create(['jabatan' => 'Jabatan Lain', 'unit_kerja' => 'Unit Lain']);
+        JobHistory::create(['employee_nik' => $outsider->nik, 'jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Rantai', 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        $this->assertStringContainsString(self::CONFLICT, $this->errorsFor($nodes), 'Two free seats, one already booked: only one participant fits.');
+    }
+
+    public function test_a_participants_own_booking_does_not_take_a_seat(): void
+    {
+        $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 3, holders: 1);
+        JobHistory::create(['employee_nik' => $nodes[0]['employee_nik'], 'jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Rantai', 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        $this->assertStringNotContainsString(self::CONFLICT, $this->errorsFor($nodes));
+    }
+
+    public function test_several_holders_leaving_one_formasi_report_the_seats_left_unfilled(): void
+    {
+        $unitPositions = ['Asisten Pengolahan' => 3, 'Posisi Tujuan X' => 1, 'Posisi Tujuan Y' => 1];
+        foreach ($unitPositions as $nama => $kuota) {
+            $this->unit->positions()->attach(Position::factory()->create(['nama' => $nama, 'rm_level' => 'RM-3'])->id, ['kuota' => $kuota]);
+        }
+        Position::factory()->create(['nama' => 'Asisten Asal A', 'rm_level' => 'RM-3']);
+
+        $leaverP = Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Rantai']);
+        $leaverR = Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Rantai']);
+        $arriving = Employee::factory()->create(['jabatan' => 'Asisten Asal A', 'unit_kerja' => 'Unit Rantai']);
+        $node = fn (Employee $e, string $target) => ['employee_nik' => $e->nik, 'target_jabatan' => $target, 'target_unit_kerja' => 'Unit Rantai', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'];
+
+        $result = app(ChainTopologyAnalyzer::class)->validateChainTopology([
+            $node($leaverP, 'Posisi Tujuan X'),
+            $node($leaverR, 'Posisi Tujuan Y'),
+            $node($arriving, 'Asisten Pengolahan'),
+        ]);
+
+        $unfilled = collect($result['unfilled_vacancies'])->where('jabatan', 'Asisten Pengolahan');
+        $this->assertCount(1, $unfilled, 'Two holders leave, one participant arrives: one seat stays open.');
     }
 
     public function test_a_single_seat_formasi_still_takes_one_participant_only(): void

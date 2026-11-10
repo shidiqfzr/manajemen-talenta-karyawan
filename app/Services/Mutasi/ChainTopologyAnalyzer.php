@@ -198,14 +198,15 @@ class ChainTopologyAnalyzer
                 $errors[] = "Karyawan {$emp->nama} sudah menempati posisi {$targetJabatan} di {$targetUnitKerja}.";
             }
 
-            // Analyze target vacancy and occupancy (also tells how many seats the formasi can still take)
-            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja);
+            // Analyze target vacancy and occupancy. Bookings of the participants themselves do not count against the seats.
+            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja, $niks);
 
-            // Duplicate target guard (unless pool): a formasi takes as many participants as it has free seats, at least one
+            // Duplicate target guard (unless pool): a formasi takes as many participants as it has open seats (free seats not
+            // already booked by someone outside the chain), at least one
             if (! $isPool) {
                 $targetCounts[$posKey] = ($targetCounts[$posKey] ?? 0) + 1;
-                if ($targetCounts[$posKey] > max(1, (int) ($analysis['free_slots'] ?? 1))) {
-                    $errors[] = "Konflik target: Formasi {$targetJabatan} di {$targetUnitKerja} ditargetkan oleh lebih dari satu karyawan.";
+                if ($targetCounts[$posKey] > max(1, (int) ($analysis['open_slots'] ?? 1))) {
+                    $errors[] = "Konflik target: Formasi {$targetJabatan} di {$targetUnitKerja} ditargetkan oleh karyawan melebihi sisa kuotanya.";
                 }
                 $targetPositions[$posKey] = $node['employee_nik'];
             }
@@ -216,7 +217,7 @@ class ChainTopologyAnalyzer
 
             if ($analysis['type'] === 'pool') {
                 $linkType = 'pool';
-            } elseif ($analysis['is_reserved'] && ! in_array($analysis['reserved_job']->employee_nik, $niks, true)) {
+            } elseif ($analysis['is_reserved']) {
                 $resName = $analysis['reserved_occupant']->nama ?? $analysis['reserved_job']->employee_nik;
                 $resTmt = $analysis['reserved_job']->tmt_awal ? Carbon::parse($analysis['reserved_job']->tmt_awal)->translatedFormat('d M Y') : 'mendatang';
                 $linkType = 'conflict';
@@ -287,18 +288,31 @@ class ChainTopologyAnalyzer
         }
 
         // Detect positions vacated by participants that are NOT filled by anyone in the chain
+        // Each arrival fills one seat vacated in that formasi; departures beyond the arrivals stay open (several holders of
+        // a multi-seat formasi may leave at once).
+        $arrivalsLeft = $targetCounts;
+        $unfilledLeaverNiks = [];
         foreach ($nodes as $node) {
             $emp = $employees[$node['employee_nik']];
             $vacatedKey = "{$emp->jabatan}|{$emp->unit_kerja}";
 
-            if (! isset($targetPositions[$vacatedKey]) && ! in_array($emp->nik, $temporaryNiks, true)) {
-                $unfilledVacancies[] = [
-                    'jabatan' => $emp->jabatan,
-                    'unit_kerja' => $emp->unit_kerja,
-                    'left_by' => $emp->nama,
-                    'left_by_nik' => $emp->nik,
-                ];
+            if (in_array($emp->nik, $temporaryNiks, true)) {
+                continue;
             }
+
+            if (($arrivalsLeft[$vacatedKey] ?? 0) > 0) {
+                $arrivalsLeft[$vacatedKey]--;
+
+                continue;
+            }
+
+            $unfilledLeaverNiks[] = $emp->nik;
+            $unfilledVacancies[] = [
+                'jabatan' => $emp->jabatan,
+                'unit_kerja' => $emp->unit_kerja,
+                'left_by' => $emp->nama,
+                'left_by_nik' => $emp->nik,
+            ];
         }
 
         // ── Graph Decomposition into Weakly Connected Components (Enterprise Multi-Cluster) ──
@@ -469,7 +483,7 @@ class ChainTopologyAnalyzer
                         ];
                     }
                     $empVacKey = "{$nodeData['current_jabatan']}|{$nodeData['current_unit']}";
-                    if (! isset($targetPositions[$empVacKey]) && ! in_array($nodeData['employee_nik'], $temporaryNiks, true)) {
+                    if (in_array($nodeData['employee_nik'], $unfilledLeaverNiks, true)) {
                         $clusterUnfilled[] = [
                             'jabatan' => $nodeData['current_jabatan'],
                             'unit_kerja' => $nodeData['current_unit'],

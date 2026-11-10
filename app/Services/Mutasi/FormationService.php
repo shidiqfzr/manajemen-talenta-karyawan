@@ -21,8 +21,13 @@ class FormationService
     /**
      * Analyse what will happen if an employee is moved to the given target position.
      * Returns a structured result that drives the live impact panel in the UI.
+     *
+     * `$excludeNiks` are the employees whose own scheduled bookings must not count against the formasi (the requester,
+     * or every participant of a chain): a booking by someone who is moving anyway does not take a seat from them.
+     *
+     * @param  list<string>  $excludeNiks
      */
-    public function analyzeTarget(string $jabatan, string $unitKerja): array
+    public function analyzeTarget(string $jabatan, string $unitKerja, array $excludeNiks = []): array
     {
         // Check if the position is an overflow/advisor or diperban (pool) position
         $position = Position::getAllCached()->get($jabatan);
@@ -38,16 +43,22 @@ class FormationService
                 'reserved_job' => null,
                 'occupant' => null,
                 'occupant_job' => null,
+                'kuota' => null,
+                'holders' => 0,
+                'free_slots' => null,
+                'open_slots' => null,
+                'multi_seat' => false,
             ];
         }
 
-        // Seat count of the formasi (master formasi quota; a pair outside the master is a single seat).
-        $kuota = max(1, (int) (DB::table('position_unit')
+        // Seat count of the formasi: the master quota (0 is a real quota, meaning no seat) or one seat for a pair outside the master.
+        $quotaRow = DB::table('position_unit')
             ->join('units', 'units.id', '=', 'position_unit.unit_id')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
             ->where('units.nama', $unitKerja)
             ->where('positions.nama', $jabatan)
-            ->value('position_unit.kuota') ?? 1));
+            ->first(['position_unit.kuota']);
+        $kuota = $quotaRow === null ? 1 : (int) $quotaRow->kuota;
 
         // Every current holder, Pj/Plt included: a temporary holder keeps the seat, so the formasi is not released (§5.2).
         $holders = Employee::with('currentJob')
@@ -55,7 +66,10 @@ class FormationService
             ->where('unit_kerja', $unitKerja)
             ->orderBy('nik')
             ->get();
-        $freeSlots = JobVacancyService::freeSlots($kuota, $holders->count());
+        // A Pj/Plt placed through Mutasi has no Employee row here but still takes a seat (open history row).
+        $temporaryHolders = app(JobVacancyService::class)->temporaryHolderCounts($jabatan, $unitKerja)->get("{$unitKerja}|{$jabatan}", 0);
+        $holderCount = $holders->count() + $temporaryHolders;
+        $freeSlots = JobVacancyService::freeSlots($kuota, $holderCount);
         $hasFreeSlot = $freeSlots > 0;
 
         // Scheduled future-dated mutations (is_applied = false) reserve seats; the latest one is reported.
@@ -63,12 +77,14 @@ class FormationService
             ->where('jabatan', $jabatan)
             ->where('unit_kerja', $unitKerja)
             ->where('is_applied', false)
+            ->when($excludeNiks !== [], fn ($query) => $query->whereNotIn('employee_nik', $excludeNiks))
             ->orderByDesc('id')
             ->get();
         $pendingScheduled = $pending->first();
 
         // Bookings only block the formasi once they use up the free quota (always so for a single seat).
-        $isReserved = $pending->isNotEmpty() && $pending->count() >= $freeSlots;
+        $isReserved = JobVacancyService::isReserved($pending->count(), $freeSlots);
+        $openSlots = max($freeSlots - $pending->count(), 0);
 
         // A formasi with a free seat takes a straight transfer; only a full one needs the occupant to swap out.
         $occupant = $hasFreeSlot ? null : $holders->first();
@@ -82,8 +98,9 @@ class FormationService
             'occupant' => $occupant,
             'occupant_job' => $occupant?->currentJob,
             'kuota' => $kuota,
-            'holders' => $holders->count(),
+            'holders' => $holderCount,
             'free_slots' => $freeSlots,
+            'open_slots' => $openSlots,
             'multi_seat' => $kuota > 1,
         ];
     }

@@ -429,7 +429,8 @@ class MutasiProcess extends Component
         }
 
         $service = $this->service();
-        $analysis = $service->analyzeTarget($this->form->targetJabatan, $this->form->targetUnitKerja);
+        // The employee's own scheduled booking of this formasi must not block them.
+        $analysis = $service->analyzeTarget($this->form->targetJabatan, $this->form->targetUnitKerja, array_filter([$this->form->employeeNik]));
 
         $occupant = $analysis['occupant'];
         $occupantRm = $occupant ? $service->resolveEmployeeRm($occupant) : null;
@@ -455,7 +456,7 @@ class MutasiProcess extends Component
             // A full multi-seat formasi has no single incumbent to swap with (mirrors MutasiService::resolveSwapOccupant).
             if ($analysis['multi_seat'] ?? false) {
                 $this->isSwapAllowed = false;
-                $this->swapIncompatibilityMessage = "Formasi target berkuota {$analysis['kuota']} dan seluruh kuotanya terisi, sehingga tidak ada satu pejabat petahana untuk ditukar. Kosongkan satu kuota lebih dulu melalui Mutasi Berantai.";
+                $this->swapIncompatibilityMessage = "Formasi target berkuota {$analysis['kuota']} dan seluruh kuotanya terisi, sehingga tidak ada satu pejabat petahana untuk ditukar. Kosongkan satu kuota lebih dulu dengan memindahkan salah satu pemegang melalui mutasi terpisah.";
             }
 
             // Check Employee B's tenure in their current unit

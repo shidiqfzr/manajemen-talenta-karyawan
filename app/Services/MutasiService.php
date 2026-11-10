@@ -79,7 +79,8 @@ class MutasiService
 
             $this->guard->assertAllowed($employee, $request);
 
-            $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja);
+            // The requester's own scheduled booking of this formasi must not block them (nor count against its seats).
+            $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja, [$request->employeeNik]);
             $this->assertTargetNotReservedByOthers($analysis, $request);
 
             if ($analysis['vacant'] || $analysis['type'] === 'pool') {
@@ -104,7 +105,8 @@ class MutasiService
      */
     private function assertTargetNotReservedByOthers(array $analysis, MutasiRequest $request): void
     {
-        if (! $analysis['is_reserved'] || ($analysis['reserved_job']->employee_nik ?? null) === $request->employeeNik) {
+        // Bookings by the requester are already left out of the analysis, so any reservation left belongs to others.
+        if (! $analysis['is_reserved']) {
             return;
         }
 
@@ -123,11 +125,14 @@ class MutasiService
      */
     private function resolveSwapOccupant(Employee $employee, array $analysis, MutasiRequest $request): Employee
     {
-        // A full multi-seat formasi has several holders and no rule yet for which one to swap with; a swap only
-        // makes sense when exactly one person holds the target.
-        if ($analysis['multi_seat'] ?? false) {
-            throw new MutasiRuleViolationException(
-                "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota {$analysis['kuota']} dan seluruh kuotanya terisi. Penempatan pada formasi berkuota ganda yang penuh belum didukung; kosongkan satu kuota lebih dulu (mis. melalui Mutasi Berantai)."
+        // A swap needs exactly one incumbent. There is none for a formasi without seats (quota 0) or one whose seats are all
+        // taken by temporary assignees, and no rule yet says which holder to swap with in a full multi-seat formasi.
+        if (($analysis['occupant'] ?? null) === null || ($analysis['multi_seat'] ?? false)) {
+            $kuota = (int) ($analysis['kuota'] ?? 1);
+
+            throw new MutasiRuleViolationException($kuota < 1
+                ? "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota 0 sehingga tidak menerima penempatan."
+                : "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota {$kuota} dan seluruh kuotanya terisi. Tidak ada satu pejabat petahana untuk ditukar; kosongkan satu kuota lebih dulu dengan memindahkan salah satu pemegang melalui mutasi terpisah."
             );
         }
 
@@ -380,9 +385,9 @@ class MutasiService
     // -------------------------------------------------------------------------
 
     /** @see FormationService::analyzeTarget() */
-    public function analyzeTarget(string $jabatan, string $unitKerja): array
+    public function analyzeTarget(string $jabatan, string $unitKerja, array $excludeNiks = []): array
     {
-        return $this->formations->analyzeTarget($jabatan, $unitKerja);
+        return $this->formations->analyzeTarget($jabatan, $unitKerja, $excludeNiks);
     }
 
     /** @see FormationService::getAvailableTargetPositions() */

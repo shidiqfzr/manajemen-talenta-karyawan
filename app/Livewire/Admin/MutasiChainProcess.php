@@ -346,7 +346,9 @@ class MutasiChainProcess extends Component
         $service = $this->service();
 
         // 1. Analyze occupant
-        $targetAnalysis = $service->analyzeTarget($targetJabatan, $targetUnit);
+        // Bookings of the chain's own participants do not count against the target's seats.
+        $participantNiks = array_values(array_filter(array_column($this->nodes, 'employee_nik')));
+        $targetAnalysis = $service->analyzeTarget($targetJabatan, $targetUnit, $participantNiks);
         if ($targetAnalysis['type'] === 'pool') {
             $node['occupant_nik'] = null;
             $node['occupant_nama'] = null;
@@ -355,6 +357,11 @@ class MutasiChainProcess extends Component
             $node['occupant_nik'] = null;
             $node['occupant_nama'] = null;
             $node['link_type'] = 'vacant';
+        } elseif (($targetAnalysis['occupant'] ?? null) === null) {
+            // Reserved by a scheduled mutation (or without any seat): nobody to connect to, resolve that first.
+            $node['occupant_nik'] = null;
+            $node['occupant_nama'] = null;
+            $node['link_type'] = 'conflict';
         } else {
             $occupant = $targetAnalysis['occupant'];
             $node['occupant_nik'] = $occupant->nik;

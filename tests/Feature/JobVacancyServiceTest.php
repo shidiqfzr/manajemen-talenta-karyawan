@@ -361,6 +361,54 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame(['Manajer Belum Pernah Terisi'], $this->service->getVacancies()->pluck('jabatan')->all());
     }
 
+    public function test_a_pj_plt_placed_through_mutasi_takes_a_seat(): void
+    {
+        $position = $this->seat('Asisten Dua Kursi', 2);
+        $this->holders($position, 1);
+        // A Pj/Plt placed through Mutasi keeps the Employee row at home; only an open history row records the assignment.
+        $assignee = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create(['employee_nik' => $assignee->nik, 'jabatan' => $position->nama, 'unit_kerja' => $this->unit->nama, 'status_penugasan' => 'Plt', 'tmt_awal' => now()->subDays(5)->toDateString(), 'is_applied' => true]);
+
+        $row = $this->row('Asisten Dua Kursi');
+
+        $this->assertSame(1, $row->filled);
+        $this->assertSame(1, $row->acting);
+        $this->assertSame(0, $row->free_slots);
+    }
+
+    public function test_a_pj_plt_who_is_already_an_employee_row_at_the_formasi_is_counted_once(): void
+    {
+        $position = $this->seat('Asisten Dua Kursi', 2);
+        $acting = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'status_penugasan' => 'Plt']);
+        JobHistory::create(['employee_nik' => $acting->nik, 'jabatan' => $position->nama, 'unit_kerja' => $this->unit->nama, 'status_penugasan' => 'Plt', 'tmt_awal' => now()->subDays(5)->toDateString(), 'is_applied' => true]);
+
+        $row = $this->row('Asisten Dua Kursi');
+
+        $this->assertSame(1, $row->acting);
+        $this->assertSame(1, $row->free_slots);
+    }
+
+    public function test_bookings_reserve_a_formasi_only_when_they_use_up_the_free_quota(): void
+    {
+        $this->assertFalse(JobVacancyService::isReserved(0, 0));
+        $this->assertFalse(JobVacancyService::isReserved(1, 2));
+        $this->assertTrue(JobVacancyService::isReserved(2, 2));
+        $this->assertTrue(JobVacancyService::isReserved(1, 0), 'A booked formasi without a free seat stays reserved.');
+
+        $position = $this->seat('Asisten Tiga Kursi', 3);
+        $this->holders($position, 1);
+        $book = function () use ($position): void {
+            $successor = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+            JobHistory::create(['employee_nik' => $successor->nik, 'jabatan' => $position->nama, 'unit_kerja' => $this->unit->nama, 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+        };
+
+        $book();
+        $this->assertFalse($this->row('Asisten Tiga Kursi')->is_reserved, 'Two free seats, one booked: the formasi is still open.');
+
+        $book();
+        $this->assertTrue($this->row('Asisten Tiga Kursi')->is_reserved);
+    }
+
     public function test_free_slots_are_the_quota_left_after_every_holder_including_acting(): void
     {
         $this->assertSame(3, JobVacancyService::freeSlots(5, 2));
@@ -559,7 +607,7 @@ class JobVacancyServiceTest extends TestCase
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(5, $queries);
+        $this->assertLessThanOrEqual(6, $queries);
     }
 
     public function test_filters_by_search_unit_and_status(): void

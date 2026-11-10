@@ -36,6 +36,27 @@ class MutasiChainProcessTest extends TestCase
             ->assertSeeLivewire('admin.mutasi-chain-process');
     }
 
+    public function test_inspecting_a_booked_vacant_target_flags_a_conflict_instead_of_crashing(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Kebun Dipesan']);
+        $seat = Position::factory()->create(['nama' => 'Posisi Dipesan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Asal', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id);
+
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Asal', 'unit_kerja' => 'Kebun Dipesan']);
+        $booker = Employee::factory()->create(['jabatan' => 'Jabatan Lain', 'unit_kerja' => 'Kebun Lain']);
+        JobHistory::create(['employee_nik' => $booker->nik, 'jabatan' => 'Posisi Dipesan', 'unit_kerja' => 'Kebun Dipesan', 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        Livewire::actingAs($this->adminUser)
+            ->test(MutasiChainProcess::class)
+            ->set('nodes.0.employee_nik', $mover->nik)
+            ->set('nodes.0.jenis_mutasi', 'ROTASI')
+            ->set('nodes.0.target_unit_kerja', 'Kebun Dipesan')
+            ->set('nodes.0.target_jabatan', 'Posisi Dipesan')
+            ->assertSet('nodes.0.link_type', 'conflict')
+            ->assertSet('nodes.0.occupant_nik', null);
+    }
+
     public function test_renders_unit_combobox_component_when_employee_selected(): void
     {
         $emp = Employee::factory()->create(['nama' => 'Budi Santoso', 'unit_kerja' => 'Kebun Danau Salak']);

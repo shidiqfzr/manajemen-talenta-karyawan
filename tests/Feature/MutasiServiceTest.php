@@ -106,6 +106,63 @@ class MutasiServiceTest extends TestCase
         $this->assertSame($historiesBefore, JobHistory::count());
     }
 
+    public function test_a_requester_holding_the_latest_booking_is_not_blocked_by_it(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Booking']);
+        $kosong = Position::factory()->create(['nama' => 'Posisi Kosong Dipesan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($kosong->id);
+
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Booking']);
+        JobHistory::create(['employee_nik' => $mover->nik, 'jabatan' => 'Posisi Kosong Dipesan', 'unit_kerja' => 'Unit Booking', 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        $result = $this->service->processMutasi(new MutasiRequest($mover->nik, 'Posisi Kosong Dipesan', 'Unit Booking', now()->toDateString(), 'ROTASI'));
+
+        $this->assertSame('transfer', $result['type']);
+        $this->assertSame('Posisi Kosong Dipesan', $mover->refresh()->jabatan);
+    }
+
+    public function test_a_zero_quota_formasi_rejects_placement(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Nol']);
+        $seat = Position::factory()->create(['nama' => 'Petugas Mess', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 0]);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Nol']);
+
+        $this->expectException(MutasiRuleViolationException::class);
+        $this->expectExceptionMessage('berkuota 0');
+
+        $this->service->processMutasi(new MutasiRequest($mover->nik, 'Petugas Mess', 'Unit Nol', now()->toDateString(), 'ROTASI'));
+    }
+
+    public function test_a_plt_placed_through_mutasi_uses_a_seat_of_a_multi_seat_formasi(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 2]);
+        Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $acting = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+        $definitive = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+
+        $this->service->processMutasi(new MutasiRequest(
+            employeeNik: $acting->nik,
+            targetJabatan: 'Asisten Pengolahan',
+            targetUnitKerja: 'Unit Multi',
+            tmtAwal: now()->toDateString(),
+            jenisMutasi: 'PENUGASAN',
+            statusJabatan: 'Plt',
+        ));
+
+        try {
+            $this->service->processMutasi(new MutasiRequest($definitive->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+            $this->fail('The Plt took the second seat, so a definitive placement must be rejected.');
+        } catch (MutasiRuleViolationException $e) {
+            $this->assertStringContainsString('berkuota 2', $e->getMessage());
+        }
+    }
+
     public function test_simultaneous_swap_when_target_occupied()
     {
         // Setup

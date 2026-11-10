@@ -136,10 +136,6 @@ class JobVacancyService
     public const STATUS_ANY_VACANT = 'kosong';
 
     /**
-     * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
-     * sementara sehingga formasi yang hanya dijabat Pj/Plt tetap lowong (DOMAIN.md §5.2).
-     */
-    /**
      * Kuota yang masih dapat diisi penempatan: kuota dikurangi SELURUH pemegang, termasuk Pj/Plt, karena pemegang
      * sementara tetap menempati kursinya dan formasinya tidak dilepaskan (DOMAIN.md §5.2). Berbeda dengan
      * `vacant_slots` (kuota dikurangi pejabat definitif), yang mengukur kekosongan jabatan definitif.
@@ -155,6 +151,20 @@ class JobVacancyService
         return in_array(strtolower(trim((string) $statusPenugasan)), self::ACTING_STATUSES, true);
     }
 
+    /**
+     * Pemesanan mutasi terjadwal menutup formasi hanya bila jumlahnya menghabiskan kuota yang masih kosong: satu
+     * pemesanan pada formasi berkuota tiga yang baru terisi satu tidak menutup kursi kedua. Formasi tanpa kuota kosong
+     * tertutup oleh pemesanan apa pun. Sumber tunggal bagi FormationService::analyzeTarget() dan layar monitoring.
+     */
+    public static function isReserved(int $bookings, int $freeSlots): bool
+    {
+        return $bookings > 0 && $bookings >= $freeSlots;
+    }
+
+    /**
+     * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
+     * sementara sehingga formasi yang hanya dijabat Pj/Plt tetap lowong (DOMAIN.md §5.2).
+     */
     public static function classifySeat(int $kuota, int $definitive, int $acting): string
     {
         return match (true) {
@@ -164,6 +174,30 @@ class JobVacancyService
             $definitive === 0 => 'empty',
             default => 'partial',
         };
+    }
+
+    /**
+     * Penugasan sementara (Pj/Plt) yang ditempatkan lewat Mutasi hanya tercatat sebagai baris riwayat terbuka; baris
+     * karyawannya tetap di formasi asal. Penugasan itu tetap menempati satu kursi di formasi tujuan. Karyawan yang
+     * baris karyawannya sudah berada di formasi itu tidak dihitung dua kali.
+     *
+     * @return Collection<string, int> jumlah per "unit_kerja|jabatan"
+     */
+    public function temporaryHolderCounts(?string $jabatan = null, ?string $unitKerja = null): Collection
+    {
+        return DB::table('job_histories as jh')
+            ->join('employees as emp', 'emp.nik', '=', 'jh.employee_nik')
+            ->whereNull('jh.deleted_at')
+            ->where('jh.is_applied', true)
+            ->whereNull('jh.tmt_akhir')
+            ->whereRaw("lower(trim(jh.status_penugasan)) in ('".implode("', '", self::ACTING_STATUSES)."')")
+            ->where(fn ($q) => $q->whereColumn('emp.jabatan', '!=', 'jh.jabatan')->orWhereColumn('emp.unit_kerja', '!=', 'jh.unit_kerja'))
+            ->when($jabatan !== null, fn ($q) => $q->where('jh.jabatan', $jabatan))
+            ->when($unitKerja !== null, fn ($q) => $q->where('jh.unit_kerja', $unitKerja))
+            ->selectRaw('jh.unit_kerja, jh.jabatan, count(distinct jh.employee_nik) as total')
+            ->groupBy('jh.unit_kerja', 'jh.jabatan')
+            ->get()
+            ->mapWithKeys(fn ($row) => ["{$row->unit_kerja}|{$row->jabatan}" => (int) $row->total]);
     }
 
     /**
@@ -368,17 +402,21 @@ class JobVacancyService
             ->unique(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}")
             ->keyBy(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}");
 
-        // Pemesanan terbaru (id terbesar) menang, sama dengan FormationService::analyzeTarget.
+        // Pemesanan per formasi; yang terbaru (id terbesar) disebut namanya, sama dengan FormationService::analyzeTarget.
         $reserved = JobHistory::with('employee:nik,nama')
             ->where('is_applied', false)
             ->orderBy('id')
             ->get()
-            ->keyBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
+            ->groupBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
 
-        return $seats->map(function (object $seat) use ($holders, $lastDeparture, $reserved): object {
+        // Pj/Plt yang ditempatkan lewat Mutasi menempati kursi tanpa baris karyawan di formasi tujuan.
+        $temporary = $this->temporaryHolderCounts();
+
+        return $seats->map(function (object $seat) use ($holders, $lastDeparture, $reserved, $temporary): object {
             $group = $holders->get("{$seat->unit_kerja}|{$seat->jabatan}", collect());
-            $acting = (int) $group->filter(fn ($row) => self::isActing($row->status_penugasan))->sum('total');
-            $definitive = (int) $group->sum('total') - $acting;
+            $acting = (int) $group->filter(fn ($row) => self::isActing($row->status_penugasan))->sum('total')
+                + $temporary->get("{$seat->unit_kerja}|{$seat->jabatan}", 0);
+            $definitive = (int) $group->filter(fn ($row) => ! self::isActing($row->status_penugasan))->sum('total');
             $kuota = (int) $seat->kuota;
 
             $key = "{$seat->jabatan}|{$seat->unit_kerja}";
@@ -387,7 +425,8 @@ class JobVacancyService
             $vacantSince = $departure && $kuota - $definitive > 0 ? Carbon::parse($departure) : null;
             // Tanggal keluar di masa depan (mutasi terjadwal) belum menghitung lama kosong.
             $daysVacant = $vacantSince ? max(0, (int) $vacantSince->diffInDays(now())) : null;
-            $booking = $reserved->get($key);
+            $bookings = $reserved->get($key, collect());
+            $booking = $bookings->last();
 
             $seat->family = JabatanFamily::of($seat->jabatan);
             $seat->latest_history_id = $lastDeparture->get($key)?->id;
@@ -408,7 +447,7 @@ class JobVacancyService
                 $daysVacant >= 30 => 'yellow',
                 default => 'green',
             };
-            $seat->is_reserved = $booking !== null;
+            $seat->is_reserved = self::isReserved($bookings->count(), $seat->free_slots);
             $seat->reserved_occupant_name = $booking?->employee?->nama;
             $seat->reserved_tmt = $booking?->tmt_awal ? Carbon::parse($booking->tmt_awal)->translatedFormat('d M Y') : null;
 

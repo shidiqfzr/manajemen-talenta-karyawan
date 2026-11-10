@@ -155,6 +155,69 @@ class FormationServiceTest extends TestCase
         $this->assertFalse($analysis['vacant']);
     }
 
+    public function test_a_pj_plt_placed_through_mutasi_takes_a_seat(): void
+    {
+        $this->seat('Asisten Dua Kursi', 2);
+        $this->holders('Asisten Dua Kursi', 1);
+        $assignee = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create(['employee_nik' => $assignee->nik, 'jabatan' => 'Asisten Dua Kursi', 'unit_kerja' => $this->unit->nama, 'status_penugasan' => 'Plt', 'tmt_awal' => now()->subDays(5)->toDateString(), 'is_applied' => true]);
+
+        $analysis = $this->analyze('Asisten Dua Kursi');
+
+        $this->assertSame(2, $analysis['holders']);
+        $this->assertSame(0, $analysis['free_slots']);
+        $this->assertSame('occupied', $analysis['type']);
+    }
+
+    public function test_a_zero_quota_formasi_has_no_free_seat_and_no_occupant(): void
+    {
+        $this->seat('Petugas Mess', 0);
+
+        $analysis = $this->analyze('Petugas Mess');
+
+        $this->assertSame(0, $analysis['kuota']);
+        $this->assertSame(0, $analysis['free_slots']);
+        $this->assertSame('occupied', $analysis['type']);
+        $this->assertNull($analysis['occupant']);
+    }
+
+    public function test_bookings_of_excluded_employees_do_not_reserve_the_formasi(): void
+    {
+        $this->seat('Manajer Dipesan', 1);
+        $this->book('Manajer Dipesan', 1);
+        $booker = JobHistory::where('is_applied', false)->value('employee_nik');
+
+        $this->assertTrue($this->analyze('Manajer Dipesan')['is_reserved']);
+
+        $own = $this->formations->analyzeTarget('Manajer Dipesan', $this->unit->nama, [$booker]);
+        $this->assertFalse($own['is_reserved'], 'The requester\'s own booking must not block them.');
+        $this->assertTrue($own['vacant']);
+    }
+
+    public function test_open_slots_are_the_free_seats_not_taken_by_other_bookings(): void
+    {
+        $this->seat('Asisten Tiga Kursi', 3);
+        $this->holders('Asisten Tiga Kursi', 1);
+        $this->book('Asisten Tiga Kursi', 1);
+        $booker = JobHistory::where('is_applied', false)->value('employee_nik');
+
+        $this->assertSame(2, $this->analyze('Asisten Tiga Kursi')['free_slots']);
+        $this->assertSame(1, $this->analyze('Asisten Tiga Kursi')['open_slots']);
+        $this->assertSame(2, $this->formations->analyzeTarget('Asisten Tiga Kursi', $this->unit->nama, [$booker])['open_slots']);
+    }
+
+    public function test_a_pool_result_has_the_same_keys_as_any_other_result(): void
+    {
+        Position::create(['nama' => 'Advisor Uji', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true, 'is_overflow' => true]);
+
+        $analysis = $this->analyze('Advisor Uji');
+
+        $this->assertSame('pool', $analysis['type']);
+        foreach (['kuota', 'holders', 'free_slots', 'open_slots', 'multi_seat'] as $key) {
+            $this->assertArrayHasKey($key, $analysis);
+        }
+    }
+
     public function test_a_pair_outside_the_master_formasi_counts_as_one_seat(): void
     {
         Position::create(['nama' => 'Jabatan Di Luar Master', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
