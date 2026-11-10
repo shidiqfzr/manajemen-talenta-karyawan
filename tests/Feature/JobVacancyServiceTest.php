@@ -31,15 +31,15 @@ class JobVacancyServiceTest extends TestCase
         $this->unit = Unit::create(['nama' => 'Kebun Tracker Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
     }
 
-    private function seat(string $jabatan, int $kuota, ?Unit $unit = null, bool $positionActive = true): Position
+    private function seat(string $jabatan, int $kuota, ?Unit $unit = null, bool $positionActive = true, string $rm = 'RM-3', string $bidang = 'TAN'): Position
     {
-        $position = Position::create(['nama' => $jabatan, 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => $positionActive]);
+        $position = Position::create(['nama' => $jabatan, 'level' => 'Karpim', 'rm_level' => $rm, 'is_active' => $positionActive]);
 
         DB::table('position_unit')->insert([
             'unit_id' => ($unit ?? $this->unit)->id,
             'position_id' => $position->id,
             'kuota' => $kuota,
-            'bidang' => 'TAN',
+            'bidang' => $bidang,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -171,6 +171,128 @@ class JobVacancyServiceTest extends TestCase
 
         $this->assertTrue($row->is_reserved);
         $this->assertSame('Sari Pengganti', $row->reserved_occupant_name);
+    }
+
+    private function otherUnit(string $nama = 'Pabrik Pembanding', string $wilayah = 'Wilayah Kalimantan Barat'): Unit
+    {
+        return Unit::create(['nama' => $nama, 'kode' => 'PKS', 'wilayah' => $wilayah, 'is_active' => true, 'urutan' => 2]);
+    }
+
+    public function test_seats_include_filled_formasi_and_carry_family_and_wilayah(): void
+    {
+        $first = $this->seat('Asisten Afdeling I', 1);
+        $this->seat('Asisten Afdeling II', 1);
+        $this->holders($first, 1);
+
+        $seats = $this->service->getFormasiSeats();
+
+        $this->assertCount(2, $seats);
+        $full = $seats->firstWhere('jabatan', 'Asisten Afdeling I');
+        $this->assertSame('full', $full->status);
+        $this->assertSame('Asisten Afdeling', $full->family);
+        $this->assertSame('Wilayah Kalimantan Barat', $full->wilayah);
+        $this->assertSame('empty', $seats->firstWhere('jabatan', 'Asisten Afdeling II')->status);
+    }
+
+    public function test_kosong_status_matches_every_vacant_state_only(): void
+    {
+        $full = $this->seat('Manajer Penuh', 1);
+        $this->holders($full, 1);
+        $partial = $this->seat('Manajer Sebagian', 2);
+        $this->holders($partial, 1);
+        $acting = $this->seat('Manajer Plt', 1);
+        $this->holders($acting, 1, 'Plt');
+        $this->seat('Manajer Kosong', 1);
+
+        $names = $this->service->getFormasiSeats(status: 'kosong')->pluck('jabatan')->sort()->values()->all();
+
+        $this->assertSame(['Manajer Kosong', 'Manajer Plt', 'Manajer Sebagian'], $names);
+    }
+
+    public function test_rm_bidang_and_wilayah_filters(): void
+    {
+        $kaltim = $this->otherUnit('Kebun Kaltim', 'Wilayah Kalimantan Timur');
+        $this->seat('Kepala Keuangan', 1, null, rm: 'RM-2', bidang: 'KEU');
+        $this->seat('Asisten Tanaman', 1, $kaltim, rm: 'RM-3', bidang: 'TAN');
+
+        $this->assertSame(['Kepala Keuangan'], $this->service->getFormasiSeats(rmLevel: 'RM-2')->pluck('jabatan')->all());
+        $this->assertSame(['Asisten Tanaman'], $this->service->getFormasiSeats(bidang: 'TAN')->pluck('jabatan')->all());
+        $this->assertSame(['Asisten Tanaman'], $this->service->getFormasiSeats(wilayah: 'Wilayah Kalimantan Timur')->pluck('jabatan')->all());
+        $this->assertSame([], $this->service->getFormasiSeats(rmLevel: 'RM-9')->pluck('jabatan')->all());
+    }
+
+    public function test_search_matches_the_family_name(): void
+    {
+        $this->seat('Asisten Afdeling IV', 1);
+        $this->seat('Manajer Pabrik', 1);
+
+        $this->assertSame(['Asisten Afdeling IV'], $this->service->getFormasiSeats(search: 'afdeling')->pluck('jabatan')->all());
+    }
+
+    public function test_distribution_groups_numbered_positions_into_one_family(): void
+    {
+        $unitB = $this->otherUnit();
+        $a1 = $this->seat('Asisten Afdeling I', 1);
+        $this->holders($a1, 1);
+        $this->seat('Asisten Afdeling II', 1);
+        $a3 = $this->seat('Asisten Afdeling III', 2, $unitB);
+        $this->holders($a3, 1, 'Definitif', $unitB);
+
+        $row = $this->service->getJabatanDistribution()->firstWhere('family', 'Asisten Afdeling');
+
+        $this->assertSame(3, $row->jabatan_count);
+        $this->assertSame(2, $row->unit_count);
+        $this->assertSame(4, $row->kuota);
+        $this->assertSame(2, $row->filled);
+        $this->assertSame(2, $row->vacant_slots);
+        $this->assertSame(2, $row->vacant_units);
+        $this->assertSame(50, $row->fill_rate);
+        $this->assertSame(['RM-3'], $row->rm_levels);
+        $this->assertCount(3, $row->seats);
+    }
+
+    public function test_distribution_filters_seats_before_grouping(): void
+    {
+        $unitB = $this->otherUnit();
+        $this->seat('Asisten Afdeling I', 1);
+        $this->seat('Asisten Afdeling III', 2, $unitB);
+
+        $filtered = $this->service->getJabatanDistribution(unitKerja: 'Pabrik Pembanding');
+        $row = $filtered->firstWhere('family', 'Asisten Afdeling');
+
+        $this->assertCount(1, $filtered);
+        $this->assertSame(2, $row->kuota);
+        $this->assertSame(1, $row->unit_count);
+        $this->assertCount(1, $row->seats);
+    }
+
+    public function test_distribution_orders_families_with_most_vacancies_first(): void
+    {
+        $this->seat('Manajer Satu', 1);
+        $this->seat('Asisten Dua', 3);
+
+        $this->assertSame(['Asisten Dua', 'Manajer Satu'], $this->service->getJabatanDistribution()->pluck('family')->all());
+    }
+
+    public function test_query_count_is_fixed_regardless_of_seat_count(): void
+    {
+        $units = [$this->unit, $this->otherUnit('Unit Dua'), $this->otherUnit('Unit Tiga')];
+        foreach (range(1, 30) as $n) {
+            $unit = $units[$n % 3];
+            $position = $this->seat("Asisten Afdeling {$n}", 1, $unit);
+            if ($n % 2 === 0) {
+                $this->holders($position, 1, 'Definitif', $unit);
+            }
+        }
+        $successor = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create(['employee_nik' => $successor->nik, 'jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => $this->unit->nama, 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        DB::enableQueryLog();
+        $this->service->getJabatanDistribution();
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(5, $queries);
     }
 
     public function test_filters_by_search_unit_and_status(): void

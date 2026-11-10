@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Services\Formasi\JabatanFamily;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -138,14 +139,17 @@ class JobVacancyService
     /** Label status formasi jabatan; dipakai layar Formasi, filter, dan ekspor agar istilahnya sama. */
     public const SEAT_STATUS_LABELS = [
         'over' => 'Melebihi kuota',
-        'partial' => 'Ada lowongan',
+        'partial' => 'Sebagian kosong',
         'acting' => 'Diisi Pj/Plt',
         'empty' => 'Kosong',
         'full' => 'Penuh',
     ];
 
-    /** Status yang masih memiliki lowongan (kuota belum terisi pejabat definitif). */
+    /** Status yang masih memiliki kekosongan (kuota belum terisi pejabat definitif). */
     public const VACANT_STATUSES = ['partial', 'acting', 'empty'];
+
+    /** Nilai filter status yang mencakup seluruh VACANT_STATUSES sekaligus. */
+    public const STATUS_ANY_VACANT = 'kosong';
 
     /**
      * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
@@ -163,38 +167,102 @@ class JobVacancyService
     }
 
     /**
-     * Pelacak formasi lowong: setiap formasi jabatan (unit aktif, jabatan aktif) yang kuotanya belum terisi
-     * pejabat definitif. Dihitung langsung dari position_unit dan karyawan, tanpa status tersimpan, sehingga
-     * tidak dapat bergeser dari data karyawan. Formasi yang tidak pernah terisi ikut terdeteksi.
+     * Seluruh formasi jabatan (unit aktif, jabatan aktif), terisi maupun kosong, beserta statusnya. Dihitung langsung
+     * dari position_unit dan karyawan, tanpa status tersimpan, sehingga tidak dapat bergeser dari data karyawan.
+     * Formasi yang tidak pernah terisi ikut terdeteksi. Urutan bawaan: kekosongan terbanyak, lalu terlama kosong.
+     *
+     * `$status` berisi kunci SEAT_STATUS_LABELS atau STATUS_ANY_VACANT; nilai lain tidak cocok dengan apa pun.
      *
      * @return Collection<int, object>
      */
-    public function getFormasiVacancies(?string $search = null, ?string $unitKerja = null, ?string $status = null): Collection
-    {
+    public function getFormasiSeats(
+        ?string $search = null,
+        ?string $unitKerja = null,
+        ?string $status = null,
+        ?string $wilayah = null,
+        ?string $rmLevel = null,
+        ?string $bidang = null,
+    ): Collection {
         $rows = $this->formasiRows();
 
         if ($search !== null && $search !== '') {
             $term = mb_strtolower($search);
             $rows = $rows->filter(fn (object $row) => str_contains(mb_strtolower($row->jabatan), $term)
+                || str_contains(mb_strtolower($row->family), $term)
                 || str_contains(mb_strtolower($row->unit_kerja), $term));
         }
 
-        if ($unitKerja !== null && $unitKerja !== '') {
-            $rows = $rows->where('unit_kerja', $unitKerja);
+        foreach (['unit_kerja' => $unitKerja, 'wilayah' => $wilayah, 'rm_level' => $rmLevel, 'bidang' => $bidang] as $column => $value) {
+            if ($value !== null && $value !== '') {
+                $rows = $rows->where($column, $value);
+            }
         }
-
-        $rows = $rows->where('vacant_slots', '>', 0);
 
         if ($status !== null && $status !== '') {
-            $rows = $rows->where('status', $status);
+            $rows = $status === self::STATUS_ANY_VACANT
+                ? $rows->whereIn('status', self::VACANT_STATUSES)
+                : $rows->where('status', $status);
         }
 
-        // Longest vacant first; formasi that were never filled have no date and follow the dated ones.
         return $rows
             ->sortBy([
+                fn (object $a, object $b) => $b->vacant_slots <=> $a->vacant_slots,
+                // Formasi that were never filled have no date and follow the dated ones.
                 fn (object $a, object $b) => ($b->days_vacant ?? -1) <=> ($a->days_vacant ?? -1),
                 fn (object $a, object $b) => strcmp($a->unit_kerja, $b->unit_kerja),
                 fn (object $a, object $b) => strcmp($a->jabatan, $b->jabatan),
+            ])
+            ->values();
+    }
+
+    /**
+     * Pelacak formasi kosong: formasi jabatan yang kuotanya belum terisi pejabat definitif.
+     * Bawaan menampilkan seluruh status kosong; `$status` dapat mempersempitnya.
+     *
+     * @return Collection<int, object>
+     */
+    public function getFormasiVacancies(?string $search = null, ?string $unitKerja = null, ?string $status = null): Collection
+    {
+        return $this->getFormasiSeats($search, $unitKerja, $status !== null && $status !== '' ? $status : self::STATUS_ANY_VACANT);
+    }
+
+    /**
+     * Sebaran per rumpun jabatan (JabatanFamily): satu baris per rumpun dengan total kuota, terisi, kosong, dan
+     * jumlah unit, beserta rincian formasi per unit. Filter diterapkan pada formasi sebelum dikelompokkan.
+     *
+     * @return Collection<int, object>
+     */
+    public function getJabatanDistribution(
+        ?string $search = null,
+        ?string $unitKerja = null,
+        ?string $status = null,
+        ?string $wilayah = null,
+        ?string $rmLevel = null,
+        ?string $bidang = null,
+    ): Collection {
+        return $this->getFormasiSeats($search, $unitKerja, $status, $wilayah, $rmLevel, $bidang)
+            ->groupBy('family')
+            ->map(function (Collection $seats, string $family): object {
+                $kuota = (int) $seats->sum('kuota');
+                $filled = (int) $seats->sum('filled');
+
+                return (object) [
+                    'family' => $family,
+                    'rm_levels' => $seats->pluck('rm_level')->filter()->unique()->sort()->values()->all(),
+                    'jabatan_count' => $seats->pluck('jabatan')->unique()->count(),
+                    'unit_count' => $seats->pluck('unit_id')->unique()->count(),
+                    'kuota' => $kuota,
+                    'filled' => $filled,
+                    'acting' => (int) $seats->sum('acting'),
+                    'vacant_slots' => (int) $seats->sum('vacant_slots'),
+                    'vacant_units' => $seats->where('vacant_slots', '>', 0)->pluck('unit_id')->unique()->count(),
+                    'fill_rate' => $kuota > 0 ? (int) round(min($filled, $kuota) / $kuota * 100) : 0,
+                    'seats' => $seats->values(),
+                ];
+            })
+            ->sortBy([
+                fn (object $a, object $b) => $b->vacant_slots <=> $a->vacant_slots,
+                fn (object $a, object $b) => strcmp($a->family, $b->family),
             ])
             ->values();
     }
@@ -253,7 +321,7 @@ class JobVacancyService
             ->where('positions.is_active', true)
             ->get([
                 'position_unit.id as position_unit_id', 'position_unit.kuota', 'position_unit.bidang',
-                'units.id as unit_id', 'units.nama as unit_kerja',
+                'units.id as unit_id', 'units.nama as unit_kerja', 'units.wilayah',
                 'positions.nama as jabatan', 'positions.level', 'positions.rm_level',
             ]);
 
@@ -293,6 +361,7 @@ class JobVacancyService
             $daysVacant = $vacantSince ? (int) $vacantSince->diffInDays(now()) : null;
             $booking = $reserved->get($key);
 
+            $seat->family = JabatanFamily::of($seat->jabatan);
             $seat->kuota = $kuota;
             $seat->filled = $definitive;
             $seat->acting = $acting;
