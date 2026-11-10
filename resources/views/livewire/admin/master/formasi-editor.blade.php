@@ -165,7 +165,7 @@
             <x-admin.kpi-card title="Formasi Jabatan" :value="$stats['seats']" subtitle="Jabatan pada seluruh unit" icon="fas fa-briefcase" theme="primary" />
             <x-admin.kpi-card title="Total Kuota" :value="$stats['kuota']" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
             <x-admin.kpi-card title="Terisi" :value="$stats['filled']" :badge="$stats['kuota'] > 0 ? round($stats['filled'] / $stats['kuota'] * 100).'%' : null" :subtitle="$stats['over'].' formasi melebihi kuota'" icon="fas fa-user-check" theme="primary" />
-            <x-admin.kpi-card title="Formasi Lowong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' lowongan, klik untuk rincian'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.lowongan.index')" />
+            <x-admin.kpi-card title="Formasi Lowong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' lowongan, klik untuk rincian'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.sebaran.index')" />
         </div>
 
         <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Karyawan) -->
@@ -216,7 +216,7 @@
                                 </td>
                                 <td class="py-3.5 px-5 tabular-nums">
                                     @if ($row->vacant > 0)
-                                        <a href="{{ route('admin.master.lowongan.index', ['unit' => $row->nama]) }}" wire:navigate aria-label="Lihat {{ $row->vacant }} lowongan pada {{ $row->nama }}"
+                                        <a href="{{ route('admin.master.sebaran.index', ['unit' => $row->nama]) }}" wire:navigate aria-label="Lihat {{ $row->vacant }} lowongan pada {{ $row->nama }}"
                                             class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-50 text-warning-800 border border-warning-200 hover:bg-warning-100 transition">{{ $row->vacant }} lowong</a>
                                     @else
                                         <span class="text-surface-400">0</span>

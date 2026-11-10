@@ -171,7 +171,8 @@ class JobVacancyService
      * dari position_unit dan karyawan, tanpa status tersimpan, sehingga tidak dapat bergeser dari data karyawan.
      * Formasi yang tidak pernah terisi ikut terdeteksi. Urutan bawaan: kekosongan terbanyak, lalu terlama kosong.
      *
-     * `$status` berisi kunci SEAT_STATUS_LABELS atau STATUS_ANY_VACANT; nilai lain tidak cocok dengan apa pun.
+     * `$status` berisi kunci SEAT_STATUS_LABELS atau STATUS_ANY_VACANT; `$severity` berisi red, yellow, green, atau unknown.
+     * Nilai lain tidak cocok dengan apa pun.
      *
      * @return Collection<int, object>
      */
@@ -182,6 +183,7 @@ class JobVacancyService
         ?string $wilayah = null,
         ?string $rmLevel = null,
         ?string $bidang = null,
+        ?string $severity = null,
     ): Collection {
         $rows = $this->formasiRows();
 
@@ -192,7 +194,7 @@ class JobVacancyService
                 || str_contains(mb_strtolower($row->unit_kerja), $term));
         }
 
-        foreach (['unit_kerja' => $unitKerja, 'wilayah' => $wilayah, 'rm_level' => $rmLevel, 'bidang' => $bidang] as $column => $value) {
+        foreach (['unit_kerja' => $unitKerja, 'wilayah' => $wilayah, 'rm_level' => $rmLevel, 'bidang' => $bidang, 'severity' => $severity] as $column => $value) {
             if ($value !== null && $value !== '') {
                 $rows = $rows->where($column, $value);
             }
@@ -239,8 +241,9 @@ class JobVacancyService
         ?string $wilayah = null,
         ?string $rmLevel = null,
         ?string $bidang = null,
+        ?string $severity = null,
     ): Collection {
-        return $this->getFormasiSeats($search, $unitKerja, $status, $wilayah, $rmLevel, $bidang)
+        return $this->getFormasiSeats($search, $unitKerja, $status, $wilayah, $rmLevel, $bidang, $severity)
             ->groupBy('family')
             ->map(function (Collection $seats, string $family): object {
                 $kuota = (int) $seats->sum('kuota');

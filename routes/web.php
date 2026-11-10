@@ -147,8 +147,10 @@ Route::prefix('admin')
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
             Route::resource('units', UnitController::class)->only(['store', 'update', 'destroy']);
 
-            // Formasi lowong: pelacak lintas unit formasi jabatan yang belum terisi (read-only, JobVacancyService)
-            Route::view('lowongan', 'admin.master.lowongan.index')->name('lowongan.index');
+            // Sebaran Formasi: gambaran lintas unit formasi jabatan terisi dan kosong (read-only, JobVacancyService)
+            Route::view('sebaran', 'admin.master.sebaran.index')->name('sebaran.index');
+            // Tautan lama tab "Formasi Lowong" diteruskan ke Sebaran Formasi dengan filternya.
+            Route::get('lowongan', fn (Request $request) => redirect()->route('admin.master.sebaran.index', $request->only(['unit', 'status', 'search']), 301));
 
             // Riwayat perubahan master (read-only)
             Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');

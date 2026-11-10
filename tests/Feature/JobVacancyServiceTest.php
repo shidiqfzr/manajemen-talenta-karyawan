@@ -266,6 +266,27 @@ class JobVacancyServiceTest extends TestCase
         $this->assertCount(1, $row->seats);
     }
 
+    public function test_severity_filter_applies_to_seats_before_grouping(): void
+    {
+        $old = $this->seat('Asisten Afdeling I', 1);
+        $this->seat('Asisten Afdeling II', 1);
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create([
+            'employee_nik' => $former->nik,
+            'jabatan' => $old->nama,
+            'unit_kerja' => $this->unit->nama,
+            'tmt_awal' => now()->subYears(2)->toDateString(),
+            'tmt_akhir' => now()->subDays(200)->toDateString(),
+        ]);
+
+        $this->assertSame(['Asisten Afdeling I'], $this->service->getFormasiSeats(severity: 'red')->pluck('jabatan')->all());
+        $this->assertSame(['Asisten Afdeling II'], $this->service->getFormasiSeats(severity: 'unknown')->pluck('jabatan')->all());
+
+        $row = $this->service->getJabatanDistribution(severity: 'red')->firstWhere('family', 'Asisten Afdeling');
+        $this->assertSame(1, $row->kuota);
+        $this->assertCount(1, $row->seats);
+    }
+
     public function test_distribution_orders_families_with_most_vacancies_first(): void
     {
         $this->seat('Manajer Satu', 1);
