@@ -70,6 +70,16 @@
                         {{ $counts['recent'] }}
                     </span>
                 </button>
+
+                <!-- Never filled: no departure date to age from -->
+                <button type="button" wire:click="$set('severityFilter', 'unknown')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer {{ $severityFilter === 'unknown' ? 'bg-surface-700 text-white shadow-2xs' : 'bg-white text-surface-700 hover:bg-surface-100 border border-surface-200' }}">
+                    <span class="w-1.5 h-1.5 rounded-full {{ $severityFilter === 'unknown' ? 'bg-white' : 'bg-surface-400' }}"></span>
+                    <span>Belum Pernah Terisi</span>
+                    <span class="px-1.5 py-0.2 rounded-full text-[10px] {{ $severityFilter === 'unknown' ? 'bg-white/20 text-white' : 'bg-surface-100 text-surface-700 font-bold' }}">
+                        {{ $counts['unknown'] }}
+                    </span>
+                </button>
             </div>
 
         </div>
@@ -179,6 +189,13 @@
                                         </span>
                                         <span class="text-[10px] font-semibold text-warning-800 mt-1 uppercase tracking-wider">
                                             Perhatian (30-90 Hari)
+                                        </span>
+                                    </div>
+                                @elseif ($item->severity === 'unknown')
+                                    <div class="inline-flex flex-col items-center">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-100 text-surface-700 border border-surface-200">
+                                            <i class="fas fa-minus text-surface-500 text-[10px]" aria-hidden="true"></i>
+                                            Belum pernah terisi
                                         </span>
                                     </div>
                                 @else

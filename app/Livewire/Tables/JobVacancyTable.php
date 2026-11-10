@@ -85,6 +85,7 @@ class JobVacancyTable extends Component
                 'red' => 'Kritis (> 90 hari)',
                 'yellow' => 'Sedang (30–90 hari)',
                 'green' => 'Baru (< 30 hari)',
+                'unknown' => 'Belum pernah terisi',
             ])->withoutControl(),
         ];
     }
@@ -142,6 +143,7 @@ class JobVacancyTable extends Component
             'critical' => $baseVacancies->where('severity', 'red')->count(),
             'moderate' => $baseVacancies->where('severity', 'yellow')->count(),
             'recent' => $baseVacancies->where('severity', 'green')->count(),
+            'unknown' => $baseVacancies->where('severity', 'unknown')->count(),
         ];
 
         $filteredVacancies = $this->severityFilter

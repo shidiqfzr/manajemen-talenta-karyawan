@@ -5,8 +5,12 @@ namespace Tests\Feature;
 use App\Livewire\Tables\JobVacancyTable;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\Position;
+use App\Models\Unit;
 use App\Models\User;
+use App\Services\JobVacancyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -29,8 +33,23 @@ class JobVacancyTableTest extends TestCase
         $this->makeVacancy('Jabatan Baru Alfa', 'Unit Alfa', now()->subDays(5));
     }
 
+    /** A formasi seat (master formasi) in the given unit; the unit is created on first use. */
+    private function makeSeat(string $jabatan, string $unit, int $kuota = 1): Position
+    {
+        $unitModel = Unit::firstOrCreate(['nama' => $unit], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
+        $position = Position::create(['nama' => $jabatan, 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+
+        DB::table('position_unit')->insert([
+            'unit_id' => $unitModel->id, 'position_id' => $position->id, 'kuota' => $kuota, 'bidang' => 'TAN',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $position;
+    }
+
     private function makeVacancy(string $jabatan, string $unit, $vacantSince): void
     {
+        $this->makeSeat($jabatan, $unit);
         $employee = Employee::factory()->create(['jabatan' => 'Jabatan Aktif '.$jabatan, 'unit_kerja' => $unit]);
 
         JobHistory::create([
@@ -129,6 +148,46 @@ class JobVacancyTableTest extends TestCase
             ->assertSet('perPage', 10)
             ->set('perPage', 25)
             ->assertSet('perPage', 25);
+    }
+
+    public function test_formasi_that_was_never_filled_is_listed_and_filterable(): void
+    {
+        $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
+
+        $component = Livewire::test(JobVacancyTable::class)
+            ->assertSee('Jabatan Belum Pernah Terisi')
+            ->assertSee('Belum pernah terisi');
+        $this->assertStringContainsString('4 Lowongan', preg_replace('/\s+/', ' ', $component->html()));
+
+        $component->set('severityFilter', 'unknown')
+            ->assertSet('severityFilter', 'unknown')
+            ->assertSee('Jabatan Belum Pernah Terisi')
+            ->assertDontSee('Jabatan Kritis Alfa')
+            ->assertSeeHtml('aria-label="Hapus filter Urgensi"');
+    }
+
+    public function test_filled_formasi_and_positions_outside_the_master_are_not_listed(): void
+    {
+        $full = $this->makeSeat('Jabatan Sudah Penuh', 'Unit Alfa');
+        Employee::factory()->create(['jabatan' => $full->nama, 'unit_kerja' => 'Unit Alfa']);
+
+        // A departure from a position that is not a formasi seat is no vacancy.
+        $former = Employee::factory()->create(['jabatan' => 'Jabatan Lain', 'unit_kerja' => 'Unit Alfa']);
+        JobHistory::create(['employee_nik' => $former->nik, 'jabatan' => 'Jabatan Di Luar Master', 'unit_kerja' => 'Unit Alfa', 'tmt_awal' => now()->subYears(2)->toDateString(), 'tmt_akhir' => now()->subDays(20)->toDateString()]);
+
+        Livewire::test(JobVacancyTable::class)
+            ->assertDontSee('Jabatan Sudah Penuh')
+            ->assertDontSee('Jabatan Di Luar Master')
+            ->assertSee('Jabatan Kritis Alfa');
+    }
+
+    public function test_the_monitor_count_equals_the_formasi_kosong_count_of_sebaran_formasi(): void
+    {
+        $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
+
+        $html = preg_replace('/\s+/', ' ', Livewire::test(JobVacancyTable::class)->html());
+
+        $this->assertStringContainsString(app(JobVacancyService::class)->getFormasiStatistics()['vacant_formasi'].' Lowongan', $html);
     }
 
     public function test_reserved_vacancy_shows_the_reserved_employee_name(): void

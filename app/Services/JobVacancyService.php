@@ -12,119 +12,65 @@ use Illuminate\Support\Facades\DB;
 class JobVacancyService
 {
     /**
-     * Retrieve all vacant positions (Jabatan & Unit Kerja where previous occupant departed
-     * and no current active employee occupies it).
+     * Monitoring Formasi Kosong (modul Mutasi): formasi jabatan yang kuotanya belum terisi pejabat definitif.
+     * Memakai sumber yang sama dengan Sebaran Formasi (getFormasiSeats), sehingga angka kekosongan di seluruh aplikasi
+     * selalu sama. Menambahkan pejabat terakhir (dari riwayat jabatan), jenjang, golongan, dan lama kosong dalam
+     * bentuk yang dipakai tabel monitoring. Terurut dari yang terlama kosong; formasi yang belum pernah terisi di akhir.
+     *
+     * @return Collection<int, object>
      */
     public function getVacancies(?string $search = null, ?string $unitKerja = null): Collection
     {
-        // 1. Find the latest departure record for every vacated (jabatan, unit_kerja) pair
-        $vacatedSubquery = DB::table('job_histories as jh')
-            ->select(
-                'jh.jabatan',
-                'jh.unit_kerja',
-                DB::raw('MAX(jh.tmt_akhir) as vacant_since'),
-                DB::raw('MAX(jh.id) as latest_history_id')
-            )
-            ->whereNotNull('jh.tmt_akhir')
-            ->groupBy('jh.jabatan', 'jh.unit_kerja');
-
-        $query = DB::table(DB::raw("({$vacatedSubquery->toSql()}) as v"))
-            ->mergeBindings($vacatedSubquery)
-            ->join('job_histories as jh', 'jh.id', '=', 'v.latest_history_id')
-            ->leftJoin('employees as last_emp', 'last_emp.nik', '=', 'jh.employee_nik')
-            // Exclude positions that are currently occupied by an active employee
-            ->whereNotExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('employees as current_emp')
-                    ->whereColumn('current_emp.jabatan', 'v.jabatan')
-                    ->whereColumn('current_emp.unit_kerja', 'v.unit_kerja');
-            })
-            ->select([
-                'v.jabatan',
-                'v.unit_kerja',
-                'v.vacant_since',
-                'jh.level',
-                'jh.golongan',
-                'jh.employee_nik as last_occupant_nik',
-                'last_emp.nama as last_occupant_name',
-                'last_emp.foto as last_occupant_photo',
+        $rows = $this->getFormasiSeats($search, $unitKerja, self::STATUS_ANY_VACANT)
+            ->sortBy([
+                fn (object $a, object $b) => ($b->days_vacant ?? -1) <=> ($a->days_vacant ?? -1),
+                fn (object $a, object $b) => strcmp($a->unit_kerja, $b->unit_kerja),
+                fn (object $a, object $b) => strcmp($a->jabatan, $b->jabatan),
             ])
-            ->orderBy('v.vacant_since', 'asc'); // Longest vacant first
+            ->values();
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('v.jabatan', 'like', "%{$search}%")
-                    ->orWhere('v.unit_kerja', 'like', "%{$search}%")
-                    ->orWhere('last_emp.nama', 'like', "%{$search}%")
-                    ->orWhere('jh.employee_nik', 'like', "%{$search}%");
-            });
-        }
+        $historyIds = $rows->pluck('latest_history_id')->filter()->all();
+        $occupants = $historyIds === [] ? collect() : DB::table('job_histories as jh')
+            ->leftJoin('employees as emp', 'emp.nik', '=', 'jh.employee_nik')
+            ->whereIn('jh.id', $historyIds)
+            ->get(['jh.id', 'jh.employee_nik', 'jh.level', 'jh.golongan', 'emp.nama', 'emp.foto'])
+            ->keyBy('id');
 
-        if ($unitKerja) {
-            $query->where('v.unit_kerja', $unitKerja);
-        }
+        return $rows->map(function (object $row) use ($occupants): object {
+            $last = $occupants->get($row->latest_history_id);
+            $since = $row->vacant_since ? Carbon::parse($row->vacant_since) : null;
 
-        $results = $query->get();
+            $row->level = $last->level ?? $row->level;
+            $row->golongan = $last->golongan ?? null;
+            $row->last_occupant_nik = $last->employee_nik ?? null;
+            $row->last_occupant_name = $last->nama ?? null;
+            $row->last_occupant_photo = $last->foto ?? null;
+            $row->vacant_since_formatted ??= '—';
+            $row->duration_human = $since
+                ? $since->diffForHumans(now(), ['parts' => 2, 'syntax' => Carbon::DIFF_RELATIVE_TO_NOW])
+                : 'Belum pernah terisi';
 
-        // Fetch all pending scheduled mutations (is_applied = false)
-        $scheduledByPosition = JobHistory::with('employee')
-            ->where('is_applied', false)
-            ->get()
-            ->keyBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
-
-        // Enhance each record with Carbon duration helpers and reservation status
-        return $results->map(function ($item) use ($scheduledByPosition) {
-            $vacantDate = $item->vacant_since ? Carbon::parse($item->vacant_since) : null;
-            $daysVacant = $vacantDate ? (int) $vacantDate->diffInDays(now()) : 0;
-
-            // Severity level:
-            // green: < 30 days, yellow: 30 - 90 days, red: > 90 days
-            $severity = 'green';
-            if ($daysVacant > 90) {
-                $severity = 'red';
-            } elseif ($daysVacant >= 30) {
-                $severity = 'yellow';
-            }
-
-            $key = "{$item->jabatan}|{$item->unit_kerja}";
-            $scheduled = $scheduledByPosition->get($key);
-
-            $item->days_vacant = $daysVacant;
-            $item->duration_human = $vacantDate ? $vacantDate->diffForHumans(now(), ['parts' => 2, 'syntax' => Carbon::DIFF_RELATIVE_TO_NOW]) : 'Tidak diketahui';
-            $item->vacant_since_formatted = $vacantDate ? $vacantDate->translatedFormat('d M Y') : '—';
-            $item->severity = $severity;
-            $item->is_reserved = $scheduled !== null;
-            $item->reserved_occupant_name = $scheduled?->employee?->nama;
-            $item->reserved_occupant_nik = $scheduled?->employee_nik;
-            $item->reserved_tmt = $scheduled?->tmt_awal ? Carbon::parse($scheduled->tmt_awal)->translatedFormat('d M Y') : null;
-            $item->reserved_sk = $scheduled?->nomor_sk;
-
-            return $item;
+            return $row;
         });
     }
 
     /**
-     * Get summary metrics for the vacancy dashboard.
+     * Ringkasan Monitoring Formasi Kosong. `total_vacancies` selalu sama dengan `vacant_formasi` pada
+     * getFormasiStatistics(), dan keempat ember lama kosong (critical, moderate, recent, unknown) berjumlah sama dengannya.
      */
     public function getStatistics(): array
     {
-        $allVacancies = $this->getVacancies();
-
-        $totalVacancies = $allVacancies->count();
-        $unitsAffected = $allVacancies->pluck('unit_kerja')->unique()->count();
-        $longestVacant = $allVacancies->first(); // Since it is ordered by vacant_since ASC
-
-        $criticalCount = $allVacancies->where('severity', 'red')->count();
-        $moderateCount = $allVacancies->where('severity', 'yellow')->count();
-        $recentCount = $allVacancies->where('severity', 'green')->count();
+        $all = $this->getVacancies();
 
         return [
-            'total_vacancies' => $totalVacancies,
-            'units_affected' => $unitsAffected,
-            'longest_vacant' => $longestVacant,
-            'critical_count' => $criticalCount,
-            'moderate_count' => $moderateCount,
-            'recent_count' => $recentCount,
+            'total_vacancies' => $all->count(),
+            'units_affected' => $all->pluck('unit_kerja')->unique()->count(),
+            // Terlama kosong yang tanggalnya diketahui; null bila semua formasi kosong belum pernah terisi.
+            'longest_vacant' => $all->first(fn (object $row) => $row->days_vacant !== null),
+            'critical_count' => $all->where('severity', 'red')->count(),
+            'moderate_count' => $all->where('severity', 'yellow')->count(),
+            'recent_count' => $all->where('severity', 'green')->count(),
+            'unknown_count' => $all->where('severity', 'unknown')->count(),
         ];
     }
 
@@ -365,7 +311,7 @@ class JobVacancyService
         $lastDeparture = DB::table('job_histories')
             ->whereNull('deleted_at')
             ->whereNotNull('tmt_akhir')
-            ->selectRaw('jabatan, unit_kerja, max(tmt_akhir) as vacant_since')
+            ->selectRaw('jabatan, unit_kerja, max(tmt_akhir) as vacant_since, max(id) as latest_history_id')
             ->groupBy('jabatan', 'unit_kerja')
             ->get()
             ->keyBy(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}");
@@ -389,6 +335,7 @@ class JobVacancyService
             $booking = $reserved->get($key);
 
             $seat->family = JabatanFamily::of($seat->jabatan);
+            $seat->latest_history_id = $lastDeparture->get($key)?->latest_history_id;
             $seat->kuota = $kuota;
             $seat->filled = $definitive;
             $seat->acting = $acting;

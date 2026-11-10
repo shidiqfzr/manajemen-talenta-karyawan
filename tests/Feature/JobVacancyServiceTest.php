@@ -336,6 +336,116 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame(50, $this->service->getFormasiStatistics()['fill_rate']);
     }
 
+    private function departure(Position $position, Employee $former, int $daysAgo, ?Unit $unit = null): void
+    {
+        JobHistory::create([
+            'employee_nik' => $former->nik,
+            'jabatan' => $position->nama,
+            'unit_kerja' => ($unit ?? $this->unit)->nama,
+            'level' => 'Karpim',
+            'golongan' => 'IV/A',
+            'tmt_awal' => now()->subYears(2)->toDateString(),
+            'tmt_akhir' => now()->subDays($daysAgo)->toDateString(),
+        ]);
+    }
+
+    public function test_monitor_vacancies_are_the_formasi_without_a_definitive_holder_only(): void
+    {
+        $full = $this->seat('Manajer Penuh', 1);
+        $this->holders($full, 1);
+        $this->seat('Manajer Belum Pernah Terisi', 1);
+        $outsider = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $notFormasi = new Position(['nama' => 'Jabatan Di Luar Master']);
+        $this->departure($notFormasi, $outsider, 10);
+
+        $this->assertSame(['Manajer Belum Pernah Terisi'], $this->service->getVacancies()->pluck('jabatan')->all());
+    }
+
+    public function test_monitor_vacancy_carries_the_last_occupant_and_age(): void
+    {
+        $position = $this->seat('Manajer Eks', 1);
+        $former = Employee::factory()->create(['nama' => 'Budi Pensiun', 'unit_kerja' => 'Pensiun', 'jabatan' => 'Mantan']);
+        $this->departure($position, $former, 45);
+
+        $row = $this->service->getVacancies()->firstWhere('jabatan', 'Manajer Eks');
+
+        $this->assertSame($former->nik, $row->last_occupant_nik);
+        $this->assertSame('Budi Pensiun', $row->last_occupant_name);
+        $this->assertSame('Karpim', $row->level);
+        $this->assertSame('IV/A', $row->golongan);
+        $this->assertSame(45, $row->days_vacant);
+        $this->assertSame('yellow', $row->severity);
+        $this->assertNotSame('—', $row->vacant_since_formatted);
+        $this->assertNotSame('', $row->duration_human);
+    }
+
+    public function test_monitor_vacancy_that_was_never_filled_has_no_last_occupant(): void
+    {
+        $this->seat('Manajer Baru Dibuka', 1);
+
+        $row = $this->service->getVacancies()->firstWhere('jabatan', 'Manajer Baru Dibuka');
+
+        $this->assertNull($row->last_occupant_nik);
+        $this->assertNull($row->last_occupant_name);
+        $this->assertSame('Karpim', $row->level);
+        $this->assertNull($row->golongan);
+        $this->assertSame('unknown', $row->severity);
+        $this->assertSame('—', $row->vacant_since_formatted);
+        $this->assertSame('Belum pernah terisi', $row->duration_human);
+    }
+
+    public function test_monitor_lists_the_longest_vacant_first_and_never_filled_last(): void
+    {
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $this->seat('Manajer Baru', 1);
+        $this->departure($this->seat('Manajer Sedang', 1), $former, 60);
+        $this->departure($this->seat('Manajer Lama', 1), $former, 300);
+
+        $this->assertSame(['Manajer Lama', 'Manajer Sedang', 'Manajer Baru'], $this->service->getVacancies()->pluck('jabatan')->all());
+    }
+
+    public function test_monitor_statistics_match_the_formasi_statistics_and_the_buckets_add_up(): void
+    {
+        $unitB = $this->otherUnit();
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $this->departure($this->seat('Manajer Kritis', 1), $former, 200);
+        $this->departure($this->seat('Manajer Perhatian', 1, $unitB), $former, 50, $unitB);
+        $this->departure($this->seat('Manajer Segar', 1), $former, 5);
+        $this->seat('Manajer Belum Terisi', 2, $unitB);
+        $this->holders($this->seat('Manajer Penuh', 1), 1);
+
+        $monitor = $this->service->getStatistics();
+        $formasi = $this->service->getFormasiStatistics();
+
+        $this->assertSame($formasi['vacant_formasi'], $monitor['total_vacancies']);
+        $this->assertSame(4, $monitor['total_vacancies']);
+        $this->assertSame(2, $monitor['units_affected']);
+        $this->assertSame(1, $monitor['critical_count']);
+        $this->assertSame(1, $monitor['moderate_count']);
+        $this->assertSame(1, $monitor['recent_count']);
+        $this->assertSame(1, $monitor['unknown_count']);
+        $this->assertSame(
+            $monitor['total_vacancies'],
+            $monitor['critical_count'] + $monitor['moderate_count'] + $monitor['recent_count'] + $monitor['unknown_count']
+        );
+        $this->assertSame('Manajer Kritis', $monitor['longest_vacant']->jabatan);
+    }
+
+    public function test_monitor_query_count_is_fixed(): void
+    {
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        foreach (range(1, 25) as $n) {
+            $this->departure($this->seat("Manajer Uji {$n}", 1), $former, $n);
+        }
+
+        DB::enableQueryLog();
+        $this->service->getVacancies();
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(7, $queries);
+    }
+
     public function test_distribution_orders_families_with_most_vacancies_first(): void
     {
         $this->seat('Manajer Satu', 1);
