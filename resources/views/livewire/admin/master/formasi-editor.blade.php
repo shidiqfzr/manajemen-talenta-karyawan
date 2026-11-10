@@ -25,7 +25,7 @@
             <x-admin.kpi-card title="Total Kuota" :value="$seats->sum('kuota')" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
             <x-admin.kpi-card title="Terisi" :value="$seats->sum('filled')" subtitle="Karyawan menempati formasi" icon="fas fa-user-check" theme="teal" />
             @php $vacantSlots = (int) $seats->sum('vacant_slots') @endphp
-            <x-admin.kpi-card title="Lowong" :value="$vacantSlots" :subtitle="$seatStatusFilter === 'vacant' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk melihat formasi yang belum terisi'" icon="fas fa-user-clock" :theme="$vacantSlots > 0 ? 'warning' : 'neutral'" :active="$seatStatusFilter === 'vacant'"
+            <x-admin.kpi-card title="Kosong" :value="$vacantSlots" :subtitle="$seatStatusFilter === 'vacant' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk melihat formasi yang belum terisi'" icon="fas fa-user-clock" :theme="$vacantSlots > 0 ? 'warning' : 'neutral'" :active="$seatStatusFilter === 'vacant'"
                 role="button" tabindex="0" aria-pressed="{{ $seatStatusFilter === 'vacant' ? 'true' : 'false' }}" wire:click="toggleVacantFilter" wire:keydown.enter="toggleVacantFilter" wire:keydown.space.prevent="toggleVacantFilter" />
             @if ($overQuota > 0 || $seatStatusFilter === 'over')
                 <x-admin.kpi-card title="Melebihi Kuota" :value="$overQuota" :subtitle="$seatStatusFilter === 'over' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk menampilkan yang perlu ditinjau'" icon="fas fa-triangle-exclamation" theme="danger" :active="$seatStatusFilter === 'over'"
@@ -90,17 +90,8 @@
                                     @endif
                                 </td>
                                 <td class="py-3.5 px-5">
-                                    @if ($seat->state === 'over')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-danger-50 text-danger-700 border border-danger-200"><span class="w-1.5 h-1.5 rounded-full bg-danger" aria-hidden="true"></span>Melebihi kuota</span>
-                                    @elseif ($seat->state === 'empty')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-100 text-surface-600 border border-surface-200"><span class="w-1.5 h-1.5 rounded-full bg-surface-400" aria-hidden="true"></span>Kosong</span>
-                                    @elseif ($seat->state === 'acting')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-earth-100 text-earth-800 border border-earth-300"><span class="w-1.5 h-1.5 rounded-full bg-earth-700" aria-hidden="true"></span>Diisi Pj/Plt</span>
-                                    @elseif ($seat->state === 'partial')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-50 text-warning-800 border border-warning-200"><span class="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true"></span>Ada lowongan</span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary-100 text-primary-800"><span class="w-1.5 h-1.5 rounded-full bg-primary-600" aria-hidden="true"></span>Penuh</span>
-                                    @endif
+                                    {{-- Status dan labelnya berasal dari JobVacancyService, sama dengan tab Sebaran Formasi. --}}
+                                    <x-admin.master.seat-status :status="$seat->state" :label="\App\Services\JobVacancyService::SEAT_STATUS_LABELS[$seat->state]" />
                                 </td>
                                 <td class="py-3.5 px-5 text-right">
                                     <x-admin.row-menu :label="$seat->jabatan">
@@ -165,7 +156,7 @@
             <x-admin.kpi-card title="Formasi Jabatan" :value="$stats['seats']" subtitle="Jabatan pada seluruh unit" icon="fas fa-briefcase" theme="primary" />
             <x-admin.kpi-card title="Total Kuota" :value="$stats['kuota']" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
             <x-admin.kpi-card title="Terisi" :value="$stats['filled']" :badge="$stats['kuota'] > 0 ? round($stats['filled'] / $stats['kuota'] * 100).'%' : null" :subtitle="$stats['over'].' formasi melebihi kuota'" icon="fas fa-user-check" theme="primary" />
-            <x-admin.kpi-card title="Formasi Lowong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' lowongan, klik untuk rincian'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.sebaran.index')" />
+            <x-admin.kpi-card title="Formasi Kosong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' kuota kosong, klik untuk rincian'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.sebaran.index', ['status' => 'kosong'])" />
         </div>
 
         <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Karyawan) -->
@@ -192,7 +183,7 @@
                             <x-admin.table.th sortable field="seats" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Jabatan</x-admin.table.th>
                             <x-admin.table.th sortable field="kuota" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Kuota</x-admin.table.th>
                             <x-admin.table.th sortable field="filled" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Terisi</x-admin.table.th>
-                            <x-admin.table.th sortable field="vacant" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Lowong</x-admin.table.th>
+                            <x-admin.table.th sortable field="vacant" :sort-field="$sortField" :sort-direction="$sortDirection" class="py-3.5 px-5">Kosong</x-admin.table.th>
                             <x-admin.table.th class="py-3.5 px-5 text-right">Aksi</x-admin.table.th>
                         </tr>
                     </thead>
@@ -216,8 +207,8 @@
                                 </td>
                                 <td class="py-3.5 px-5 tabular-nums">
                                     @if ($row->vacant > 0)
-                                        <a href="{{ route('admin.master.sebaran.index', ['unit' => $row->nama]) }}" wire:navigate aria-label="Lihat {{ $row->vacant }} lowongan pada {{ $row->nama }}"
-                                            class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-50 text-warning-800 border border-warning-200 hover:bg-warning-100 transition">{{ $row->vacant }} lowong</a>
+                                        <a href="{{ route('admin.master.sebaran.index', ['tampilan' => 'unit', 'unit' => $row->nama, 'status' => 'kosong']) }}" wire:navigate aria-label="Lihat {{ $row->vacant }} kuota kosong pada {{ $row->nama }}"
+                                            class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-50 text-warning-800 border border-warning-200 hover:bg-warning-100 transition">{{ $row->vacant }} kosong</a>
                                     @else
                                         <span class="text-surface-400">0</span>
                                     @endif

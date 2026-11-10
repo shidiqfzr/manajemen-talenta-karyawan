@@ -103,19 +103,42 @@ class FormasiEditorTest extends TestCase
 
     public function test_unit_list_shows_vacant_slots_and_can_filter_units_with_vacancies(): void
     {
-        $this->seat($this->position('Manajer Lowong Daftar'), 2);
+        $this->seat($this->position('Manajer Kosong Daftar'), 2);
         $filledUnit = Unit::create(['nama' => 'Kebun Penuh Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 2]);
         $position = $this->position('Manajer Penuh Daftar');
         DB::table('position_unit')->insert(['unit_id' => $filledUnit->id, 'position_id' => $position->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
         Employee::factory()->create(['unit_kerja' => $filledUnit->nama, 'jabatan' => $position->nama]);
 
         $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
-            ->assertSee('2 lowong')
-            ->assertSee('Formasi Lowong')
+            ->assertSee('2 kosong')
+            ->assertSee('Formasi Kosong')
             ->set('statusFilter', 'vacant');
 
         $list->assertSee('Kebun Editor Uji')->assertDontSee('Kebun Penuh Uji');
         $this->assertSame(2, $list->instance()->overviewStats['vacant']);
+    }
+
+    public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
+    {
+        $this->seat($this->position('Manajer Kosong Tautan'), 1);
+
+        $url = route('admin.master.sebaran.index', ['tampilan' => 'unit', 'unit' => 'Kebun Editor Uji', 'status' => 'kosong']);
+
+        Livewire::actingAs($this->admin)->test(FormasiEditor::class)->assertSeeHtml(e($url));
+    }
+
+    public function test_editor_screens_never_say_lowong(): void
+    {
+        $partial = $this->position('Manajer Sebagian Kosong');
+        $this->seat($partial, 2);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $partial->nama]);
+
+        $unitScreen = strtolower($this->editor()->html());
+        $listScreen = strtolower(Livewire::actingAs($this->admin)->test(FormasiEditor::class)->html());
+
+        $this->assertStringNotContainsString('lowong', $unitScreen);
+        $this->assertStringNotContainsString('lowong', $listScreen);
+        $this->assertStringContainsString('sebagian kosong', $unitScreen);
     }
 
     public function test_add_seat_flow_previews_then_confirms_and_audits(): void

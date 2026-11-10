@@ -203,7 +203,7 @@ class FormasiEditor extends Component
         return [
             Filter::select('rmFilter', 'RM Band', array_combine(array_keys(Position::RM_LEVEL_LIST), array_keys(Position::RM_LEVEL_LIST)))->icon('fas fa-layer-group'),
             Filter::select('bidangFilter', 'Bidang', Position::BIDANG_LIST)->icon('fas fa-sitemap'),
-            Filter::select('seatStatusFilter', 'Status', ['vacant' => 'Semua lowong'] + self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'])->icon('fas fa-toggle-on'),
+            Filter::select('seatStatusFilter', 'Status', ['vacant' => 'Semua kosong'] + self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'])->icon('fas fa-toggle-on'),
         ];
     }
 
@@ -224,7 +224,7 @@ class FormasiEditor extends Component
     {
         return [
             Filter::select('wilayahFilter', 'Wilayah', array_combine(Unit::WILAYAH_LIST, Unit::WILAYAH_LIST))->icon('fas fa-location-dot'),
-            Filter::select('statusFilter', 'Status', ['active' => 'Aktif', 'inactive' => 'Nonaktif', 'vacant' => 'Ada formasi lowong'])->icon('fas fa-toggle-on'),
+            Filter::select('statusFilter', 'Status', ['active' => 'Aktif', 'inactive' => 'Nonaktif', 'vacant' => 'Ada formasi kosong'])->icon('fas fa-toggle-on'),
         ];
     }
 
@@ -267,7 +267,7 @@ class FormasiEditor extends Component
         $this->resetPage();
     }
 
-    /** Kartu KPI "Lowong" menampilkan seluruh formasi yang belum terisi pejabat definitif. */
+    /** Kartu KPI "Kosong" menampilkan seluruh formasi yang belum terisi pejabat definitif. */
     public function toggleVacantFilter(): void
     {
         $this->seatStatusFilter = $this->seatStatusFilter === 'vacant' ? '' : 'vacant';
@@ -699,7 +699,7 @@ class FormasiEditor extends Component
                 DB::raw("coalesce(sum(case when lower(coalesce(employees.status_penugasan, '')) in ('pj', 'plt') then 1 else 0 end), 0) as acting"),
             ])
             ->groupBy('unit_id');
-        // Lowongan dihitung JobVacancyService (sumber tunggal); unit nonaktif tidak termasuk.
+        // Kekosongan dihitung JobVacancyService (sumber tunggal); unit nonaktif tidak termasuk.
         $vacancies = app(JobVacancyService::class)->getFormasiUnitSummary();
 
         return $this->units->map(function (Unit $unit) use ($occupied, $vacancies): object {
