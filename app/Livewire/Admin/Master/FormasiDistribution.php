@@ -182,7 +182,7 @@ class FormasiDistribution extends Component
                 $row->filled,
                 $row->vacant_slots,
                 $row->status_label,
-                $row->vacant_since_formatted ?? 'Belum pernah terisi',
+                $row->vacant_slots <= 0 ? '-' : ($row->vacant_since_formatted ?? 'Belum pernah terisi'),
             ]);
             $export = new FormasiExport('Sebaran Unit', ['NO', 'UNIT KERJA', 'WILAYAH', 'JABATAN', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'KOSONG', 'STATUS FORMASI', 'KOSONG SEJAK'], $rows->values(), auth()->user());
         }

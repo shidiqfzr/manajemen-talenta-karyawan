@@ -118,6 +118,21 @@ class FormasiEditorTest extends TestCase
         $this->assertSame(2, $list->instance()->overviewStats['vacant']);
     }
 
+    public function test_pejabat_sementara_pjs_holder_leaves_the_seat_vacant_on_both_screens(): void
+    {
+        $position = $this->position('Manajer Dijabat Pjs');
+        $this->seat($position, 1);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'status_penugasan' => 'Pejabat Sementara (Pjs)']);
+
+        $unit = $this->editor();
+        $unit->assertSee('Diisi Pj/Plt');
+        $this->assertSame('acting', $unit->instance()->seats->first()->state);
+        $this->assertSame(1, $unit->instance()->seats->first()->vacant_slots);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class);
+        $this->assertSame(1, $list->instance()->overviewStats['vacant']);
+    }
+
     public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
     {
         $this->seat($this->position('Manajer Kosong Tautan'), 1);

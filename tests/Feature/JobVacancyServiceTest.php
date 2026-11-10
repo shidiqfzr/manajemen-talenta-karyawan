@@ -287,6 +287,55 @@ class JobVacancyServiceTest extends TestCase
         $this->assertCount(1, $row->seats);
     }
 
+    public function test_pejabat_sementara_pjs_holder_does_not_fill_the_formasi(): void
+    {
+        $position = $this->seat('Manajer Dijabat Pjs', 1);
+        $this->holders($position, 1, 'Pejabat Sementara (Pjs)');
+
+        $row = $this->row('Manajer Dijabat Pjs');
+
+        $this->assertNotNull($row, 'A formasi held only by Pejabat Sementara (Pjs) is still vacant.');
+        $this->assertSame('acting', $row->status);
+        $this->assertSame(0, $row->filled);
+        $this->assertSame(1, $row->acting);
+    }
+
+    public function test_full_formasi_carry_no_vacancy_age_or_severity(): void
+    {
+        $position = $this->seat('Manajer Penuh Lagi', 1);
+        $this->holders($position, 1);
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        JobHistory::create([
+            'employee_nik' => $former->nik,
+            'jabatan' => $position->nama,
+            'unit_kerja' => $this->unit->nama,
+            'tmt_awal' => now()->subYears(2)->toDateString(),
+            'tmt_akhir' => now()->subDays(400)->toDateString(),
+        ]);
+        $this->seat('Manajer Belum Pernah Terisi', 1);
+
+        $full = $this->service->getFormasiSeats()->firstWhere('jabatan', 'Manajer Penuh Lagi');
+
+        $this->assertSame('full', $full->status);
+        $this->assertNull($full->vacant_since);
+        $this->assertNull($full->days_vacant);
+        $this->assertSame('none', $full->severity);
+        $this->assertSame(['Manajer Belum Pernah Terisi'], $this->service->getFormasiSeats(severity: 'unknown')->pluck('jabatan')->all());
+        $this->assertSame([], $this->service->getFormasiSeats(severity: 'red')->pluck('jabatan')->all());
+    }
+
+    public function test_fill_rate_never_lets_an_over_quota_formasi_hide_an_empty_one(): void
+    {
+        $over = $this->seat('Asisten Afdeling I', 1);
+        $this->holders($over, 2);
+        $this->seat('Asisten Afdeling II', 1);
+
+        $family = $this->service->getJabatanDistribution()->firstWhere('family', 'Asisten Afdeling');
+
+        $this->assertSame(50, $family->fill_rate);
+        $this->assertSame(50, $this->service->getFormasiStatistics()['fill_rate']);
+    }
+
     public function test_distribution_orders_families_with_most_vacancies_first(): void
     {
         $this->seat('Manajer Satu', 1);

@@ -288,6 +288,23 @@ class FormasiDistributionTest extends TestCase
         Livewire::actingAs($user)->test(FormasiDistribution::class)->assertForbidden();
     }
 
+    public function test_unit_export_marks_filled_formasi_without_a_vacancy_date(): void
+    {
+        Excel::fake();
+        Excel::matchByRegex();
+
+        $this->table()->call('setView', 'unit')->call('export');
+
+        Excel::assertDownloaded('/^Sebaran_Formasi_Unit_PTPN4_Reg5_\d{8}_\d{6}\.xlsx$/', function (FormasiExport $export) {
+            $filled = $export->collection()->firstWhere(3, 'Asisten Afdeling V');
+
+            $this->assertSame('Penuh', $filled[9]);
+            $this->assertSame('-', $filled[10]);
+
+            return true;
+        });
+    }
+
     public function test_the_screen_never_says_lowong(): void
     {
         $perJabatan = strtolower($this->table()->call('toggleFamily', 'Asisten Afdeling')->html());

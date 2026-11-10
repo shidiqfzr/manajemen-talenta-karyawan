@@ -148,6 +148,12 @@ class JobVacancyService
     /** Status yang masih memiliki kekosongan (kuota belum terisi pejabat definitif). */
     public const VACANT_STATUSES = ['partial', 'acting', 'empty'];
 
+    /**
+     * Status penugasan sementara (huruf kecil): Pj, Plt, dan "Pejabat Sementara (Pjs)" pada formulir dan impor karyawan.
+     * Pemegang berstatus ini tidak mengisi kuota (DOMAIN.md §5.2).
+     */
+    public const ACTING_STATUSES = ['pj', 'plt', 'pjs', 'pejabat sementara (pjs)'];
+
     /** Nilai filter status yang mencakup seluruh VACANT_STATUSES sekaligus. */
     public const STATUS_ANY_VACANT = 'kosong';
 
@@ -155,6 +161,11 @@ class JobVacancyService
      * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
      * sementara sehingga formasi yang hanya dijabat Pj/Plt tetap lowong (DOMAIN.md §5.2).
      */
+    public static function isActing(?string $statusPenugasan): bool
+    {
+        return in_array(strtolower(trim((string) $statusPenugasan)), self::ACTING_STATUSES, true);
+    }
+
     public static function classifySeat(int $kuota, int $definitive, int $acting): string
     {
         return match (true) {
@@ -259,7 +270,7 @@ class JobVacancyService
                     'acting' => (int) $seats->sum('acting'),
                     'vacant_slots' => (int) $seats->sum('vacant_slots'),
                     'vacant_units' => $seats->where('vacant_slots', '>', 0)->pluck('unit_id')->unique()->count(),
-                    'fill_rate' => $kuota > 0 ? (int) round(min($filled, $kuota) / $kuota * 100) : 0,
+                    'fill_rate' => $kuota > 0 ? (int) round(self::coveredQuota($seats) / $kuota * 100) : 0,
                     'seats' => $seats->values(),
                 ];
             })
@@ -280,6 +291,7 @@ class JobVacancyService
         $rows = $this->formasiRows();
         $kuota = (int) $rows->sum('kuota');
         $filled = (int) $rows->sum('filled');
+        $covered = self::coveredQuota($rows);
 
         return [
             'total_seats' => $rows->count(),
@@ -289,7 +301,7 @@ class JobVacancyService
             'vacant_formasi' => $rows->where('vacant_slots', '>', 0)->count(),
             'acting_count' => $rows->where('status', 'acting')->count(),
             'over_count' => $rows->where('status', 'over')->count(),
-            'fill_rate' => $kuota > 0 ? (int) round(min($filled, $kuota) / $kuota * 100) : 0,
+            'fill_rate' => $kuota > 0 ? (int) round($covered / $kuota * 100) : 0,
         ];
     }
 
@@ -307,6 +319,17 @@ class JobVacancyService
                 'vacant_formasi' => $rows->where('vacant_slots', '>', 0)->count(),
             ])
             ->all();
+    }
+
+    /**
+     * Kuota yang tertutup pejabat definitif: tiap formasi dibatasi pada kuotanya sendiri, sehingga kelebihan pada satu
+     * formasi tidak menutupi formasi lain yang masih kosong.
+     *
+     * @param  Collection<int, object>  $seats
+     */
+    private static function coveredQuota(Collection $seats): int
+    {
+        return (int) $seats->sum(fn (object $seat) => min($seat->filled, $seat->kuota));
     }
 
     /**
@@ -354,13 +377,14 @@ class JobVacancyService
 
         return $seats->map(function (object $seat) use ($holders, $lastDeparture, $reserved): object {
             $group = $holders->get("{$seat->unit_kerja}|{$seat->jabatan}", collect());
-            $acting = (int) $group->filter(fn ($row) => in_array(strtolower((string) $row->status_penugasan), ['pj', 'plt'], true))->sum('total');
+            $acting = (int) $group->filter(fn ($row) => self::isActing($row->status_penugasan))->sum('total');
             $definitive = (int) $group->sum('total') - $acting;
             $kuota = (int) $seat->kuota;
 
             $key = "{$seat->jabatan}|{$seat->unit_kerja}";
             $departure = $lastDeparture->get($key)?->vacant_since;
-            $vacantSince = $departure ? Carbon::parse($departure) : null;
+            // Umur kekosongan hanya bermakna selama masih ada kuota kosong; formasi penuh tidak membawa tanggal lama.
+            $vacantSince = $departure && $kuota - $definitive > 0 ? Carbon::parse($departure) : null;
             $daysVacant = $vacantSince ? (int) $vacantSince->diffInDays(now()) : null;
             $booking = $reserved->get($key);
 
@@ -375,6 +399,7 @@ class JobVacancyService
             $seat->vacant_since_formatted = $vacantSince?->translatedFormat('d M Y');
             $seat->days_vacant = $daysVacant;
             $seat->severity = match (true) {
+                $seat->vacant_slots <= 0 => 'none',
                 $daysVacant === null => 'unknown',
                 $daysVacant > 90 => 'red',
                 $daysVacant >= 30 => 'yellow',

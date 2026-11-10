@@ -540,7 +540,7 @@ class FormasiEditor extends Component
             ])
             ->map(function (object $seat) use ($holders): object {
                 $group = $holders->get($seat->jabatan, collect());
-                $acting = (int) $group->filter(fn ($row) => in_array(strtolower((string) $row->status_penugasan), ['pj', 'plt'], true))->sum('total');
+                $acting = (int) $group->filter(fn ($row) => JobVacancyService::isActing($row->status_penugasan))->sum('total');
 
                 $seat->kuota = (int) $seat->kuota;
                 $seat->filled = (int) $group->sum('total');
@@ -696,7 +696,7 @@ class FormasiEditor extends Component
             ->get([
                 'position_unit.unit_id', 'position_unit.kuota',
                 DB::raw('count(employees.nik) as filled'),
-                DB::raw("coalesce(sum(case when lower(coalesce(employees.status_penugasan, '')) in ('pj', 'plt') then 1 else 0 end), 0) as acting"),
+                DB::raw("coalesce(sum(case when lower(trim(coalesce(employees.status_penugasan, ''))) in ('".implode("', '", JobVacancyService::ACTING_STATUSES)."') then 1 else 0 end), 0) as acting"),
             ])
             ->groupBy('unit_id');
         // Kekosongan dihitung JobVacancyService (sumber tunggal); unit nonaktif tidak termasuk.
