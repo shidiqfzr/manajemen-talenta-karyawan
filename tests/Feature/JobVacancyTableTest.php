@@ -66,8 +66,8 @@ class JobVacancyTableTest extends TestCase
         $html = Livewire::test(JobVacancyTable::class)->html();
 
         $this->assertStringContainsString('Filter Lanjutan', $html);
-        $this->assertStringContainsString('Daftar Jabatan Lowong', $html);
-        $this->assertStringContainsString('3 Lowongan', preg_replace('/\s+/', ' ', $html));
+        $this->assertStringContainsString('Daftar Formasi Kosong', $html);
+        $this->assertStringContainsString('3 Formasi', preg_replace('/\s+/', ' ', $html));
         $this->assertStringContainsString('id="per-page-page"', $html);
         $this->assertStringContainsString('Opsi Pengisian', $html);
         $this->assertStringNotContainsString('Ekspor Excel', $html);
@@ -157,7 +157,7 @@ class JobVacancyTableTest extends TestCase
         $component = Livewire::test(JobVacancyTable::class)
             ->assertSee('Jabatan Belum Pernah Terisi')
             ->assertSee('Belum pernah terisi');
-        $this->assertStringContainsString('4 Lowongan', preg_replace('/\s+/', ' ', $component->html()));
+        $this->assertStringContainsString('4 Formasi', preg_replace('/\s+/', ' ', $component->html()));
 
         $component->set('severityFilter', 'unknown')
             ->assertSet('severityFilter', 'unknown')
@@ -223,13 +223,40 @@ class JobVacancyTableTest extends TestCase
             ->assertSee('Jabatan Kritis Alfa');
     }
 
+    public function test_one_render_loads_the_formasi_data_once_even_with_filters(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::test(JobVacancyTable::class)->set('search', 'Alfa')->set('selectedUnit', 'Unit Alfa');
+
+        $seatLoads = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'from "position_unit"') || str_contains($q['query'], 'from `position_unit`'))->count();
+        DB::disableQueryLog();
+
+        // Initial render + the two updates = 3 requests; each may load the seats once, never twice.
+        $this->assertSame(3, $seatLoads);
+    }
+
+    public function test_the_monitor_uses_the_official_formasi_kosong_wording(): void
+    {
+        $acting = $this->makeSeat('Jabatan Dijabat Plt', 'Unit Gamma');
+        Employee::factory()->create(['jabatan' => $acting->nama, 'unit_kerja' => 'Unit Gamma', 'status_penugasan' => 'Plt']);
+
+        $html = strtolower(Livewire::test(JobVacancyTable::class)->html());
+        $empty = strtolower(Livewire::test(JobVacancyTable::class)->set('search', 'tidak-ada-hasil')->html());
+
+        $this->assertStringNotContainsString('lowong', $html);
+        $this->assertStringNotContainsString('lowong', $empty);
+        $this->assertStringContainsString('jabatan kosong', $html);
+    }
+
     public function test_the_monitor_count_equals_the_formasi_kosong_count_of_sebaran_formasi(): void
     {
         $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
 
         $html = preg_replace('/\s+/', ' ', Livewire::test(JobVacancyTable::class)->html());
 
-        $this->assertStringContainsString(app(JobVacancyService::class)->getFormasiStatistics()['vacant_formasi'].' Lowongan', $html);
+        $this->assertStringContainsString(app(JobVacancyService::class)->getFormasiStatistics()['vacant_formasi'].' Formasi', $html);
     }
 
     public function test_reserved_vacancy_shows_the_reserved_employee_name(): void

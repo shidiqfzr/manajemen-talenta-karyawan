@@ -23,7 +23,7 @@
             :has-active-filters="$hasActiveFilters"
             :search="$search"
             search-placeholder="Cari jabatan, unit kerja, nama, atau NIK..." />
-        <x-admin.table.header title="Daftar Jabatan Lowong" :paginator="$vacancies" noun="Lowongan" />
+        <x-admin.table.header title="Daftar Formasi Kosong" :paginator="$vacancies" noun="Formasi" />
 
         <!-- Tier 2: Sub-Header Urgency Status Strip -->
         <div class="px-5 py-2.5 bg-surface-50 border-t border-b border-surface-200 flex flex-wrap items-center justify-between gap-3">
@@ -89,7 +89,7 @@
                 <thead>
                     <tr class="bg-surface-50 border-b border-surface-200">
                         <x-admin.table.th class="py-3.5 px-5">Unit Kerja</x-admin.table.th>
-                        <x-admin.table.th class="py-3.5 px-5">Jabatan Lowong</x-admin.table.th>
+                        <x-admin.table.th class="py-3.5 px-5">Jabatan Kosong</x-admin.table.th>
                         <x-admin.table.th class="py-3.5 px-5">Pejabat Terakhir</x-admin.table.th>
                         <x-admin.table.th class="py-3.5 px-5">Kosong Sejak</x-admin.table.th>
                         <x-admin.table.th align="center" class="py-3.5 px-5">Durasi &amp; Urgensi</x-admin.table.th>
@@ -116,7 +116,7 @@
                                 </div>
                             </td>
 
-                            <!-- Jabatan Lowong -->
+                            {{-- Jabatan Kosong --}}
                             <td class="py-3.5 px-5 align-top">
                                 <div class="font-semibold text-surface-900 text-sm leading-tight group-hover:text-primary-700 transition">
                                     {{ $item->jabatan }}
@@ -272,6 +272,6 @@
             </table>
         </div>
 
-        <x-admin.table.pagination :paginator="$vacancies" noun="lowongan" :per-page-options="$perPageOptions" />
+        <x-admin.table.pagination :paginator="$vacancies" noun="formasi" :per-page-options="$perPageOptions" />
     </x-admin.table.card>
 </div>

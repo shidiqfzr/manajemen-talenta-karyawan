@@ -17,11 +17,43 @@ class JobVacancyService
      * selalu sama. Menambahkan pejabat terakhir (dari riwayat jabatan), jenjang, golongan, dan lama kosong dalam
      * bentuk yang dipakai tabel monitoring. Terurut dari yang terlama kosong; formasi yang belum pernah terisi di akhir.
      *
+     * Layar yang menyaring beberapa kali dalam satu permintaan memuat sekali tanpa filter lalu memanggil
+     * filterVacancies(), agar data formasi tidak dimuat ulang setiap kali.
+     *
      * @return Collection<int, object>
      */
     public function getVacancies(?string $search = null, ?string $unitKerja = null): Collection
     {
-        $rows = $this->getFormasiSeats(null, $unitKerja, self::STATUS_ANY_VACANT)
+        return $this->filterVacancies($this->loadVacancies(), $search, $unitKerja);
+    }
+
+    /**
+     * Menyaring hasil getVacancies() menurut unit dan kata kunci. Pencarian mencakup jabatan, rumpun, unit, serta
+     * pejabat terakhir (nama dan NIK). Murni (tanpa kueri), sehingga aman dipanggil berulang pada koleksi yang sama.
+     *
+     * @param  Collection<int, object>  $vacancies
+     * @return Collection<int, object>
+     */
+    public function filterVacancies(Collection $vacancies, ?string $search = null, ?string $unitKerja = null): Collection
+    {
+        if ($unitKerja !== null && $unitKerja !== '') {
+            $vacancies = $vacancies->where('unit_kerja', $unitKerja);
+        }
+
+        if ($search === null || trim($search) === '') {
+            return $vacancies->values();
+        }
+
+        $term = mb_strtolower(trim($search));
+
+        return $vacancies->filter(fn (object $row) => collect([$row->jabatan, $row->family, $row->unit_kerja, $row->last_occupant_name, $row->last_occupant_nik])
+            ->contains(fn ($field) => $field !== null && str_contains(mb_strtolower((string) $field), $term)))->values();
+    }
+
+    /** @return Collection<int, object> */
+    private function loadVacancies(): Collection
+    {
+        $rows = $this->getFormasiSeats(null, null, self::STATUS_ANY_VACANT)
             ->sortBy([
                 fn (object $a, object $b) => ($b->days_vacant ?? -1) <=> ($a->days_vacant ?? -1),
                 fn (object $a, object $b) => strcmp($a->unit_kerja, $b->unit_kerja),
@@ -36,7 +68,7 @@ class JobVacancyService
             ->get(['jh.id', 'jh.employee_nik', 'jh.level', 'jh.golongan', 'emp.nama', 'emp.foto'])
             ->keyBy('id');
 
-        $rows = $rows->map(function (object $row) use ($occupants): object {
+        return $rows->map(function (object $row) use ($occupants): object {
             $last = $occupants->get($row->latest_history_id);
             $since = $row->vacant_since ? Carbon::parse($row->vacant_since) : null;
 
@@ -52,16 +84,6 @@ class JobVacancyService
 
             return $row;
         });
-
-        if ($search === null || trim($search) === '') {
-            return $rows;
-        }
-
-        // Pencarian monitoring juga mencakup pejabat terakhir (nama dan NIK), selain jabatan, rumpun, dan unit.
-        $term = mb_strtolower(trim($search));
-
-        return $rows->filter(fn (object $row) => collect([$row->jabatan, $row->family, $row->unit_kerja, $row->last_occupant_name, $row->last_occupant_nik])
-            ->contains(fn ($field) => $field !== null && str_contains(mb_strtolower((string) $field), $term)))->values();
     }
 
     /**

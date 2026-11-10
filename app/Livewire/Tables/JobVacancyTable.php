@@ -6,6 +6,7 @@ use App\Services\JobVacancyService;
 use App\Support\DataTable\Filter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -38,6 +39,9 @@ class JobVacancyTable extends Component
 
     /** @var ?array<string, string> */
     private ?array $unitOptions = null;
+
+    /** Seluruh formasi kosong, dimuat sekali per permintaan lalu disaring di memori. */
+    private ?Collection $allVacancies = null;
 
     /** The new query keys win; a legacy key only fills a property the new key left empty. */
     public function mount(): void
@@ -133,7 +137,8 @@ class JobVacancyTable extends Component
         }
         $this->normalisePerPage();
 
-        $baseVacancies = $service->getVacancies(
+        $baseVacancies = $service->filterVacancies(
+            $this->allVacancies($service),
             search: $this->search ?: null,
             unitKerja: $this->selectedUnit ?: null,
         );
@@ -172,11 +177,17 @@ class JobVacancyTable extends Component
         ]);
     }
 
+    /** @return Collection<int, object> */
+    private function allVacancies(?JobVacancyService $service = null): Collection
+    {
+        return $this->allVacancies ??= ($service ?? app(JobVacancyService::class))->getVacancies();
+    }
+
     /** @return array<string, string> [unit => unit] of the units that currently have vacancies. */
     private function unitOptions(): array
     {
         if ($this->unitOptions === null) {
-            $units = app(JobVacancyService::class)->getVacantUnits()->map(fn ($unit) => (string) $unit)->all();
+            $units = $this->allVacancies()->pluck('unit_kerja')->unique()->sort()->values()->map(fn ($unit) => (string) $unit)->all();
             $this->unitOptions = array_combine($units, $units) ?: [];
         }
 
