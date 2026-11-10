@@ -6,7 +6,9 @@ use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\JobVacancyService;
 use App\Services\ManPowerPlanningService;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Reads the formation (position) side of a mutation: who occupies / reserves a target position,
@@ -39,30 +41,50 @@ class FormationService
             ];
         }
 
-        // Check if position is currently occupied by an active employee
-        $occupant = Employee::with('currentJob')
+        // Seat count of the formasi (master formasi quota; a pair outside the master is a single seat).
+        $kuota = max(1, (int) (DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('units.nama', $unitKerja)
+            ->where('positions.nama', $jabatan)
+            ->value('position_unit.kuota') ?? 1));
+
+        // Every current holder, Pj/Plt included: a temporary holder keeps the seat, so the formasi is not released (§5.2).
+        $holders = Employee::with('currentJob')
             ->where('jabatan', $jabatan)
             ->where('unit_kerja', $unitKerja)
-            ->first();
+            ->orderBy('nik')
+            ->get();
+        $freeSlots = JobVacancyService::freeSlots($kuota, $holders->count());
+        $hasFreeSlot = $freeSlots > 0;
 
-        // Check if position is reserved by a scheduled future-dated mutation (is_applied = false)
-        $pendingScheduled = JobHistory::with('employee')
+        // Scheduled future-dated mutations (is_applied = false) reserve seats; the latest one is reported.
+        $pending = JobHistory::with('employee')
             ->where('jabatan', $jabatan)
             ->where('unit_kerja', $unitKerja)
             ->where('is_applied', false)
-            ->latest('id')
-            ->first();
+            ->orderByDesc('id')
+            ->get();
+        $pendingScheduled = $pending->first();
 
-        $isReserved = $pendingScheduled !== null;
+        // Bookings only block the formasi once they use up the free quota (always so for a single seat).
+        $isReserved = $pending->isNotEmpty() && $pending->count() >= $freeSlots;
+
+        // A formasi with a free seat takes a straight transfer; only a full one needs the occupant to swap out.
+        $occupant = $hasFreeSlot ? null : $holders->first();
 
         return [
-            'type' => $occupant === null ? ($isReserved ? 'reserved' : 'vacant') : 'occupied',
-            'vacant' => $occupant === null && ! $isReserved,
+            'type' => $hasFreeSlot ? ($isReserved ? 'reserved' : 'vacant') : 'occupied',
+            'vacant' => $hasFreeSlot && ! $isReserved,
             'is_reserved' => $isReserved,
             'reserved_occupant' => $pendingScheduled?->employee,
             'reserved_job' => $pendingScheduled,
             'occupant' => $occupant,
             'occupant_job' => $occupant?->currentJob,
+            'kuota' => $kuota,
+            'holders' => $holders->count(),
+            'free_slots' => $freeSlots,
+            'multi_seat' => $kuota > 1,
         ];
     }
 

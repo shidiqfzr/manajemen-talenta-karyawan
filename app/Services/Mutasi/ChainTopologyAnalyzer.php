@@ -167,6 +167,7 @@ class ChainTopologyAnalyzer
 
         $positions = Position::getAllCached();
         $targetPositions = [];
+        $targetCounts = [];
         $closedVacancies = [];
         $unfilledVacancies = [];
 
@@ -197,16 +198,17 @@ class ChainTopologyAnalyzer
                 $errors[] = "Karyawan {$emp->nama} sudah menempati posisi {$targetJabatan} di {$targetUnitKerja}.";
             }
 
-            // Duplicate target guard (unless pool)
+            // Analyze target vacancy and occupancy (also tells how many seats the formasi can still take)
+            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja);
+
+            // Duplicate target guard (unless pool): a formasi takes as many participants as it has free seats, at least one
             if (! $isPool) {
-                if (isset($targetPositions[$posKey])) {
+                $targetCounts[$posKey] = ($targetCounts[$posKey] ?? 0) + 1;
+                if ($targetCounts[$posKey] > max(1, (int) ($analysis['free_slots'] ?? 1))) {
                     $errors[] = "Konflik target: Formasi {$targetJabatan} di {$targetUnitKerja} ditargetkan oleh lebih dari satu karyawan.";
                 }
                 $targetPositions[$posKey] = $node['employee_nik'];
             }
-
-            // Analyze target vacancy and occupancy
-            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja);
             $occupant = $analysis['occupant'] ?? null;
             $linkType = 'vacant';
             $occupantNik = null;

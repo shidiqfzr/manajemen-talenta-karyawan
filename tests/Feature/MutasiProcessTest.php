@@ -759,6 +759,42 @@ class MutasiProcessTest extends TestCase
         $c->assertDontSeeHtml('data-blocked="true"');
     }
 
+    public function test_equal_rm_swap_into_a_full_multi_seat_formasi_is_blocked_with_a_clear_reason()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Employee::factory()->count(2)->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        $seat = Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()->attach($seat->id, ['kuota' => 2]);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi B');
+
+        $this->assertFalse($c->instance()->isSwapAllowed);
+        $this->assertStringContainsString('berkuota 2', $c->instance()->swapIncompatibilityMessage);
+        $this->assertNotNull($c->instance()->blockingReason);
+        $this->assertTrue($c->instance()->resolvableByChain);
+    }
+
+    public function test_multi_seat_formasi_with_a_free_seat_is_a_vacant_target_and_not_blocked()
+    {
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);
+        $seat = Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-2']);
+        Unit::where('nama', 'Bagian SDM')->first()->positions()->attach($seat->id, ['kuota' => 3]);
+
+        $c = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $empA->nik)
+            ->set('form.jenisMutasi', 'ROTASI')
+            ->set('form.targetUnitKerja', 'Bagian SDM')
+            ->set('form.targetJabatan', 'Posisi B');
+
+        $this->assertSame('vacant', $c->instance()->targetAnalysis['type']);
+        $this->assertNull($c->instance()->blockingReason);
+    }
+
     public function test_equal_rm_swap_is_not_blocked()
     {
         $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2']);

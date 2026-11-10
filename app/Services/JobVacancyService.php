@@ -139,6 +139,17 @@ class JobVacancyService
      * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
      * sementara sehingga formasi yang hanya dijabat Pj/Plt tetap lowong (DOMAIN.md §5.2).
      */
+    /**
+     * Kuota yang masih dapat diisi penempatan: kuota dikurangi SELURUH pemegang, termasuk Pj/Plt, karena pemegang
+     * sementara tetap menempati kursinya dan formasinya tidak dilepaskan (DOMAIN.md §5.2). Berbeda dengan
+     * `vacant_slots` (kuota dikurangi pejabat definitif), yang mengukur kekosongan jabatan definitif.
+     * Sumber tunggal bagi FormationService::analyzeTarget() dan tombol "Isi lewat Mutasi".
+     */
+    public static function freeSlots(int $kuota, int $holders): int
+    {
+        return max($kuota - $holders, 0);
+    }
+
     public static function isActing(?string $statusPenugasan): bool
     {
         return in_array(strtolower(trim((string) $statusPenugasan)), self::ACTING_STATUSES, true);
@@ -384,6 +395,7 @@ class JobVacancyService
             $seat->filled = $definitive;
             $seat->acting = $acting;
             $seat->vacant_slots = max($kuota - $definitive, 0);
+            $seat->free_slots = self::freeSlots($kuota, $definitive + $acting);
             $seat->status = self::classifySeat($kuota, $definitive, $acting);
             $seat->status_label = self::SEAT_STATUS_LABELS[$seat->status];
             $seat->vacant_since = $vacantSince?->toDateString();

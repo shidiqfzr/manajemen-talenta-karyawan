@@ -237,7 +237,7 @@
                                 @else
                                     <div class="inline-flex flex-col gap-1.5 w-32 items-stretch ml-auto">
                                         {{-- Mutasi hanya dapat menempatkan ke formasi tanpa pemegang; yang masih berpemegang ditolak layar Mutasi. --}}
-                                        @if (in_array($item->status, ['acting', 'partial'], true))
+                                        @if ($item->free_slots <= 0)
                                             <span class="text-[11px] text-surface-500 text-center leading-snug" title="Selesaikan melalui Mutasi Berantai">Ada pemegang aktif</span>
                                         @else
                                         <!-- 1. Mutasi / Transfer Internal -->

@@ -126,6 +126,22 @@ class FormasiDistributionTest extends TestCase
         $this->assertStringContainsString(e(route('admin.mutasi.create', ['jabatan' => 'Asisten Afdeling X', 'unit' => 'Unit Beta Uji'])), $html);
     }
 
+    public function test_a_partly_filled_formasi_with_a_free_seat_offers_the_mutasi_link(): void
+    {
+        $partial = $this->seat($this->alfa, 'Kepala Seksi Dua Kursi', 2);
+        Employee::factory()->create(['unit_kerja' => $this->alfa->nama, 'jabatan' => $partial->nama]);
+        // Two seats, one definitive holder and one Plt: no seat is free, the acting holder keeps it.
+        $full = $this->seat($this->alfa, 'Kepala Seksi Plt Dua Kursi', 2);
+        Employee::factory()->create(['unit_kerja' => $this->alfa->nama, 'jabatan' => $full->nama]);
+        Employee::factory()->create(['unit_kerja' => $this->alfa->nama, 'jabatan' => $full->nama, 'status_penugasan' => 'Plt']);
+
+        $html = $this->table()->call('setView', 'unit')->assertSee('Kepala Seksi Dua Kursi')->html();
+
+        // Free seat: Asisten Afdeling X, Kepala Keuangan Uji and the partly filled Kepala Seksi Dua Kursi. Not Plt-held ones.
+        $this->assertSame(3, substr_count($html, 'Isi lewat Mutasi'));
+        $this->assertSame(2, substr_count($html, 'Ada pemegang aktif'));
+    }
+
     public function test_status_kosong_hides_filled_formasi_in_both_views(): void
     {
         $this->table()->set('statusFilter', 'kosong')

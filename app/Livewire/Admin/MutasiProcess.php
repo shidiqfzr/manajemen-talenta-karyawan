@@ -452,6 +452,12 @@ class MutasiProcess extends Component
                 }
             }
 
+            // A full multi-seat formasi has no single incumbent to swap with (mirrors MutasiService::resolveSwapOccupant).
+            if ($analysis['multi_seat'] ?? false) {
+                $this->isSwapAllowed = false;
+                $this->swapIncompatibilityMessage = "Formasi target berkuota {$analysis['kuota']} dan seluruh kuotanya terisi, sehingga tidak ada satu pejabat petahana untuk ditukar. Kosongkan satu kuota lebih dulu melalui Mutasi Berantai.";
+            }
+
             // Check Employee B's tenure in their current unit
             if ($this->employeeDetails) {
                 $this->occupantTenureAnalysis = $service->checkTenureCompliance(

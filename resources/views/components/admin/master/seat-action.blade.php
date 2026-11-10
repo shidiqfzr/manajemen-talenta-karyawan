@@ -10,8 +10,8 @@
     <span class="text-surface-400" aria-hidden="true">—</span>
 @elseif ($seat->is_reserved)
     <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-warning-800" title="Dipesan oleh {{ $seat->reserved_occupant_name }} (TMT: {{ $seat->reserved_tmt }})"><i class="fas fa-lock text-[10px]" aria-hidden="true"></i> Terjadwal (SK)</span>
-@elseif (in_array($seat->status, ['acting', 'partial'], true))
-    {{-- Layar Mutasi menolak penempatan ke formasi yang masih berpemegang; jangan menawarkan jalan buntu. --}}
+@elseif ($seat->free_slots <= 0)
+    {{-- Layar Mutasi hanya menempatkan ke formasi yang masih punya kursi kosong (kuota dikurangi seluruh pemegang); jangan menawarkan jalan buntu. --}}
     <span class="text-[11px] text-surface-500" title="Selesaikan melalui Mutasi Berantai">Ada pemegang aktif</span>
 @else
     <a href="{{ route('admin.mutasi.create', ['jabatan' => $seat->jabatan, 'unit' => $seat->unit_kerja]) }}"

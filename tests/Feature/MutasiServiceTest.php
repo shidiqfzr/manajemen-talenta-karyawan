@@ -65,6 +65,47 @@ class MutasiServiceTest extends TestCase
         $this->assertEquals('ROTASI', $newJob->jenis_mutasi);
     }
 
+    public function test_transfer_into_a_multi_seat_formasi_with_a_free_seat_does_not_swap_anyone(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 3]);
+
+        $holder = Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+
+        $result = $this->service->processMutasi(new MutasiRequest($mover->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+
+        $this->assertSame('transfer', $result['type'], 'A free seat takes a straight transfer; nobody is swapped out.');
+        $this->assertSame('Asisten Pengolahan', $mover->refresh()->jabatan);
+        $this->assertSame('Asisten Pengolahan', $holder->refresh()->jabatan, 'The existing holder keeps the seat.');
+        $this->assertSame(2, Employee::where('jabatan', 'Asisten Pengolahan')->where('unit_kerja', 'Unit Multi')->count());
+    }
+
+    public function test_placing_into_a_full_multi_seat_formasi_is_rejected_without_changing_anything(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 2]);
+
+        Employee::factory()->count(2)->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+        $historiesBefore = JobHistory::count();
+
+        try {
+            $this->service->processMutasi(new MutasiRequest($mover->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+            $this->fail('A full multi-seat formasi must not be swapped into.');
+        } catch (MutasiRuleViolationException $e) {
+            $this->assertStringContainsString('berkuota 2', $e->getMessage());
+            $this->assertStringContainsString('seluruh kuotanya terisi', $e->getMessage());
+        }
+
+        $this->assertSame('Asisten Tanaman', $mover->refresh()->jabatan);
+        $this->assertSame($historiesBefore, JobHistory::count());
+    }
+
     public function test_simultaneous_swap_when_target_occupied()
     {
         // Setup

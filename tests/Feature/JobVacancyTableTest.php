@@ -179,8 +179,10 @@ class JobVacancyTableTest extends TestCase
             ->assertSee('Sebagian kosong')
             ->html();
 
-        // Only the three formasi without any holder (from setUp) can be placed into from here.
-        $this->assertSame(3, substr_count($html, 'Mutasi Internal</span>'));
+        // Placement is offered where Mutasi accepts it, i.e. where a seat is free: the three empty formasi from setUp
+        // and the two-seat formasi with one holder. The Plt-held single seat keeps its holder, so it has no button.
+        $this->assertSame(4, substr_count($html, 'Mutasi Internal</span>'));
+        $this->assertSame(1, substr_count($html, 'Ada pemegang aktif'));
         $this->assertStringContainsString('Rekrut Baru', $html);
     }
 

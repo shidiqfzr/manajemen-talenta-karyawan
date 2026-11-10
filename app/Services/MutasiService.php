@@ -123,6 +123,14 @@ class MutasiService
      */
     private function resolveSwapOccupant(Employee $employee, array $analysis, MutasiRequest $request): Employee
     {
+        // A full multi-seat formasi has several holders and no rule yet for which one to swap with; a swap only
+        // makes sense when exactly one person holds the target.
+        if ($analysis['multi_seat'] ?? false) {
+            throw new MutasiRuleViolationException(
+                "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota {$analysis['kuota']} dan seluruh kuotanya terisi. Penempatan pada formasi berkuota ganda yang penuh belum didukung; kosongkan satu kuota lebih dulu (mis. melalui Mutasi Berantai)."
+            );
+        }
+
         // A Pj/Plt assignee keeps their definitive seat, so the occupant would have nowhere to go.
         if (! $request->isDefinitif()) {
             throw new MutasiRuleViolationException(

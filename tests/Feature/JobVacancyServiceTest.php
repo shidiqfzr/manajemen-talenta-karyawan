@@ -361,6 +361,27 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame(['Manajer Belum Pernah Terisi'], $this->service->getVacancies()->pluck('jabatan')->all());
     }
 
+    public function test_free_slots_are_the_quota_left_after_every_holder_including_acting(): void
+    {
+        $this->assertSame(3, JobVacancyService::freeSlots(5, 2));
+        $this->assertSame(0, JobVacancyService::freeSlots(1, 1));
+        $this->assertSame(0, JobVacancyService::freeSlots(1, 2), 'An over-quota formasi has no free slot.');
+
+        $this->seat('Asisten Tiga Kursi', 3);
+        $this->holders($this->seat('Asisten Plt Satu Kursi', 1), 1, 'Plt');
+        $twoSeats = $this->seat('Asisten Dua Kursi Plt', 2);
+        $this->holders($twoSeats, 1, 'Pejabat Sementara (Pjs)');
+        $this->holders($this->seat('Asisten Sebagian', 3), 1);
+
+        $this->assertSame(3, $this->row('Asisten Tiga Kursi')->free_slots);
+        // Vacant for the quota (no definitive holder) yet nobody can be placed: the acting holder keeps the seat.
+        $plt = $this->row('Asisten Plt Satu Kursi');
+        $this->assertSame(1, $plt->vacant_slots);
+        $this->assertSame(0, $plt->free_slots);
+        $this->assertSame(1, $this->row('Asisten Dua Kursi Plt')->free_slots);
+        $this->assertSame(2, $this->row('Asisten Sebagian')->free_slots);
+    }
+
     public function test_monitor_vacancy_carries_the_last_occupant_and_age(): void
     {
         $position = $this->seat('Manajer Eks', 1);
