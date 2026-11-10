@@ -166,6 +166,48 @@ class JobVacancyTableTest extends TestCase
             ->assertSeeHtml('aria-label="Hapus filter Urgensi"');
     }
 
+    public function test_formasi_with_an_active_holder_shows_its_status_and_offers_no_mutasi_internal(): void
+    {
+        $acting = $this->makeSeat('Jabatan Dijabat Plt', 'Unit Gamma');
+        Employee::factory()->create(['jabatan' => $acting->nama, 'unit_kerja' => 'Unit Gamma', 'status_penugasan' => 'Plt']);
+        $partial = $this->makeSeat('Jabatan Dua Kursi', 'Unit Gamma', 2);
+        Employee::factory()->create(['jabatan' => $partial->nama, 'unit_kerja' => 'Unit Gamma']);
+
+        $html = Livewire::test(JobVacancyTable::class)
+            ->assertSee('Jabatan Dijabat Plt')
+            ->assertSee('Diisi Pj/Plt')
+            ->assertSee('Sebagian kosong')
+            ->html();
+
+        // Only the three formasi without any holder (from setUp) can be placed into from here.
+        $this->assertSame(3, substr_count($html, 'Mutasi Internal</span>'));
+        $this->assertStringContainsString('Rekrut Baru', $html);
+    }
+
+    public function test_search_finds_the_last_occupant_by_name(): void
+    {
+        $this->makeSeat('Jabatan Cari Nama', 'Unit Gamma');
+        $former = Employee::factory()->create(['nama' => 'Nama Unik Pencarian', 'jabatan' => 'Jabatan Lama', 'unit_kerja' => 'Unit Gamma']);
+        JobHistory::create(['employee_nik' => $former->nik, 'jabatan' => 'Jabatan Cari Nama', 'unit_kerja' => 'Unit Gamma', 'tmt_awal' => now()->subYears(2)->toDateString(), 'tmt_akhir' => now()->subDays(10)->toDateString()]);
+
+        Livewire::test(JobVacancyTable::class)
+            ->set('search', 'Unik Pencarian')
+            ->assertSee('Jabatan Cari Nama')
+            ->assertDontSee('Jabatan Kritis Alfa');
+    }
+
+    public function test_a_never_filled_formasi_is_not_called_new_and_the_chip_labels_match_the_strip(): void
+    {
+        $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
+
+        $html = Livewire::test(JobVacancyTable::class)->assertDontSee('Formasi Baru')->html();
+        $this->assertStringContainsString('Belum Pernah Terisi', $html);
+
+        $yellow = Livewire::test(JobVacancyTable::class)->set('severityFilter', 'yellow')->html();
+        $this->assertStringContainsString('Perhatian (30 - 90 hari)', $yellow);
+        $this->assertStringNotContainsString('Sedang (30', $yellow);
+    }
+
     public function test_filled_formasi_and_positions_outside_the_master_are_not_listed(): void
     {
         $full = $this->makeSeat('Jabatan Sudah Penuh', 'Unit Alfa');

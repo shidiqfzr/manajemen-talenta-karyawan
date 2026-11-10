@@ -83,9 +83,9 @@ class JobVacancyTable extends Component
             // The KPI cards drive urgency, so the toolbar shows only its chip.
             Filter::select('severityFilter', 'Urgensi', [
                 'red' => 'Kritis (> 90 hari)',
-                'yellow' => 'Sedang (30–90 hari)',
+                'yellow' => 'Perhatian (30 - 90 hari)',
                 'green' => 'Baru (< 30 hari)',
-                'unknown' => 'Belum pernah terisi',
+                'unknown' => 'Belum Pernah Terisi',
             ])->withoutControl(),
         ];
     }

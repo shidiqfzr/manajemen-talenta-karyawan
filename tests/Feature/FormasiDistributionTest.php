@@ -119,8 +119,10 @@ class FormasiDistributionTest extends TestCase
     {
         $html = $this->table()->call('setView', 'unit')->assertSet('view', 'unit')->assertSee('Asisten Afdeling V')->html();
 
-        // Vacant, unreserved: Asisten Afdeling X, Kepala Keuangan Uji, Manajer Plt Beta. The filled V has none.
-        $this->assertSame(3, substr_count($html, 'Isi lewat Mutasi'));
+        // Only formasi without any holder offer the link: Asisten Afdeling X and Kepala Keuangan Uji.
+        // The filled V has none, and the Plt-held Manajer Plt Beta cannot be placed into (Mutasi rejects it).
+        $this->assertSame(2, substr_count($html, 'Isi lewat Mutasi'));
+        $this->assertStringContainsString('Ada pemegang aktif', $html);
         $this->assertStringContainsString(e(route('admin.mutasi.create', ['jabatan' => 'Asisten Afdeling X', 'unit' => 'Unit Beta Uji'])), $html);
     }
 
@@ -245,7 +247,7 @@ class FormasiDistributionTest extends TestCase
 
         $html = $this->table()->call('setView', 'unit')->assertSee('Terjadwal (SK)')->assertSeeHtml('Dipesan oleh Sari Pengganti')->html();
 
-        $this->assertSame(2, substr_count($html, 'Isi lewat Mutasi'));
+        $this->assertSame(1, substr_count($html, 'Isi lewat Mutasi'));
     }
 
     public function test_legacy_lowongan_url_without_a_status_keeps_showing_only_vacant_formasi(): void

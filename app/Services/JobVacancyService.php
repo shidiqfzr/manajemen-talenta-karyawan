@@ -21,7 +21,7 @@ class JobVacancyService
      */
     public function getVacancies(?string $search = null, ?string $unitKerja = null): Collection
     {
-        $rows = $this->getFormasiSeats($search, $unitKerja, self::STATUS_ANY_VACANT)
+        $rows = $this->getFormasiSeats(null, $unitKerja, self::STATUS_ANY_VACANT)
             ->sortBy([
                 fn (object $a, object $b) => ($b->days_vacant ?? -1) <=> ($a->days_vacant ?? -1),
                 fn (object $a, object $b) => strcmp($a->unit_kerja, $b->unit_kerja),
@@ -36,7 +36,7 @@ class JobVacancyService
             ->get(['jh.id', 'jh.employee_nik', 'jh.level', 'jh.golongan', 'emp.nama', 'emp.foto'])
             ->keyBy('id');
 
-        return $rows->map(function (object $row) use ($occupants): object {
+        $rows = $rows->map(function (object $row) use ($occupants): object {
             $last = $occupants->get($row->latest_history_id);
             $since = $row->vacant_since ? Carbon::parse($row->vacant_since) : null;
 
@@ -52,6 +52,16 @@ class JobVacancyService
 
             return $row;
         });
+
+        if ($search === null || trim($search) === '') {
+            return $rows;
+        }
+
+        // Pencarian monitoring juga mencakup pejabat terakhir (nama dan NIK), selain jabatan, rumpun, dan unit.
+        $term = mb_strtolower(trim($search));
+
+        return $rows->filter(fn (object $row) => collect([$row->jabatan, $row->family, $row->unit_kerja, $row->last_occupant_name, $row->last_occupant_nik])
+            ->contains(fn ($field) => $field !== null && str_contains(mb_strtolower((string) $field), $term)))->values();
     }
 
     /**
@@ -308,16 +318,27 @@ class JobVacancyService
             ->get()
             ->groupBy(fn ($row) => "{$row->unit_kerja}|{$row->jabatan}");
 
+        // Keberangkatan terakhir per formasi: baris riwayat tertutup dengan tmt_akhir terbaru (seri: id terbesar).
+        // Baris milik karyawan yang masih menjabat di formasi itu diabaikan: kenaikan golongan atau perubahan status
+        // menutup lalu membuka baris riwayat tanpa orangnya pernah pergi.
         $lastDeparture = DB::table('job_histories')
             ->whereNull('deleted_at')
             ->whereNotNull('tmt_akhir')
-            ->selectRaw('jabatan, unit_kerja, max(tmt_akhir) as vacant_since, max(id) as latest_history_id')
-            ->groupBy('jabatan', 'unit_kerja')
-            ->get()
+            ->whereIn('jabatan', $seats->pluck('jabatan')->unique()->all())
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('employees')
+                ->whereColumn('employees.nik', 'job_histories.employee_nik')
+                ->whereColumn('employees.jabatan', 'job_histories.jabatan')
+                ->whereColumn('employees.unit_kerja', 'job_histories.unit_kerja'))
+            ->orderByDesc('tmt_akhir')
+            ->orderByDesc('id')
+            ->get(['id', 'jabatan', 'unit_kerja', 'tmt_akhir'])
+            ->unique(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}")
             ->keyBy(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}");
 
+        // Pemesanan terbaru (id terbesar) menang, sama dengan FormationService::analyzeTarget.
         $reserved = JobHistory::with('employee:nik,nama')
             ->where('is_applied', false)
+            ->orderBy('id')
             ->get()
             ->keyBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
 
@@ -328,14 +349,15 @@ class JobVacancyService
             $kuota = (int) $seat->kuota;
 
             $key = "{$seat->jabatan}|{$seat->unit_kerja}";
-            $departure = $lastDeparture->get($key)?->vacant_since;
+            $departure = $lastDeparture->get($key)?->tmt_akhir;
             // Umur kekosongan hanya bermakna selama masih ada kuota kosong; formasi penuh tidak membawa tanggal lama.
             $vacantSince = $departure && $kuota - $definitive > 0 ? Carbon::parse($departure) : null;
-            $daysVacant = $vacantSince ? (int) $vacantSince->diffInDays(now()) : null;
+            // Tanggal keluar di masa depan (mutasi terjadwal) belum menghitung lama kosong.
+            $daysVacant = $vacantSince ? max(0, (int) $vacantSince->diffInDays(now())) : null;
             $booking = $reserved->get($key);
 
             $seat->family = JabatanFamily::of($seat->jabatan);
-            $seat->latest_history_id = $lastDeparture->get($key)?->latest_history_id;
+            $seat->latest_history_id = $lastDeparture->get($key)?->id;
             $seat->kuota = $kuota;
             $seat->filled = $definitive;
             $seat->acting = $acting;

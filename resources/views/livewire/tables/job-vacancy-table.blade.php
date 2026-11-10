@@ -128,6 +128,10 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-earth-100 text-earth-800 border border-earth-300 tabular-nums">
                                         Gol: {{ $item->golongan ?: '—' }}
                                     </span>
+                                    @if (in_array($item->status, ['acting', 'partial'], true))
+                                        <x-admin.master.seat-status :status="$item->status" :label="$item->status_label" />
+                                        <span class="text-[11px] text-surface-500 tabular-nums">{{ $item->vacant_slots }} dari {{ $item->kuota }} kosong</span>
+                                    @endif
                                     @if ($item->is_reserved)
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-warning-100 text-warning-800 border border-warning-200" title="Dipesan oleh {{ $item->reserved_occupant_name }} (TMT: {{ $item->reserved_tmt }})">
                                             <i class="fas fa-lock text-[10px] text-warning-700" aria-hidden="true"></i> Dipesan: {{ $item->reserved_tmt }}
@@ -156,9 +160,13 @@
                                             </span>
                                         </div>
                                     </div>
+                                @elseif ($item->last_occupant_nik)
+                                    <span class="inline-flex items-center gap-1 text-surface-500 italic text-xs">
+                                        <i class="fas fa-minus text-[10px]" aria-hidden="true"></i> Data karyawan tidak tersedia
+                                    </span>
                                 @else
                                     <span class="inline-flex items-center gap-1 text-surface-500 italic text-xs">
-                                        <i class="fas fa-minus text-[10px]" aria-hidden="true"></i> Formasi Baru
+                                        <i class="fas fa-minus text-[10px]" aria-hidden="true"></i> Belum pernah terisi
                                     </span>
                                 @endif
                             </td>
@@ -228,6 +236,10 @@
                                     </div>
                                 @else
                                     <div class="inline-flex flex-col gap-1.5 w-32 items-stretch ml-auto">
+                                        {{-- Mutasi hanya dapat menempatkan ke formasi tanpa pemegang; yang masih berpemegang ditolak layar Mutasi. --}}
+                                        @if (in_array($item->status, ['acting', 'partial'], true))
+                                            <span class="text-[11px] text-surface-500 text-center leading-snug" title="Selesaikan melalui Mutasi Berantai">Ada pemegang aktif</span>
+                                        @else
                                         <!-- 1. Mutasi / Transfer Internal -->
                                         <a href="{{ route('admin.mutasi.create', ['jabatan' => $item->jabatan, 'unit' => $item->unit_kerja]) }}"
                                             class="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer text-center"
@@ -235,6 +247,7 @@
                                             <i class="fas fa-exchange-alt text-[10px]" aria-hidden="true"></i>
                                             <span>Mutasi Internal</span>
                                         </a>
+                                        @endif
 
                                         <!-- 2. Rekrut Karyawan Baru -->
                                         <a href="{{ route('admin.employees.create', ['jabatan' => $item->jabatan, 'unit_kerja' => $item->unit_kerja, 'level' => $item->level, 'golongan' => $item->golongan]) }}"

@@ -336,13 +336,13 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame(50, $this->service->getFormasiStatistics()['fill_rate']);
     }
 
-    private function departure(Position $position, Employee $former, int $daysAgo, ?Unit $unit = null): void
+    private function departure(Position $position, Employee $former, int $daysAgo, ?Unit $unit = null, string $level = 'Karpim'): void
     {
         JobHistory::create([
             'employee_nik' => $former->nik,
             'jabatan' => $position->nama,
             'unit_kerja' => ($unit ?? $this->unit)->nama,
-            'level' => 'Karpim',
+            'level' => $level,
             'golongan' => 'IV/A',
             'tmt_awal' => now()->subYears(2)->toDateString(),
             'tmt_akhir' => now()->subDays($daysAgo)->toDateString(),
@@ -365,13 +365,13 @@ class JobVacancyServiceTest extends TestCase
     {
         $position = $this->seat('Manajer Eks', 1);
         $former = Employee::factory()->create(['nama' => 'Budi Pensiun', 'unit_kerja' => 'Pensiun', 'jabatan' => 'Mantan']);
-        $this->departure($position, $former, 45);
+        $this->departure($position, $former, 45, null, 'Karpel');
 
         $row = $this->service->getVacancies()->firstWhere('jabatan', 'Manajer Eks');
 
         $this->assertSame($former->nik, $row->last_occupant_nik);
         $this->assertSame('Budi Pensiun', $row->last_occupant_name);
-        $this->assertSame('Karpim', $row->level);
+        $this->assertSame('Karpel', $row->level, 'The level comes from the departed holder, not the seat.');
         $this->assertSame('IV/A', $row->golongan);
         $this->assertSame(45, $row->days_vacant);
         $this->assertSame('yellow', $row->severity);
@@ -392,6 +392,72 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame('unknown', $row->severity);
         $this->assertSame('—', $row->vacant_since_formatted);
         $this->assertSame('Belum pernah terisi', $row->duration_human);
+    }
+
+    public function test_monitor_search_finds_the_last_occupant_by_name_or_nik(): void
+    {
+        $position = $this->seat('Manajer Eks', 1);
+        $this->seat('Manajer Lain', 1);
+        $former = Employee::factory()->create(['nama' => 'Budi Pensiun', 'unit_kerja' => 'Pensiun', 'jabatan' => 'Mantan']);
+        $this->departure($position, $former, 45);
+
+        $this->assertSame(['Manajer Eks'], $this->service->getVacancies(search: 'budi')->pluck('jabatan')->all());
+        $this->assertSame(['Manajer Eks'], $this->service->getVacancies(search: $former->nik)->pluck('jabatan')->all());
+        $this->assertSame([], $this->service->getVacancies(search: 'tidak ada')->pluck('jabatan')->all());
+    }
+
+    public function test_a_current_holders_own_history_change_is_not_a_departure(): void
+    {
+        $position = $this->seat('Asisten Dua Kursi', 2);
+        $holder = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Pemegang Aktif']);
+        // A golongan step closes the holder's row and opens a new one; the holder never left.
+        $this->departure($position, $holder, 0);
+
+        $row = $this->service->getVacancies()->firstWhere('jabatan', 'Asisten Dua Kursi');
+
+        $this->assertSame('partial', $row->status);
+        $this->assertNull($row->last_occupant_nik);
+        $this->assertNull($row->days_vacant);
+        $this->assertSame('unknown', $row->severity);
+    }
+
+    public function test_the_last_occupant_and_date_come_from_the_same_latest_departure(): void
+    {
+        $position = $this->seat('Manajer Dua Riwayat', 1);
+        $recent = Employee::factory()->create(['nama' => 'Pejabat Terbaru', 'unit_kerja' => 'Pensiun', 'jabatan' => 'Mantan']);
+        $old = Employee::factory()->create(['nama' => 'Pejabat Lama', 'unit_kerja' => 'Pensiun', 'jabatan' => 'Mantan']);
+        $this->departure($position, $recent, 30);
+        // Backfilled later (higher id) but it ended long ago: it must not win.
+        $this->departure($position, $old, 2000);
+
+        $row = $this->service->getVacancies()->firstWhere('jabatan', 'Manajer Dua Riwayat');
+
+        $this->assertSame($recent->nik, $row->last_occupant_nik);
+        $this->assertSame(30, $row->days_vacant);
+    }
+
+    public function test_a_departure_dated_in_the_future_never_gives_a_negative_age(): void
+    {
+        $position = $this->seat('Manajer Akan Pindah', 1);
+        $former = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $this->departure($position, $former, -5);
+
+        $row = $this->service->getVacancies()->firstWhere('jabatan', 'Manajer Akan Pindah');
+
+        $this->assertSame(0, $row->days_vacant);
+        $this->assertSame('green', $row->severity);
+    }
+
+    public function test_the_latest_pending_booking_names_the_reserving_employee(): void
+    {
+        $position = $this->seat('Manajer Dua Pesanan', 1);
+        $first = Employee::factory()->create(['nama' => 'Pemesan Pertama', 'unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $second = Employee::factory()->create(['nama' => 'Pemesan Kedua', 'unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        foreach ([$first, $second] as $successor) {
+            JobHistory::create(['employee_nik' => $successor->nik, 'jabatan' => $position->nama, 'unit_kerja' => $this->unit->nama, 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+        }
+
+        $this->assertSame('Pemesan Kedua', $this->row('Manajer Dua Pesanan')->reserved_occupant_name);
     }
 
     public function test_monitor_lists_the_longest_vacant_first_and_never_filled_last(): void
