@@ -135,6 +135,187 @@ class JobVacancyService
         return $this->getVacancies()->pluck('unit_kerja')->unique()->values();
     }
 
+    /** Label status formasi jabatan; dipakai layar Formasi, filter, dan ekspor agar istilahnya sama. */
+    public const SEAT_STATUS_LABELS = [
+        'over' => 'Melebihi kuota',
+        'partial' => 'Ada lowongan',
+        'acting' => 'Diisi Pj/Plt',
+        'empty' => 'Kosong',
+        'full' => 'Penuh',
+    ];
+
+    /** Status yang masih memiliki lowongan (kuota belum terisi pejabat definitif). */
+    public const VACANT_STATUSES = ['partial', 'acting', 'empty'];
+
+    /**
+     * Sumber tunggal status formasi jabatan. Hanya pejabat definitif yang mengisi kuota; Pj/Plt adalah penugasan
+     * sementara sehingga formasi yang hanya dijabat Pj/Plt tetap lowong (DOMAIN.md §5.2).
+     */
+    public static function classifySeat(int $kuota, int $definitive, int $acting): string
+    {
+        return match (true) {
+            $definitive > $kuota => 'over',
+            $definitive >= $kuota => 'full',
+            $definitive === 0 && $acting > 0 => 'acting',
+            $definitive === 0 => 'empty',
+            default => 'partial',
+        };
+    }
+
+    /**
+     * Pelacak formasi lowong: setiap formasi jabatan (unit aktif, jabatan aktif) yang kuotanya belum terisi
+     * pejabat definitif. Dihitung langsung dari position_unit dan karyawan, tanpa status tersimpan, sehingga
+     * tidak dapat bergeser dari data karyawan. Formasi yang tidak pernah terisi ikut terdeteksi.
+     *
+     * @return Collection<int, object>
+     */
+    public function getFormasiVacancies(?string $search = null, ?string $unitKerja = null, ?string $status = null): Collection
+    {
+        $rows = $this->formasiRows();
+
+        if ($search !== null && $search !== '') {
+            $term = mb_strtolower($search);
+            $rows = $rows->filter(fn (object $row) => str_contains(mb_strtolower($row->jabatan), $term)
+                || str_contains(mb_strtolower($row->unit_kerja), $term));
+        }
+
+        if ($unitKerja !== null && $unitKerja !== '') {
+            $rows = $rows->where('unit_kerja', $unitKerja);
+        }
+
+        $rows = $rows->where('vacant_slots', '>', 0);
+
+        if ($status !== null && $status !== '') {
+            $rows = $rows->where('status', $status);
+        }
+
+        // Longest vacant first; formasi that were never filled have no date and follow the dated ones.
+        return $rows
+            ->sortBy([
+                fn (object $a, object $b) => ($b->days_vacant ?? -1) <=> ($a->days_vacant ?? -1),
+                fn (object $a, object $b) => strcmp($a->unit_kerja, $b->unit_kerja),
+                fn (object $a, object $b) => strcmp($a->jabatan, $b->jabatan),
+            ])
+            ->values();
+    }
+
+    /**
+     * Ringkasan seluruh formasi (bukan hanya yang lowong) untuk kartu KPI.
+     *
+     * @return array{total_seats: int, total_kuota: int, filled: int, vacant_slots: int, vacant_formasi: int, acting_count: int, over_count: int, fill_rate: int}
+     */
+    public function getFormasiStatistics(): array
+    {
+        $rows = $this->formasiRows();
+        $kuota = (int) $rows->sum('kuota');
+        $filled = (int) $rows->sum('filled');
+
+        return [
+            'total_seats' => $rows->count(),
+            'total_kuota' => $kuota,
+            'filled' => $filled,
+            'vacant_slots' => (int) $rows->sum('vacant_slots'),
+            'vacant_formasi' => $rows->where('vacant_slots', '>', 0)->count(),
+            'acting_count' => $rows->where('status', 'acting')->count(),
+            'over_count' => $rows->where('status', 'over')->count(),
+            'fill_rate' => $kuota > 0 ? (int) round(min($filled, $kuota) / $kuota * 100) : 0,
+        ];
+    }
+
+    /**
+     * Jumlah lowongan per unit untuk kolom "Lowong" pada daftar unit.
+     *
+     * @return array<int, array{vacant_slots: int, vacant_formasi: int}> keyed by unit id
+     */
+    public function getFormasiUnitSummary(): array
+    {
+        return $this->formasiRows()
+            ->groupBy('unit_id')
+            ->map(fn (Collection $rows) => [
+                'vacant_slots' => (int) $rows->sum('vacant_slots'),
+                'vacant_formasi' => $rows->where('vacant_slots', '>', 0)->count(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Seluruh formasi jabatan pada unit dan jabatan aktif beserta statusnya. Empat kueri tetap (formasi, pemegang,
+     * tanggal keluar terakhir, pemesanan) tanpa N+1.
+     *
+     * @return Collection<int, object>
+     */
+    private function formasiRows(): Collection
+    {
+        $seats = DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('units.is_active', true)
+            ->where('positions.is_active', true)
+            ->get([
+                'position_unit.id as position_unit_id', 'position_unit.kuota', 'position_unit.bidang',
+                'units.id as unit_id', 'units.nama as unit_kerja',
+                'positions.nama as jabatan', 'positions.level', 'positions.rm_level',
+            ]);
+
+        if ($seats->isEmpty()) {
+            return collect();
+        }
+
+        // Holders per (unit, jabatan): definitive vs acting (Pj/Plt).
+        $holders = Employee::query()
+            ->selectRaw('unit_kerja, jabatan, status_penugasan, count(*) as total')
+            ->groupBy('unit_kerja', 'jabatan', 'status_penugasan')
+            ->get()
+            ->groupBy(fn ($row) => "{$row->unit_kerja}|{$row->jabatan}");
+
+        $lastDeparture = DB::table('job_histories')
+            ->whereNull('deleted_at')
+            ->whereNotNull('tmt_akhir')
+            ->selectRaw('jabatan, unit_kerja, max(tmt_akhir) as vacant_since')
+            ->groupBy('jabatan', 'unit_kerja')
+            ->get()
+            ->keyBy(fn ($row) => "{$row->jabatan}|{$row->unit_kerja}");
+
+        $reserved = JobHistory::with('employee:nik,nama')
+            ->where('is_applied', false)
+            ->get()
+            ->keyBy(fn ($jh) => "{$jh->jabatan}|{$jh->unit_kerja}");
+
+        return $seats->map(function (object $seat) use ($holders, $lastDeparture, $reserved): object {
+            $group = $holders->get("{$seat->unit_kerja}|{$seat->jabatan}", collect());
+            $acting = (int) $group->filter(fn ($row) => in_array(strtolower((string) $row->status_penugasan), ['pj', 'plt'], true))->sum('total');
+            $definitive = (int) $group->sum('total') - $acting;
+            $kuota = (int) $seat->kuota;
+
+            $key = "{$seat->jabatan}|{$seat->unit_kerja}";
+            $departure = $lastDeparture->get($key)?->vacant_since;
+            $vacantSince = $departure ? Carbon::parse($departure) : null;
+            $daysVacant = $vacantSince ? (int) $vacantSince->diffInDays(now()) : null;
+            $booking = $reserved->get($key);
+
+            $seat->kuota = $kuota;
+            $seat->filled = $definitive;
+            $seat->acting = $acting;
+            $seat->vacant_slots = max($kuota - $definitive, 0);
+            $seat->status = self::classifySeat($kuota, $definitive, $acting);
+            $seat->status_label = self::SEAT_STATUS_LABELS[$seat->status];
+            $seat->vacant_since = $vacantSince?->toDateString();
+            $seat->vacant_since_formatted = $vacantSince?->translatedFormat('d M Y');
+            $seat->days_vacant = $daysVacant;
+            $seat->severity = match (true) {
+                $daysVacant === null => 'unknown',
+                $daysVacant > 90 => 'red',
+                $daysVacant >= 30 => 'yellow',
+                default => 'green',
+            };
+            $seat->is_reserved = $booking !== null;
+            $seat->reserved_occupant_name = $booking?->employee?->nama;
+            $seat->reserved_tmt = $booking?->tmt_awal ? Carbon::parse($booking->tmt_awal)->translatedFormat('d M Y') : null;
+
+            return $seat;
+        });
+    }
+
     /**
      * Fill a vacant position by assigning / promoting / transferring an employee.
      */

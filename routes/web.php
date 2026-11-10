@@ -147,6 +147,9 @@ Route::prefix('admin')
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
             Route::resource('units', UnitController::class)->only(['store', 'update', 'destroy']);
 
+            // Formasi lowong: pelacak lintas unit formasi jabatan yang belum terisi (read-only, JobVacancyService)
+            Route::view('lowongan', 'admin.master.lowongan.index')->name('lowongan.index');
+
             // Riwayat perubahan master (read-only)
             Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');
 

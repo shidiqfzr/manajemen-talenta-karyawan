@@ -6,6 +6,7 @@
 @php
     $sections = [
         ['label' => 'Formasi', 'route' => 'admin.master.formasi.index', 'match' => 'admin.master.formasi.*', 'icon' => 'fa-table-list'],
+        ['label' => 'Formasi Lowong', 'route' => 'admin.master.lowongan.index', 'match' => 'admin.master.lowongan.*', 'icon' => 'fa-user-clock'],
         ['label' => 'Riwayat Perubahan', 'route' => 'admin.master.riwayat.index', 'match' => 'admin.master.riwayat.*', 'icon' => 'fa-clock-rotate-left'],
     ];
 @endphp

@@ -11,6 +11,7 @@ use App\Models\Unit;
 use App\Services\Formasi\FormasiDialogs;
 use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
+use App\Services\JobVacancyService;
 use App\Services\ManPowerPlanningService;
 use App\Support\DataTable\Filter;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,12 +38,7 @@ class FormasiEditor extends Component
     public const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
     /** Label status formasi jabatan; dipakai filter, tabel, dan ekspor agar istilahnya sama. */
-    public const SEAT_STATE_LABELS = [
-        'over' => 'Melebihi kuota',
-        'vacant' => 'Ada lowongan',
-        'empty' => 'Kosong',
-        'full' => 'Penuh',
-    ];
+    public const SEAT_STATE_LABELS = JobVacancyService::SEAT_STATUS_LABELS;
 
     #[Url(as: 'per_page', except: 25)]
     public int $perPage = 25;
@@ -70,7 +66,7 @@ class FormasiEditor extends Component
     #[Url(as: 'bidang', except: '')]
     public string $bidangFilter = '';
 
-    /** over | empty | vacant | full | inactive */
+    /** vacant | over | empty | partial | acting | full | inactive */
     #[Url(as: 'state', except: '')]
     public string $seatStatusFilter = '';
 
@@ -117,7 +113,7 @@ class FormasiEditor extends Component
     private const SORTABLE = ['jabatan', 'rm_level', 'bidang', 'kuota', 'filled'];
 
     /** Kolom yang dapat diurutkan pada daftar unit. */
-    private const OVERVIEW_SORTABLE = ['nama', 'wilayah', 'seats', 'kuota', 'filled'];
+    private const OVERVIEW_SORTABLE = ['nama', 'wilayah', 'seats', 'kuota', 'filled', 'vacant'];
 
     /**
      * Unduh Excel sesuai tampilan: daftar unit (bila belum memilih unit) atau formasi jabatan unit terpilih,
@@ -207,7 +203,7 @@ class FormasiEditor extends Component
         return [
             Filter::select('rmFilter', 'RM Band', array_combine(array_keys(Position::RM_LEVEL_LIST), array_keys(Position::RM_LEVEL_LIST)))->icon('fas fa-layer-group'),
             Filter::select('bidangFilter', 'Bidang', Position::BIDANG_LIST)->icon('fas fa-sitemap'),
-            Filter::select('seatStatusFilter', 'Status', self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'])->icon('fas fa-toggle-on'),
+            Filter::select('seatStatusFilter', 'Status', ['vacant' => 'Semua lowong'] + self::SEAT_STATE_LABELS + ['inactive' => 'Jabatan nonaktif'])->icon('fas fa-toggle-on'),
         ];
     }
 
@@ -228,7 +224,7 @@ class FormasiEditor extends Component
     {
         return [
             Filter::select('wilayahFilter', 'Wilayah', array_combine(Unit::WILAYAH_LIST, Unit::WILAYAH_LIST))->icon('fas fa-location-dot'),
-            Filter::select('statusFilter', 'Status', ['active' => 'Aktif', 'inactive' => 'Nonaktif'])->icon('fas fa-toggle-on'),
+            Filter::select('statusFilter', 'Status', ['active' => 'Aktif', 'inactive' => 'Nonaktif', 'vacant' => 'Ada formasi lowong'])->icon('fas fa-toggle-on'),
         ];
     }
 
@@ -268,6 +264,13 @@ class FormasiEditor extends Component
     public function toggleOverQuotaFilter(): void
     {
         $this->seatStatusFilter = $this->seatStatusFilter === 'over' ? '' : 'over';
+        $this->resetPage();
+    }
+
+    /** Kartu KPI "Lowong" menampilkan seluruh formasi yang belum terisi pejabat definitif. */
+    public function toggleVacantFilter(): void
+    {
+        $this->seatStatusFilter = $this->seatStatusFilter === 'vacant' ? '' : 'vacant';
         $this->resetPage();
     }
 
@@ -520,10 +523,12 @@ class FormasiEditor extends Component
             return collect();
         }
 
-        $filled = Employee::where('unit_kerja', $unit->nama)
-            ->selectRaw('jabatan, count(*) as total')
-            ->groupBy('jabatan')
-            ->pluck('total', 'jabatan');
+        // Pemegang per jabatan, dipisah pejabat definitif dan Pj/Plt (hanya definitif yang mengisi kuota).
+        $holders = Employee::where('unit_kerja', $unit->nama)
+            ->selectRaw('jabatan, status_penugasan, count(*) as total')
+            ->groupBy('jabatan', 'status_penugasan')
+            ->get()
+            ->groupBy('jabatan');
 
         return DB::table('position_unit')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
@@ -533,16 +538,16 @@ class FormasiEditor extends Component
                 'positions.id as position_id', 'positions.is_active as position_active',
                 'positions.nama as jabatan', 'positions.level', 'positions.rm_level',
             ])
-            ->map(function (object $seat) use ($filled): object {
+            ->map(function (object $seat) use ($holders): object {
+                $group = $holders->get($seat->jabatan, collect());
+                $acting = (int) $group->filter(fn ($row) => in_array(strtolower((string) $row->status_penugasan), ['pj', 'plt'], true))->sum('total');
+
                 $seat->kuota = (int) $seat->kuota;
-                $seat->filled = (int) ($filled[$seat->jabatan] ?? 0);
-                $seat->over_quota = $seat->filled > $seat->kuota;
-                $seat->state = match (true) {
-                    $seat->over_quota => 'over',
-                    $seat->filled === 0 => 'empty',
-                    $seat->filled < $seat->kuota => 'vacant',
-                    default => 'full',
-                };
+                $seat->filled = (int) $group->sum('total');
+                $seat->acting = $acting;
+                $seat->vacant_slots = max($seat->kuota - ($seat->filled - $acting), 0);
+                $seat->state = JobVacancyService::classifySeat($seat->kuota, $seat->filled - $acting, $acting);
+                $seat->over_quota = $seat->state === 'over';
 
                 return $seat;
             })
@@ -568,7 +573,8 @@ class FormasiEditor extends Component
             ->when($this->rmFilter !== '', fn ($rows) => $rows->where('rm_level', $this->rmFilter))
             ->when($this->bidangFilter !== '', fn ($rows) => $rows->where('bidang', $this->bidangFilter))
             ->when($this->seatStatusFilter === 'inactive', fn ($rows) => $rows->where('position_active', false))
-            ->when(in_array($this->seatStatusFilter, ['over', 'empty', 'vacant', 'full'], true), fn ($rows) => $rows->where('state', $this->seatStatusFilter))
+            ->when($this->seatStatusFilter === 'vacant', fn ($rows) => $rows->whereIn('state', JobVacancyService::VACANT_STATUSES))
+            ->when(in_array($this->seatStatusFilter, array_keys(self::SEAT_STATE_LABELS), true), fn ($rows) => $rows->where('state', $this->seatStatusFilter))
             ->values();
     }
 
@@ -666,7 +672,8 @@ class FormasiEditor extends Component
             ->when($term !== '', fn ($rows) => $rows->filter(fn ($row) => str_contains(mb_strtolower($row->nama), $term)))
             ->when($this->wilayahFilter !== '', fn ($rows) => $rows->where('wilayah', $this->wilayahFilter))
             ->when($this->statusFilter === 'active', fn ($rows) => $rows->where('is_active', true))
-            ->when($this->statusFilter === 'inactive', fn ($rows) => $rows->where('is_active', false));
+            ->when($this->statusFilter === 'inactive', fn ($rows) => $rows->where('is_active', false))
+            ->when($this->statusFilter === 'vacant', fn ($rows) => $rows->where('vacant', '>', 0));
 
         if (in_array($this->sortField, self::OVERVIEW_SORTABLE, true)) {
             $rows = $rows->sortBy(fn (object $row) => is_string($row->{$this->sortField}) ? mb_strtolower($row->{$this->sortField}) : $row->{$this->sortField}, SORT_REGULAR, $this->sortDirection === 'desc');
@@ -686,10 +693,16 @@ class FormasiEditor extends Component
                 ->on('employees.unit_kerja', '=', 'units.nama')
                 ->on('employees.jabatan', '=', 'positions.nama'))
             ->groupBy('position_unit.id', 'position_unit.unit_id', 'position_unit.kuota')
-            ->get(['position_unit.unit_id', 'position_unit.kuota', DB::raw('count(employees.nik) as filled')])
+            ->get([
+                'position_unit.unit_id', 'position_unit.kuota',
+                DB::raw('count(employees.nik) as filled'),
+                DB::raw("coalesce(sum(case when lower(coalesce(employees.status_penugasan, '')) in ('pj', 'plt') then 1 else 0 end), 0) as acting"),
+            ])
             ->groupBy('unit_id');
+        // Lowongan dihitung JobVacancyService (sumber tunggal); unit nonaktif tidak termasuk.
+        $vacancies = app(JobVacancyService::class)->getFormasiUnitSummary();
 
-        return $this->units->map(function (Unit $unit) use ($occupied): object {
+        return $this->units->map(function (Unit $unit) use ($occupied, $vacancies): object {
             $rows = $occupied->get($unit->id, collect());
 
             return (object) [
@@ -700,7 +713,9 @@ class FormasiEditor extends Component
                 'seats' => $rows->count(),
                 'kuota' => (int) $rows->sum('kuota'),
                 'filled' => (int) $rows->sum('filled'),
-                'over' => $rows->filter(fn ($row) => (int) $row->filled > (int) $row->kuota)->count(),
+                'over' => $rows->filter(fn ($row) => (int) $row->filled - (int) $row->acting > (int) $row->kuota)->count(),
+                'vacant' => $vacancies[$unit->id]['vacant_slots'] ?? 0,
+                'vacant_formasi' => $vacancies[$unit->id]['vacant_formasi'] ?? 0,
             ];
         });
     }
@@ -727,7 +742,7 @@ class FormasiEditor extends Component
     /**
      * Total lintas unit untuk KPI layar awal.
      *
-     * @return array{units: int, seats: int, kuota: int, filled: int, over: int}
+     * @return array{units: int, seats: int, kuota: int, filled: int, over: int, vacant: int, vacant_formasi: int}
      */
     #[Computed]
     public function overviewStats(): array
@@ -740,6 +755,8 @@ class FormasiEditor extends Component
             'kuota' => (int) $rows->sum('kuota'),
             'filled' => (int) $rows->sum('filled'),
             'over' => (int) $rows->sum('over'),
+            'vacant' => (int) $rows->sum('vacant'),
+            'vacant_formasi' => (int) $rows->sum('vacant_formasi'),
         ];
     }
 

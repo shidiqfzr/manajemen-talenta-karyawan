@@ -82,6 +82,42 @@ class FormasiEditorTest extends TestCase
         $this->editor()->assertSee('Melebihi kuota');
     }
 
+    public function test_acting_holder_leaves_the_seat_vacant_and_the_vacancy_filter_finds_it(): void
+    {
+        $acting = $this->position('Manajer Dijabat Plt');
+        $this->seat($acting, 1);
+        $full = $this->position('Manajer Sudah Penuh');
+        $this->seat($full, 1);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $acting->nama, 'status_penugasan' => 'Plt']);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $full->nama]);
+
+        $this->editor()
+            ->assertSee('Diisi Pj/Plt')
+            ->call('toggleVacantFilter')
+            ->assertSet('seatStatusFilter', 'vacant')
+            ->assertSee('Manajer Dijabat Plt')
+            ->assertDontSee('Manajer Sudah Penuh')
+            ->call('toggleVacantFilter')
+            ->assertSet('seatStatusFilter', '');
+    }
+
+    public function test_unit_list_shows_vacant_slots_and_can_filter_units_with_vacancies(): void
+    {
+        $this->seat($this->position('Manajer Lowong Daftar'), 2);
+        $filledUnit = Unit::create(['nama' => 'Kebun Penuh Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 2]);
+        $position = $this->position('Manajer Penuh Daftar');
+        DB::table('position_unit')->insert(['unit_id' => $filledUnit->id, 'position_id' => $position->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
+        Employee::factory()->create(['unit_kerja' => $filledUnit->nama, 'jabatan' => $position->nama]);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
+            ->assertSee('2 lowong')
+            ->assertSee('Formasi Lowong')
+            ->set('statusFilter', 'vacant');
+
+        $list->assertSee('Kebun Editor Uji')->assertDontSee('Kebun Penuh Uji');
+        $this->assertSame(2, $list->instance()->overviewStats['vacant']);
+    }
+
     public function test_add_seat_flow_previews_then_confirms_and_audits(): void
     {
         $position = $this->position('Asisten Baru Uji');
@@ -463,7 +499,7 @@ class FormasiEditorTest extends TestCase
             ->assertSee('Total Kuota')
             ->assertSee('1 formasi melebihi kuota');
 
-        $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 1, 'filled' => 2, 'over' => 1], $component->instance()->overviewStats);
+        $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 1, 'filled' => 2, 'over' => 1, 'vacant' => 0, 'vacant_formasi' => 0], $component->instance()->overviewStats);
     }
 
     public function test_add_dialog_is_one_form_with_name_suggestions_and_no_separate_create_button(): void
