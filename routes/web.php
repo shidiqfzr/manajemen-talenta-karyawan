@@ -150,7 +150,20 @@ Route::prefix('admin')
             // Sebaran Formasi: gambaran lintas unit formasi jabatan terisi dan kosong (read-only, JobVacancyService)
             Route::view('sebaran', 'admin.master.sebaran.index')->name('sebaran.index');
             // Tautan lama tab "Formasi Lowong" diteruskan ke Sebaran Formasi dengan filternya.
-            Route::get('lowongan', fn (Request $request) => redirect()->route('admin.master.sebaran.index', $request->only(['unit', 'status', 'search']), 301));
+            // Tab lama hanya menampilkan formasi kosong, jadi tanpa status bawaannya tetap "kosong".
+            Route::get('lowongan', function (Request $request) {
+                $params = [];
+                foreach (['unit', 'status', 'search', 'durasi'] as $key) {
+                    $value = $request->query($key);
+                    $value = $key === 'status' && ($value === null || $value === '') ? 'kosong' : $value;
+
+                    if (is_string($value) && $value !== '') {
+                        $params[$key] = $value;
+                    }
+                }
+
+                return redirect()->route('admin.master.sebaran.index', $params, 301);
+            });
 
             // Riwayat perubahan master (read-only)
             Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');

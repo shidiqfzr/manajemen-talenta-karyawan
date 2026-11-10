@@ -92,7 +92,7 @@ class FormasiDistribution extends Component
         $this->normaliseAll();
     }
 
-    /** Pencarian, filter, atau halaman berubah: kembali ke halaman pertama dan tutup rincian rumpun. */
+    /** Pencarian atau filter berubah: kembali ke halaman pertama dan tutup rincian rumpun. */
     public function updated(): void
     {
         $this->normaliseAll();
@@ -201,6 +201,10 @@ class FormasiDistribution extends Component
         $rows = $this->sorted($this->view === self::VIEW_JABATAN ? $this->distribution($service) : $this->seats($service));
 
         $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $this->perPage)));
+        if ($page !== $this->getPage()) {
+            // Simpan halaman yang sebenarnya ditampilkan, agar "Sebelumnya" dan "Berikutnya" bergerak dari sana.
+            $this->setPage($page);
+        }
         $paginator = new LengthAwarePaginator($rows->forPage($page, $this->perPage)->values(), $rows->count(), $this->perPage, $page);
 
         $filterValues = $this->activeFilterValues($service);

@@ -851,6 +851,9 @@ class FormasiEditor extends Component
     {
         $perPage = in_array($this->perPage, self::PER_PAGE_OPTIONS, true) ? $this->perPage : 25;
         $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $perPage)));
+        if ($page !== $this->getPage()) {
+            $this->setPage($page);
+        }
 
         return new LengthAwarePaginator($rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page);
     }

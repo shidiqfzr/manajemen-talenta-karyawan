@@ -248,6 +248,38 @@ class FormasiDistributionTest extends TestCase
         $this->assertSame(2, substr_count($html, 'Isi lewat Mutasi'));
     }
 
+    public function test_legacy_lowongan_url_without_a_status_keeps_showing_only_vacant_formasi(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/admin/master/lowongan?unit=Unit+Beta+Uji&durasi=unknown')
+            ->assertStatus(301)
+            ->assertRedirect(route('admin.master.sebaran.index', ['unit' => 'Unit Beta Uji', 'status' => 'kosong', 'durasi' => 'unknown']));
+    }
+
+    public function test_a_page_beyond_the_last_page_is_stored_as_the_last_page(): void
+    {
+        foreach (range(1, 12) as $n) {
+            $this->seat($this->alfa, sprintf('Kepala Seksi Uji %02d', $n), 1);
+        }
+
+        Livewire::actingAs($this->admin)
+            ->withQueryParams(['page' => 50, 'per_page' => 10])
+            ->test(FormasiDistribution::class)
+            ->assertSet('paginators.page', 2)
+            ->call('previousPage')
+            ->assertSet('paginators.page', 1);
+    }
+
+    public function test_view_toggle_is_a_keyboard_navigable_radiogroup(): void
+    {
+        $html = $this->table()->html();
+
+        $this->assertMatchesRegularExpression('/role="radio" aria-checked="true" tabindex="0"/', $html);
+        $this->assertMatchesRegularExpression('/role="radio" aria-checked="false" tabindex="-1"/', $html);
+        $this->assertStringContainsString('@keydown.arrow-right.prevent', $html);
+        $this->assertStringContainsString('@keydown.arrow-left.prevent', $html);
+    }
+
     public function test_legacy_lowongan_url_redirects_to_sebaran_and_keeps_the_filters(): void
     {
         $this->actingAs($this->admin)

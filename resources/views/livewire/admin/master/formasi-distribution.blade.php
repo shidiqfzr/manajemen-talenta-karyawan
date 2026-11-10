@@ -25,9 +25,12 @@
             search-placeholder="Cari jabatan atau unit kerja..." />
         <x-admin.table.header :title="$isJabatan ? 'Sebaran per Jabatan' : 'Sebaran per Unit'" :paginator="$rows" :noun="$isJabatan ? 'Jabatan' : 'Formasi'" :export="true">
             <x-slot:actions>
-                <div role="radiogroup" aria-label="Tampilan sebaran" class="inline-flex rounded-lg border border-surface-300 bg-white p-0.5">
+                <div role="radiogroup" aria-label="Tampilan sebaran" x-data
+                    @keydown.arrow-right.prevent="$focus.wrap().next(); $nextTick(() => $focus.focused()?.click())"
+                    @keydown.arrow-left.prevent="$focus.wrap().previous(); $nextTick(() => $focus.focused()?.click())"
+                    class="inline-flex rounded-lg border border-surface-300 bg-white p-0.5">
                     @foreach (['jabatan' => 'Per Jabatan', 'unit' => 'Per Unit'] as $key => $label)
-                        <button type="button" role="radio" aria-checked="{{ $view === $key ? 'true' : 'false' }}" wire:click="setView('{{ $key }}')"
+                        <button type="button" role="radio" aria-checked="{{ $view === $key ? 'true' : 'false' }}" tabindex="{{ $view === $key ? '0' : '-1' }}" wire:click="setView('{{ $key }}')"
                             class="px-3 py-1.5 rounded-md text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === $key ? 'bg-primary-600 text-white shadow-2xs' : 'text-surface-600 hover:bg-surface-100' }}">{{ $label }}</button>
                     @endforeach
                 </div>

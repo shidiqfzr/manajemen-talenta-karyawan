@@ -133,6 +133,18 @@ class FormasiEditorTest extends TestCase
         $this->assertSame(1, $list->instance()->overviewStats['vacant']);
     }
 
+    public function test_a_page_beyond_the_last_page_is_stored_as_the_last_page(): void
+    {
+        foreach (range(1, 12) as $n) {
+            $this->seat($this->position(sprintf('Kepala Seksi Halaman %02d', $n)), 1);
+        }
+
+        Livewire::actingAs($this->admin)
+            ->withQueryParams(['page' => 50, 'per_page' => 10])
+            ->test(FormasiEditor::class, ['unitId' => $this->unit->id])
+            ->assertSet('paginators.page', 2);
+    }
+
     public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
     {
         $this->seat($this->position('Manajer Kosong Tautan'), 1);
