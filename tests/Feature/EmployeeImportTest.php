@@ -2394,6 +2394,23 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(['Karpim', 'RM-1', 'TAN', 1, 1, 0], array_slice($manajer, 2, 6));
     }
 
+    public function test_formasi_sheet_leaves_quota_blank_for_an_opened_pool_jabatan(): void
+    {
+        $unit = $this->formasiUnit('Kebun Template Pool', 'Manajer Template Pool', 'RM-1', 1);
+        $service = new MasterFormasiService;
+        $advisor = $service->createPoolPosition(['nama' => 'Advisor Template RM-1', 'jenis' => 'advisor', 'rm_level' => 'RM-1'], $this->admin);
+        $service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $seatRows = array_values(array_filter((new EmployeeTemplateFormasiSheet)->array(), fn (array $row) => $row[0] === 'Kebun Template Pool'));
+        $pool = collect($seatRows)->first(fn (array $row) => $row[1] === 'Advisor Template RM-1');
+        $ordinary = collect($seatRows)->first(fn (array $row) => $row[1] === 'Manajer Template Pool');
+
+        // Kolom: unit, jabatan, level, RM, bidang, kuota, terisi, sisa
+        $this->assertSame('', $pool[5], 'Jabatan penampungan tidak memiliki kuota, jangan tampil sebagai 0.');
+        $this->assertSame('Tanpa batas', $pool[7]);
+        $this->assertSame(1, $ordinary[5]);
+    }
+
     public function test_template_workbook_makes_jabatan_depend_on_the_selected_unit(): void
     {
         $this->seed(PositionUnitSeeder::class);

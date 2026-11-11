@@ -150,7 +150,7 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
                 'level' => $record->level,
                 'rm_level' => $record->rm_level ?? '',
                 'bidang' => $record->bidang ?? '',
-                'kuota' => (int) $record->kuota,
+                'kuota' => $isPool ? '' : (int) $record->kuota,
                 'terisi' => $filled,
                 'sisa' => $isPool ? 'Tanpa batas' : max(0, (int) $record->kuota - $filled),
             ];

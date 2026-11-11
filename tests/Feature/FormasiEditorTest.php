@@ -509,7 +509,8 @@ class FormasiEditorTest extends TestCase
         $log = MasterAuditLog::where('action', 'seat_access.view_occupants')->sole();
         $this->assertSame('seat_access', $log->entity_type);
         $this->assertSame($this->admin->id, $log->user_id);
-        $this->assertSame(
+        // assertEquals: a JSON column does not keep key order on every database (MySQL sorts the keys).
+        $this->assertEquals(
             ['unit' => $this->unit->nama, 'jabatan' => 'Asisten Audit', 'rm_level' => 'RM-3', 'bidang' => 'TAN', 'jumlah_baris' => 1],
             $log->new_values
         );

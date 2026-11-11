@@ -234,6 +234,24 @@ class FormationServiceTest extends TestCase
         }
     }
 
+    public function test_a_pool_jabatan_opened_on_the_unit_is_offered_whatever_its_name_says(): void
+    {
+        // An office unit (not plantation or factory): the title rules only accept "kepala bagian" style Diperbantukan titles there.
+        $unit = Unit::create(['nama' => 'Bagian Teknik Uji', 'kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true, 'urutan' => 5]);
+        $opened = Position::create(['nama' => 'Manajer Diperbantukan', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true, 'is_overflow' => true, 'is_diperban' => true]);
+        Position::create(['nama' => 'Manajer Diperbantukan Lain', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true, 'is_overflow' => true, 'is_diperban' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $unit->id, 'position_id' => $opened->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        $ordinary = Position::create(['nama' => 'Kepala Bagian Uji', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $unit->id, 'position_id' => $ordinary->id, 'kuota' => 1, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        Position::create(['nama' => 'Kepala Divisi Asal', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true]);
+        $mover = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Kepala Divisi Asal', 'rm_level' => 'RM-1']);
+
+        $targets = $this->formations->getAvailableTargetPositions($mover, 'Bagian Teknik Uji', 'SANKSI_INDISIPLINER');
+
+        $this->assertContains('Manajer Diperbantukan', $targets, 'HR opened it on this unit, so it is offered.');
+        $this->assertNotContains('Manajer Diperbantukan Lain', $targets, 'Not opened here: the name rules still apply.');
+    }
+
     public function test_a_pair_outside_the_master_formasi_counts_as_one_seat(): void
     {
         Position::create(['nama' => 'Jabatan Di Luar Master', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);

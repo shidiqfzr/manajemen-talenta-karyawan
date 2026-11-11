@@ -14,7 +14,6 @@ use App\Services\Formasi\ImpactResult;
 use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class MasterFormasiServiceTest extends TestCase
@@ -811,7 +810,9 @@ class MasterFormasiServiceTest extends TestCase
     {
         $unit = $this->unit();
         $position = $this->position();
-        Schema::drop('master_audit_logs');
+        // A failing audit write, forced with a model event: dropping the table would be DDL, which ends the test's
+        // transaction on MySQL and would make the rollback below untestable there.
+        MasterAuditLog::creating(fn () => throw new \RuntimeException('audit down'));
 
         try {
             $this->service->addSeat($unit, $position, 1, 'TAN', $this->admin);

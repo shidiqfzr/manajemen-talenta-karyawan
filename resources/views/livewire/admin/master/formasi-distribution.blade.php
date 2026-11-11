@@ -25,9 +25,9 @@
             search-placeholder="Cari jabatan atau unit kerja..." />
         <x-admin.table.header :title="$isJabatan ? 'Sebaran per Jabatan' : 'Sebaran per Unit'" :paginator="$rows" :noun="$isJabatan ? 'Jabatan' : 'Formasi'" :export="true">
             <x-slot:actions>
-                <div role="radiogroup" aria-label="Tampilan sebaran" x-data
-                    @keydown.arrow-right.prevent="$focus.wrap().next(); $nextTick(() => $focus.focused()?.click())"
-                    @keydown.arrow-left.prevent="$focus.wrap().previous(); $nextTick(() => $focus.focused()?.click())"
+                <div role="radiogroup" aria-label="Tampilan sebaran" x-data="{ move(step) { const radios = [...$el.querySelectorAll('[role=radio]')]; const index = radios.indexOf(document.activeElement); if (index < 0) { return; } const target = radios[(index + step + radios.length) % radios.length]; target.focus(); target.click(); } }"
+                    @keydown.arrow-right.prevent="move(1)" @keydown.arrow-down.prevent="move(1)"
+                    @keydown.arrow-left.prevent="move(-1)" @keydown.arrow-up.prevent="move(-1)"
                     class="inline-flex rounded-lg border border-surface-300 bg-white p-0.5">
                     @foreach (['jabatan' => 'Per Jabatan', 'unit' => 'Per Unit'] as $key => $label)
                         <button type="button" role="radio" aria-checked="{{ $view === $key ? 'true' : 'false' }}" tabindex="{{ $view === $key ? '0' : '-1' }}" wire:click="setView('{{ $key }}')"

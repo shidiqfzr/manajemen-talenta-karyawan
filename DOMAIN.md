@@ -575,5 +575,21 @@ Saat AI Model menulis kode untuk repositori ini, patuhi aturan mutlak berikut:
 4. **Patuhi Pasangan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md)**:
    - Jika mengubah tampilan atau membuat komponen baru, rujuk [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) untuk struktur token CSS, modal dialog, formulir input, dan layout kartu enterprise.
 
+## 12. Register Keputusan Aturan Bisnis
+
+Aturan di bawah ini ditetapkan sementara oleh tim pengembang karena belum ada ketentuan tertulis dari SDM. Setiap aturan tetap berlaku di sistem, tetapi baru menjadi ketetapan setelah disetujui SDM: isi kolom **Keputusan SDM** dengan nama, jabatan, dan tanggal persetujuan, lalu ubah status menjadi *Disetujui*. Bila SDM memutuskan lain, ubah aturannya pada rujukan kode, perbarui bab terkait di dokumen ini, dan catat perubahannya pada riwayat revisi. Aturan bisnis baru yang belum punya dasar tertulis wajib ditambahkan ke daftar ini.
+
+| No | Aturan yang berlaku saat ini | Rujukan | Status | Pertanyaan untuk SDM | Keputusan SDM |
+|---|---|---|---|---|---|
+| 1 | Pj/Plt, termasuk yang ditempatkan lewat Mutasi, menempati satu kuota formasi dan tidak melepaskannya. | §5.2, `JobVacancyService::freeSlots()` | Sementara | Apakah penugasan sementara boleh dianggap tidak menempati kuota, sehingga pejabat definitif tetap dapat ditempatkan? | — |
+| 2 | Formasi berkuota ganda menerima penempatan langsung selama kuotanya belum penuh. Bila penuh, tukar jabatan ditolak. | §5.2, `FormationService::analyzeTarget()`, `MutasiService::resolveSwapOccupant()` | Sementara | Bila formasi berkuota ganda penuh, pemegang mana yang ditukar dan siapa yang memilihnya? | — |
+| 3 | Jabatan bernomor romawi dilaporkan sebagai satu rumpun pada Sebaran Formasi (mis. Asisten Afdeling I s.d. XIII menjadi "Asisten Afdeling"). | §9.3, `JabatanFamily::of()` | Sementara | Apakah pelaporan per rumpun sesuai kebutuhan, atau tiap afdeling dilaporkan terpisah? | — |
+| 4 | Jabatan di luar Master Formasi tidak dihitung sebagai formasi kosong. Saat ini Karpel hanya ada pada unit Regional Office. | §3.6, §9.3 | Sementara | Kapan formasi Karpel pada kebun dan pabrik ditambahkan ke Master Formasi, atau memang tidak dikendalikan? | — |
+| 5 | Jabatan penampungan (Advisor, Diperbantukan) dibuka per unit; hanya yang dibuka yang dapat dipakai pada penambahan manual dan impor. | §3.6 butir 6, `MasterFormasiService::openPoolPosition()` | Sementara | Apakah jabatan penampungan boleh dipakai di semua unit tanpa dibuka lebih dulu? | — |
+| 6 | Mutasi masih dapat menempatkan karyawan pada jabatan penampungan yang belum dibuka pada unit tujuan; baris itu tampil sebagai "Belum dibuka di unit". | §9.3 | Sementara | Apakah jabatan dibuka otomatis saat mutasi berlaku, atau penempatan seperti itu ditolak? | — |
+| 7 | Diperbantukan dicatat sebagai jenis jabatan penampungan; aturan Mutasi tetap memperlakukannya sebagai sanksi indisipliner. | §5.4 butir 7, §9.3 | Sementara | Apakah Diperbantukan di PTPN IV Regional V adalah sanksi, penugasan biasa, atau keduanya? Bila bukan sanksi, apakah tetap perlu tanggal berakhir? | — |
+| 8 | Tugas Belajar tidak diberi aturan khusus (belum ada kasus di PTPN IV Regional V); karyawan tetap terhitung mengisi formasinya. | §9.3 | Sementara | Bila kasusnya muncul, apakah kuota formasi karyawan itu dihitung terisi atau terbuka? | — |
+| 9 | Admin membuat, mengubah nama, membuka, menutup, dan menghapus jabatan penampungan; setiap perubahan tercatat pada riwayat perubahan master dengan alasan. | §9.7 | Sementara | Apakah cukup satu admin, atau perubahan perlu persetujuan dua pihak seperti impor Excel? | — |
+
 ---
 *Dokumen ini dirawat sebagai Single Source of Truth Domain PTPN IV Regional V berdampingan dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md).*

@@ -176,6 +176,14 @@ class FormationService
                 fn ($pos) => $isSanction ? $pos->is_diperban : $pos->is_overflow
             );
 
+            // Jabatan penampungan yang dibuka HR pada unit tujuan selalu layak (selama RM Band sama): pembukaan eksplisit
+            // lebih kuat daripada tebakan dari nama jabatan di bawah, yang hanya berlaku untuk yang belum dibuka.
+            $openedPoolNames = $unit
+                ? $unit->positions()->active()
+                    ->where(fn ($q) => $q->where('positions.is_overflow', true)->orWhere('positions.is_diperban', true))
+                    ->pluck('positions.nama')->all()
+                : [];
+
             foreach ($poolPositions as $pos) {
                 if (! $isSanction && $pos->is_diperban) {
                     continue;
@@ -185,21 +193,23 @@ class FormationService
                 if ($posRm === $empRmNumber) {
                     $posNameLower = strtolower($pos->nama);
 
+                    $openedHere = in_array($pos->nama, $openedPoolNames, true);
+
                     // Domain rules
                     $isTanamanPos = str_contains($posNameLower, 'tanaman');
                     $isTanamanUnit = str_contains(strtolower($targetUnitKerja), 'tanaman') || str_contains(strtolower($targetUnitKerja), 'kebun') || str_contains(strtolower($targetUnitKerja), 'group');
-                    if ($isTanamanPos && ! $isTanamanUnit) {
+                    if (! $openedHere && $isTanamanPos && ! $isTanamanUnit) {
                         continue;
                     }
 
                     $isTeknikPos = str_contains($posNameLower, 'teknik') || str_contains($posNameLower, 'pabrik');
                     $isTeknikUnit = str_contains(strtolower($targetUnitKerja), 'teknik') || str_contains(strtolower($targetUnitKerja), 'pabrik') || str_contains(strtolower($targetUnitKerja), 'group');
-                    if ($isTeknikPos && ! $isTeknikUnit) {
+                    if (! $openedHere && $isTeknikPos && ! $isTeknikUnit) {
                         continue;
                     }
 
                     // Nomenclature rules
-                    if ($pos->is_diperban && $posRm < 4) {
+                    if (! $openedHere && $pos->is_diperban && $posRm < 4) {
                         if ($isTargetOperational && ! $pos->isOperationalTitle()) {
                             continue;
                         }
