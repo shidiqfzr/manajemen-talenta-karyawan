@@ -866,7 +866,14 @@ class FormasiEditor extends Component
     private function ownsSeat(int $seatId): bool
     {
         return $this->unitId !== null
-            && DB::table('position_unit')->where('id', $seatId)->where('unit_id', $this->unitId)->exists();
+            // Tautan jabatan penampungan dikelola pada tab Jabatan Penampungan, bukan sebagai formasi.
+            && DB::table('position_unit')
+                ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+                ->where('position_unit.id', $seatId)
+                ->where('position_unit.unit_id', $this->unitId)
+                ->where('positions.is_overflow', false)
+                ->where('positions.is_diperban', false)
+                ->exists();
     }
 
     private function authorizeAdmin(): void

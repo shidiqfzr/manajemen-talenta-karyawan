@@ -161,6 +161,92 @@ class PoolPositionsTest extends TestCase
         $this->assertSame(1, MasterAuditLog::where('action', 'pool.closed')->count());
     }
 
+    public function test_rename_flow_corrects_a_typo_and_needs_a_reason(): void
+    {
+        $position = $this->pool('Asisten Diperbantukn', true, 'RM-3');
+
+        $component = $this->screen()
+            ->call('startRename', $position->id)
+            ->assertSet('renamePositionId', $position->id)
+            ->assertSet('renameNama', 'Asisten Diperbantukn')
+            ->set('renameNama', 'Asisten Diperbantukan')
+            ->set('renameReason', 'pendek')
+            ->call('saveRename')
+            ->assertHasErrors('rename');
+        $this->assertSame('Asisten Diperbantukn', $position->refresh()->nama);
+
+        $component->set('renameReason', 'Memperbaiki salah ketik nama')->call('saveRename')->assertHasNoErrors()->assertSet('renamePositionId', null)->assertSee('Asisten Diperbantukan');
+        $this->assertSame('Asisten Diperbantukan', $position->refresh()->nama);
+        $this->assertSame(1, MasterAuditLog::where('action', 'position.renamed')->count());
+    }
+
+    public function test_delete_flow_removes_an_unused_jabatan_and_is_blocked_while_it_is_opened(): void
+    {
+        $unused = $this->pool('Advisor Keliru RM-4', false, 'RM-4');
+        $opened = $this->pool('Advisor RM-2');
+        $this->open($opened);
+
+        $this->screen()
+            ->call('startDelete', $opened->id)
+            ->set('deleteReason', 'Alasan yang cukup panjang')
+            ->call('saveDelete')
+            ->assertHasErrors('delete')
+            ->assertSee('tab Jabatan Penampungan');
+        $this->assertNotNull(Position::find($opened->id));
+
+        $this->screen()
+            ->call('startDelete', $unused->id)
+            ->set('deleteReason', 'Dibuat keliru, belum pernah dipakai')
+            ->call('saveDelete')
+            ->assertHasNoErrors()
+            ->assertSet('deletePositionId', null)
+            ->assertDontSeeHtml('wire:key="pool-'.$unused->id.'"');
+        $this->assertNull(Position::find($unused->id));
+    }
+
+    public function test_dialogs_ignore_ordinary_positions_and_units_that_cannot_open_the_jabatan(): void
+    {
+        $ordinary = Position::create(['nama' => 'Manajer Biasa', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $this->kalbar->id, 'position_id' => $ordinary->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
+        $advisor = $this->pool('Advisor RM-2');
+        $inactive = Unit::create(['nama' => 'Unit Tidak Aktif', 'kode' => 'Group', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => false, 'urutan' => 9]);
+
+        $this->screen()
+            ->call('startRename', $ordinary->id)->assertSet('renamePositionId', null)
+            ->call('startDelete', $ordinary->id)->assertSet('deletePositionId', null)
+            ->call('startClose', $ordinary->id, $this->kalbar->id)->assertSet('closePositionId', null)
+            ->call('startOpen', $advisor->id, $inactive->id)->assertSet('openingPositionId', $advisor->id)->assertSet('openUnitId', null);
+    }
+
+    public function test_an_action_keeps_the_page_the_admin_is_on(): void
+    {
+        foreach (range(1, 12) as $n) {
+            $this->pool(sprintf('Advisor Uji %02d', $n));
+        }
+
+        $this->screen()
+            ->set('perPage', 10)
+            ->call('gotoPage', 2)
+            ->assertSet('paginators.page', 2)
+            ->call('openCreate')
+            ->set('newNama', 'Advisor Baru')
+            ->assertSet('paginators.page', 2);
+    }
+
+    public function test_one_request_loads_the_pool_data_once(): void
+    {
+        $this->pool('Advisor RM-2');
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->screen();
+
+        $loads = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'count(*) as total'))->count();
+        DB::disableQueryLog();
+
+        $this->assertSame(1, $loads);
+    }
+
     public function test_per_unit_view_shows_opened_jabatan_and_flags_holders_without_an_opened_unit(): void
     {
         $advisor = $this->pool('Advisor RM-2');

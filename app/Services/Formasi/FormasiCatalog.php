@@ -70,7 +70,8 @@ class FormasiCatalog
             ]);
 
         foreach ($seats as $seat) {
-            if ($seat->bidang === null) {
+            // Tautan jabatan penampungan (dibuka pada unit) bukan kursi formasi: bidang karyawannya tetap perkiraan (§3.6 butir 9).
+            if ($seat->bidang === null || $seat->is_overflow || $seat->is_diperban) {
                 continue;
             }
 

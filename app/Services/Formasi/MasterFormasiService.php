@@ -10,6 +10,7 @@ use App\Models\Position;
 use App\Models\Unit;
 use App\Models\UnitAlias;
 use App\Models\User;
+use App\Services\JobVacancyService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
@@ -132,6 +133,7 @@ class MasterFormasiService
             if ($nama === '') {
                 throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
             }
+            $this->assertNameLength($nama);
 
             $jenis = $data['jenis'] ?? null;
             if (! is_string($jenis) || ! isset(self::POOL_TYPES[$jenis])) {
@@ -209,9 +211,12 @@ class MasterFormasiService
         DB::transaction(function () use ($unit, $position, $reason, $user): void {
             $this->assertIsPool($position);
 
-            $link = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $position->id)->first();
+            // Same lock as FormasiSeatGuard: an employee being added to this unit at the same moment waits for us, or we for it.
+            Unit::whereKey($unit->id)->lockForUpdate()->first();
+
+            $link = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $position->id)->lockForUpdate()->first();
             if ($link === null) {
-                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' belum dibuka pada unit '{$unit->nama}'.");
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' belum dibuka atau sudah ditutup pada unit '{$unit->nama}'.");
             }
 
             $holders = Employee::where('unit_kerja', $unit->nama)->where('jabatan', $position->nama)->count();
@@ -219,15 +224,67 @@ class MasterFormasiService
                 throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$holders} karyawan pada unit '{$unit->nama}'. Pindahkan karyawan tersebut lebih dulu melalui modul Mutasi.");
             }
 
+            $assignees = (int) app(JobVacancyService::class)->temporaryHolderCounts($position->nama, $unit->nama)->sum();
+            if ($assignees > 0) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$assignees} penugasan sementara (Pj/Plt) pada unit '{$unit->nama}'. Akhiri penugasan tersebut lebih dulu melalui modul Mutasi.");
+            }
+
+            $pending = $this->pendingMutations($unit->nama, $position->nama);
+            if ($pending > 0) {
+                throw new FormasiRuleViolationException("{$pending} mutasi terjadwal belum berlaku menuju jabatan penampungan '{$position->nama}' pada unit '{$unit->nama}'. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.");
+            }
+
             $reason = $this->requireReason($reason);
 
-            DB::table('position_unit')->where('id', $link->id)->delete();
+            if (DB::table('position_unit')->where('id', $link->id)->delete() !== 1) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' sudah ditutup pada unit '{$unit->nama}'.");
+            }
 
             MasterAuditLog::record(
                 $user, 'pool.closed', 'pool_seat', $link->id, $this->seatLabel($unit->nama, $position->nama),
                 ['jenis' => $position->is_diperban ? 'diperbantukan' : 'advisor'], null, $reason
             );
         });
+    }
+
+    /**
+     * Mengubah nama jabatan penampungan (mis. salah ketik). Wajib beralasan dan tercatat sebagai perubahan nama jabatan.
+     */
+    public function renamePoolPosition(Position $position, string $nama, ?string $reason, User $user): Position
+    {
+        return DB::transaction(function () use ($position, $nama, $reason, $user): Position {
+            $this->assertIsPool($position);
+
+            $nama = trim($nama);
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
+            }
+            $this->assertNameLength($nama);
+            if (Position::whereRaw('lower(nama) = ?', [mb_strtolower($nama)])->where('id', '!=', $position->id)->exists()) {
+                throw new FormasiRuleViolationException("Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain.");
+            }
+
+            return $this->updatePosition($position, ['nama' => $nama], $reason, $user);
+        });
+    }
+
+    /**
+     * Menghapus jabatan penampungan yang tidak lagi diperlukan. Diblokir selama masih dibuka pada unit, dijabat, atau
+     * tercatat pada riwayat jabatan (gunakan penutupan atau Nonaktifkan); wajib beralasan.
+     */
+    public function deletePoolPosition(Position $position, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($position, $reason, $user): void {
+            $this->assertIsPool($position);
+            $this->deletePosition($position, $reason, $user);
+        });
+    }
+
+    private function assertNameLength(string $nama): void
+    {
+        if (mb_strlen($nama) > 255) {
+            throw new FormasiRuleViolationException('Nama jabatan maksimal 255 karakter.');
+        }
     }
 
     private function assertIsPool(Position $position): void
@@ -527,7 +584,12 @@ class MasterFormasiService
     {
         $unit = Unit::findOrFail($unitId);
         $employees = Employee::where('unit_kerja', $unit->nama)->count();
-        $seats = DB::table('position_unit')->where('unit_id', $unit->id)->count();
+        $links = DB::table('position_unit')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('position_unit.unit_id', $unit->id)
+            ->get(['positions.is_overflow', 'positions.is_diperban']);
+        $poolLinks = $links->filter(fn ($link) => $link->is_overflow || $link->is_diperban)->count();
+        $seats = $links->count() - $poolLinks;
         $history = JobHistory::where('unit_kerja', $unit->nama)->count();
         $blockers = [];
 
@@ -536,6 +598,9 @@ class MasterFormasiService
         }
         if ($seats > 0) {
             $blockers[] = "Unit ini masih memiliki {$seats} formasi jabatan.";
+        }
+        if ($poolLinks > 0) {
+            $blockers[] = "Unit ini masih membuka {$poolLinks} jabatan penampungan; tutup melalui tab Jabatan Penampungan.";
         }
         if ($history > 0) {
             $blockers[] = "Unit ini tercatat pada {$history} riwayat jabatan.";
@@ -604,7 +669,9 @@ class MasterFormasiService
             $blockers[] = "{$employees} karyawan masih memegang jabatan ini.";
         }
         if ($seats > 0) {
-            $blockers[] = "Jabatan ini masih menjadi {$seats} formasi jabatan.";
+            $blockers[] = $position->is_overflow || $position->is_diperban
+                ? "Jabatan ini masih dibuka pada {$seats} unit; tutup melalui tab Jabatan Penampungan terlebih dahulu."
+                : "Jabatan ini masih menjadi {$seats} formasi jabatan.";
         }
         if ($history > 0) {
             $blockers[] = "Jabatan ini tercatat pada {$history} riwayat jabatan.";
@@ -771,7 +838,7 @@ class MasterFormasiService
 
     private function assertPositionNameFree(string $nama): void
     {
-        if (Position::where('nama', $nama)->exists()) {
+        if (Position::whereRaw('lower(nama) = ?', [mb_strtolower($nama)])->exists()) {
             throw new FormasiRuleViolationException("Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain.");
         }
     }

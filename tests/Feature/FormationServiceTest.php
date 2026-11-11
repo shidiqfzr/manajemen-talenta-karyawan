@@ -218,6 +218,22 @@ class FormationServiceTest extends TestCase
         }
     }
 
+    public function test_an_opened_pool_position_is_never_an_ordinary_mutasi_target(): void
+    {
+        $this->seat('Asisten Tanaman', 2);
+        $pool = Position::create(['nama' => 'Advisor RM-3', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true, 'is_overflow' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $this->unit->id, 'position_id' => $pool->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        Position::create(['nama' => 'Asisten Asal', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);
+        $mover = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Asisten Asal', 'rm_level' => 'RM-3']);
+
+        foreach (['ROTASI', 'MUTASI_UNIT', 'PENUGASAN'] as $jenis) {
+            $targets = $this->formations->getAvailableTargetPositions($mover, $this->unit->nama, $jenis);
+
+            $this->assertContains('Asisten Tanaman', $targets, $jenis);
+            $this->assertNotContains('Advisor RM-3', $targets, "{$jenis}: a pool Jabatan is only reachable through Penugasan Khusus or Sanksi.");
+        }
+    }
+
     public function test_a_pair_outside_the_master_formasi_counts_as_one_seat(): void
     {
         Position::create(['nama' => 'Jabatan Di Luar Master', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true]);

@@ -114,7 +114,12 @@ class FormationService
         $allJabatan = [];
 
         if ($unit) {
-            $allJabatan = $unit->positions()->active()->pluck('nama')->toArray();
+            // Jabatan penampungan yang dibuka pada unit bukan target mutasi biasa; hanya Penugasan Khusus dan Sanksi
+            // yang menjangkaunya (blok "smart override" di bawah).
+            $allJabatan = $unit->positions()->active()
+                ->where('positions.is_overflow', false)
+                ->where('positions.is_diperban', false)
+                ->pluck('nama')->toArray();
         }
 
         if (empty($allJabatan)) {

@@ -70,7 +70,24 @@ class PoolPositions extends Component
 
     public string $closeReason = '';
 
+    // Dialog Ubah Nama
+    #[Locked]
+    public ?int $renamePositionId = null;
+
+    public string $renameNama = '';
+
+    public string $renameReason = '';
+
+    // Dialog Hapus Jabatan
+    #[Locked]
+    public ?int $deletePositionId = null;
+
+    public string $deleteReason = '';
+
     public ?string $notice = null;
+
+    /** Data jabatan dan bezetting, dimuat sekali per permintaan lalu dibuang setelah setiap perubahan. */
+    private ?array $cache = null;
 
     public function mount(): void
     {
@@ -78,7 +95,13 @@ class PoolPositions extends Component
         $this->normalise();
     }
 
-    public function updated(): void
+    public function updatedSearch(): void
+    {
+        $this->normalise();
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
     {
         $this->normalise();
         $this->resetPage();
@@ -123,6 +146,7 @@ class PoolPositions extends Component
             return;
         }
 
+        $this->cache = null;
         $this->creating = false;
         $this->notice = "Jabatan penampungan '{$position->nama}' dibuat. Buka pada unit yang menggunakannya agar karyawan dapat ditempatkan.";
     }
@@ -134,14 +158,18 @@ class PoolPositions extends Component
         $this->authorizeAdmin();
         $this->resetErrorBag('open');
 
-        $position = Position::find($positionId);
-        if ($position === null || ! ($position->is_overflow || $position->is_diperban) || ! $position->is_active) {
+        $position = $this->poolPosition($positionId);
+        if ($position === null || ! $position->is_active) {
             return;
         }
 
+        // A preselected unit is only kept when it can actually take the jabatan (active and not yet opened).
+        $unit = $unitId ? Unit::active()->whereKey($unitId)->first() : null;
+        $alreadyOpen = $unit && DB::table('position_unit')->where('position_id', $position->id)->where('unit_id', $unit->id)->exists();
+
         $this->notice = null;
         $this->openingPositionId = $position->id;
-        $this->openUnitId = $unitId;
+        $this->openUnitId = $unit && ! $alreadyOpen ? $unit->id : null;
     }
 
     public function cancelOpen(): void
@@ -175,6 +203,7 @@ class PoolPositions extends Component
             return;
         }
 
+        $this->cache = null;
         $this->notice = "Jabatan penampungan '{$position->nama}' dibuka pada unit '{$unit->nama}'.";
         $this->cancelOpen();
     }
@@ -186,7 +215,8 @@ class PoolPositions extends Component
         $this->authorizeAdmin();
         $this->resetErrorBag('close');
 
-        $opened = DB::table('position_unit')->where('position_id', $positionId)->where('unit_id', $unitId)->exists();
+        $position = $this->poolPosition($positionId);
+        $opened = $position && DB::table('position_unit')->where('position_id', $positionId)->where('unit_id', $unitId)->exists();
         if (! $opened) {
             return;
         }
@@ -224,8 +254,103 @@ class PoolPositions extends Component
             return;
         }
 
+        $this->cache = null;
         $this->notice = "Jabatan penampungan '{$position->nama}' ditutup pada unit '{$unit->nama}'.";
         $this->cancelClose();
+    }
+
+    // ───────────────────────────── Ubah nama dan hapus ─────────────────────────────
+
+    public function startRename(int $positionId): void
+    {
+        $this->authorizeAdmin();
+        $this->resetErrorBag('rename');
+
+        $position = $this->poolPosition($positionId);
+        if ($position === null) {
+            return;
+        }
+
+        $this->notice = null;
+        $this->renamePositionId = $position->id;
+        $this->renameNama = $position->nama;
+        $this->renameReason = '';
+    }
+
+    public function cancelRename(): void
+    {
+        $this->renamePositionId = null;
+        $this->renameNama = '';
+        $this->renameReason = '';
+        $this->resetErrorBag('rename');
+    }
+
+    public function saveRename(MasterFormasiService $service): void
+    {
+        $this->authorizeAdmin();
+        $this->resetErrorBag('rename');
+
+        $position = $this->renamePositionId ? Position::find($this->renamePositionId) : null;
+        if ($position === null) {
+            return;
+        }
+
+        try {
+            $renamed = $service->renamePoolPosition($position, $this->renameNama, $this->renameReason, auth()->user());
+        } catch (FormasiRuleViolationException $e) {
+            $this->addError('rename', $e->getMessage());
+
+            return;
+        }
+
+        $this->cache = null;
+        $this->notice = "Nama jabatan penampungan diubah menjadi '{$renamed->nama}'.";
+        $this->cancelRename();
+    }
+
+    public function startDelete(int $positionId): void
+    {
+        $this->authorizeAdmin();
+        $this->resetErrorBag('delete');
+
+        $position = $this->poolPosition($positionId);
+        if ($position === null) {
+            return;
+        }
+
+        $this->notice = null;
+        $this->deletePositionId = $position->id;
+        $this->deleteReason = '';
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->deletePositionId = null;
+        $this->deleteReason = '';
+        $this->resetErrorBag('delete');
+    }
+
+    public function saveDelete(MasterFormasiService $service): void
+    {
+        $this->authorizeAdmin();
+        $this->resetErrorBag('delete');
+
+        $position = $this->deletePositionId ? Position::find($this->deletePositionId) : null;
+        if ($position === null) {
+            return;
+        }
+
+        try {
+            $service->deletePoolPosition($position, $this->deleteReason, auth()->user());
+        } catch (FormasiRuleViolationException $e) {
+            $this->addError('delete', $e->getMessage());
+
+            return;
+        }
+
+        $this->cache = null;
+        $this->notice = "Jabatan penampungan '{$position->nama}' dihapus.";
+        $this->cancelDelete();
     }
 
     // ───────────────────────────── Tampilan ─────────────────────────────
@@ -234,7 +359,7 @@ class PoolPositions extends Component
     #[Computed]
     public function stats(): array
     {
-        [$jabatan, , $unitRows] = $this->data();
+        [$jabatan, $unitRows] = $this->data();
 
         return [
             'jabatan' => $jabatan->count(),
@@ -248,7 +373,7 @@ class PoolPositions extends Component
         $this->authorizeAdmin();
         $this->normalise();
 
-        [$jabatan, , $unitRows] = $this->data();
+        [$jabatan, $unitRows] = $this->data();
         $term = mb_strtolower($this->search);
         $matches = fn (object $row, array $fields) => $term === '' || collect($fields)->contains(fn (string $f) => str_contains(mb_strtolower((string) $row->{$f}), $term));
 
@@ -272,17 +397,26 @@ class PoolPositions extends Component
             'openableUnits' => $this->openingPositionId ? $this->openableUnits($this->openingPositionId) : collect(),
             'closingPosition' => $this->closePositionId ? Position::find($this->closePositionId) : null,
             'closingUnit' => $this->closeUnitId ? Unit::find($this->closeUnitId) : null,
+            'renamingPosition' => $this->renamePositionId ? Position::find($this->renamePositionId) : null,
+            'deletingPosition' => $this->deletePositionId ? Position::find($this->deletePositionId) : null,
         ]);
     }
 
     /**
      * Seluruh jabatan penampungan beserta pembukaannya pada unit dan jumlah karyawan. Karyawan pada jabatan penampungan yang
-     * belum dibuka pada unitnya (mis. diimpor lebih dulu) tetap tampil, agar ketidaksesuaian terlihat.
+     * belum dibuka pada unitnya (mis. diimpor lebih dulu) tetap tampil, agar ketidaksesuaian terlihat. Pencocokan teks
+     * karyawan dengan nama master tidak peka huruf besar-kecil dan spasi tepi, sama dengan perilaku MySQL pada kueri.
      *
-     * @return array{0: Collection<int, object>, 1: Collection<int, object>, 2: Collection<int, object>}
+     * @return array{0: Collection<int, object>, 1: Collection<int, object>}
      */
     private function data(): array
     {
+        if ($this->cache !== null) {
+            return $this->cache;
+        }
+
+        $norm = fn (?string $text): string => mb_strtolower(trim((string) $text));
+
         $positions = Position::where(fn ($q) => $q->where('is_overflow', true)->orWhere('is_diperban', true))
             ->orderBy('rm_level')->orderBy('nama')->get();
 
@@ -291,14 +425,21 @@ class PoolPositions extends Component
             ->whereIn('position_unit.position_id', $positions->pluck('id'))
             ->get(['position_unit.position_id', 'units.id as unit_id', 'units.nama as unit_nama']);
 
-        $holders = Employee::query()
+        // Pemegang per (unit, jabatan) dengan kunci yang dinormalisasi.
+        $holders = [];
+        foreach (Employee::query()
             ->whereIn('jabatan', $positions->pluck('nama'))
             ->selectRaw('unit_kerja, jabatan, count(*) as total')
             ->groupBy('unit_kerja', 'jabatan')
-            ->get();
-        $units = Unit::whereIn('nama', $holders->pluck('unit_kerja')->unique())->get()->keyBy('nama');
+            ->get() as $row) {
+            $key = $norm($row->unit_kerja).'|'.$norm($row->jabatan);
+            $holders[$key] ??= ['unit_kerja' => $row->unit_kerja, 'unit' => $norm($row->unit_kerja), 'jabatan' => $norm($row->jabatan), 'total' => 0];
+            $holders[$key]['total'] += (int) $row->total;
+        }
+        $holdersByJabatan = collect($holders)->groupBy('jabatan')->map(fn (Collection $g) => (int) $g->sum('total'));
+        $unitsByName = Unit::get(['id', 'nama'])->keyBy(fn (Unit $u) => $norm($u->nama));
 
-        $jabatan = $positions->map(function (Position $p) use ($links, $holders): object {
+        $jabatan = $positions->map(function (Position $p) use ($links, $holdersByJabatan, $norm): object {
             $jenis = $p->is_diperban ? 'diperbantukan' : 'advisor';
 
             return (object) [
@@ -309,37 +450,52 @@ class PoolPositions extends Component
                 'rm_level' => $p->rm_level,
                 'is_active' => $p->is_active,
                 'units' => $links->where('position_id', $p->id)->count(),
-                'holders' => (int) $holders->where('jabatan', $p->nama)->sum('total'),
+                'holders' => (int) $holdersByJabatan->get($norm($p->nama), 0),
             ];
         })->values();
 
         $byId = $jabatan->keyBy('id');
-        $byName = $jabatan->keyBy('nama');
+        $byName = $jabatan->keyBy(fn (object $j) => $norm($j->nama));
 
-        $opened = $links->map(function ($link) use ($byId, $holders): object {
+        $openedKeys = [];
+        $opened = $links->map(function ($link) use ($byId, $holders, $norm, &$openedKeys): object {
             $p = $byId[$link->position_id];
+            $key = $norm($link->unit_nama).'|'.$norm($p->nama);
+            $openedKeys[$key] = true;
 
             return (object) [
                 'unit_id' => $link->unit_id, 'unit_nama' => $link->unit_nama, 'position_id' => $p->id, 'nama' => $p->nama,
                 'jenis_label' => $p->jenis_label, 'rm_level' => $p->rm_level, 'opened' => true,
-                'holders' => (int) $holders->where('unit_kerja', $link->unit_nama)->where('jabatan', $p->nama)->sum('total'),
+                'holders' => (int) ($holders[$key]['total'] ?? 0),
             ];
         });
 
-        $stray = $holders
-            ->reject(fn ($h) => $links->contains(fn ($l) => $l->unit_nama === $h->unit_kerja && $byId[$l->position_id]->nama === $h->jabatan))
-            ->map(function ($h) use ($byName, $units): object {
-                $p = $byName[$h->jabatan];
+        $stray = collect($holders)
+            ->reject(fn (array $h, string $key) => isset($openedKeys[$key]))
+            ->map(function (array $h) use ($byName, $unitsByName): ?object {
+                $p = $byName->get($h['jabatan']);
+                if ($p === null) {
+                    return null;
+                }
 
                 return (object) [
-                    'unit_id' => $units->get($h->unit_kerja)?->id, 'unit_nama' => $h->unit_kerja, 'position_id' => $p->id, 'nama' => $p->nama,
-                    'jenis_label' => $p->jenis_label, 'rm_level' => $p->rm_level, 'opened' => false, 'holders' => (int) $h->total,
+                    'unit_id' => $unitsByName->get($h['unit'])?->id, 'unit_nama' => $h['unit_kerja'], 'position_id' => $p->id, 'nama' => $p->nama,
+                    'jenis_label' => $p->jenis_label, 'rm_level' => $p->rm_level, 'opened' => false, 'holders' => $h['total'],
                 ];
-            });
+            })
+            ->filter();
 
         $unitRows = $opened->concat($stray)->sortBy([['unit_nama', 'asc'], ['nama', 'asc']])->values();
 
-        return [$jabatan, $links, $unitRows];
+        return $this->cache = [$jabatan, $unitRows];
+    }
+
+    /** Jabatan penampungan dengan id ini, atau null bila tidak ada atau bukan jabatan penampungan. */
+    private function poolPosition(int $positionId): ?Position
+    {
+        $position = Position::find($positionId);
+
+        return $position && ($position->is_overflow || $position->is_diperban) ? $position : null;
     }
 
     /** @return Collection<int, Unit> unit aktif yang belum membuka jabatan ini */

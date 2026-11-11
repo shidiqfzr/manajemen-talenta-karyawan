@@ -94,6 +94,8 @@ class MasterFormasiServiceTest extends TestCase
             [['nama' => 'Jenis Salah', 'jenis' => 'hukuman', 'rm_level' => 'RM-2'], 'Advisor atau Diperbantukan'],
             [['nama' => 'RM Salah', 'jenis' => 'advisor', 'rm_level' => 'RM-7'], 'RM-1 sampai RM-4'],
             [['nama' => 'Sudah Ada', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], 'sudah digunakan'],
+            [['nama' => 'sudah ada', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], 'sudah digunakan'],
+            [['nama' => str_repeat('a', 256), 'jenis' => 'advisor', 'rm_level' => 'RM-2'], 'maksimal 255'],
         ] as [$data, $message]) {
             try {
                 $this->service->createPoolPosition($data, $this->admin);
@@ -157,6 +159,80 @@ class MasterFormasiServiceTest extends TestCase
         $this->assertSame(0, DB::table('position_unit')->count());
         $log = MasterAuditLog::where('action', 'pool.closed')->first();
         $this->assertSame('Tidak lagi dipakai pada unit ini', $log->reason);
+    }
+
+    public function test_close_pool_position_is_also_blocked_by_scheduled_mutasi_and_by_pj_plt_assignees(): void
+    {
+        $unit = $this->unit();
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $successor = Employee::factory()->create(['unit_kerja' => 'Unit Lain', 'jabatan' => 'Jabatan Lain']);
+        $booking = JobHistory::create(['employee_nik' => $successor->nik, 'jabatan' => $advisor->nama, 'unit_kerja' => $unit->nama, 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+        $this->assertThrows(fn () => $this->service->closePoolPosition($unit, $advisor, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, 'mutasi terjadwal');
+        $booking->delete();
+
+        JobHistory::create(['employee_nik' => $successor->nik, 'jabatan' => $advisor->nama, 'unit_kerja' => $unit->nama, 'status_penugasan' => 'Plt', 'tmt_awal' => now()->subDays(3)->toDateString(), 'is_applied' => true]);
+        $this->assertThrows(fn () => $this->service->closePoolPosition($unit, $advisor, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, 'penugasan sementara');
+
+        $this->assertSame(1, DB::table('position_unit')->count());
+    }
+
+    public function test_deleting_a_unit_or_jabatan_blocked_only_by_pool_links_names_the_pool_tab(): void
+    {
+        $unit = $this->unit();
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $unitImpact = $this->service->previewImpact('unit.delete', ['unit_id' => $unit->id]);
+        $this->assertTrue($unitImpact->blocked);
+        $this->assertStringContainsString('jabatan penampungan', $unitImpact->blockers[0]);
+        $this->assertStringNotContainsString('formasi jabatan', $unitImpact->blockers[0]);
+
+        $positionImpact = $this->service->previewImpact('position.delete', ['position_id' => $advisor->id]);
+        $this->assertTrue($positionImpact->blocked);
+        $this->assertStringContainsString('tab Jabatan Penampungan', $positionImpact->blockers[0]);
+    }
+
+    public function test_rename_pool_position_keeps_everything_else_and_audits_the_rename(): void
+    {
+        $advisor = $this->service->createPoolPosition(['nama' => 'Asisten Diperbantukn', 'jenis' => 'diperbantukan', 'rm_level' => 'RM-3'], $this->admin);
+
+        $renamed = $this->service->renamePoolPosition($advisor, 'Asisten Diperbantukan', 'Memperbaiki salah ketik nama', $this->admin);
+
+        $this->assertSame('Asisten Diperbantukan', $renamed->nama);
+        $this->assertTrue($renamed->is_diperban);
+        $this->assertSame('RM-3', $renamed->rm_level);
+        $this->assertSame(1, MasterAuditLog::where('action', 'position.renamed')->count());
+    }
+
+    public function test_rename_and_delete_pool_position_refuse_ordinary_positions_and_bad_input(): void
+    {
+        $ordinary = $this->position('Manajer', 'Karpim', 'RM-1');
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $this->service->createPoolPosition(['nama' => 'Advisor RM-3', 'jenis' => 'advisor', 'rm_level' => 'RM-3'], $this->admin);
+
+        $this->assertThrows(fn () => $this->service->renamePoolPosition($ordinary, 'Nama Lain', 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, 'bukan jabatan penampungan');
+        $this->assertThrows(fn () => $this->service->deletePoolPosition($ordinary, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, 'bukan jabatan penampungan');
+        $this->assertThrows(fn () => $this->service->renamePoolPosition($advisor, 'advisor rm-3', 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, 'sudah digunakan');
+        $this->assertThrows(fn () => $this->service->renamePoolPosition($advisor, 'Nama Baru', 'pendek', $this->admin), FormasiRuleViolationException::class, 'minimal 10 karakter');
+        $this->assertSame('Advisor RM-2', $advisor->refresh()->nama);
+    }
+
+    public function test_delete_pool_position_needs_it_closed_everywhere_and_a_reason(): void
+    {
+        $unit = $this->unit();
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $this->assertThrows(fn () => $this->service->deletePoolPosition($advisor, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class);
+        $this->service->closePoolPosition($unit, $advisor, 'Tidak lagi dipakai pada unit ini', $this->admin);
+
+        $this->assertThrows(fn () => $this->service->deletePoolPosition($advisor, 'pendek', $this->admin), FormasiRuleViolationException::class, 'minimal 10 karakter');
+        $this->service->deletePoolPosition($advisor, 'Dibuat keliru, belum pernah dipakai', $this->admin);
+
+        $this->assertNull(Position::find($advisor->id));
+        $this->assertSame(1, MasterAuditLog::where('action', 'position.deleted')->count());
     }
 
     public function test_pool_actions_never_touch_ordinary_formasi(): void

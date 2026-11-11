@@ -163,6 +163,20 @@ class FormasiEditorTest extends TestCase
         $this->assertSame(0, $stats['over']);
     }
 
+    public function test_a_pool_link_cannot_be_edited_or_removed_as_a_formasi(): void
+    {
+        $advisor = Position::create(['nama' => 'Advisor RM-2', 'level' => 'Karpim', 'rm_level' => 'RM-2', 'is_active' => true, 'is_overflow' => true]);
+        $linkId = DB::table('position_unit')->insertGetId(['unit_id' => $this->unit->id, 'position_id' => $advisor->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->editor()
+            ->call('startRemoveSeat', $linkId)->assertSet('pendingOperation', null)
+            ->call('startUpdateSeat', $linkId, 3, 'TAN')->assertSet('pendingOperation', null)
+            ->call('openEditSeat', $linkId)->assertSet('editSeatId', null)
+            ->call('viewOccupants', $linkId)->assertSet('occupantSeatId', null);
+
+        $this->assertSame(0, (int) DB::table('position_unit')->where('id', $linkId)->value('kuota'));
+    }
+
     public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
     {
         $this->seat($this->position('Manajer Kosong Tautan'), 1);
