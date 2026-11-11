@@ -145,6 +145,24 @@ class FormasiEditorTest extends TestCase
             ->assertSet('paginators.page', 2);
     }
 
+    public function test_opened_pool_positions_are_not_formasi_on_either_screen(): void
+    {
+        $advisor = Position::create(['nama' => 'Advisor RM-2', 'level' => 'Karpim', 'rm_level' => 'RM-2', 'is_active' => true, 'is_overflow' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $this->unit->id, 'position_id' => $advisor->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $advisor->nama]);
+        $this->seat($this->position('Manajer Biasa'), 1);
+
+        $unitScreen = $this->editor();
+        $this->assertSame(['Manajer Biasa'], $unitScreen->instance()->seats->pluck('jabatan')->all());
+        $unitScreen->assertDontSee('Advisor RM-2');
+
+        $stats = Livewire::actingAs($this->admin)->test(FormasiEditor::class)->instance()->overviewStats;
+        $this->assertSame(1, $stats['seats']);
+        $this->assertSame(1, $stats['kuota']);
+        $this->assertSame(0, $stats['filled'], 'A pool holder never fills a formasi.');
+        $this->assertSame(0, $stats['over']);
+    }
+
     public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
     {
         $this->seat($this->position('Manajer Kosong Tautan'), 1);

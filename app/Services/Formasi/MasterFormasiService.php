@@ -105,6 +105,138 @@ class MasterFormasiService
         });
     }
 
+    // ───────────────── Jabatan penampungan (Advisor, Diperbantukan) ─────────────────
+
+    /**
+     * Jenis jabatan penampungan => [is_overflow, is_diperban], sama dengan data seeder. Jabatan penampungan opsional pada
+     * sebuah unit, bukan bagian Master Formasi: tanpa kuota, tidak mengisi atau mengosongkan formasi mana pun (DOMAIN.md §3.6).
+     */
+    public const POOL_TYPES = ['advisor' => [true, false], 'diperbantukan' => [true, true]];
+
+    /** RM Band jabatan penampungan yang tersedia. */
+    public const POOL_RM_LEVELS = ['RM-1', 'RM-2', 'RM-3', 'RM-4'];
+
+    /** Bidang bawaan jabatan penampungan, sama dengan data seeder. */
+    private const POOL_BIDANG = 'UMU';
+
+    /**
+     * Membuat jabatan penampungan baru (level Karpim, tanpa kuota dan tanpa unit). Untuk dipakai pada sebuah unit,
+     * jabatan ini harus dibuka lebih dulu lewat openPoolPosition().
+     *
+     * @param  array{nama?: ?string, jenis?: ?string, rm_level?: ?string}  $data
+     */
+    public function createPoolPosition(array $data, User $user): Position
+    {
+        return DB::transaction(function () use ($data, $user): Position {
+            $nama = trim((string) ($data['nama'] ?? ''));
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
+            }
+
+            $jenis = $data['jenis'] ?? null;
+            if (! is_string($jenis) || ! isset(self::POOL_TYPES[$jenis])) {
+                throw new FormasiRuleViolationException('Jenis jabatan penampungan harus Advisor atau Diperbantukan.');
+            }
+
+            $rm = $data['rm_level'] ?? null;
+            if (! in_array($rm, self::POOL_RM_LEVELS, true)) {
+                throw new FormasiRuleViolationException('RM Band jabatan penampungan harus RM-1 sampai RM-4.');
+            }
+
+            $this->assertPositionNameFree($nama);
+
+            [$overflow, $diperban] = self::POOL_TYPES[$jenis];
+            $position = Position::create([
+                'nama' => $nama,
+                'bidang' => self::POOL_BIDANG,
+                'level' => 'Karpim',
+                'rm_level' => $rm,
+                'is_active' => true,
+                'is_overflow' => $overflow,
+                'is_diperban' => $diperban,
+            ]);
+
+            MasterAuditLog::record(
+                $user, 'position.created', 'position', $position->id, $position->nama, null,
+                $position->only(['nama', 'bidang', 'level', 'rm_level']) + ['jenis' => $jenis]
+            );
+
+            return $position;
+        });
+    }
+
+    /**
+     * Membuka jabatan penampungan pada sebuah unit agar karyawan dapat ditempatkan padanya (penambahan manual dan impor
+     * memeriksa jabatan terhadap unit). Baris `position_unit` berkuota 0 hanyalah tanda "dibuka"; jabatan penampungan
+     * tidak dihitung sebagai formasi.
+     */
+    public function openPoolPosition(Unit $unit, Position $position, User $user): int
+    {
+        return DB::transaction(function () use ($unit, $position, $user): int {
+            $this->assertIsPool($position);
+            if (! $unit->is_active) {
+                throw new FormasiRuleViolationException("Unit '{$unit->nama}' tidak aktif sehingga tidak dapat menerima jabatan penampungan.");
+            }
+
+            try {
+                $id = DB::table('position_unit')->insertGetId([
+                    'unit_id' => $unit->id,
+                    'position_id' => $position->id,
+                    'kuota' => 0,
+                    'bidang' => $position->bidang ?? self::POOL_BIDANG,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' sudah dibuka pada unit '{$unit->nama}'.");
+            }
+
+            MasterAuditLog::record(
+                $user, 'pool.opened', 'pool_seat', $id, $this->seatLabel($unit->nama, $position->nama),
+                null, ['jenis' => $position->is_diperban ? 'diperbantukan' : 'advisor']
+            );
+
+            return $id;
+        });
+    }
+
+    /**
+     * Menutup jabatan penampungan pada sebuah unit. Diblokir selama masih ada karyawan yang menjabatnya pada unit itu,
+     * dan wajib beralasan; pemindahan karyawan tetap melalui modul Mutasi.
+     */
+    public function closePoolPosition(Unit $unit, Position $position, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($unit, $position, $reason, $user): void {
+            $this->assertIsPool($position);
+
+            $link = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $position->id)->first();
+            if ($link === null) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' belum dibuka pada unit '{$unit->nama}'.");
+            }
+
+            $holders = Employee::where('unit_kerja', $unit->nama)->where('jabatan', $position->nama)->count();
+            if ($holders > 0) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$holders} karyawan pada unit '{$unit->nama}'. Pindahkan karyawan tersebut lebih dulu melalui modul Mutasi.");
+            }
+
+            $reason = $this->requireReason($reason);
+
+            DB::table('position_unit')->where('id', $link->id)->delete();
+
+            MasterAuditLog::record(
+                $user, 'pool.closed', 'pool_seat', $link->id, $this->seatLabel($unit->nama, $position->nama),
+                ['jenis' => $position->is_diperban ? 'diperbantukan' : 'advisor'], null, $reason
+            );
+        });
+    }
+
+    private function assertIsPool(Position $position): void
+    {
+        if (! ($position->is_overflow || $position->is_diperban)) {
+            throw new FormasiRuleViolationException("'{$position->nama}' bukan jabatan penampungan. Formasi jabatan biasa dikelola melalui Formasi.");
+        }
+    }
+
     // ─────────────────────────────── Unit kerja ───────────────────────────────
 
     /**

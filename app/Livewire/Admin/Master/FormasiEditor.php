@@ -533,6 +533,9 @@ class FormasiEditor extends Component
         return DB::table('position_unit')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
             ->where('position_unit.unit_id', $unit->id)
+            // Jabatan penampungan yang dibuka pada unit bukan formasi (tab Jabatan Penampungan).
+            ->where('positions.is_overflow', false)
+            ->where('positions.is_diperban', false)
             ->get([
                 'position_unit.id', 'position_unit.kuota', 'position_unit.bidang',
                 'positions.id as position_id', 'positions.is_active as position_active',
@@ -689,6 +692,8 @@ class FormasiEditor extends Component
         $occupied = DB::table('position_unit')
             ->join('units', 'units.id', '=', 'position_unit.unit_id')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('positions.is_overflow', false)
+            ->where('positions.is_diperban', false)
             ->leftJoin('employees', fn ($join) => $join
                 ->on('employees.unit_kerja', '=', 'units.nama')
                 ->on('employees.jabatan', '=', 'positions.nama'))

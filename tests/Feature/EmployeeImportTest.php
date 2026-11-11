@@ -22,6 +22,7 @@ use App\Models\Unit;
 use App\Models\UnitAlias;
 use App\Models\User;
 use App\Services\EmployeeImportService;
+use App\Services\Formasi\MasterFormasiService;
 use App\Services\Import\EmployeeImportDictionary;
 use Carbon\Carbon;
 use Database\Seeders\PositionUnitSeeder;
@@ -1335,6 +1336,28 @@ class EmployeeImportTest extends TestCase
         $unit->positions()->attach($position->id, ['kuota' => $kuota, 'bidang' => 'TAN']);
 
         return $unit;
+    }
+
+    public function test_import_accepts_an_opened_pool_jabatan_beyond_any_quota_and_rejects_it_where_it_is_not_opened(): void
+    {
+        $opened = $this->formasiUnit('Kebun Pool Terbuka', 'Manajer Pool Terbuka', 'RM-1', 1);
+        $this->formasiUnit('Kebun Pool Tertutup', 'Manajer Pool Tertutup', 'RM-1', 1);
+        $service = new MasterFormasiService;
+        $advisor = $service->createPoolPosition(['nama' => 'Advisor Impor RM-1', 'jenis' => 'advisor', 'rm_level' => 'RM-1'], $this->admin);
+        $service->openPoolPosition($opened, $advisor, $this->admin);
+
+        $file = $this->createExcelUploadFile([
+            $this->karpimImportRow('88004001', 'Advisor Impor RM-1', 'Kebun Pool Terbuka'),
+            $this->karpimImportRow('88004002', 'Advisor Impor RM-1', 'Kebun Pool Terbuka'),
+            $this->karpimImportRow('88004003', 'Advisor Impor RM-1', 'Kebun Pool Tertutup'),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file]);
+
+        $this->assertDatabaseHas('employees', ['nik' => '88004001', 'jabatan' => 'Advisor Impor RM-1']);
+        $this->assertDatabaseHas('employees', ['nik' => '88004002', 'jabatan' => 'Advisor Impor RM-1']);
+        $this->assertDatabaseMissing('employees', ['nik' => '88004003']);
+        $this->assertStringContainsString('tidak valid untuk Unit Kerja', session('import_summary')['errors'][0]['errors'][0]);
     }
 
     public function test_import_rejects_a_level_for_which_the_unit_has_no_formasi(): void

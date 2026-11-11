@@ -59,6 +59,119 @@ class MasterFormasiServiceTest extends TestCase
         Employee::factory()->count($count)->create(['unit_kerja' => $unit->nama, 'jabatan' => $position->nama]);
     }
 
+    // ───────────────────────── Jabatan penampungan (Advisor, Diperbantukan) ─────────────────────────
+
+    public function test_create_pool_position_makes_an_advisor_without_any_quota_or_unit(): void
+    {
+        $position = $this->service->createPoolPosition(['nama' => 'Advisor Khusus RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+
+        $this->assertTrue($position->is_overflow);
+        $this->assertFalse($position->is_diperban);
+        $this->assertTrue($position->is_active);
+        $this->assertSame('Karpim', $position->level);
+        $this->assertSame('RM-2', $position->rm_level);
+        $this->assertSame(0, DB::table('position_unit')->where('position_id', $position->id)->count());
+
+        $log = MasterAuditLog::where('action', 'position.created')->latest('id')->first();
+        $this->assertSame('Advisor Khusus RM-2', $log->entity_label);
+        $this->assertSame('advisor', $log->new_values['jenis']);
+    }
+
+    public function test_create_pool_position_for_diperbantukan_sets_both_pool_flags(): void
+    {
+        $position = $this->service->createPoolPosition(['nama' => 'Manajer Diperbantukan', 'jenis' => 'diperbantukan', 'rm_level' => 'RM-1'], $this->admin);
+
+        $this->assertTrue($position->is_overflow);
+        $this->assertTrue($position->is_diperban);
+    }
+
+    public function test_create_pool_position_rejects_bad_input_and_duplicates(): void
+    {
+        $this->position('Sudah Ada');
+
+        foreach ([
+            [['nama' => '  ', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], 'wajib diisi'],
+            [['nama' => 'Jenis Salah', 'jenis' => 'hukuman', 'rm_level' => 'RM-2'], 'Advisor atau Diperbantukan'],
+            [['nama' => 'RM Salah', 'jenis' => 'advisor', 'rm_level' => 'RM-7'], 'RM-1 sampai RM-4'],
+            [['nama' => 'Sudah Ada', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], 'sudah digunakan'],
+        ] as [$data, $message]) {
+            try {
+                $this->service->createPoolPosition($data, $this->admin);
+                $this->fail('Expected a rule violation for '.json_encode($data));
+            } catch (FormasiRuleViolationException $e) {
+                $this->assertStringContainsString($message, $e->getMessage());
+            }
+        }
+
+        $this->assertSame(1, Position::count());
+    }
+
+    public function test_open_pool_position_attaches_it_to_the_unit_with_no_quota_and_audits(): void
+    {
+        $unit = $this->unit('Group Manager Kalbar');
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $row = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $advisor->id)->first();
+        $this->assertSame(0, (int) $row->kuota);
+        $this->assertSame('UMU', $row->bidang);
+        $log = MasterAuditLog::where('action', 'pool.opened')->first();
+        $this->assertSame('Group Manager Kalbar — Advisor RM-2', $log->entity_label);
+        $this->assertSame($this->admin->id, $log->user_id);
+    }
+
+    public function test_open_pool_position_refuses_ordinary_positions_inactive_units_and_repeats(): void
+    {
+        $unit = $this->unit();
+        $ordinary = $this->position('Manajer', 'Karpim', 'RM-1');
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+
+        foreach ([
+            fn () => $this->service->openPoolPosition($unit, $ordinary, $this->admin),
+            fn () => $this->service->openPoolPosition($this->unit('Unit Mati', false), $advisor, $this->admin),
+        ] as $attempt) {
+            $this->assertThrows($attempt, FormasiRuleViolationException::class);
+        }
+
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+        $this->assertThrows(fn () => $this->service->openPoolPosition($unit, $advisor, $this->admin), FormasiRuleViolationException::class, 'sudah dibuka');
+        $this->assertSame(1, DB::table('position_unit')->count());
+    }
+
+    public function test_close_pool_position_needs_a_reason_and_no_holders(): void
+    {
+        $unit = $this->unit();
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+        $this->employees($unit, $advisor, 2);
+
+        $this->assertThrows(fn () => $this->service->closePoolPosition($unit, $advisor, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class, '2 karyawan');
+        $this->assertSame(1, DB::table('position_unit')->count());
+
+        Employee::where('jabatan', $advisor->nama)->delete();
+        $this->assertThrows(fn () => $this->service->closePoolPosition($unit, $advisor, 'pendek', $this->admin), FormasiRuleViolationException::class, 'minimal 10 karakter');
+
+        $this->service->closePoolPosition($unit, $advisor, 'Tidak lagi dipakai pada unit ini', $this->admin);
+
+        $this->assertSame(0, DB::table('position_unit')->count());
+        $log = MasterAuditLog::where('action', 'pool.closed')->first();
+        $this->assertSame('Tidak lagi dipakai pada unit ini', $log->reason);
+    }
+
+    public function test_pool_actions_never_touch_ordinary_formasi(): void
+    {
+        $unit = $this->unit();
+        $manager = $this->position('Manajer', 'Karpim', 'RM-1');
+        $this->seat($unit, $manager, 2, 'TAN');
+        $advisor = $this->service->createPoolPosition(['nama' => 'Advisor RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+
+        $this->assertThrows(fn () => $this->service->closePoolPosition($unit, $manager, 'Alasan yang cukup panjang', $this->admin), FormasiRuleViolationException::class);
+        $this->service->openPoolPosition($unit, $advisor, $this->admin);
+
+        $this->assertSame(2, DB::table('position_unit')->where('position_id', $manager->id)->value('kuota'));
+    }
+
     public function test_add_seat_creates_the_seat_and_one_audit_row(): void
     {
         $unit = $this->unit();

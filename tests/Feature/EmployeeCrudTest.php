@@ -10,6 +10,7 @@ use App\Models\Position;
 use App\Models\Training;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Formasi\MasterFormasiService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -346,6 +347,36 @@ class EmployeeCrudTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88770003', 'Jabatan Tanpa Kursi'))
             ->assertSessionHasErrors('jabatan');
         $this->assertDatabaseMissing('employees', ['nik' => '88770003']);
+    }
+
+    public function test_store_accepts_an_opened_pool_jabatan_beyond_any_quota_and_rejects_it_where_it_is_not_opened(): void
+    {
+        $opened = Unit::firstOrCreate(['nama' => 'Group Manager Kalbar Uji'], ['kode' => 'GMK', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $closed = Unit::firstOrCreate(['nama' => 'Group Manager Kalselteng Uji'], ['kode' => 'GMS', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $service = new MasterFormasiService;
+        $advisor = $service->createPoolPosition(['nama' => 'Advisor Uji RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $service->openPoolPosition($opened, $advisor, $this->admin);
+
+        $payload = fn (string $nik, string $unitName) => [
+            'nik' => $nik,
+            'nama' => 'ADVISOR UJI',
+            'jabatan' => 'Advisor Uji RM-2',
+            'unit_kerja' => $unitName,
+            'level' => 'Karpim',
+            'golongan' => 'IVA/00',
+            'job_grade' => 15,
+            'person_grade' => 15,
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ];
+
+        // A pool Jabatan has no quota: two Advisors fit in the unit where it is opened.
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780001', $opened->nama))->assertRedirect(route('admin.employees.index'));
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780002', $opened->nama))->assertRedirect(route('admin.employees.index'));
+        $this->assertDatabaseHas('employees', ['nik' => '88780002', 'jabatan' => 'Advisor Uji RM-2']);
+
+        // Not opened in this unit: rejected like any Jabatan outside the unit's Master Formasi.
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780003', $closed->nama))->assertSessionHasErrors('jabatan');
+        $this->assertDatabaseMissing('employees', ['nik' => '88780003']);
     }
 
     public function test_create_form_follows_position_control_and_form_accessibility_rules(): void

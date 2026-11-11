@@ -422,6 +422,7 @@ class MasterDataTest extends TestCase
         $pages = [
             'admin.master.formasi.index' => 'Formasi',
             'admin.master.sebaran.index' => 'Sebaran Formasi',
+            'admin.master.penampungan.index' => 'Jabatan Penampungan',
             'admin.master.riwayat.index' => 'Riwayat Perubahan',
         ];
 
@@ -433,11 +434,11 @@ class MasterDataTest extends TestCase
             $links = [];
             preg_match_all('/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s', $nav[0], $links, PREG_SET_ORDER);
 
-            $this->assertCount(3, $links, "{$route}: tiga bagian harus tersedia.");
+            $this->assertCount(4, $links, "{$route}: empat bagian harus tersedia.");
             $this->assertSame(
                 array_map(fn ($name) => route($name), array_keys($pages)),
                 array_map(fn ($link) => html_entity_decode($link[1]), $links),
-                "{$route}: urutan bagian harus Formasi, Sebaran Formasi, lalu Riwayat."
+                "{$route}: urutan bagian harus Formasi, Sebaran Formasi, Jabatan Penampungan, lalu Riwayat."
             );
 
             $current = array_values(array_filter($links, fn ($link) => str_contains($link[0], 'aria-current="page"')));

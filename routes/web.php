@@ -149,6 +149,8 @@ Route::prefix('admin')
 
             // Sebaran Formasi: gambaran lintas unit formasi jabatan terisi dan kosong (read-only, JobVacancyService)
             Route::view('sebaran', 'admin.master.sebaran.index')->name('sebaran.index');
+            // Jabatan Penampungan: Advisor dan Diperbantukan di luar formasi (dibuat, dibuka pada unit, bezetting per unit)
+            Route::view('penampungan', 'admin.master.penampungan.index')->name('penampungan.index');
             // Tautan lama tab "Formasi Lowong" diteruskan ke Sebaran Formasi dengan filternya.
             // Tab lama hanya menampilkan formasi kosong, jadi tanpa status bawaannya tetap "kosong".
             Route::get('lowongan', function (Request $request) {
