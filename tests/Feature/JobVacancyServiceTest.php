@@ -122,6 +122,35 @@ class JobVacancyServiceTest extends TestCase
         $this->assertSame(1, $this->service->getFormasiStatistics()['over_count']);
     }
 
+    public function test_pool_positions_never_become_formasi_or_vacancies(): void
+    {
+        // Advisor and Diperbantukan are optional pool positions, separate from the Master Formasi: no quota, no vacancy,
+        // even if one is attached to a unit by mistake (e.g. directly in the database).
+        foreach (['Advisor RM-3' => [true, false], 'Karyawan Diperbantukan RM-3' => [true, true], 'Posisi Diperbantukan Saja' => [false, true]] as $nama => [$overflow, $diperban]) {
+            $position = Position::create(['nama' => $nama, 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true, 'is_overflow' => $overflow, 'is_diperban' => $diperban]);
+            DB::table('position_unit')->insert(['unit_id' => $this->unit->id, 'position_id' => $position->id, 'kuota' => 2, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $this->seat('Manajer Formasi Sungguhan', 1);
+
+        $this->assertSame(['Manajer Formasi Sungguhan'], $this->service->getFormasiSeats()->pluck('jabatan')->all());
+        $this->assertSame(['Manajer Formasi Sungguhan'], $this->service->getVacancies()->pluck('jabatan')->all());
+        $this->assertSame(1, $this->service->getFormasiStatistics()['total_seats']);
+        $this->assertSame(1, $this->service->getFormasiStatistics()['total_kuota']);
+    }
+
+    public function test_pool_position_holders_do_not_change_any_formasi_count(): void
+    {
+        $this->holders($this->seat('Manajer Formasi Sungguhan', 1), 1);
+        $advisor = Position::create(['nama' => 'Advisor RM-3', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true, 'is_overflow' => true]);
+        $this->holders($advisor, 3);
+
+        $stats = $this->service->getFormasiStatistics();
+
+        $this->assertSame(1, $stats['total_seats']);
+        $this->assertSame(1, $stats['filled']);
+        $this->assertSame(0, $stats['vacant_slots']);
+    }
+
     public function test_inactive_unit_and_inactive_position_are_excluded(): void
     {
         $inactiveUnit = Unit::create(['nama' => 'Unit Nonaktif Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => false, 'urutan' => 2]);

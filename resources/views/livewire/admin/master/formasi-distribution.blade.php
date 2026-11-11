@@ -38,7 +38,7 @@
         </x-admin.table.header>
 
         <p class="px-5 py-2.5 bg-surface-50 border-b border-surface-200 text-[11px] text-surface-500">
-            Hanya pejabat definitif yang mengisi kuota; jabatan yang dijabat Pj/Plt tetap tercatat kosong. Cakupan formasi saat ini: seluruh Karpim dan Karpel pada unit Regional Office.
+            Hanya pejabat definitif yang mengisi kuota; jabatan yang dijabat Pj/Plt tetap tercatat kosong. Cakupan mengikuti Master Formasi; jabatan penampungan (Advisor dan Diperbantukan) tidak termasuk.
         </p>
 
         <div class="overflow-x-auto">

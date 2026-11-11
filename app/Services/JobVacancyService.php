@@ -368,6 +368,10 @@ class JobVacancyService
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
             ->where('units.is_active', true)
             ->where('positions.is_active', true)
+            // Jabatan penampungan (Advisor, Diperbantukan) opsional pada unit dan bukan bagian Master Formasi: tanpa kuota,
+            // tidak mengisi atau mengosongkan formasi apa pun. Ditolak juga di sini bila salah terpasang pada sebuah unit.
+            ->where('positions.is_overflow', false)
+            ->where('positions.is_diperban', false)
             ->get([
                 'position_unit.id as position_unit_id', 'position_unit.kuota', 'position_unit.bidang',
                 'units.id as unit_id', 'units.nama as unit_kerja', 'units.wilayah',

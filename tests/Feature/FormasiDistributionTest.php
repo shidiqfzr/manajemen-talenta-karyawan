@@ -81,6 +81,15 @@ class FormasiDistributionTest extends TestCase
             ->assertDontSee('Asisten Afdeling X');
     }
 
+    public function test_the_coverage_note_follows_the_master_formasi_and_names_the_pool_exclusion(): void
+    {
+        $html = preg_replace('/\s+/', ' ', $this->table()->html());
+
+        $this->assertStringContainsString('Cakupan mengikuti Master Formasi', $html);
+        $this->assertStringContainsString('Advisor dan Diperbantukan', $html);
+        $this->assertStringNotContainsString('pada unit Regional Office', $html, 'The note must not hardcode today\'s coverage.');
+    }
+
     public function test_kpi_cards_summarise_the_whole_formasi(): void
     {
         $html = preg_replace('/\s+/', ' ', $this->table()->html());
