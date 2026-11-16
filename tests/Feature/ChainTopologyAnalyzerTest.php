@@ -55,6 +55,28 @@ class ChainTopologyAnalyzerTest extends TestCase
         return implode(' | ', app(ChainTopologyAnalyzer::class)->validateChainTopology($nodes)['errors']);
     }
 
+    public function test_a_participant_whose_retirement_date_has_arrived_is_refused_even_before_the_separation_runs(): void
+    {
+        $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 3, holders: 0);
+        Employee::findOrFail($nodes[0]['employee_nik'])->update(['tanggal_pensiun' => now()->startOfMonth()->toDateString()]);
+
+        $errors = $this->errorsFor($nodes);
+
+        $this->assertStringContainsString('telah memasuki Batas Usia Pensiun', $errors);
+        $this->assertStringContainsString($nodes[0]['employee_nik'], $errors);
+    }
+
+    public function test_a_participant_separated_for_another_reason_is_not_reported_as_retired(): void
+    {
+        $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 3, holders: 0);
+        Employee::findOrFail($nodes[0]['employee_nik'])->update(['tanggal_berhenti' => now()->subDay()->toDateString(), 'alasan_berhenti' => 'Mengundurkan Diri']);
+
+        $errors = $this->errorsFor($nodes);
+
+        $this->assertStringContainsString('telah berhenti (Mengundurkan Diri)', $errors);
+        $this->assertStringNotContainsString('Batas Usia Pensiun', $errors);
+    }
+
     public function test_two_participants_may_fill_two_free_seats_of_a_multi_seat_formasi(): void
     {
         $nodes = $this->twoMoversInto('Asisten Pengolahan', kuota: 3, holders: 1);

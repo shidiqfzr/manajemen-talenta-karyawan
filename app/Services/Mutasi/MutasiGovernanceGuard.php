@@ -195,10 +195,27 @@ class MutasiGovernanceGuard
         ];
     }
 
+    /**
+     * Sudah berhenti, atau tanggal pensiun efektifnya (tanggal_pensiun, atau tanggal lahir + BUP) sudah tiba. Aturan yang
+     * sama dengan PensiunService::dueEmployees(), sehingga karyawan yang jatuh tempo tidak lolos selama pemberhentian
+     * otomatis belum berjalan.
+     */
     public function isRetired(Employee $emp): bool
     {
-        return $emp->isSeparated()
-            || ($emp->tanggal_pensiun && Carbon::parse($emp->tanggal_pensiun)->lt(now()->startOfMonth()));
+        return $emp->isSeparated() || $emp->isPensionReached();
+    }
+
+    /**
+     * Klausa alasan karyawan tidak dapat dimutasi, untuk disisipkan pada pesan ("Karyawan X {klausa} dan tidak dapat
+     * dimutasi."). Karyawan yang berhenti bukan karena pensiun tidak boleh disebut telah mencapai BUP.
+     */
+    public function retiredReason(Employee $emp): string
+    {
+        if ($emp->isSeparated() && $emp->alasan_berhenti !== null && $emp->alasan_berhenti !== Employee::ALASAN_PENSIUN) {
+            return "telah berhenti ({$emp->alasan_berhenti})";
+        }
+
+        return 'telah memasuki Batas Usia Pensiun';
     }
 
     /**
@@ -259,7 +276,7 @@ class MutasiGovernanceGuard
 
         if ($this->isRetired($employee)) {
             throw new MutasiRuleViolationException(
-                "Karyawan {$employee->nama} telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi."
+                "Karyawan {$employee->nama} {$this->retiredReason($employee)} dan tidak dapat dimutasi."
             );
         }
 

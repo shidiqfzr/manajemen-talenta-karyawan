@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Models\JobHistory;
 use App\Models\User;
 use App\Services\MutasiService;
+use App\Support\SpreadsheetCell;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
@@ -195,16 +196,7 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
      */
     public static function sanitizeCellValue(mixed $val): string
     {
-        $str = (string) ($val ?? '');
-        if ($str === '') {
-            return '';
-        }
-
-        if (in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'".$str;
-        }
-
-        return $str;
+        return SpreadsheetCell::neutralise($val);
     }
 
     public function registerEvents(): array

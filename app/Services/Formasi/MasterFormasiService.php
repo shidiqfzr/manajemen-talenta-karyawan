@@ -36,6 +36,7 @@ class MasterFormasiService
     public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user): int
     {
         return DB::transaction(function () use ($unit, $position, $kuota, $bidang, $user): int {
+            $this->lockUnit($unit->id);
             $this->assertSeatInput($position, $kuota, $bidang);
             $this->assertNotBlocked($this->previewImpact('seat.add', ['unit_id' => $unit->id, 'position_id' => $position->id]));
 
@@ -64,7 +65,7 @@ class MasterFormasiService
     public function updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User $user): void
     {
         DB::transaction(function () use ($positionUnitId, $kuota, $bidang, $user): void {
-            $seat = $this->findSeat($positionUnitId);
+            $seat = $this->findSeatLocked($positionUnitId);
             $position = Position::findOrFail($seat->position_id);
             $this->assertSeatInput($position, $kuota, $bidang);
 
@@ -91,7 +92,7 @@ class MasterFormasiService
     public function removeSeat(int $positionUnitId, ?string $reason, User $user): void
     {
         DB::transaction(function () use ($positionUnitId, $reason, $user): void {
-            $seat = $this->findSeat($positionUnitId);
+            $seat = $this->findSeatLocked($positionUnitId);
             $this->assertNotBlocked($this->previewImpact('seat.remove', ['seat_id' => $positionUnitId]));
             $reason = $this->requireReason($reason);
 
@@ -211,8 +212,7 @@ class MasterFormasiService
         DB::transaction(function () use ($unit, $position, $reason, $user): void {
             $this->assertIsPool($position);
 
-            // Same lock as FormasiSeatGuard: an employee being added to this unit at the same moment waits for us, or we for it.
-            Unit::whereKey($unit->id)->lockForUpdate()->first();
+            $this->lockUnit($unit->id);
 
             $link = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $position->id)->lockForUpdate()->first();
             if ($link === null) {
@@ -564,7 +564,8 @@ class MasterFormasiService
     private function previewUnitDeactivate(int $unitId): ImpactResult
     {
         $unit = Unit::findOrFail($unitId);
-        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        // Hanya karyawan aktif yang menahan unit; arsip karyawan berhenti tidak dapat dipindahkan lewat Mutasi.
+        $employees = Employee::aktif()->where('unit_kerja', $unit->nama)->count();
         $pending = $this->pendingMutations($unit->nama);
         $blockers = [];
 
@@ -583,7 +584,7 @@ class MasterFormasiService
     private function previewUnitDelete(int $unitId): ImpactResult
     {
         $unit = Unit::findOrFail($unitId);
-        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        $employees = Employee::aktif()->where('unit_kerja', $unit->nama)->count();
         $links = DB::table('position_unit')
             ->join('positions', 'positions.id', '=', 'position_unit.position_id')
             ->where('position_unit.unit_id', $unit->id)
@@ -641,7 +642,7 @@ class MasterFormasiService
     private function previewPositionDeactivate(int $positionId): ImpactResult
     {
         $position = Position::findOrFail($positionId);
-        $employees = Employee::where('jabatan', $position->nama)->count();
+        $employees = Employee::aktif()->where('jabatan', $position->nama)->count();
         $pending = $this->pendingMutations(null, $position->nama);
         $blockers = [];
 
@@ -660,7 +661,7 @@ class MasterFormasiService
     private function previewPositionDelete(int $positionId): ImpactResult
     {
         $position = Position::findOrFail($positionId);
-        $employees = Employee::where('jabatan', $position->nama)->count();
+        $employees = Employee::aktif()->where('jabatan', $position->nama)->count();
         $seats = DB::table('position_unit')->where('position_id', $position->id)->count();
         $history = JobHistory::where('jabatan', $position->nama)->count();
         $blockers = [];
@@ -894,6 +895,23 @@ class MasterFormasiService
         if ($bidang === null && $position->level === 'Karpim') {
             throw new FormasiRuleViolationException("Bidang wajib diisi untuk formasi Karpim jabatan '{$position->nama}'.");
         }
+    }
+
+    /**
+     * Same lock as FormasiSeatGuard: an employee being added to this unit at the same moment waits for us, or we
+     * for it, so the occupancy we preview and audit is the occupancy the change lands on. Call inside a transaction.
+     */
+    protected function lockUnit(int $unitId): void
+    {
+        Unit::whereKey($unitId)->lockForUpdate()->first();
+    }
+
+    /** The seat read under the unit lock (the unit is only known from the seat, so it is read again after locking). */
+    private function findSeatLocked(int $positionUnitId): object
+    {
+        $this->lockUnit($this->findSeat($positionUnitId)->unit_id);
+
+        return $this->findSeat($positionUnitId);
     }
 
     private function findSeat(int $positionUnitId): object

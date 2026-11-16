@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\SpreadsheetCell;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -105,16 +106,7 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
      */
     public static function sanitizeCellValue(mixed $val): string
     {
-        $str = (string) ($val ?? '');
-        if ($str === '') {
-            return '';
-        }
-
-        if (in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'".$str;
-        }
-
-        return $str;
+        return SpreadsheetCell::neutralise($val);
     }
 
     protected function findRawValue(array $raw, array $possibleKeys): string

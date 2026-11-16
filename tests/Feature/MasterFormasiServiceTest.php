@@ -247,6 +247,46 @@ class MasterFormasiServiceTest extends TestCase
         $this->assertSame(2, DB::table('position_unit')->where('position_id', $manager->id)->value('kuota'));
     }
 
+    /**
+     * Same unit lock as FormasiSeatGuard: a quota change must serialize with employees being added to the unit.
+     * SQLite ignores row locks, so the lock request itself is recorded, together with the seat as it was at that moment.
+     */
+    private function lockRecordingService(array &$locks): MasterFormasiService
+    {
+        return new class($locks) extends MasterFormasiService
+        {
+            public function __construct(private array &$locks) {}
+
+            protected function lockUnit(int $unitId): void
+            {
+                $this->locks[] = [
+                    'unit_id' => $unitId,
+                    'seats' => DB::table('position_unit')->where('unit_id', $unitId)->pluck('kuota')->map(fn ($k) => (int) $k)->all(),
+                ];
+                parent::lockUnit($unitId);
+            }
+        };
+    }
+
+    public function test_every_seat_write_takes_the_unit_lock_before_changing_the_seat(): void
+    {
+        $unit = $this->unit();
+        $position = $this->position();
+        $locks = [];
+        $service = $this->lockRecordingService($locks);
+
+        $id = $service->addSeat($unit, $position, 3, 'TAN', $this->admin);
+        $this->assertSame([['unit_id' => $unit->id, 'seats' => []]], $locks, 'addSeat locks before inserting the seat');
+
+        $locks = [];
+        $service->updateSeat($id, 2, 'TAN', $this->admin);
+        $this->assertSame([['unit_id' => $unit->id, 'seats' => [3]]], $locks, 'updateSeat locks while the old quota is still in place');
+
+        $locks = [];
+        $service->removeSeat($id, 'Formasi tidak lagi diperlukan unit', $this->admin);
+        $this->assertSame([['unit_id' => $unit->id, 'seats' => [2]]], $locks, 'removeSeat locks while the seat still exists');
+    }
+
     public function test_add_seat_creates_the_seat_and_one_audit_row(): void
     {
         $unit = $this->unit();
@@ -489,6 +529,39 @@ class MasterFormasiServiceTest extends TestCase
         }
 
         $this->assertTrue($unit->fresh()->is_active);
+    }
+
+    public function test_separated_employees_do_not_block_deactivating_or_deleting_their_old_unit_or_jabatan(): void
+    {
+        $unit = $this->unit('Kebun Arsip');
+        $position = $this->position('Asisten Arsip');
+        Employee::factory()->count(2)->create([
+            'unit_kerja' => $unit->nama,
+            'jabatan' => $position->nama,
+            'tanggal_berhenti' => '2026-01-01',
+            'alasan_berhenti' => Employee::ALASAN_PENSIUN,
+        ]);
+
+        // Deactivating is not blocked at all by archived employees.
+        foreach ([['unit.deactivate', ['unit_id' => $unit->id]], ['position.deactivate', ['position_id' => $position->id]]] as [$operation, $params]) {
+            $this->assertFalse($this->service->previewImpact($operation, $params)->blocked, "{$operation} must ignore separated employees (archive only)");
+        }
+
+        // Deleting stays blocked by their job history (audit trail), but never by "employees still in the unit".
+        foreach ([['unit.delete', ['unit_id' => $unit->id]], ['position.delete', ['position_id' => $position->id]]] as [$operation, $params]) {
+            $impact = $this->service->previewImpact($operation, $params);
+            $this->assertStringNotContainsString('karyawan masih', implode(' ', $impact->blockers), "{$operation} must not count separated employees");
+            $this->assertSame(0, $impact->affectedEmployees);
+        }
+
+        $this->service->setUnitActive($unit, false, 'Unit digabung ke unit lain', $this->admin);
+        $this->assertFalse($unit->fresh()->is_active);
+
+        // An active holder still blocks, and only active holders are counted.
+        Employee::factory()->create(['unit_kerja' => $unit->nama, 'jabatan' => $position->nama]);
+        $impact = $this->service->previewImpact('position.deactivate', ['position_id' => $position->id]);
+        $this->assertTrue($impact->blocked);
+        $this->assertSame(1, $impact->affectedEmployees);
     }
 
     public function test_deactivate_empty_unit_requires_a_reason_and_activation_does_not(): void

@@ -194,6 +194,28 @@ class MutasiServiceTest extends TestCase
         $this->assertTrue(JobHistory::where('employee_nik', $empB->nik)->where('jabatan', 'Posisi A')->whereNull('tmt_akhir')->exists());
     }
 
+    public function test_swap_history_records_each_employees_own_golongan_and_grade(): void
+    {
+        // Same RM Band on both seats, so the swap is a plain Rotasi whatever golongan each employee holds.
+        Position::factory()->create(['nama' => 'Posisi A', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-3']);
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Unit A', 'golongan' => 'IIIC/00', 'job_grade' => '12']);
+        $empB = Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Unit A', 'golongan' => 'IIID/00', 'job_grade' => '13']);
+
+        $this->service->processMutasi(new MutasiRequest($empA->nik, 'Posisi B', 'Unit A', now()->toDateString(), 'ROTASI'));
+
+        foreach ([$empA, $empB] as $employee) {
+            $employee->refresh();
+            $history = JobHistory::where('employee_nik', $employee->nik)->whereNull('tmt_akhir')->firstOrFail();
+
+            $this->assertSame($employee->golongan, $history->golongan, "{$employee->nik}: history golongan must match the employee record");
+            $this->assertSame((string) $employee->job_grade, (string) $history->job_grade, "{$employee->nik}: history job grade must match the employee record");
+        }
+
+        $this->assertSame('IIID/00', $empB->golongan, 'A swap does not change the displaced employee\'s golongan');
+        $this->assertSame('13', (string) $empB->job_grade);
+    }
+
     public function test_multi_occupancy_pool_advisor_does_not_trigger_swap()
     {
         // Setup

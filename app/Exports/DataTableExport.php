@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\User;
 use App\Support\DataTable\Column;
+use App\Support\SpreadsheetCell;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
@@ -85,11 +86,7 @@ final class DataTableExport implements FromQuery, WithCustomChunkSize, WithEvent
     /** Prefixes a quote so spreadsheet apps never evaluate the cell as a formula. */
     public function neutralise(string $value): string
     {
-        if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-            return "'".$value;
-        }
-
-        return $value;
+        return SpreadsheetCell::neutralise($value);
     }
 
     private function downloader(): string

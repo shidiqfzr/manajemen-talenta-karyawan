@@ -335,11 +335,13 @@ class MutasiService
             'golongan' => $request->newGolongan ?: $empA->golongan,
             'job_grade' => $request->newJobGrade ?: $empA->job_grade,
         ];
+        // Employee B keeps their own golongan / job grade (only A may receive a new one through the request), so
+        // B's new history row must record B's own values, matching the employee record.
         $profileB = [
             'rm_level' => $posA['rm_level'] ?? $empB->rm_level,
             'level' => $posA['level'] ?? $empB->level,
-            'golongan' => $posA['golongan'] ?? $empB->golongan,
-            'job_grade' => $posA['job_grade'],
+            'golongan' => $posB['golongan'],
+            'job_grade' => $posB['job_grade'],
         ];
 
         if (! $request->isFuture()) {

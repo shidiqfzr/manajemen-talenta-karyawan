@@ -25,12 +25,14 @@ class MutasiLookup
      */
     public function getSelectableEmployees(?string $unitKerja = null): Collection
     {
+        // The pension date can come from tanggal_lahir + BUP, so the rule is applied on the model (same as the guard).
         return Employee::query()
             ->aktif()
-            ->where(fn ($q) => $q->whereNull('tanggal_pensiun')->orWhere('tanggal_pensiun', '>=', now()->startOfMonth()))
             ->when($unitKerja, fn ($q) => $q->where('unit_kerja', $unitKerja))
             ->orderBy('nama')
-            ->get(['nik', 'nama', 'jabatan', 'unit_kerja', 'rm_level', 'golongan']);
+            ->get(['nik', 'nama', 'jabatan', 'unit_kerja', 'rm_level', 'golongan', 'tanggal_lahir', 'tanggal_pensiun'])
+            ->reject(fn (Employee $employee) => $this->guard->isRetired($employee))
+            ->values();
     }
 
     /**

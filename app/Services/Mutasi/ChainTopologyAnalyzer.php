@@ -143,8 +143,8 @@ class ChainTopologyAnalyzer
         foreach ($niks as $nik) {
             if (! isset($employees[$nik])) {
                 $errors[] = "Data karyawan dengan NIK {$nik} tidak ditemukan.";
-            } elseif ($employees[$nik]->isSeparated() || ($employees[$nik]->tanggal_pensiun && Carbon::parse($employees[$nik]->tanggal_pensiun)->lt(now()->startOfMonth()))) {
-                $errors[] = "Karyawan {$employees[$nik]->nama} (NIK: {$nik}) telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi.";
+            } elseif ($this->guard->isRetired($employees[$nik])) {
+                $errors[] = "Karyawan {$employees[$nik]->nama} (NIK: {$nik}) {$this->guard->retiredReason($employees[$nik])} dan tidak dapat dimutasi.";
             }
         }
 

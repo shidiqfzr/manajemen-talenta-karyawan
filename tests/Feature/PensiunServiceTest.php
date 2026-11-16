@@ -213,6 +213,39 @@ class PensiunServiceTest extends TestCase
         $this->assertSame($admin->id, MasterAuditLog::where('action', 'employee.separated')->firstOrFail()->user_id);
     }
 
+    public function test_separation_refuses_a_future_effective_date_so_nothing_changes_early(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $employee = $this->holder('1990-01-01');
+        $jobsBefore = $employee->activeJobs()->count();
+
+        $this->actingAs($admin)->post(route('admin.employees.separate', $employee), [
+            'alasan' => 'Mengundurkan Diri',
+            'tanggal_berhenti' => '2026-12-01',
+        ])->assertSessionHasErrors('tanggal_berhenti');
+
+        $employee->refresh();
+        $this->assertNull($employee->tanggal_berhenti);
+        $this->assertSame($jobsBefore, $employee->activeJobs()->count());
+        $this->assertSame(0, MasterAuditLog::where('action', 'employee.separated')->count());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service()->separate($employee, 'Mengundurkan Diri', Carbon::parse('2026-12-01'));
+    }
+
+    public function test_separation_dated_today_or_earlier_is_accepted(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $employee = $this->holder('1990-01-01');
+
+        $this->actingAs($admin)->post(route('admin.employees.separate', $employee), [
+            'alasan' => 'Mengundurkan Diri',
+            'tanggal_berhenti' => '2026-11-11',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('2026-11-11', $employee->fresh()->tanggal_berhenti->toDateString());
+    }
+
     public function test_separation_rejects_an_unknown_reason_and_non_admins(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -238,14 +271,28 @@ class PensiunServiceTest extends TestCase
         $this->assertNotContains($retired->nik, app(MutasiLookup::class)->getSelectableEmployees()->pluck('nik')->all());
     }
 
+    public function test_an_employee_due_for_retirement_is_not_offered_for_mutasi_before_the_separation_runs(): void
+    {
+        // Lahir November 1970 => tanggal pensiun 1 November 2026, sudah tiba pada 11 November tetapi belum diproses.
+        $due = $this->holder('1970-11-05');
+        $active = $this->holder('1990-01-01');
+
+        $this->assertTrue(app(MutasiGovernanceGuard::class)->isRetired($due));
+        $this->assertFalse(app(MutasiGovernanceGuard::class)->isRetired($active));
+
+        $selectable = app(MutasiLookup::class)->getSelectableEmployees()->pluck('nik')->all();
+        $this->assertNotContains($due->nik, $selectable);
+        $this->assertContains($active->nik, $selectable);
+    }
+
     public function test_the_staff_directory_excludes_separated_employees(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
+        $staff = User::factory()->create(['role' => 'user']);
         $retired = $this->holder('1970-08-15');
         $active = $this->holder('1990-01-01');
         $this->service()->processDue();
 
-        $this->actingAs($admin)->get(route('user.employees.index'))
+        $this->actingAs($staff)->get(route('user.employees.index'))
             ->assertOk()->assertSee($active->nama)->assertDontSee($retired->nama);
     }
 

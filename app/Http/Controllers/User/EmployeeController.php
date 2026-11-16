@@ -16,7 +16,8 @@ class EmployeeController extends Controller
 
     public function show($nik)
     {
-        $employee = Employee::findOrFail($nik);
+        // Karyawan berhenti hanya arsip internal HR: tidak ditampilkan kepada peran user (UU PDP).
+        $employee = Employee::aktif()->findOrFail($nik);
 
         return view('user.employees.show', compact('employee'));
     }

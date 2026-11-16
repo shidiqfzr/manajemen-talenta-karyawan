@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /**
  * Lifecycle of a Usulan Mutasi Berantai (DOMAIN.md §5.2.6): saved drafts and the four-eyes approval policy.
@@ -109,15 +110,33 @@ class ChainProposalService
      */
     public function saveDraft(?MutasiChainProposal $proposal, array $header, array $nodes, User $user): MutasiChainProposal
     {
+        $previousFile = $proposal?->file_sk;
+        $newFile = $header['file_sk'] ?? null;
+
+        try {
+            $saved = $this->persistDraft($proposal, $header, $nodes, $user, $newFile);
+        } catch (Throwable $e) {
+            // The upload was stored before this call; a draft that was not saved must not keep it (UU PDP retention).
+            $this->deleteReplacedUpload($newFile, $previousFile);
+            throw $e;
+        }
+
+        if ($newFile && $previousFile && $previousFile !== $newFile) {
+            $this->deleteFile($previousFile);
+        }
+
+        return $saved;
+    }
+
+    private function persistDraft(?MutasiChainProposal $proposal, array $header, array $nodes, User $user, ?string $newFile): MutasiChainProposal
+    {
         if ($proposal) {
             $this->assertEditableBy($proposal, $user);
         }
 
         $inputs = self::extractInputs($nodes);
-        $previousFile = $proposal?->file_sk;
-        $newFile = $header['file_sk'] ?? null;
 
-        $proposal = DB::transaction(function () use ($proposal, $header, $inputs, $user, $newFile) {
+        return DB::transaction(function () use ($proposal, $header, $inputs, $user, $newFile) {
             $proposal ??= new MutasiChainProposal([
                 'created_by' => $user->id,
                 'created_by_name' => $user->name,
@@ -130,7 +149,7 @@ class ChainProposalService
                 'tmt_awal' => self::nullIfBlank($header['tmt_awal'] ?? null),
                 'catatan' => self::nullIfBlank($header['catatan'] ?? null),
                 'payload' => $inputs,
-                'participant_count' => count(array_filter($inputs, fn (array $i) => $i['employee_nik'] !== '')),
+                'participant_count' => self::countParticipants($inputs),
                 'payload_digest' => null,
             ]);
             if ($newFile) {
@@ -142,12 +161,6 @@ class ChainProposalService
 
             return $proposal;
         });
-
-        if ($newFile && $previousFile && $previousFile !== $newFile) {
-            Storage::disk(self::DISK)->delete($previousFile);
-        }
-
-        return $proposal;
     }
 
     /** Store an uploaded SK file for a proposal on the private disk (SECURITY.md §4.4). */
@@ -290,6 +303,28 @@ class ChainProposalService
      */
     public function executeDirect(?MutasiChainProposal $proposal, User $user, array $header, array $nodes): array
     {
+        $previousFile = $proposal?->file_sk;
+        $newFile = $header['file_sk'] ?? null;
+
+        try {
+            $result = $this->runDirect($proposal, $user, $header, $nodes);
+        } catch (Throwable $e) {
+            // The SK file was uploaded before the SK was issued; if issuing failed it has no owner and must not stay.
+            $this->deleteReplacedUpload($newFile, $previousFile);
+            throw $e;
+        }
+
+        // The draft's earlier upload was replaced by the one that is now on the issued SK.
+        if ($newFile && $previousFile && $previousFile !== $newFile) {
+            $this->deleteFile($previousFile);
+        }
+
+        return $result;
+    }
+
+    /** @return array<string, mixed> */
+    private function runDirect(?MutasiChainProposal $proposal, User $user, array $header, array $nodes): array
+    {
         if (self::requiresApproval()) {
             throw new MutasiRuleViolationException('Kebijakan persetujuan berjenjang aktif: ajukan usulan ini untuk disetujui admin lain.');
         }
@@ -328,9 +363,7 @@ class ChainProposalService
 
         $file = $proposal->file_sk;
         $proposal->delete();
-        if ($file) {
-            Storage::disk(self::DISK)->delete($file);
-        }
+        $this->deleteFile($file);
     }
 
     /** Mark every pending proposal past its deadline as expired. Returns how many. */
@@ -341,11 +374,9 @@ class ChainProposalService
             ->where('expires_at', '<', now())
             ->get()
             ->each(function (MutasiChainProposal $proposal) use (&$expired): void {
-                DB::transaction(function () use ($proposal) {
-                    $proposal->update(['status' => MutasiChainProposal::STATUS_EXPIRED, 'payload_digest' => null]);
-                    $this->log($proposal, MutasiChainProposalEvent::ACTION_EXPIRED, null);
-                });
-                $expired++;
+                if ($this->expire($proposal)) {
+                    $expired++;
+                }
             });
 
         return $expired;
@@ -371,10 +402,54 @@ class ChainProposalService
             'decided_by_name' => $user->name,
             'decided_at' => now(),
             'expires_at' => null,
-            'participant_count' => count($proposal->payload ?? []),
+            'participant_count' => self::countParticipants($proposal->payload ?? []),
         ])->save();
 
         $this->log($proposal, MutasiChainProposalEvent::ACTION_EXECUTED, $user);
+    }
+
+    private function deleteFile(?string $path): void
+    {
+        if ($path) {
+            Storage::disk(self::DISK)->delete($path);
+        }
+    }
+
+    /** Delete an upload that did not become part of the proposal; the file the proposal already had is never touched. */
+    private function deleteReplacedUpload(?string $uploaded, ?string $existing): void
+    {
+        if ($uploaded && $uploaded !== $existing) {
+            $this->deleteFile($uploaded);
+        }
+    }
+
+    /**
+     * Participants are the slots that carry an employee; padded empty slots are not people.
+     *
+     * @param  list<array<string, string>>  $inputs
+     */
+    private static function countParticipants(array $inputs): int
+    {
+        return count(array_filter($inputs, fn (array $input) => trim((string) ($input['employee_nik'] ?? '')) !== ''));
+    }
+
+    /**
+     * Expire a proposal only if it is still pending and overdue. The row is locked and re-read inside the
+     * transaction, so a decision that landed after the caller selected the proposal is never overwritten.
+     */
+    private function expire(MutasiChainProposal $proposal): bool
+    {
+        return DB::transaction(function () use ($proposal): bool {
+            $locked = $this->lock($proposal);
+            if (! $this->isOverdue($locked)) {
+                return false;
+            }
+
+            $locked->update(['status' => MutasiChainProposal::STATUS_EXPIRED, 'payload_digest' => null]);
+            $this->log($locked, MutasiChainProposalEvent::ACTION_EXPIRED, null);
+
+            return true;
+        });
     }
 
     private function lock(MutasiChainProposal $proposal): MutasiChainProposal
@@ -398,15 +473,9 @@ class ChainProposalService
      */
     private function expireIfDue(MutasiChainProposal $proposal): void
     {
-        $proposal = $proposal->fresh() ?? $proposal;
-        if (! $this->isOverdue($proposal)) {
+        if (! $this->isOverdue($proposal->fresh() ?? $proposal) || ! $this->expire($proposal)) {
             return;
         }
-
-        DB::transaction(function () use ($proposal) {
-            $proposal->update(['status' => MutasiChainProposal::STATUS_EXPIRED, 'payload_digest' => null]);
-            $this->log($proposal, MutasiChainProposalEvent::ACTION_EXPIRED, null);
-        });
 
         throw new MutasiRuleViolationException(self::EXPIRED_MESSAGE);
     }

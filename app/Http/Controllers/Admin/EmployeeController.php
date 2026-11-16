@@ -177,10 +177,14 @@ class EmployeeController extends Controller
         $evaluations = $employee->evaluations()->latest()->paginate((int) config('hris.pagination.default'));
 
         // Dampak pemberhentian yang ditampilkan pada modal sebelum eksekusi (DESIGN.md §7.2).
+        // Pemberhentian berlaku seketika, jadi tanggal bawaan tidak pernah melewati hari ini.
+        $today = Carbon::today()->toDateString();
+        $pensiun = $employee->effective_tanggal_pensiun?->toDateString();
         $separationImpact = [
             'active_jobs' => $employee->activeJobs()->count(),
             'scheduled' => $employee->scheduledJobs()->count(),
-            'pensiun' => $employee->effective_tanggal_pensiun?->toDateString(),
+            'pensiun' => $pensiun !== null && $pensiun <= $today ? $pensiun : null,
+            'today' => $today,
         ];
 
         return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations', 'separationImpact'));
@@ -466,12 +470,13 @@ class EmployeeController extends Controller
 
         $validated = $request->validate([
             'alasan' => ['required', Rule::in(Employee::ALASAN_BERHENTI)],
-            'tanggal_berhenti' => ['required', 'date'],
+            'tanggal_berhenti' => ['required', 'date', 'before_or_equal:today'],
             'nomor_sk' => ['nullable', 'string', 'max:100'],
             'tanggal_sk' => ['nullable', 'date', 'required_with:nomor_sk'],
         ], [
             'alasan.required' => 'Alasan pemberhentian wajib dipilih.',
             'tanggal_berhenti.required' => 'Tanggal berhenti wajib diisi.',
+            'tanggal_berhenti.before_or_equal' => 'Tanggal berhenti tidak boleh melewati hari ini. Catat pemberhentian pada tanggal berlakunya.',
             'tanggal_sk.required_with' => 'Tanggal SK wajib diisi bila nomor SK diisi.',
         ]);
 

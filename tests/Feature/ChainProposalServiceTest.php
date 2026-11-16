@@ -12,7 +12,9 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\Mutasi\ChainProposalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -249,6 +251,118 @@ class ChainProposalServiceTest extends TestCase
         $other->forceFill(['expires_at' => now()->subDay()])->save();
         $this->assertSame(1, $this->service->expireStale());
         $this->assertSame(MutasiChainProposal::STATUS_EXPIRED, $other->refresh()->status);
+    }
+
+    public function test_expiry_never_overwrites_a_proposal_decided_after_it_was_selected(): void
+    {
+        $proposal = $this->submittedProposal();
+        $proposal->forceFill(['expires_at' => now()->subMinute()])->save();
+
+        // Simulate a checker approving at the very moment the expiry job has already read the row.
+        $armed = true;
+        MutasiChainProposal::retrieved(function (MutasiChainProposal $model) use (&$armed, $proposal) {
+            if ($armed && $model->is($proposal)) {
+                $armed = false;
+                DB::table('mutasi_chain_proposals')->where('id', $proposal->id)
+                    ->update(['status' => MutasiChainProposal::STATUS_EXECUTED]);
+            }
+        });
+
+        $this->assertSame(0, $this->service->expireStale());
+        $this->assertSame(MutasiChainProposal::STATUS_EXECUTED, $proposal->refresh()->status);
+        $this->assertSame(0, $proposal->events()->where('action', MutasiChainProposalEvent::ACTION_EXPIRED)->count());
+    }
+
+    public function test_executed_proposal_counts_only_filled_participants(): void
+    {
+        $blank = array_fill_keys(ChainProposalService::INPUT_FIELDS, '');
+        $nodes = [...$this->cycleNodes(), $blank, $blank];
+
+        config(['hris.mutasi_chain.require_approval' => true]);
+        $proposal = $this->service->saveDraft(null, $this->header(), $nodes, $this->maker);
+        $this->assertSame(3, $proposal->participant_count);
+        $this->service->submit($proposal, $this->maker);
+
+        $this->service->approve($proposal->refresh(), $this->checker, $nodes);
+
+        $this->assertSame(MutasiChainProposal::STATUS_EXECUTED, $proposal->refresh()->status);
+        $this->assertSame(3, $proposal->participant_count);
+    }
+
+    private function storeSk(string $name = 'sk.pdf'): string
+    {
+        return $this->service->storeFile(UploadedFile::fake()->create($name, 10, 'application/pdf'));
+    }
+
+    public function test_a_failed_direct_execution_does_not_leave_the_uploaded_sk_behind(): void
+    {
+        Storage::fake('local');
+        config(['hris.mutasi_chain.require_approval' => false]);
+        $file = $this->storeSk();
+
+        // A one-person "chain" fails validation inside the transaction.
+        try {
+            $this->service->executeDirect(null, $this->maker, $this->header() + ['file_sk' => $file, 'created_by' => $this->maker->id], [$this->cycleNodes()[0]]);
+            $this->fail('An invalid chain must not be executed.');
+        } catch (MutasiRuleViolationException) {
+            Storage::disk('local')->assertMissing($file);
+        }
+
+        // The policy refusal happens before any transaction and must clean up the same way.
+        config(['hris.mutasi_chain.require_approval' => true]);
+        $file = $this->storeSk('sk-2.pdf');
+        try {
+            $this->service->executeDirect(null, $this->maker, $this->header() + ['file_sk' => $file], $this->cycleNodes());
+            $this->fail('Direct execution must be refused under the approval policy.');
+        } catch (MutasiRuleViolationException) {
+            Storage::disk('local')->assertMissing($file);
+        }
+    }
+
+    public function test_a_failed_execution_keeps_the_file_the_draft_already_had(): void
+    {
+        Storage::fake('local');
+        config(['hris.mutasi_chain.require_approval' => false]);
+        $existing = $this->storeSk('lama.pdf');
+        $draft = $this->service->saveDraft(null, $this->header() + ['file_sk' => $existing], $this->cycleNodes(), $this->maker);
+
+        try {
+            $this->service->executeDirect($draft, $this->maker, $this->header() + ['file_sk' => $existing, 'created_by' => $this->maker->id], [$this->cycleNodes()[0]]);
+            $this->fail('An invalid chain must not be executed.');
+        } catch (MutasiRuleViolationException) {
+            Storage::disk('local')->assertExists($existing);
+            $this->assertSame($existing, $draft->refresh()->file_sk);
+        }
+    }
+
+    public function test_executing_with_a_replacement_file_removes_the_one_the_draft_replaced(): void
+    {
+        Storage::fake('local');
+        config(['hris.mutasi_chain.require_approval' => false]);
+        $old = $this->storeSk('lama.pdf');
+        $draft = $this->service->saveDraft(null, $this->header() + ['file_sk' => $old], $this->cycleNodes(), $this->maker);
+        $new = $this->storeSk('baru.pdf');
+
+        $this->service->executeDirect($draft, $this->maker, $this->header() + ['file_sk' => $new, 'created_by' => $this->maker->id], $this->cycleNodes());
+
+        $this->assertSame($new, $draft->refresh()->file_sk);
+        Storage::disk('local')->assertExists($new);
+        Storage::disk('local')->assertMissing($old);
+    }
+
+    public function test_a_draft_that_cannot_be_saved_does_not_keep_the_new_upload(): void
+    {
+        Storage::fake('local');
+        $draft = $this->service->saveDraft(null, $this->header(), $this->cycleNodes(), $this->maker);
+        $file = $this->storeSk();
+
+        try {
+            // Only the maker may change a draft.
+            $this->service->saveDraft($draft, $this->header() + ['file_sk' => $file], $this->cycleNodes(), $this->checker);
+            $this->fail('A different admin must not change the draft.');
+        } catch (MutasiRuleViolationException) {
+            Storage::disk('local')->assertMissing($file);
+        }
     }
 
     public function test_only_never_submitted_drafts_can_be_discarded(): void

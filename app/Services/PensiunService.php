@@ -92,6 +92,12 @@ class PensiunService
             throw new InvalidArgumentException('Tanggal pemberhentian wajib diisi untuk alasan selain Pensiun.');
         }
 
+        // Pemberhentian berlaku seketika (karyawan keluar dari formasi, riwayat ditutup, mutasi dibatalkan), sehingga
+        // tanggal efektif tidak boleh di masa depan. Pemberhentian berjadwal dicatat pada tanggal berlakunya.
+        if ($tanggal !== null && $tanggal->copy()->startOfDay()->gt(Carbon::today())) {
+            throw new InvalidArgumentException('Tanggal pemberhentian tidak boleh melewati hari ini.');
+        }
+
         return DB::transaction(function () use ($employee, $alasan, $tanggal, $nomorSk, $tanggalSk, $actor): bool {
             $locked = Employee::where('nik', $employee->nik)->lockForUpdate()->first();
             $tanggal ??= $locked?->effective_tanggal_pensiun;

@@ -34,7 +34,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // User Routes
 Route::prefix('user')
     ->name('user.')
-    // ->middleware(['auth', 'role:user'])
+    ->middleware(['auth', 'role:user'])
     ->group(function () {
 
         // Employees

@@ -151,7 +151,7 @@
                             <div x-data="{
                                     open: {{ $errors->hasAny(['alasan', 'tanggal_berhenti', 'nomor_sk', 'tanggal_sk']) ? 'true' : 'false' }},
                                     alasan: @js(old('alasan', 'Pensiun')),
-                                    tanggal: @js(old('tanggal_berhenti', $separationImpact['pensiun'])),
+                                    tanggal: @js(old('tanggal_berhenti', $separationImpact['pensiun'] ?? $separationImpact['today'])),
                                     pensiun: @js($separationImpact['pensiun']),
                                     syncDate() { if (this.alasan === 'Pensiun' && this.pensiun) this.tanggal = this.pensiun; }
                                 }">
@@ -172,8 +172,9 @@
 
                                     <x-admin.form.select name="alasan" label="Alasan Pemberhentian" :options="\App\Models\Employee::ALASAN_BERHENTI" :selected="old('alasan', 'Pensiun')" :placeholder="null" required
                                         x-model="alasan" @change="syncDate()" />
-                                    <x-admin.form.input name="tanggal_berhenti" type="date" label="Tanggal Berhenti" :value="old('tanggal_berhenti', $separationImpact['pensiun'])" required
-                                        x-model="tanggal" hint="Untuk alasan Pensiun, tanggal mengikuti tanggal pensiun efektif karyawan." />
+                                    <x-admin.form.input name="tanggal_berhenti" type="date" label="Tanggal Berhenti" :value="old('tanggal_berhenti', $separationImpact['pensiun'] ?? $separationImpact['today'])" required
+                                        max="{{ $separationImpact['today'] }}"
+                                        x-model="tanggal" hint="Tanggal berhenti berlaku seketika dan tidak boleh melewati hari ini. Pensiun normal diproses otomatis pada tanggal pensiun efektif." />
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <x-admin.form.input name="nomor_sk" label="Nomor SK (opsional)" maxlength="100" />
                                         <x-admin.form.input name="tanggal_sk" type="date" label="Tanggal SK" />
