@@ -423,7 +423,7 @@ class EmployeeImportRowValidator
      */
     private function occupancy(string $unitName, string $jabatan): int
     {
-        $this->occupancyCache[$unitName] ??= Employee::where('unit_kerja', $unitName)
+        $this->occupancyCache[$unitName] ??= Employee::aktif()->where('unit_kerja', $unitName)
             ->where('status_penugasan', 'Definitif')
             ->selectRaw('jabatan, count(*) as total')
             ->groupBy('jabatan')

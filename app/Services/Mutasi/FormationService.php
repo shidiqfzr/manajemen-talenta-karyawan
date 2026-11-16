@@ -62,6 +62,7 @@ class FormationService
 
         // Every current holder, Pj/Plt included: a temporary holder keeps the seat, so the formasi is not released (§5.2).
         $holders = Employee::with('currentJob')
+            ->aktif()
             ->where('jabatan', $jabatan)
             ->where('unit_kerja', $unitKerja)
             ->orderBy('nik')
@@ -125,7 +126,7 @@ class FormationService
         if (empty($allJabatan)) {
             $historicalJobs = JobHistory::where('unit_kerja', $targetUnitKerja)
                 ->pluck('jabatan')->unique()->toArray();
-            $activeJobs = Employee::where('unit_kerja', $targetUnitKerja)
+            $activeJobs = Employee::aktif()->where('unit_kerja', $targetUnitKerja)
                 ->pluck('jabatan')->unique()->toArray();
 
             $allJabatan = array_unique(array_merge($historicalJobs, $activeJobs));
@@ -145,11 +146,13 @@ class FormationService
             $jRmNumber = self::rmNumber($this->resolvePositionRm($j));
 
             if ($jenisMutasi === 'PROMOSI') {
-                if ($jRmNumber < $empRmNumber) {
+                // Promotion moves exactly one RM band up (e.g. RM-3 -> RM-2).
+                if ($jRmNumber === $empRmNumber - 1) {
                     $filtered->push($j);
                 }
             } elseif ($jenisMutasi === 'DEMOSI') {
-                if ($jRmNumber > $empRmNumber) {
+                // Demotion moves exactly one RM band down (e.g. RM-3 -> RM-4).
+                if ($jRmNumber === $empRmNumber + 1) {
                     $filtered->push($j);
                 }
             } elseif (in_array($jenisMutasi, ['ROTASI', 'MUTASI_UNIT'])) {

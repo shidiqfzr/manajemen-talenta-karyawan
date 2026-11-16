@@ -87,6 +87,11 @@ class EmployeeObserver
      */
     public function updated(Employee $employee): void
     {
+        // Karyawan yang sudah berhenti tidak membuka riwayat jabatan baru: jabatan terakhirnya menjadi arsip.
+        if ($employee->getOriginal('tanggal_berhenti') !== null) {
+            return;
+        }
+
         if (! $this->hasCoreJob($employee)) {
             return;
         }

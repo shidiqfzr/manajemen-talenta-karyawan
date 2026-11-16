@@ -3,7 +3,6 @@
 namespace App\Services\Mutasi;
 
 use App\Models\Employee;
-use App\Models\JobHistory;
 use App\Models\Position;
 use Carbon\Carbon;
 
@@ -36,14 +35,11 @@ class ChainTopologyAnalyzer
             if (! empty($node['dispensasi_tenure']) && ! empty($node['alasan_dispensasi_tenure'])) {
                 $reasons[] = '[Dispensasi Masa Dinas]: '.$node['alasan_dispensasi_tenure'];
             }
-            if (! empty($node['dispensasi_promosi']) && ! empty($node['alasan_dispensasi_promosi'])) {
-                $reasons[] = '[Dispensasi Promosi]: '.$node['alasan_dispensasi_promosi'];
-            }
             if (empty($reasons) && ! empty($node['alasan_dispensasi'])) {
                 $reasons[] = $node['alasan_dispensasi'];
             }
 
-            $node['is_dispensasi'] = ! empty($node['is_dispensasi']) || ! empty($node['dispensasi_tenure']) || ! empty($node['dispensasi_promosi']);
+            $node['is_dispensasi'] = ! empty($node['is_dispensasi']) || ! empty($node['dispensasi_tenure']);
             $node['alasan_dispensasi'] = $reasons ? implode(' | ', $reasons) : null;
 
             return $node;
@@ -147,7 +143,7 @@ class ChainTopologyAnalyzer
         foreach ($niks as $nik) {
             if (! isset($employees[$nik])) {
                 $errors[] = "Data karyawan dengan NIK {$nik} tidak ditemukan.";
-            } elseif ($employees[$nik]->tanggal_pensiun && Carbon::parse($employees[$nik]->tanggal_pensiun)->lt(now()->startOfMonth())) {
+            } elseif ($employees[$nik]->isSeparated() || ($employees[$nik]->tanggal_pensiun && Carbon::parse($employees[$nik]->tanggal_pensiun)->lt(now()->startOfMonth()))) {
                 $errors[] = "Karyawan {$employees[$nik]->nama} (NIK: {$nik}) telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi.";
             }
         }
@@ -186,9 +182,16 @@ class ChainTopologyAnalyzer
             $targetUnitKerja = $node['target_unit_kerja'];
             $posKey = "{$targetJabatan}|{$targetUnitKerja}";
 
-            $jenisMutasi = $node['jenis_mutasi'] ?? 'MUTASI_UNIT';
-            if (! in_array($jenisMutasi, JobHistory::MUTASI_TYPES, true)) {
-                $errors[] = "Jenis mutasi '{$jenisMutasi}' untuk karyawan {$emp->nama} tidak dikenal dalam Pedoman Tata Kelola SDM.";
+            // Same per-participant placement rules as a single mutation (type, status, unit, Promosi/Demosi direction)
+            $violation = $this->guard->placementRuleViolation(
+                $emp,
+                $node['jenis_mutasi'] ?? 'MUTASI_UNIT',
+                $node['status_jabatan'] ?? 'Definitif',
+                $targetJabatan,
+                $targetUnitKerja
+            );
+            if ($violation !== null) {
+                $errors[] = $violation;
             }
 
             $isPool = isset($positions[$targetJabatan]) && ($positions[$targetJabatan]->is_overflow || $positions[$targetJabatan]->is_diperban);
@@ -262,11 +265,8 @@ class ChainTopologyAnalyzer
             // Governance: Promotion eligibility
             $promo = $this->guard->checkPromotionEligibility($emp, $targetJabatan);
             if ($promo['is_applicable'] && ! $promo['is_eligible']) {
-                if (! $isDispensasi) {
-                    $errors[] = "Karyawan {$emp->nama} belum memenuhi kriteria promosi ke {$targetJabatan}. Harap setujui dispensasi promosi.";
-                } else {
-                    $warnings[] = "Karyawan {$emp->nama} dipromosikan dengan Dispensasi Khusus Direksi ke {$targetJabatan}.";
-                }
+                // Advisory: promotion qualification has no approval flow yet, so it warns instead of blocking
+                $warnings[] = "Karyawan {$emp->nama} belum memenuhi kualifikasi promosi ke {$targetJabatan}.";
             }
 
             $nodesAnalysis[] = [
@@ -401,14 +401,14 @@ class ChainTopologyAnalyzer
                 $orderedIndices = [];
                 $loopback = null;
                 $clusterType = 'complex';
-                $clusterLabel = "Klaster Majemuk ({$compSize} Karyawan)";
+                $clusterLabel = "Alur Gabungan ({$compSize} Karyawan)";
 
                 if ($isCompCyclic) {
                     $clusterType = 'cyclic';
                     $cycleClusterCount++;
                     $clusterLabel = $compSize === 2
-                        ? 'Tukar Jabatan / Swap (2 Karyawan)'
-                        : "Rantai Siklis ({$compSize} Karyawan)";
+                        ? 'Tukar Jabatan (2 Karyawan)'
+                        : "Rantai Tertutup ({$compSize} Karyawan)";
 
                     // Order sequentially starting from node with lowest original index
                     $start = min($compNodeIndices);
@@ -462,11 +462,11 @@ class ChainTopologyAnalyzer
                     if ($compSize >= 2) {
                         $clusterType = 'domino';
                         $dominoClusterCount++;
-                        $clusterLabel = "Alur Domino ({$compSize} Karyawan)";
+                        $clusterLabel = "Rantai Terbuka ({$compSize} Karyawan)";
                     } else {
                         $clusterType = 'open';
                         $openClusterCount++;
-                        $clusterLabel = 'Transfer Mandiri (1 Karyawan)';
+                        $clusterLabel = 'Mutasi Mandiri (1 Karyawan)';
                     }
                 }
 
@@ -495,7 +495,7 @@ class ChainTopologyAnalyzer
                 $clusters[] = [
                     'id' => $compIdx + 1,
                     'type' => $clusterType,
-                    'title' => 'Klaster #'.($compIdx + 1)." • {$clusterLabel}",
+                    'title' => 'Alur Mutasi #'.($compIdx + 1)." • {$clusterLabel}",
                     'type_label' => $clusterLabel,
                     'is_zero_vacancy' => ($clusterType === 'cyclic'),
                     'node_indices' => $orderedIndices,
@@ -520,34 +520,34 @@ class ChainTopologyAnalyzer
                 $single = $clusters[0];
                 if ($single['type'] === 'cyclic') {
                     $topology = 'cyclic';
-                    $topologyLabel = 'Rantai Tertutup Tunggal (Siklis Sempurna / Net Zero Vacancy)';
+                    $topologyLabel = 'Rantai Tertutup (Tanpa Lowongan Baru)';
                 } elseif ($single['type'] === 'domino') {
                     $topology = 'domino';
-                    $topologyLabel = 'Efek Domino Terbuka (1 Ditutup, 1 Ditinggalkan)';
+                    $topologyLabel = 'Rantai Terbuka (1 Formasi Terisi, 1 Lowongan Baru)';
                 } else {
                     $topology = 'open';
-                    $topologyLabel = 'Transfer Mandiri (Formasi Bebas)';
+                    $topologyLabel = 'Mutasi Mandiri ke Formasi Kosong';
                 }
             } else {
                 if ($cycleClusterCount === $totalClusters) {
                     $topology = 'multi_cyclic';
-                    $topologyLabel = "Rantai Multi-Siklis ({$cycleClusterCount} Siklus Mandiri / Net Zero Vacancy)";
+                    $topologyLabel = "{$cycleClusterCount} Rantai Tertutup (Tanpa Lowongan Baru)";
                 } elseif ($dominoClusterCount === $totalClusters) {
                     $topology = 'multi_domino';
-                    $topologyLabel = "Rantai Multi-Domino ({$dominoClusterCount} Alur Domino Mandiri)";
+                    $topologyLabel = "{$dominoClusterCount} Rantai Terbuka";
                 } else {
                     $parts = [];
                     if ($cycleClusterCount > 0) {
-                        $parts[] = "{$cycleClusterCount} Siklis";
+                        $parts[] = "{$cycleClusterCount} Rantai Tertutup";
                     }
                     if ($dominoClusterCount > 0) {
-                        $parts[] = "{$dominoClusterCount} Domino";
+                        $parts[] = "{$dominoClusterCount} Rantai Terbuka";
                     }
                     if ($openClusterCount > 0) {
-                        $parts[] = "{$openClusterCount} Transfer Mandiri";
+                        $parts[] = "{$openClusterCount} Mutasi Mandiri";
                     }
                     $topology = 'multi_mixed';
-                    $topologyLabel = 'Rantai Majemuk Multi-Klaster ('.implode(', ', $parts).')';
+                    $topologyLabel = 'Gabungan '.$totalClusters.' Alur Mutasi ('.implode(', ', $parts).')';
                 }
             }
         }

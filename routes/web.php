@@ -76,6 +76,8 @@ Route::prefix('admin')
             Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
             Route::get('/{employee}/edit', [AdminEmployeeController::class, 'edit'])->name('edit');
             Route::put('/{employee}', [AdminEmployeeController::class, 'update'])->name('update');
+            Route::post('/{employee}/separate', [AdminEmployeeController::class, 'separate'])->name('separate')->middleware('throttle:20,1');
+            Route::post('/{employee}/separation-sk', [AdminEmployeeController::class, 'recordSeparationSk'])->name('separation-sk')->middleware('throttle:20,1');
             Route::post('/bulk-destroy', [AdminEmployeeController::class, 'bulkDestroy'])->name('bulkDestroy');
             Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy'])->name('destroy');
 

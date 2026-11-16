@@ -130,5 +130,5 @@
         <x-admin.table.pagination :paginator="$rows" noun="penilaian" :per-page-options="$this->perPageOptions()" />
     </x-admin.table.card>
 
-    <x-admin.confirm-delete-modal title="Hapus Penilaian" noun="penilaian" consequence="Skor dan kategori 9-Box pada penilaian ini ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan." />
+    <x-admin.confirm-delete-modal title="Hapus Penilaian" noun="penilaian" reason consequence="Skor dan kategori 9-Box pada penilaian ini ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan." />
 </div>

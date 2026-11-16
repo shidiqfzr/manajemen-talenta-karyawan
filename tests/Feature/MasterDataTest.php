@@ -451,7 +451,7 @@ class MasterDataTest extends TestCase
     {
         $html = $this->actingAs($this->admin)->get(route('admin.master.formasi.index'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('title="Master Formasi"', $html);
+        $this->assertStringContainsString('title="Formasi"', $html);
         foreach (['Master Unit Kerja', 'Master Jabatan', 'Formasi Unit Kerja', 'Riwayat Perubahan Master'] as $oldTitle) {
             $this->assertStringNotContainsString('title="'.$oldTitle.'"', $html, "Sidebar tidak boleh lagi memuat entri terpisah '{$oldTitle}'.");
         }

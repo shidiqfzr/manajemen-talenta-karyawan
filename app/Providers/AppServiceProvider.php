@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Observers\EmployeeObserver;
 use App\Services\Formasi\FormasiCatalog;
+use App\Support\HrisPermission;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,6 +37,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Permanent deletion of employee master records (directory bulk action); admin only, like the admin route group.
         Gate::define('delete-employee', fn (User $user) => $user->role === 'admin');
+
+        // Pemberhentian karyawan dari jabatan (pensiun dini, mengundurkan diri, dll.) dan pencatatan SK-nya; admin only.
+        Gate::define('separate-employee', fn (User $user) => $user->role === 'admin');
+
+        // Permission => roles map from config('hris.permissions'): new roles are granted there, not in code.
+        HrisPermission::register();
     }
 
     /**

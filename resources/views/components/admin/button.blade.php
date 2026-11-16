@@ -12,7 +12,7 @@
     Varian danger wajib didahului modal konfirmasi.
 --}}
 @props([
-    'variant' => 'primary', // primary, secondary, ghost, danger
+    'variant' => 'primary', // primary, secondary, soft, ghost, danger
     'size' => 'md', // sm, md, lg
     'type' => 'button', // button, submit, reset
     'icon' => null,
@@ -21,7 +21,7 @@
 ])
 
 @php
-    $baseClasses = 'inline-flex items-center justify-center gap-2 font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed';
+    $baseClasses = 'inline-flex items-center justify-center gap-2 font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed';
 
     $sizeClasses = [
         'sm' => 'px-3 py-1.5 text-xs rounded-lg',
@@ -30,10 +30,13 @@
     ][$size] ?? 'px-5 py-2.5 text-sm rounded-xl';
 
     $variantClasses = [
-        'primary' => 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white shadow-xs focus-visible:ring-primary-500 border border-transparent',
-        'secondary' => 'bg-white hover:bg-surface-50 active:bg-surface-100 text-surface-700 border border-surface-300 shadow-xs focus-visible:ring-primary-500',
-        'ghost' => 'hover:bg-surface-100 active:bg-surface-200 text-surface-600 border border-transparent focus-visible:ring-primary-500',
-        'danger' => 'bg-danger hover:bg-danger-700 active:bg-danger-800 text-white shadow-xs focus-visible:ring-danger border border-transparent',
+        // Primary nonaktif memakai abu netral (bukan hijau pudar) agar label tetap terbaca dan jelas tidak bisa diklik
+        'primary' => 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white shadow-xs focus-visible:ring-primary-500 border border-transparent disabled:bg-surface-200 disabled:hover:bg-surface-200 disabled:text-surface-600 disabled:shadow-none',
+        'secondary' => 'bg-white hover:bg-surface-50 active:bg-surface-100 text-surface-700 border border-surface-300 shadow-xs focus-visible:ring-primary-500 disabled:opacity-60',
+        // Aksi sekunder-positif di dalam kartu/panel (mis. "Tambah Penugasan", "Reset Pencarian"): tint primary tanpa border
+        'soft' => 'bg-primary-50 hover:bg-primary-100 active:bg-primary-200 text-primary-700 border border-transparent focus-visible:ring-primary-500 disabled:opacity-60',
+        'ghost' => 'hover:bg-surface-100 active:bg-surface-200 text-surface-600 border border-transparent focus-visible:ring-primary-500 disabled:opacity-60',
+        'danger' => 'bg-danger hover:bg-danger-700 active:bg-danger-800 text-white shadow-xs focus-visible:ring-danger border border-transparent disabled:opacity-60',
     ][$variant] ?? 'bg-primary-600 hover:bg-primary-700 text-white';
 
     $iconSize = $size === 'sm' ? 'text-[10px]' : 'text-xs';

@@ -13,9 +13,13 @@
     'allOptionText' => '-- Semua Opsi --',
     'maxHeight' => 'max-h-60',
     'containerClass' => '',
+    'size' => 'compact',     // 'compact' (filters/toolbars) or 'form' (matches x-admin.form.input)
 ])
 
 @php
+    $triggerSize = $size === 'form'
+        ? 'px-3.5 py-2.5 bg-surface-50/70 border-surface-200 text-xs sm:text-sm font-medium'
+        : 'px-3 py-2 bg-white border-surface-300 text-xs font-normal';
     $resolvedSelected = $selected ?? $value ?? ($name ? request($name) : null) ?? '';
 
     // Normalize options into uniform array: [['value' => ..., 'label' => ...]]
@@ -157,7 +161,7 @@
         @keydown.arrow-up.prevent="navigateUp()"
         @keydown.enter.prevent="if(!open) toggleOpen(); else selectActive();"
         tabindex="0"
-        class="w-full px-3 py-2 bg-white border border-surface-300 rounded-lg text-xs font-normal flex items-center justify-between transition cursor-pointer hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 shadow-2xs select-none"
+        class="w-full {{ $triggerSize }} border rounded-lg flex items-center justify-between transition cursor-pointer hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 shadow-2xs select-none"
         :class="selectedValue ? 'text-surface-800' : 'text-surface-500'">
         
         <div class="flex items-center gap-2 min-w-0 pr-1 flex-1">

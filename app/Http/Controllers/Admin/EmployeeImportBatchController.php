@@ -18,8 +18,6 @@ use Illuminate\View\View;
  */
 class EmployeeImportBatchController extends Controller
 {
-    private const ROWS_PER_PAGE = 25;
-
     public function __construct(private EmployeeImportGovernanceService $governance) {}
 
     public function index(Request $request): View|RedirectResponse
@@ -140,11 +138,12 @@ class EmployeeImportBatchController extends Controller
     private function paginate(array $rows, Request $request): LengthAwarePaginator
     {
         $page = max(1, (int) $request->query('page', 1));
+        $perPage = (int) config('hris.pagination.default');
 
         return new LengthAwarePaginator(
-            array_slice($rows, ($page - 1) * self::ROWS_PER_PAGE, self::ROWS_PER_PAGE),
+            array_slice($rows, ($page - 1) * $perPage, $perPage),
             count($rows),
-            self::ROWS_PER_PAGE,
+            $perPage,
             $page,
             ['path' => $request->url()]
         );

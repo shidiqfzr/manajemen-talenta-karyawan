@@ -34,7 +34,14 @@
                         <i :class="copiedNik === '{{ $employee->nik }}' ? 'fas fa-check text-primary-600' : 'far fa-copy'" aria-hidden="true"></i>
                     </button>
                     {{-- Penanda masa pensiun melekat pada orangnya: kode singkat + ikon di samping NIK, hanya pada baris yang menyimpang (DESIGN.md §5.1). Teks lengkap untuk pembaca layar (sr-only) dan tooltip. --}}
-                    @if($employee->isPensionReached())
+                    @if($employee->isSeparated())
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded border border-surface-200 bg-surface-100 px-1.5 py-0.5 text-[10px] font-bold text-surface-700"
+                            title="Karyawan telah pensiun per {{ $employee->tanggal_berhenti?->format('d M Y') }}; tidak lagi menempati jabatan">
+                            <i class="fas fa-user-check text-[10px]" aria-hidden="true"></i>
+                            <span aria-hidden="true">Pensiun</span>
+                            <span class="sr-only">Karyawan sudah pensiun</span>
+                        </span>
+                    @elseif($employee->isPensionReached())
                         <span class="inline-flex shrink-0 items-center gap-1 rounded border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[10px] font-bold text-danger-800"
                             title="Karyawan telah mencapai Batas Usia Pensiun (BUP {{ \App\Services\KepegawaianPolicy::BATAS_USIA_PENSIUN }} Tahun) per {{ $employee->effective_tanggal_pensiun?->format('d M Y') }}">
                             <i class="fas fa-user-clock text-[10px]" aria-hidden="true"></i>
@@ -178,51 +185,14 @@
         @endif
     </td>
 
-    <!-- Aksi (Enterprise Context Menu & Quick Preview) -->
+    {{-- Aksi: memakai x-admin.row-menu agar tampilan, hover, dan navigasi keyboard sama dengan seluruh tabel admin (DESIGN.md §7.5, §14) --}}
     <td class="py-3.5 px-4 whitespace-nowrap text-right" @click.stop>
-        <div class="relative inline-block text-right" x-data="{ open: false }">
-            <button type="button" @click="open = !open"
-                class="p-2 text-surface-500 hover:text-surface-700 hover:bg-surface-100 rounded-lg transition cursor-pointer inline-flex items-center justify-center"
-                title="Menu Aksi">
-                <i class="fas fa-ellipsis-v text-xs" aria-hidden="true"></i>
-            </button>
-
-                <div x-show="open" @click.away="open = false" x-cloak
-                    x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="transform opacity-0 scale-95"
-                    x-transition:enter-end="transform opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-75"
-                    x-transition:leave-start="transform opacity-100 scale-100"
-                    x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute right-0 z-30 mt-1 w-48 origin-top-right rounded-xl bg-white p-1 text-xs shadow-lg ring-1 ring-surface-900/5 focus:outline-none border border-surface-200 text-left">
-                    
-                    <a href="{{ route('admin.employees.show', $employee->nik) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
-                        <i class="fas fa-id-card text-surface-400 w-3.5" aria-hidden="true"></i>
-                        <span>Profil Lengkap</span>
-                    </a>
-
-                    <a href="{{ route('admin.employees.edit', $employee->nik) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
-                        <i class="fas fa-pencil-alt text-surface-400 w-3.5" aria-hidden="true"></i>
-                        <span>Ubah Data Karyawan</span>
-                    </a>
-
-                    <a href="{{ route('admin.mutasi.create', ['nik' => $employee->nik]) }}"
-                        class="flex items-center gap-2 px-3 py-2 text-surface-700 hover:bg-surface-50 rounded-lg transition font-medium">
-                        <i class="fas fa-exchange-alt text-primary-600 w-3.5" aria-hidden="true"></i>
-                        <span>Ajukan Mutasi</span>
-                    </a>
-
-                    <div class="my-1 border-t border-surface-100"></div>
-
-                    <button type="button"
-                        @click="open = false; confirmDelete('{{ $employee->nik }}', '{{ addslashes($employee->nama) }}', '{{ route('admin.employees.destroy', $employee->nik) }}')"
-                        class="flex w-full items-center gap-2 px-3 py-2 text-danger hover:bg-danger-50 rounded-lg transition cursor-pointer font-medium">
-                        <i class="fas fa-trash-alt text-danger w-3.5" aria-hidden="true"></i>
-                        <span>Hapus Karyawan</span>
-                    </button>
-                </div>
-            </div>
-        </td>
+        <x-admin.row-menu :label="$employee->nama">
+            <x-admin.master.menu-item icon="fas fa-id-card" :href="route('admin.employees.show', $employee->nik)">Profil Lengkap</x-admin.master.menu-item>
+            <x-admin.master.menu-item icon="fas fa-pencil-alt" :href="route('admin.employees.edit', $employee->nik)">Ubah Data Karyawan</x-admin.master.menu-item>
+            <x-admin.master.menu-item icon="fas fa-exchange-alt" :href="route('admin.mutasi.create', ['nik' => $employee->nik])">Ajukan Mutasi</x-admin.master.menu-item>
+            <x-admin.master.menu-item icon="fas fa-trash-alt" tone="danger" separated
+                @click="confirmDelete('{{ $employee->nik }}', '{{ addslashes($employee->nama) }}', '{{ route('admin.employees.destroy', $employee->nik) }}')">Hapus Karyawan</x-admin.master.menu-item>
+        </x-admin.row-menu>
+    </td>
 </tr>

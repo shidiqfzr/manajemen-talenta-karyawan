@@ -90,17 +90,6 @@ class TrainingParticipantTable extends Component
         return 'Daftar Peserta';
     }
 
-    /** @return array<int, int> */
-    protected function perPageOptions(): array
-    {
-        return [10, 20, 50, 100];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 20;
-    }
-
     protected function exportName(): ?string
     {
         return null;

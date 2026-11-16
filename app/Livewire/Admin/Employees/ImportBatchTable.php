@@ -107,17 +107,6 @@ class ImportBatchTable extends Component
         return 'Riwayat & Persetujuan Impor';
     }
 
-    /** @return array<int, int> */
-    protected function perPageOptions(): array
-    {
-        return [10, 15, 25, 50, 100];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 15;
-    }
-
     public function render(): View
     {
         return view('livewire.admin.employees.import-batch-table');

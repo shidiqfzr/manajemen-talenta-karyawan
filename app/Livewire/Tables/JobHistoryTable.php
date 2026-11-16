@@ -62,16 +62,6 @@ class JobHistoryTable extends Component
         return 'Riwayat Jabatan';
     }
 
-    protected function perPageOptions(): array
-    {
-        return [5, 10, 25, 50];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 5;
-    }
-
     protected function exportName(): ?string
     {
         return null;

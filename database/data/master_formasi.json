@@ -7,25 +7,60 @@
         "urutan": 1,
         "positions": [
             {
-                "nama": "Pengawas Wilayah Audit Regional",
-                "bidang": "UMU",
-                "level": "Karpim",
-                "rm_level": "RM-1",
-                "kuota": 1
-            },
-            {
-                "nama": "Ketua Tim Audit Regional",
+                "nama": "Ketua Tim Audit VA",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-2",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Auditor Regional",
+                "nama": "Ketua Tim Audit VB",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Ketua Tim Audit VC",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Ketua Tim Audit VD",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Auditor VA",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Auditor VB",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 3
+            },
+            {
+                "nama": "Asisten Auditor VC",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten Auditor VD",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
             }
         ]
     },

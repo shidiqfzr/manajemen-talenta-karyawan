@@ -19,9 +19,9 @@ class FormasiCatalogTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame([
-            'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 6],
-            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 15],
-            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 63],
+            'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
+            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 18],
+            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 68],
         ], app(FormasiCatalog::class)->standarFormasi());
     }
 

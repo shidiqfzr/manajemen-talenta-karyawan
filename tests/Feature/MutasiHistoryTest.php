@@ -597,7 +597,7 @@ class MutasiHistoryTest extends TestCase
             ->assertSet('statusFilter', '')
             ->assertSet('unitFilter', '')
             ->assertSet('mutasiFilter', '')
-            ->assertSet('perPage', 15)
+            ->assertSet('perPage', 25)
             ->assertSet('sortField', 'tmt_awal')
             ->assertSet('sortDirection', 'desc');
     }

@@ -78,8 +78,9 @@ class JobVacancyService
             $row->last_occupant_name = $last->nama ?? null;
             $row->last_occupant_photo = $last->foto ?? null;
             $row->vacant_since_formatted ??= '—';
+            // Locale dipaksa 'id': teks relatif dan nama bulan tidak boleh mengikuti APP_LOCALE (bawaan 'en').
             $row->duration_human = $since
-                ? $since->diffForHumans(now(), ['parts' => 2, 'syntax' => Carbon::DIFF_RELATIVE_TO_NOW])
+                ? $since->copy()->locale('id')->diffForHumans(now(), ['parts' => 2, 'syntax' => Carbon::DIFF_RELATIVE_TO_NOW])
                 : 'Belum pernah terisi';
 
             return $row;
@@ -384,6 +385,7 @@ class JobVacancyService
 
         // Holders per (unit, jabatan): definitive vs acting (Pj/Plt).
         $holders = Employee::query()
+            ->aktif()
             ->selectRaw('unit_kerja, jabatan, status_penugasan, count(*) as total')
             ->groupBy('unit_kerja', 'jabatan', 'status_penugasan')
             ->get()
@@ -397,6 +399,7 @@ class JobVacancyService
             ->whereNotNull('tmt_akhir')
             ->whereIn('jabatan', $seats->pluck('jabatan')->unique()->all())
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('employees')
+                ->whereNull('employees.tanggal_berhenti')
                 ->whereColumn('employees.nik', 'job_histories.employee_nik')
                 ->whereColumn('employees.jabatan', 'job_histories.jabatan')
                 ->whereColumn('employees.unit_kerja', 'job_histories.unit_kerja'))
@@ -442,7 +445,7 @@ class JobVacancyService
             $seat->status = self::classifySeat($kuota, $definitive, $acting);
             $seat->status_label = self::SEAT_STATUS_LABELS[$seat->status];
             $seat->vacant_since = $vacantSince?->toDateString();
-            $seat->vacant_since_formatted = $vacantSince?->translatedFormat('d M Y');
+            $seat->vacant_since_formatted = $vacantSince?->copy()->locale('id')->translatedFormat('d M Y');
             $seat->days_vacant = $daysVacant;
             $seat->severity = match (true) {
                 $seat->vacant_slots <= 0 => 'none',
@@ -453,7 +456,7 @@ class JobVacancyService
             };
             $seat->is_reserved = self::isReserved($bookings->count(), $seat->free_slots);
             $seat->reserved_occupant_name = $booking?->employee?->nama;
-            $seat->reserved_tmt = $booking?->tmt_awal ? Carbon::parse($booking->tmt_awal)->translatedFormat('d M Y') : null;
+            $seat->reserved_tmt = $booking?->tmt_awal ? Carbon::parse($booking->tmt_awal)->locale('id')->translatedFormat('d M Y') : null;
 
             return $seat;
         });

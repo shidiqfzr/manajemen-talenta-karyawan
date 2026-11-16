@@ -147,10 +147,7 @@
                                                         Kata kunci <span class="font-mono font-bold text-primary-800" x-text="'&ldquo;' + searchColumn + '&rdquo;'"></span> tidak sesuai dengan {{ $guideTotal }} kolom kamus resmi.
                                                     </p>
                                                 </div>
-                                                <button type="button" @click="searchColumn = ''; $refs.searchColInput?.focus()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold transition cursor-pointer">
-                                                    <i class="fas fa-rotate-left text-[10px]" aria-hidden="true"></i>
-                                                    <span>Reset Pencarian</span>
-                                                </button>
+                                                <x-admin.button variant="soft" size="sm" icon="fas fa-rotate-left" @click="searchColumn = ''; $refs.searchColInput?.focus()">Reset Pencarian</x-admin.button>
                                             </div>
                                         </td>
                                     </tr>

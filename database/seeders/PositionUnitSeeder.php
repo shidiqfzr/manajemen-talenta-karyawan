@@ -112,7 +112,7 @@ class PositionUnitSeeder extends Seeder
 
         // Explicitly seed Generic Pool Positions (Advisor & Diperbantukan) since they are missing from master JSON
         $this->command->info('Memastikan jabatan Pool (Advisor & Diperbantukan) tersedia...');
-        $rms = ['RM-1', 'RM-2', 'RM-3', 'RM-4'];
+        $rms = ['RM-1', 'RM-2', 'RM-3'];
         foreach ($rms as $rm) {
             Position::firstOrCreate(
                 ['nama' => "Advisor {$rm}"],

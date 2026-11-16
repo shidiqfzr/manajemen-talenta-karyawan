@@ -9,7 +9,7 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        $employees = Employee::all();
+        $employees = Employee::aktif()->get();
 
         return view('user.employees.index', compact('employees'));
     }

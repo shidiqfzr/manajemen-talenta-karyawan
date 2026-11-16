@@ -7,9 +7,12 @@ use App\Exceptions\MutasiRuleViolationException;
 use App\Livewire\Forms\MutasiForm;
 use App\Models\JobHistory;
 use App\Services\Data\MutasiRequest;
+use App\Services\Mutasi\DispensasiBasis;
 use App\Services\Mutasi\TalentProfileBuilder;
 use App\Services\MutasiService;
+use App\Support\HrisPermission;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -49,6 +52,16 @@ class MutasiProcess extends Component
     public ?array $selectedTalentData = null;
 
     public bool $showTalentDrawer = false;
+
+    /**
+     * A single mutation takes effect at once and shows personal data, so it needs the permission to issue an SK
+     * (mutasi.approve), not just to prepare one. Checked on every request, because route middleware is not
+     * re-applied to Livewire update requests.
+     */
+    public function boot(): void
+    {
+        abort_unless(Gate::allows(HrisPermission::MUTASI_APPROVE), 403, 'Unauthorized.');
+    }
 
     public function mount(?string $jabatan = null, ?string $unit = null, ?string $nik = null): void
     {
@@ -174,11 +187,12 @@ class MutasiProcess extends Component
         $this->employeeDetails = $this->form->employeeNik ? $this->resolveEmployee($this->form->employeeNik) : null;
         $this->runAnalysis();
         $this->runTenureAnalysis();
+        $this->runPromotionAnalysis();
 
         try {
             return $this->form->validateForm(
-                tenureAnalysis: $this->tenureAnalysis,
                 promotionAnalysis: $this->promotionAnalysis,
+                tenureAnalysis: $this->tenureAnalysis,
                 targetAnalysis: $this->targetAnalysis,
                 employeeDetails: $this->employeeDetails,
                 isSwapAllowed: $this->isSwapAllowed,
@@ -214,9 +228,39 @@ class MutasiProcess extends Component
         };
     }
 
+    /** Promotion qualification applies and is unmet (requires Direksi dispensation, like tenure). */
+    private function promotionIsUnmet(): bool
+    {
+        return ! empty($this->promotionAnalysis)
+            && ($this->promotionAnalysis['is_applicable'] ?? false)
+            && ! ($this->promotionAnalysis['is_eligible'] ?? true);
+    }
+
+    /** Unit tenure applies and is below the minimum (requires Direksi dispensation). */
+    private function tenureIsUnmet(): bool
+    {
+        return ! empty($this->tenureAnalysis)
+            && ($this->tenureAnalysis['is_applicable'] ?? true)
+            && ! ($this->tenureAnalysis['is_compliant'] ?? true);
+    }
+
+    /** True when at least one regulation exception needs Direksi approval. */
+    #[Computed]
+    public function needsDispensasi(): bool
+    {
+        return $this->tenureIsUnmet() || $this->promotionIsUnmet();
+    }
+
+    /** The Direksi approval evidence (document reference + approval date) is complete. */
+    #[Computed]
+    public function dispensasiApproved(): bool
+    {
+        return DispensasiBasis::isComplete($this->form->alasanDispensasiDireksi, $this->form->tanggalDispensasiDireksi);
+    }
+
     /**
-     * Everything still outstanding before this placement can be processed, blocker first.
-     * Applicability mirrors x-admin.mutasi.compliance-guard so the header summary and the cards agree.
+     * Everything that still stops this mutation, most important first (DESIGN.md §7.2: show the count before the detail).
+     * The formasi obstacle comes first because the dispensation cannot be used until it is resolved.
      *
      * @return list<string>
      */
@@ -225,16 +269,14 @@ class MutasiProcess extends Component
     {
         $issues = [];
 
-        if ($reason = $this->blockingReason()) {
-            $issues[] = $reason;
+        if ($this->resolvableByChain) {
+            $issues[] = 'Pejabat petahana perlu dipindahkan lebih dulu.';
+        } elseif ($this->blockingReason) {
+            $issues[] = $this->blockingReason;
         }
 
-        if ($this->tenureAnalysis && ! ($this->tenureAnalysis['is_compliant'] ?? true) && ($this->tenureAnalysis['is_applicable'] ?? true)) {
-            $issues[] = 'Masa dinas unit kerja belum memenuhi, perlu dispensasi.';
-        }
-
-        if ($this->promotionAnalysis && ! ($this->promotionAnalysis['is_eligible'] ?? true) && ($this->promotionAnalysis['is_applicable'] ?? false)) {
-            $issues[] = 'Kualifikasi promosi belum memenuhi, perlu dispensasi.';
+        if ($this->needsDispensasi && ! $this->dispensasiApproved) {
+            $issues[] = 'Dasar persetujuan Direksi belum dilengkapi.';
         }
 
         return $issues;
@@ -305,15 +347,10 @@ class MutasiProcess extends Component
         }
 
         // Consolidate dispensation data
-        $isDispensasi = $this->form->dispensasiTenure || $this->form->dispensasiPromosi;
-        $alasanList = [];
-        if ($this->form->dispensasiTenure && $this->form->alasanDispensasiTenure) {
-            $alasanList[] = "Masa Dinas: {$this->form->alasanDispensasiTenure}";
-        }
-        if ($this->form->dispensasiPromosi && $this->form->alasanDispensasiPromosi) {
-            $alasanList[] = "Promosi: {$this->form->alasanDispensasiPromosi}";
-        }
-        $alasanDispensasi = ! empty($alasanList) ? implode(' | ', $alasanList) : null;
+        $isDispensasi = $this->form->dispensasiTenure;
+        $alasanDispensasi = $isDispensasi && $this->form->alasanDispensasiTenure
+            ? "Masa Dinas: {$this->form->alasanDispensasiTenure}"
+            : null;
 
         $request = new MutasiRequest(
             employeeNik: $this->form->employeeNik,
@@ -333,6 +370,8 @@ class MutasiProcess extends Component
             alasanDispensasi: $alasanDispensasi,
             newGolongan: $this->form->newGolongan,
             newJobGrade: $this->form->newJobGrade,
+            dispensasiPromosi: $this->form->dispensasiPromosi && $this->promotionIsUnmet(),
+            alasanDispensasiPromosi: $this->form->alasanDispensasiPromosi,
         );
 
         try {
@@ -483,7 +522,9 @@ class MutasiProcess extends Component
                 'tmt_awal' => $analysis['reserved_job']?->tmt_awal ? Carbon::parse($analysis['reserved_job']->tmt_awal)->format('d/m/Y') : null,
                 'sk_nomor' => $analysis['reserved_job']?->nomor_sk,
             ] : null,
+            // Full talent profile so the incumbent renders on the same card as the selected employee
             'occupant' => $occupant ? [
+                ...($service->getTalentProfile($occupant->nik) ?? []),
                 'nik' => $occupant->nik,
                 'nama' => $occupant->nama,
                 'jabatan' => $occupant->jabatan,

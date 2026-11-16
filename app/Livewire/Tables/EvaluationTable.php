@@ -63,16 +63,6 @@ class EvaluationTable extends Component
         return 'Riwayat Evaluasi';
     }
 
-    protected function perPageOptions(): array
-    {
-        return [5, 10, 25, 50];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 5;
-    }
-
     protected function exportName(): ?string
     {
         return null;

@@ -5,6 +5,7 @@
     'prefill' => []
 ])
 {{-- Jalur rekrutmen mengikuti daftar baku Employee::ENTRY_CHANNELS (DOMAIN.md Bab 2.1): CKP, Talent Scouting, RBB, Reguler --}}
+{{-- Aturan pensiun & label bidang bersumber dari KepegawaianPolicy / Position (DOMAIN.md Bab 5.1): jangan di-hardcode di view. --}}
 @php
     $genders =['L' => 'Laki-laki', 'P' => 'Perempuan'];
     $religions = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
@@ -12,6 +13,9 @@
     $educationLevels = ['SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'];
     $levels = ['Karpim' => 'Karyawan Pimpinan', 'Karpel' => 'Karyawan Pelaksana'];
     $entryChannels = \App\Models\Employee::ENTRY_CHANNELS;
+    $bupTahun = \App\Services\KepegawaianPolicy::BATAS_USIA_PENSIUN;
+    $mbtBulan = \App\Services\KepegawaianPolicy::MBT_BULAN_SEBELUM_PENSIUN;
+    $bidangLabels = \App\Models\Position::BIDANG_LIST;
     $activeUnits = \App\Models\Unit::where('is_active', true)->orderBy('urutan')->orderBy('nama')->get();
     if ($activeUnits->isNotEmpty()) {
         $groupedUnits = $activeUnits->groupBy('wilayah')
@@ -53,7 +57,10 @@
         selectedRmLevel: '{{ $defaultRmLevel }}',
         statusKaryawan: '{{ $defaultStatusKaryawan }}',
         isEdit: {{ $employee ? 'true' : 'false' }},
-        nikCheckUrl: '{{ route('admin.employees.checkNik') }}'
+        nikCheckUrl: '{{ route('admin.employees.checkNik') }}',
+        bupTahun: @js($bupTahun),
+        mbtBulan: @js($mbtBulan),
+        bidangLabels: @js($bidangLabels)
     })"
     @unit-selected.window="unitKerja = $event.detail.unit">
 
@@ -266,18 +273,18 @@
                         :value="old('tanggal_lahir')"
                     >
                         <x-slot name="headerRight">
-                            <span class="text-[10px] text-surface-500">Usia Pensiun 56 thn</span>
+                            <span class="text-[10px] text-surface-500">Usia Pensiun {{ $bupTahun }} thn</span>
                         </x-slot>
                     </x-admin.form.input>
                     
                     <!-- Contextual Live Pill Badges for MBT & BUP -->
                     <div x-show="tanggalLahir" x-cloak class="mt-2 flex flex-wrap items-center gap-1.5">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning-50 text-warning-800 border border-warning-200 text-[10px] font-medium">
-                            <abbr title="Masa Bebas Tugas: 6 bulan sebelum pensiun" class="font-bold no-underline cursor-help">MBT (H-6 bln):</abbr>
+                            <abbr title="Masa Bebas Tugas: {{ $mbtBulan }} bulan sebelum pensiun" class="font-bold no-underline cursor-help">MBT (H-{{ $mbtBulan }} bln):</abbr>
                             <span class="font-mono" x-text="calculateMbt()"></span>
                         </span>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-50 text-primary-800 border border-primary-200 text-[10px] font-medium">
-                            <abbr title="Batas Usia Pensiun: 56 tahun" class="font-bold no-underline cursor-help">BUP (56):</abbr>
+                            <abbr title="Batas Usia Pensiun: {{ $bupTahun }} tahun" class="font-bold no-underline cursor-help">BUP ({{ $bupTahun }}):</abbr>
                             <span class="font-mono" x-text="calculatePensiun()"></span>
                         </span>
                     </div>
@@ -789,13 +796,7 @@
                 },
 
                 get bidangLabel() {
-                    const map = {
-                        'KEU': 'Keuangan & Akuntansi',
-                        'TAN': 'Tanaman & Agronomi',
-                        'TEK': 'Teknik & Pengolahan',
-                        'UMU': 'Umum & Tata Kelola'
-                    };
-                    return map[this.serverBidang] || this.serverBidang;
+                    return this.bidangLabels[this.serverBidang] || this.serverBidang;
                 },
 
                 get bidangColor() {
@@ -908,7 +909,7 @@
                     if (!this.tanggalLahir) return null;
                     let parts = this.tanggalLahir.split('-');
                     if (parts.length !== 3) return null;
-                    let year = parseInt(parts[0]) + 56;
+                    let year = parseInt(parts[0]) + this.bupTahun;
                     let month = parts[1];
                     return `01-${month}-${year}`;
                 },
@@ -917,9 +918,9 @@
                     if (!this.tanggalLahir) return null;
                     let parts = this.tanggalLahir.split('-');
                     if (parts.length !== 3) return null;
-                    // Pensiun = awal bulan lahir + 56 tahun; MBT = 6 bulan sebelumnya (KepegawaianPolicy::MBT_BULAN_SEBELUM_PENSIUN).
-                    let year = parseInt(parts[0]) + 56;
-                    let month = parseInt(parts[1]) - 6;
+                    // Pensiun = awal bulan lahir + BUP; MBT = MBT_BULAN_SEBELUM_PENSIUN bulan sebelumnya (nilai dari KepegawaianPolicy).
+                    let year = parseInt(parts[0]) + this.bupTahun;
+                    let month = parseInt(parts[1]) - this.mbtBulan;
                     if (month < 1) { month += 12; year -= 1; }
                     return `01-${String(month).padStart(2, '0')}-${year}`;
                 },

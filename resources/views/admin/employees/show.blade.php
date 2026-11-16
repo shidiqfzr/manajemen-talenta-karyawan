@@ -30,7 +30,7 @@
         <nav class="flex items-center gap-2 text-xs font-medium text-surface-500" aria-label="Breadcrumb">
             <a href="{{ route('admin.employees.index') }}" class="hover:text-primary-700 transition">Core HR</a>
             <i class="fas fa-chevron-right text-[10px] text-surface-400" aria-hidden="true"></i>
-            <a href="{{ route('admin.employees.index') }}" class="hover:text-primary-700 transition">Manajemen Karyawan</a>
+            <a href="{{ route('admin.employees.index') }}" class="hover:text-primary-700 transition">Karyawan</a>
             <i class="fas fa-chevron-right text-[10px] text-surface-400" aria-hidden="true"></i>
             <span class="text-surface-900 font-semibold truncate max-w-xs">{{ $employee->nama }}</span>
         </nav>
@@ -132,13 +132,68 @@
                         <span>Edit Profil</span>
                     </a>
 
-                    @if(Route::has('admin.mutasi.create'))
+                    @if($employee->isSeparated())
+                        <span class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200 bg-surface-100 text-surface-700 text-xs sm:text-sm font-semibold">
+                            <i class="fas fa-user-check text-xs" aria-hidden="true"></i>
+                            <span>{{ $employee->alasan_berhenti }} per {{ $employee->tanggal_berhenti->format('d M Y') }}</span>
+                        </span>
+                    @elseif(Route::has('admin.mutasi.create'))
                         <a href="{{ route('admin.mutasi.create', ['employee_nik' => $employee->nik]) }}"
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm hover:shadow">
                             <i class="fas fa-arrow-right-arrow-left text-xs" aria-hidden="true"></i>
                             <span>Ajukan Mutasi</span>
                         </a>
                     @endif
+
+                    @can('separate-employee')
+                        @if(! $employee->isSeparated())
+                            {{-- Pemberhentian non-otomatis (pensiun dini, mengundurkan diri, dll.): tindakan destruktif, cangkang x-admin.modal, dampak ditampilkan sebelum eksekusi (DESIGN.md §7.2, §7.6). --}}
+                            <div x-data="{
+                                    open: {{ $errors->hasAny(['alasan', 'tanggal_berhenti', 'nomor_sk', 'tanggal_sk']) ? 'true' : 'false' }},
+                                    alasan: @js(old('alasan', 'Pensiun')),
+                                    tanggal: @js(old('tanggal_berhenti', $separationImpact['pensiun'])),
+                                    pensiun: @js($separationImpact['pensiun']),
+                                    syncDate() { if (this.alasan === 'Pensiun' && this.pensiun) this.tanggal = this.pensiun; }
+                                }">
+                                <x-admin.button variant="secondary" icon="fas fa-user-slash" class="border-danger-200 text-danger-700 hover:bg-danger-50" @click="open = true">Berhentikan</x-admin.button>
+
+                                <x-admin.modal tone="danger" icon="fas fa-user-slash" form :action="route('admin.employees.separate', $employee)"
+                                    :title="'Berhentikan '.$employee->nama.'?'"
+                                    description="Karyawan dilepas dari jabatan dan kursi formasinya menjadi kosong. Tindakan ini tercatat pada Riwayat Perubahan.">
+                                    {{-- Dampak sebelum eksekusi --}}
+                                    <div class="rounded-xl border border-warning-200 bg-warning-50 p-3 text-xs text-warning-800 space-y-1" role="note">
+                                        <p class="font-semibold">Dampak pemberhentian</p>
+                                        <ul class="list-disc pl-4 space-y-0.5">
+                                            <li>Kursi {{ $employee->jabatan }} di {{ $employee->unit_kerja }} menjadi kosong.</li>
+                                            <li>{{ $separationImpact['active_jobs'] }} riwayat jabatan aktif ditutup pada tanggal berhenti.</li>
+                                            <li>{{ $separationImpact['scheduled'] }} mutasi terjadwal dibatalkan.</li>
+                                        </ul>
+                                    </div>
+
+                                    <x-admin.form.select name="alasan" label="Alasan Pemberhentian" :options="\App\Models\Employee::ALASAN_BERHENTI" :selected="old('alasan', 'Pensiun')" :placeholder="null" required
+                                        x-model="alasan" @change="syncDate()" />
+                                    <x-admin.form.input name="tanggal_berhenti" type="date" label="Tanggal Berhenti" :value="old('tanggal_berhenti', $separationImpact['pensiun'])" required
+                                        x-model="tanggal" hint="Untuk alasan Pensiun, tanggal mengikuti tanggal pensiun efektif karyawan." />
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <x-admin.form.input name="nomor_sk" label="Nomor SK (opsional)" maxlength="100" />
+                                        <x-admin.form.input name="tanggal_sk" type="date" label="Tanggal SK" />
+                                    </div>
+
+                                    <x-slot:footer>
+                                        <x-admin.button variant="danger" type="submit" icon="fas fa-user-slash" once>Ya, Berhentikan</x-admin.button>
+                                    </x-slot:footer>
+                                </x-admin.modal>
+                            </div>
+                        @elseif(! $employee->nomor_sk_berhenti)
+                            {{-- SK boleh menyusul setelah pemberhentian otomatis, tetapi tidak boleh terlewat. --}}
+                            <form method="POST" action="{{ route('admin.employees.separation-sk', $employee) }}" class="flex items-end gap-2">
+                                @csrf
+                                <x-admin.form.input name="nomor_sk" label="Nomor SK Pemberhentian" required maxlength="100" />
+                                <x-admin.form.input name="tanggal_sk" type="date" label="Tanggal SK" required />
+                                <x-admin.button type="submit" variant="primary" size="sm" once>Catat SK</x-admin.button>
+                            </form>
+                        @endif
+                    @endcan
                 </div>
             </div>
         </div>

@@ -9,7 +9,7 @@
         icon="fas fa-user-pen"
         :breadcrumbs="[
             ['label' => 'Core HR'],
-            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
+            ['label' => 'Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Edit Karyawan']
         ]"
         back-url="{{ route('admin.employees.index') }}"

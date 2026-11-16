@@ -35,8 +35,6 @@ class FormasiEditor extends Component
     use WithPagination;
 
     /** Pilihan jumlah baris per halaman pada kedua tabel. */
-    public const PER_PAGE_OPTIONS = [10, 25, 50, 100];
-
     /** Label status formasi jabatan; dipakai filter, tabel, dan ekspor agar istilahnya sama. */
     public const SEAT_STATE_LABELS = JobVacancyService::SEAT_STATUS_LABELS;
 
@@ -158,8 +156,8 @@ class FormasiEditor extends Component
 
     public function updatedPerPage(): void
     {
-        if (! in_array($this->perPage, self::PER_PAGE_OPTIONS, true)) {
-            $this->perPage = 25;
+        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
+            $this->perPage = $this->defaultPerPage();
         }
         $this->resetPage();
     }
@@ -524,7 +522,7 @@ class FormasiEditor extends Component
         }
 
         // Pemegang per jabatan, dipisah pejabat definitif dan Pj/Plt (hanya definitif yang mengisi kuota).
-        $holders = Employee::where('unit_kerja', $unit->nama)
+        $holders = Employee::aktif()->where('unit_kerja', $unit->nama)
             ->selectRaw('jabatan, status_penugasan, count(*) as total')
             ->groupBy('jabatan', 'status_penugasan')
             ->get()
@@ -735,6 +733,7 @@ class FormasiEditor extends Component
     public function unregisteredEmployeeUnits(): Collection
     {
         return Employee::query()
+            ->aktif()
             ->whereNotNull('unit_kerja')
             ->whereNotIn('unit_kerja', Unit::query()->select('nama'))
             ->selectRaw('unit_kerja, count(*) as total')
@@ -794,7 +793,7 @@ class FormasiEditor extends Component
 
         $mpp = app(ManPowerPlanningService::class);
 
-        return Employee::where('unit_kerja', $this->unit->nama)
+        return Employee::aktif()->where('unit_kerja', $this->unit->nama)
             ->where('jabatan', $seat->jabatan)
             ->orderBy('nama')
             ->limit(self::OCCUPANT_LIMIT)
@@ -824,7 +823,7 @@ class FormasiEditor extends Component
     {
         return view('livewire.admin.master.formasi-editor', [
             'bidangList' => Position::BIDANG_LIST,
-            'perPageOptions' => self::PER_PAGE_OPTIONS,
+            'perPageOptions' => $this->perPageOptions(),
             'seatFilters' => $this->seatFilters(),
             'seatFilterValues' => $this->seatFilterValues(),
             'unitFilters' => $this->unitFilters(),
@@ -854,7 +853,7 @@ class FormasiEditor extends Component
      */
     private function paginate(Collection $rows): LengthAwarePaginator
     {
-        $perPage = in_array($this->perPage, self::PER_PAGE_OPTIONS, true) ? $this->perPage : 25;
+        $perPage = in_array($this->perPage, $this->perPageOptions(), true) ? $this->perPage : $this->defaultPerPage();
         $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $perPage)));
         if ($page !== $this->getPage()) {
             $this->setPage($page);
@@ -879,5 +878,16 @@ class FormasiEditor extends Component
     private function authorizeAdmin(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /** @return array<int, int> Opsi baris per halaman; satu standar untuk seluruh tabel (config hris.pagination). */
+    protected function perPageOptions(): array
+    {
+        return array_map('intval', config('hris.pagination.options'));
+    }
+
+    protected function defaultPerPage(): int
+    {
+        return (int) config('hris.pagination.default');
     }
 }

@@ -93,15 +93,14 @@ class TrainingTableTest extends TestCase
         $this->assertSame(7, $component->instance()->rows->total());
     }
 
-    public function test_default_sort_and_five_per_page(): void
+    public function test_default_sort_and_standard_page_size(): void
     {
         $component = $this->table()
             ->assertSet('sortField', 'tanggal_mulai')
             ->assertSet('sortDirection', 'desc')
-            ->assertSet('perPage', 5)
+            ->assertSet('perPage', 25)
             ->assertSeeInOrder(['Pelatihan 07', 'Pelatihan 06', 'Pelatihan 05', 'Pelatihan 04', 'Pelatihan 03'])
-            ->assertDontSee('Pelatihan 02')
-            ->assertSeeHtml('aria-label="Halaman pelatihan"')
+            ->assertSeeHtml('id="per-page-pelatihan_page"')
             // Sortable headers: Judul Pelatihan, Tanggal, Penyelenggara only.
             ->assertSeeHtml("sortBy('judul')")
             ->assertSeeHtml("sortBy('tanggal_mulai')")
@@ -113,8 +112,8 @@ class TrainingTableTest extends TestCase
             ->assertSeeHtml('event.stopImmediatePropagation()')
             ->assertDontSeeHtml('return confirm(');
 
-        $this->assertCount(5, $component->instance()->rows->items());
-        $this->assertSame([5, 10, 25, 50], invade($component->instance())->perPageOptions());
+        $this->assertCount(7, $component->instance()->rows->items());
+        $this->assertSame([10, 25, 50, 100], invade($component->instance())->perPageOptions());
     }
 
     public function test_search_matches_declared_columns(): void
@@ -152,11 +151,20 @@ class TrainingTableTest extends TestCase
 
     public function test_page_name_is_isolated(): void
     {
+        // 25 newer trainings fill page 1, so the seven seeded ones land on page 2.
+        for ($i = 1; $i <= 25; $i++) {
+            $this->makeTraining([
+                'judul' => sprintf('Tambahan %02d', $i),
+                'tanggal_mulai' => sprintf('2025-01-%02d', $i),
+                'tanggal_akhir' => sprintf('2025-01-%02d', $i),
+            ])->employees()->attach($this->employee->nik);
+        }
+
         $component = $this->table()
             ->call('gotoPage', 2, 'pelatihan_page')
             ->assertSet('paginators.pelatihan_page', 2)
             ->assertSee('Pelatihan 02')
-            ->assertDontSee('Pelatihan 07')
+            ->assertDontSee('Tambahan 25')
             ->assertSeeHtml("gotoPage(1, 'pelatihan_page')")
             ->assertSeeHtml('id="per-page-pelatihan_page"');
 

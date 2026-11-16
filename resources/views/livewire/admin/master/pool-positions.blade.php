@@ -33,6 +33,22 @@
             search-placeholder="Cari jabatan atau unit kerja..." />
         <x-admin.table.header :title="$isJabatan ? 'Daftar Jabatan Penampungan' : 'Bezetting per Unit'" :paginator="$rows" :noun="$isJabatan ? 'Jabatan' : 'Baris'">
             <x-slot:actions>
+                {{-- Aturan jabatan penampungan: popover info agar tidak memenuhi header tabel (DESIGN.md §7.5) --}}
+                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.away="open = false">
+                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="pool-rules" aria-label="Aturan jabatan penampungan"
+                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-surface-500 hover:text-primary-700 hover:bg-surface-100 transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        <i class="fas fa-circle-info text-sm" aria-hidden="true"></i>
+                    </button>
+                    <div id="pool-rules" x-show="open" x-cloak x-transition.opacity
+                        class="absolute right-0 top-full mt-2 z-30 w-80 max-w-[calc(100vw-2rem)] p-4 bg-white border border-surface-200 rounded-xl shadow-lg text-xs text-surface-600 text-left">
+                        <p class="font-bold text-surface-900 mb-2">Aturan Jabatan Penampungan</p>
+                        <ul class="space-y-1.5 list-disc pl-4 marker:text-primary-600">
+                            <li>Opsional pada sebuah unit dan bukan bagian dari Master Formasi.</li>
+                            <li>Tanpa kuota: tidak mengisi atau mengosongkan formasi mana pun.</li>
+                            <li>Buka jabatan pada unit agar karyawan dapat ditempatkan padanya.</li>
+                        </ul>
+                    </div>
+                </div>
                 <div role="radiogroup" aria-label="Tampilan jabatan penampungan" x-data="{ move(step) { const radios = [...$el.querySelectorAll('[role=radio]')]; const index = radios.indexOf(document.activeElement); if (index < 0) { return; } const target = radios[(index + step + radios.length) % radios.length]; target.focus(); target.click(); } }"
                     @keydown.arrow-right.prevent="move(1)" @keydown.arrow-down.prevent="move(1)"
                     @keydown.arrow-left.prevent="move(-1)" @keydown.arrow-up.prevent="move(-1)"
@@ -45,10 +61,6 @@
                 <x-admin.button size="sm" icon="fas fa-plus" wire:click="openCreate">Tambah Jabatan</x-admin.button>
             </x-slot:actions>
         </x-admin.table.header>
-
-        <p class="px-5 py-2.5 bg-surface-50 border-b border-surface-200 text-[11px] text-surface-500">
-            Jabatan penampungan bersifat opsional pada sebuah unit dan bukan bagian dari Master Formasi: tanpa kuota, tidak mengisi atau mengosongkan formasi mana pun. Buka sebuah jabatan pada unit agar karyawan dapat ditempatkan padanya.
-        </p>
 
         <div class="overflow-x-auto">
             @if ($isJabatan)
@@ -77,13 +89,13 @@
                                 <td class="py-3.5 px-5 tabular-nums">{{ $row->units }} unit</td>
                                 <td class="py-3.5 px-5 tabular-nums">{{ $fmt($row->holders) }}</td>
                                 <td class="py-3.5 px-5 text-right whitespace-nowrap">
-                                    <div class="inline-flex items-center gap-2">
+                                    <x-admin.row-menu :label="$row->nama">
                                         @if ($row->is_active)
-                                            <x-admin.button size="sm" variant="secondary" icon="fas fa-door-open" wire:click="startOpen({{ $row->id }})">Buka di Unit</x-admin.button>
+                                            <x-admin.master.menu-item icon="fas fa-door-open" wire:click="startOpen({{ $row->id }})">Buka di Unit</x-admin.master.menu-item>
                                         @endif
-                                        <x-admin.button size="sm" variant="secondary" icon="fas fa-pen" wire:click="startRename({{ $row->id }})" aria-label="Ubah nama {{ $row->nama }}">Ubah Nama</x-admin.button>
-                                        <x-admin.button size="sm" variant="secondary" icon="fas fa-trash-can" wire:click="startDelete({{ $row->id }})" aria-label="Hapus {{ $row->nama }}">Hapus</x-admin.button>
-                                    </div>
+                                        <x-admin.master.menu-item icon="fas fa-pencil-alt" wire:click="startRename({{ $row->id }})">Ubah Nama</x-admin.master.menu-item>
+                                        <x-admin.master.menu-item icon="fas fa-trash-can" tone="danger" separated wire:click="startDelete({{ $row->id }})">Hapus Jabatan</x-admin.master.menu-item>
+                                    </x-admin.row-menu>
                                 </td>
                             </tr>
                         @empty
@@ -123,9 +135,13 @@
                                 </td>
                                 <td class="py-3.5 px-5 text-right whitespace-nowrap">
                                     @if (! $row->opened && $row->unit_id)
-                                        <x-admin.button size="sm" variant="secondary" icon="fas fa-door-open" wire:click="startOpen({{ $row->position_id }}, {{ $row->unit_id }})">Buka</x-admin.button>
+                                        <x-admin.row-menu :label="$row->nama.' di '.$row->unit_nama">
+                                            <x-admin.master.menu-item icon="fas fa-door-open" wire:click="startOpen({{ $row->position_id }}, {{ $row->unit_id }})">Buka di Unit</x-admin.master.menu-item>
+                                        </x-admin.row-menu>
                                     @elseif ($row->opened && $row->holders === 0)
-                                        <x-admin.button size="sm" variant="secondary" icon="fas fa-door-closed" wire:click="startClose({{ $row->position_id }}, {{ $row->unit_id }})">Tutup</x-admin.button>
+                                        <x-admin.row-menu :label="$row->nama.' di '.$row->unit_nama">
+                                            <x-admin.master.menu-item icon="fas fa-door-closed" wire:click="startClose({{ $row->position_id }}, {{ $row->unit_id }})">Tutup di Unit</x-admin.master.menu-item>
+                                        </x-admin.row-menu>
                                     @elseif ($row->opened)
                                         <span class="text-[11px] text-surface-500">Masih dijabat</span>
                                     @endif
@@ -145,166 +161,132 @@
 
     {{-- Dialog Tambah Jabatan Penampungan --}}
     @if ($creating)
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.closeCreate()" @click.self="$wire.closeCreate()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="pool-create-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="pool-create-title" class="text-sm font-extrabold text-surface-900">Tambah Jabatan Penampungan</h3>
-                    <p class="text-[11px] text-surface-500">Jabatan baru tanpa kuota dan belum dibuka pada unit mana pun.</p>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.closeCreate()" tone="primary" icon="fas fa-plus" size="lg" title-id="pool-create-title">
+                <x-slot:heading>Tambah Jabatan Penampungan</x-slot:heading>
+                <x-slot:subheading>Jabatan baru tanpa kuota dan belum dibuka pada unit mana pun.</x-slot:subheading>
+                <div>
+                    <label for="pool-new-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <input id="pool-new-nama" type="text" wire:model="newNama" maxlength="255" autocomplete="off" aria-required="true" placeholder="Mis. Asisten Diperbantukan" class="{{ $fieldClass }}">
                 </div>
-                <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label for="pool-new-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <input id="pool-new-nama" type="text" wire:model="newNama" maxlength="255" autocomplete="off" aria-required="true" placeholder="Mis. Asisten Diperbantukan" class="{{ $fieldClass }}">
+                        <label for="pool-new-jenis" class="block text-xs font-bold text-surface-700 mb-1.5">Jenis <span class="text-danger-700" aria-hidden="true">*</span></label>
+                        <select id="pool-new-jenis" wire:model="newJenis" aria-required="true" class="{{ $fieldClass }}">
+                            <option value="">— Pilih jenis —</option>
+                            @foreach ($jenisLabels as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="pool-new-jenis" class="block text-xs font-bold text-surface-700 mb-1.5">Jenis <span class="text-danger-700" aria-hidden="true">*</span></label>
-                            <select id="pool-new-jenis" wire:model="newJenis" aria-required="true" class="{{ $fieldClass }}">
-                                <option value="">— Pilih jenis —</option>
-                                @foreach ($jenisLabels as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="pool-new-rm" class="block text-xs font-bold text-surface-700 mb-1.5">RM Band <span class="text-danger-700" aria-hidden="true">*</span></label>
-                            <select id="pool-new-rm" wire:model="newRm" aria-required="true" class="{{ $fieldClass }}">
-                                <option value="">— Pilih RM Band —</option>
-                                @foreach ($rmLevels as $rm)
-                                    <option value="{{ $rm }}">{{ $rm }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label for="pool-new-rm" class="block text-xs font-bold text-surface-700 mb-1.5">RM Band <span class="text-danger-700" aria-hidden="true">*</span></label>
+                        <select id="pool-new-rm" wire:model="newRm" aria-required="true" class="{{ $fieldClass }}">
+                            <option value="">— Pilih RM Band —</option>
+                            @foreach ($rmLevels as $rm)
+                                <option value="{{ $rm }}">{{ $rm }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    @error('create')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
                 </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="closeCreate">Batal</x-admin.button>
+                @error('create')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button wire:click="saveCreate" target="saveCreate" icon="fas fa-check">Simpan Jabatan</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
     {{-- Dialog Buka pada Unit --}}
     @if ($openingPosition)
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.cancelOpen()" @click.self="$wire.cancelOpen()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="pool-open-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="pool-open-title" class="text-sm font-extrabold text-surface-900">Buka Jabatan pada Unit</h3>
-                    <p class="text-[11px] text-surface-500">{{ $openingPosition->nama }} ({{ $openingPosition->rm_level }})</p>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.cancelOpen()" tone="primary" icon="fas fa-door-open" size="lg" title-id="pool-open-title">
+                <x-slot:heading>Buka Jabatan pada Unit</x-slot:heading>
+                <x-slot:subtitle>{{ $openingPosition->nama }} ({{ $openingPosition->rm_level }})</x-slot:subtitle>
+                <div>
+                    <label for="pool-open-unit" class="block text-xs font-bold text-surface-700 mb-1.5">Unit Kerja <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <select id="pool-open-unit" wire:model="openUnitId" aria-required="true" class="{{ $fieldClass }}">
+                        <option value="">— Pilih unit kerja —</option>
+                        @foreach ($openableUnits as $unit)
+                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1.5 text-[11px] text-surface-500">Setelah dibuka, karyawan dapat ditambahkan atau diimpor pada jabatan ini di unit tersebut tanpa menghabiskan kuota formasi.</p>
                 </div>
-                <div class="p-6 space-y-4">
-                    <div>
-                        <label for="pool-open-unit" class="block text-xs font-bold text-surface-700 mb-1.5">Unit Kerja <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <select id="pool-open-unit" wire:model="openUnitId" aria-required="true" class="{{ $fieldClass }}">
-                            <option value="">— Pilih unit kerja —</option>
-                            @foreach ($openableUnits as $unit)
-                                <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                            @endforeach
-                        </select>
-                        <p class="mt-1.5 text-[11px] text-surface-500">Setelah dibuka, karyawan dapat ditambahkan atau diimpor pada jabatan ini di unit tersebut tanpa menghabiskan kuota formasi.</p>
-                    </div>
-                    @error('open')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="cancelOpen">Batal</x-admin.button>
+                @error('open')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button wire:click="saveOpen" target="saveOpen" icon="fas fa-door-open">Buka pada Unit</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
     {{-- Dialog Tutup pada Unit --}}
     @if ($closingPosition && $closingUnit)
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.cancelClose()" @click.self="$wire.cancelClose()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="pool-close-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="pool-close-title" class="text-sm font-extrabold text-surface-900">Tutup Jabatan pada Unit</h3>
-                    <p class="text-[11px] text-surface-500">{{ $closingPosition->nama }} di {{ $closingUnit->nama }}</p>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.cancelClose()" tone="warning" icon="fas fa-door-closed" size="lg" title-id="pool-close-title">
+                <x-slot:heading>Tutup Jabatan pada Unit</x-slot:heading>
+                <x-slot:subtitle>{{ $closingPosition->nama }} di {{ $closingUnit->nama }}</x-slot:subtitle>
+                <div>
+                    <label for="pool-close-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <textarea id="pool-close-reason" wire:model="closeReason" rows="3" aria-required="true" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
                 </div>
-                <div class="p-6 space-y-4">
-                    <div>
-                        <label for="pool-close-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <textarea id="pool-close-reason" wire:model="closeReason" rows="3" aria-required="true" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
-                    </div>
-                    @error('close')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="cancelClose">Batal</x-admin.button>
+                @error('close')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button wire:click="saveClose" target="saveClose" icon="fas fa-check">Tutup pada Unit</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
     {{-- Dialog Ubah Nama --}}
     @if ($renamingPosition)
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.cancelRename()" @click.self="$wire.cancelRename()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="pool-rename-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="pool-rename-title" class="text-sm font-extrabold text-surface-900">Ubah Nama Jabatan</h3>
-                    <p class="text-[11px] text-surface-500">Jenis dan RM Band tidak berubah.</p>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.cancelRename()" tone="primary" icon="fas fa-pen" size="lg" title-id="pool-rename-title">
+                <x-slot:heading>Ubah Nama Jabatan</x-slot:heading>
+                <x-slot:subheading>Jenis dan RM Band tidak berubah.</x-slot:subheading>
+                <div>
+                    <label for="pool-rename-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <input id="pool-rename-nama" type="text" wire:model="renameNama" maxlength="255" autocomplete="off" aria-required="true" class="{{ $fieldClass }}">
                 </div>
-                <div class="p-6 space-y-4">
-                    <div>
-                        <label for="pool-rename-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <input id="pool-rename-nama" type="text" wire:model="renameNama" maxlength="255" autocomplete="off" aria-required="true" class="{{ $fieldClass }}">
-                    </div>
-                    <div>
-                        <label for="pool-rename-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <textarea id="pool-rename-reason" wire:model="renameReason" rows="3" aria-required="true" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
-                    </div>
-                    @error('rename')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
+                <div>
+                    <label for="pool-rename-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <textarea id="pool-rename-reason" wire:model="renameReason" rows="3" aria-required="true" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
                 </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="cancelRename">Batal</x-admin.button>
+                @error('rename')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button wire:click="saveRename" target="saveRename" icon="fas fa-check">Simpan Nama</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
     {{-- Dialog Hapus Jabatan --}}
     @if ($deletingPosition)
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.cancelDelete()" @click.self="$wire.cancelDelete()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="pool-delete-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="pool-delete-title" class="text-sm font-extrabold text-surface-900">Hapus Jabatan Penampungan</h3>
-                    <p class="text-[11px] text-surface-500">{{ $deletingPosition->nama }}. Hanya jabatan yang belum dibuka pada unit, belum dijabat, dan belum tercatat pada riwayat yang dapat dihapus.</p>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.cancelDelete()" tone="danger" icon="fas fa-trash-can" size="lg" title-id="pool-delete-title">
+                <x-slot:heading>Hapus Jabatan Penampungan</x-slot:heading>
+                <x-slot:subtitle>{{ $deletingPosition->nama }}</x-slot:subtitle>
+                <x-slot:subheading>Hanya jabatan yang belum dibuka pada unit, belum dijabat, dan belum tercatat pada riwayat yang dapat dihapus.</x-slot:subheading>
+                <div>
+                    <label for="pool-delete-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <textarea id="pool-delete-reason" wire:model="deleteReason" rows="3" aria-required="true" placeholder="Jelaskan alasan penghapusan (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
                 </div>
-                <div class="p-6 space-y-4">
-                    <div>
-                        <label for="pool-delete-reason" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <textarea id="pool-delete-reason" wire:model="deleteReason" rows="3" aria-required="true" placeholder="Jelaskan alasan penghapusan (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
-                    </div>
-                    @error('delete')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="cancelDelete">Batal</x-admin.button>
+                @error('delete')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button variant="danger" wire:click="saveDelete" target="saveDelete" icon="fas fa-trash-can">Hapus Jabatan</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 </div>

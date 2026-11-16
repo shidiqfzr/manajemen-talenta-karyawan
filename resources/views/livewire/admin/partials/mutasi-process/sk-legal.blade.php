@@ -1,4 +1,16 @@
     <!-- ── 3. DATA SK DIREKSI MUTASI & LEGALITAS (AUDIT TRAIL) ── -->
+    @if ($this->blockingReason)
+        {{-- Pengungkapan bertahap: formulir SK tidak dirender selama kendala penempatan belum selesai --}}
+        <div data-sk-locked="true" class="bg-surface-50 rounded-2xl border border-dashed border-surface-300 p-4 sm:p-5 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-surface-100 text-surface-600 flex items-center justify-center shrink-0">
+                <i class="fas fa-lock text-sm" aria-hidden="true"></i>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-surface-800">Data SK Direksi Mutasi &amp; Legalitas</h3>
+                <p class="text-xs text-surface-600">Dibuka setelah kendala penempatan di atas diselesaikan.</p>
+            </div>
+        </div>
+    @else
     <div class="bg-white rounded-2xl border border-surface-200 shadow-xs p-5 sm:p-6 space-y-5 animate-fade-in">
         <div class="flex items-center justify-between pb-4 border-b border-surface-100">
             <div class="flex items-center gap-3">
@@ -12,11 +24,7 @@
             </div>
         </div>
 
-        @if ($this->blockingReason)
-            <p class="text-xs text-surface-500">Data SK dapat dilengkapi setelah kendala formasi di atas diselesaikan.</p>
-        @endif
-
-        <fieldset @disabled($this->blockingReason) class="{{ $this->blockingReason ? 'opacity-50' : '' }} space-y-5 min-w-0">
+        <div class="space-y-5 min-w-0">
         <!-- Klausul Penyesuaian Golongan & Job Grade Baru (Promosi/Demosi) -->
         @if (in_array($form->jenisMutasi, ['PROMOSI', 'DEMOSI']))
             <div class="p-4 sm:p-5 rounded-2xl bg-surface-50/80 border border-surface-200 space-y-3.5 shadow-2xs animate-fade-in">
@@ -156,5 +164,6 @@
                 @endif
             </div>
         </div>
-        </fieldset>
+        </div>
     </div>
+    @endif

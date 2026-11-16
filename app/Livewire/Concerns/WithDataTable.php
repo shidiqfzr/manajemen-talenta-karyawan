@@ -89,12 +89,12 @@ trait WithDataTable
     /** @return array<int, int> */
     protected function perPageOptions(): array
     {
-        return [10, 25, 50, 100];
+        return array_map('intval', config('hris.pagination.options'));
     }
 
     protected function defaultPerPage(): int
     {
-        return 25;
+        return (int) config('hris.pagination.default');
     }
 
     protected function exportName(): ?string

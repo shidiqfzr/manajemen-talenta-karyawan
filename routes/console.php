@@ -6,6 +6,7 @@ use App\Services\EmployeeImportGovernanceService;
 use App\Services\EmployeeImportService;
 use App\Services\ManPowerPlanningService;
 use App\Services\Mpp\MppPeriodService;
+use App\Services\Mutasi\ChainProposalService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -57,7 +58,14 @@ Artisan::command('hris:mpp-capture-period {--year= : Tahun periode (default: bul
     return 0;
 })->purpose('Merekam draf periode MPP bulan sebelumnya (dijadwalkan tanggal 1 setiap bulan)');
 
+Artisan::command('hris:expire-mutasi-proposals', function (ChainProposalService $proposals) {
+    $expired = $proposals->expireStale();
+    $this->info("Usulan mutasi berantai kedaluwarsa: {$expired}.");
+})->purpose('Menandai usulan mutasi berantai yang melewati batas waktu persetujuan sebagai kedaluwarsa');
+
 Schedule::command('hris:purge-import-files')->hourly();
 Schedule::command('hris:purge-import-governance')->daily();
 Schedule::command('hr:apply-effective-mutations')->dailyAt('00:01');
+Schedule::command('hr:process-retirements')->dailyAt('00:05');
 Schedule::command('hris:mpp-capture-period')->monthlyOn(1, '01:00');
+Schedule::command('hris:expire-mutasi-proposals')->daily();

@@ -62,22 +62,22 @@ class EvaluationIndexTableTest extends TestCase
             ->assertSeeLivewire(EvaluationIndexTable::class);
     }
 
-    public function test_lists_evaluations_newest_first_20_per_page(): void
+    public function test_lists_evaluations_newest_first_25_per_page(): void
     {
-        for ($i = 1; $i <= 25; $i++) {
+        for ($i = 1; $i <= 26; $i++) {
             $this->makeEvaluation(['bidang_tugas' => sprintf('Bidang %02d', $i), 'tanggal_pelaksanaan_asesmen' => sprintf('2024-01-%02d', $i)]);
         }
 
         $component = $this->table()
             ->assertSet('sortField', 'tanggal_pelaksanaan_asesmen')
             ->assertSet('sortDirection', 'desc')
-            ->assertSet('perPage', 20);
+            ->assertSet('perPage', 25);
 
         $items = collect($component->instance()->rows->items());
-        $this->assertCount(20, $items);
-        $this->assertSame('Bidang 25', $items->first()->bidang_tugas);
-        $this->assertSame('Bidang 06', $items->last()->bidang_tugas);
-        $this->assertSame(25, $component->instance()->rows->total());
+        $this->assertCount(25, $items);
+        $this->assertSame('Bidang 26', $items->first()->bidang_tugas);
+        $this->assertSame('Bidang 02', $items->last()->bidang_tugas);
+        $this->assertSame(26, $component->instance()->rows->total());
     }
 
     public function test_header_shows_title_and_count(): void
@@ -169,9 +169,12 @@ class EvaluationIndexTableTest extends TestCase
             ->assertSeeHtml('confirm-delete')
             ->assertSeeHtml(route('admin.evaluations.show', $evaluation->id))
             ->assertSeeHtml(route('admin.evaluations.edit', $evaluation->id))
-            ->assertSeeHtml('role="dialog"');
+            ->assertSeeHtml('role="dialog"')
+            ->assertSeeHtml('name="alasan"')
+            ->assertSeeHtml('minlength="10"')
+            ->assertSeeHtml('maxlength="500"');
 
-        $this->delete(route('admin.evaluations.destroy', $evaluation->id))
+        $this->delete(route('admin.evaluations.destroy', $evaluation->id), ['alasan' => 'Data ganda hasil impor'])
             ->assertRedirect(route('admin.evaluations.index'));
 
         $this->assertDatabaseMissing('evaluations', ['id' => $evaluation->id]);

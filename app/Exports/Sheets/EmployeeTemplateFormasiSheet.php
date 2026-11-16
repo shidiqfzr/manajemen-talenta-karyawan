@@ -118,7 +118,7 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
             return $this->seats;
         }
 
-        $terisi = Employee::query()
+        $terisi = Employee::aktif()
             ->where('status_penugasan', 'Definitif')
             ->selectRaw('unit_kerja, jabatan, count(*) as total')
             ->groupBy('unit_kerja', 'jabatan')

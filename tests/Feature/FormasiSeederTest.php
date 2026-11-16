@@ -26,8 +26,8 @@ class FormasiSeederTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame(45, Unit::count());
-        $this->assertSame(486, DB::table('position_unit')->count());
-        $this->assertSame(612, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(491, DB::table('position_unit')->count());
+        $this->assertSame(619, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_manajer_coexists_in_three_bidang(): void
@@ -60,8 +60,8 @@ class FormasiSeederTest extends TestCase
             ->sortKeys()
             ->all();
 
-        $this->assertSame(['RM-1' => 46, 'RM-2' => 72, 'RM-3' => 333, 'RM-5' => 161], $perRm);
-        $this->assertSame(['KEU' => 87, 'TAN' => 253, 'TEK' => 97, 'UMU' => 175], $perBidang);
+        $this->assertSame(['RM-1' => 45, 'RM-2' => 75, 'RM-3' => 338, 'RM-5' => 161], $perRm);
+        $this->assertSame(['KEU' => 87, 'TAN' => 253, 'TEK' => 97, 'UMU' => 182], $perBidang);
     }
 
     public function test_karpel_seats_keep_their_rm_5_band(): void
@@ -95,8 +95,8 @@ class FormasiSeederTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame(45, Unit::count());
-        $this->assertSame(486, DB::table('position_unit')->count());
-        $this->assertSame(612, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(491, DB::table('position_unit')->count());
+        $this->assertSame(619, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_seeded_units_use_the_known_wilayah_labels(): void

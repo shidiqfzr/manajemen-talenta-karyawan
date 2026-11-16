@@ -213,6 +213,10 @@ class Employee extends Model
         'jalur_masuk',
         'tanggal_mbt',
         'tanggal_pensiun',
+        'tanggal_berhenti',
+        'alasan_berhenti',
+        'nomor_sk_berhenti',
+        'tanggal_sk_berhenti',
         'agama',
         'pendidikan_terakhir',
         'sekolah',
@@ -227,8 +231,60 @@ class Employee extends Model
         'tanggal_diangkat_staf' => 'date',
         'tanggal_mbt' => 'date',
         'tanggal_pensiun' => 'date',
+        'tanggal_berhenti' => 'date',
+        'tanggal_sk_berhenti' => 'date',
         'tanggal_berakhir_sanksi' => 'date',
     ];
+
+    /** Alasan pemberhentian karena mencapai Batas Usia Pensiun (DOMAIN.md §5.1). */
+    public const ALASAN_PENSIUN = 'Pensiun';
+
+    /** Alasan pemberhentian baku; selain Pensiun hanya lewat tindakan admin dengan tanggal dan SK. */
+    public const ALASAN_BERHENTI = [
+        self::ALASAN_PENSIUN,
+        'Pensiun Dini',
+        'Mengundurkan Diri',
+        'Meninggal Dunia',
+        'Pemutusan Hubungan Kerja',
+    ];
+
+    /**
+     * Karyawan aktif: belum diberhentikan, jadi masih menempati kursi formasi. Dipakai semua perhitungan kursi,
+     * pemegang jabatan, dan headcount; arsip karyawan yang sudah berhenti dibaca lewat scopeBerhenti().
+     */
+    public function scopeAktif($query)
+    {
+        return $query->whereNull($this->qualifyColumn('tanggal_berhenti'));
+    }
+
+    /** Karyawan yang sudah diberhentikan (pensiun): hanya arsip, tidak menempati kursi. */
+    public function scopeBerhenti($query)
+    {
+        return $query->whereNotNull($this->qualifyColumn('tanggal_berhenti'));
+    }
+
+    /** Karyawan aktif yang sedang menjalani Masa Bebas Tugas: tanggal MBT sudah tiba, tetapi belum diberhentikan. */
+    public function scopeMbt($query)
+    {
+        return $query->aktif()
+            ->whereNotNull($this->qualifyColumn('tanggal_mbt'))
+            ->whereDate($this->qualifyColumn('tanggal_mbt'), '<=', today());
+    }
+
+    /** Karyawan aktif yang akan memasuki MBT dalam MBT_PERINGATAN_BULAN bulan ke depan (selaras dengan isApproachingMbt()). */
+    public function scopeMenjelangMbt($query)
+    {
+        return $query->aktif()
+            ->whereNotNull($this->qualifyColumn('tanggal_mbt'))
+            ->whereDate($this->qualifyColumn('tanggal_mbt'), '>', today())
+            ->whereDate($this->qualifyColumn('tanggal_mbt'), '<=', today()->addMonthsNoOverflow(KepegawaianPolicy::MBT_PERINGATAN_BULAN));
+    }
+
+    /** Sudah diberhentikan dari jabatan (pensiun diproses); beda dengan isPensionReached() yang hanya menilai tanggal. */
+    public function isSeparated(): bool
+    {
+        return $this->tanggal_berhenti !== null;
+    }
 
     public function trainings()
     {

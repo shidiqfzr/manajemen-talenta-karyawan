@@ -10,7 +10,7 @@
         icon="fas fa-paper-plane"
         :breadcrumbs="[
             ['label' => 'Core HR'],
-            ['label' => 'Mutasi & Penempatan', 'url' => route('admin.mutasi.index')],
+            ['label' => 'Mutasi', 'url' => route('admin.mutasi.index')],
             ['label' => 'Buat Mutasi Baru']
         ]"
         back-url="{{ route('admin.mutasi.index') }}"

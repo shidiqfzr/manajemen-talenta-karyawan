@@ -79,6 +79,11 @@ class MutasiService
 
             $this->guard->assertAllowed($employee, $request);
 
+            // Advisory promotion qualification is snapshotted before the placement changes the employee's RM
+            $request = $request->withCatatanKepatuhan($this->guard->promotionAdvisory(
+                $employee, $request->targetJabatan, $request->dispensasiPromosi, $request->alasanDispensasiPromosi
+            ));
+
             // The requester's own scheduled booking of this formasi must not block them (nor count against its seats).
             $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja, [$request->employeeNik]);
             $this->assertTargetNotReservedByOthers($analysis, $request);
@@ -232,6 +237,10 @@ class MutasiService
             foreach ($requests as $order => $request) {
                 $emp = $lockedEmployees[$request->employeeNik];
                 $profile = $this->resolvePlacementProfile($emp, $request);
+                $this->guard->assertPromotionDispensed($emp, $request);
+                $request = $request->withCatatanKepatuhan($this->guard->promotionAdvisory(
+                    $emp, $request->targetJabatan, $request->dispensasiPromosi, $request->alasanDispensasiPromosi
+                ));
 
                 if (! $isFutureTmt && $request->isDefinitif()) {
                     $this->placement->apply(
@@ -362,6 +371,7 @@ class MutasiService
             'catatan' => "{$baseNote} — bertukar dengan {$empA->nama}",
             'is_dispensasi' => false,
             'alasan_dispensasi' => null,
+            'catatan_kepatuhan' => null,
             'tanggal_berakhir_sanksi' => null,
             'batch_id' => $batchId,
             'chain_order' => 2,
@@ -501,7 +511,7 @@ class MutasiService
         ?string $jenisMutasi = null,
         ?bool $isApplied = null,
         bool $onlyDue = false,
-        int $perPage = 15,
+        ?int $perPage = null,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
         ?string $sumber = null,

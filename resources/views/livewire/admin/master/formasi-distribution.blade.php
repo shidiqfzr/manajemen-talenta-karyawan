@@ -25,6 +25,22 @@
             search-placeholder="Cari jabatan atau unit kerja..." />
         <x-admin.table.header :title="$isJabatan ? 'Sebaran per Jabatan' : 'Sebaran per Unit'" :paginator="$rows" :noun="$isJabatan ? 'Jabatan' : 'Formasi'" :export="true">
             <x-slot:actions>
+                {{-- Aturan sebaran: popover info, sama dengan tab Jabatan Penampungan --}}
+                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.away="open = false">
+                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="distribution-rules" aria-label="Aturan sebaran formasi"
+                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-surface-500 hover:text-primary-700 hover:bg-surface-100 transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        <i class="fas fa-circle-info text-sm" aria-hidden="true"></i>
+                    </button>
+                    <div id="distribution-rules" x-show="open" x-cloak x-transition.opacity
+                        class="absolute right-0 top-full mt-2 z-30 w-80 max-w-[calc(100vw-2rem)] p-4 bg-white border border-surface-200 rounded-xl shadow-lg text-xs text-surface-600 text-left">
+                        <p class="font-bold text-surface-900 mb-2">Aturan Sebaran Formasi</p>
+                        <ul class="space-y-1.5 list-disc pl-4 marker:text-primary-600">
+                            <li>Hanya pejabat definitif yang mengisi kuota.</li>
+                            <li>Jabatan yang dijabat Pj/Plt tetap tercatat kosong.</li>
+                            <li>Cakupan mengikuti Master Formasi; jabatan penampungan (Advisor dan Diperbantukan) tidak termasuk.</li>
+                        </ul>
+                    </div>
+                </div>
                 <div role="radiogroup" aria-label="Tampilan sebaran" x-data="{ move(step) { const radios = [...$el.querySelectorAll('[role=radio]')]; const index = radios.indexOf(document.activeElement); if (index < 0) { return; } const target = radios[(index + step + radios.length) % radios.length]; target.focus(); target.click(); } }"
                     @keydown.arrow-right.prevent="move(1)" @keydown.arrow-down.prevent="move(1)"
                     @keydown.arrow-left.prevent="move(-1)" @keydown.arrow-up.prevent="move(-1)"
@@ -36,10 +52,6 @@
                 </div>
             </x-slot:actions>
         </x-admin.table.header>
-
-        <p class="px-5 py-2.5 bg-surface-50 border-b border-surface-200 text-[11px] text-surface-500">
-            Hanya pejabat definitif yang mengisi kuota; jabatan yang dijabat Pj/Plt tetap tercatat kosong. Cakupan mengikuti Master Formasi; jabatan penampungan (Advisor dan Diperbantukan) tidak termasuk.
-        </p>
 
         <div class="overflow-x-auto">
             @if ($isJabatan)

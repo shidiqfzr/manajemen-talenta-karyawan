@@ -118,7 +118,7 @@ class ManPowerPlanningTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
             ->assertSee('Standar Formasi Baku')
-            ->assertSee('451')
+            ->assertSee('458')
             ->assertSee('Posisi per')
             ->assertSee('RM-1')
             ->assertSee('JUMLAH')
@@ -268,11 +268,11 @@ class ManPowerPlanningTest extends TestCase
 
         $service = new ManPowerPlanningService;
         $this->assertSame([
-            'RM-1' => ['KEU' => 2, 'TAN' => 30, 'TEK' => 11, 'UMU' => 6],
-            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 15],
-            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 63],
+            'RM-1' => ['KEU' => 2, 'TAN' => 30, 'TEK' => 11, 'UMU' => 5],
+            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 18],
+            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 68],
         ], $service->standarFormasi());
-        $this->assertSame(454, $service->getMppMatrix(2026, 11)['stats']['total_formasi']);
+        $this->assertSame(461, $service->getMppMatrix(2026, 11)['stats']['total_formasi']);
     }
 
     public function test_supply_rows_show_the_remaining_plan(): void
@@ -753,9 +753,9 @@ class ManPowerPlanningTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('admin.mutasi.index', ['tab' => 'mpp']))
             ->assertOk()
-            // Nilai lencana diperiksa langsung; pencarian teks "451" di seluruh halaman bisa kena ID acak Livewire.
-            ->assertViewHas('mppFormasiTotal', 454)
-            ->assertSeeInOrder(['Perencanaan Formasi (MPP)', '454']);
+            // Nilai lencana diperiksa langsung; pencarian teks "458" di seluruh halaman bisa kena ID acak Livewire.
+            ->assertViewHas('mppFormasiTotal', 461)
+            ->assertSeeInOrder(['Perencanaan Formasi (MPP)', '461']);
     }
 
     // ───────────────────────── Rencana pasokan ─────────────────────────

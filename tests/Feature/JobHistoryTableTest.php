@@ -90,15 +90,14 @@ class JobHistoryTableTest extends TestCase
         $this->assertSame(7, $component->instance()->rows->total());
     }
 
-    public function test_default_sort_and_five_per_page(): void
+    public function test_default_sort_and_standard_page_size(): void
     {
         $component = $this->table()
             ->assertSet('sortField', 'tmt_awal')
             ->assertSet('sortDirection', 'desc')
-            ->assertSet('perPage', 5)
+            ->assertSet('perPage', 25)
             ->assertSeeInOrder(['Jabatan 07', 'Jabatan 06', 'Jabatan 05', 'Jabatan 04', 'Jabatan 03'])
-            ->assertDontSee('Jabatan 02')
-            ->assertSeeHtml('aria-label="Halaman riwayat jabatan"')
+            ->assertSeeHtml('id="per-page-riwayat_jabatan_page"')
             // Sortable headers: Periode, Jabatan, Unit Kerja only.
             ->assertSeeHtml("sortBy('tmt_awal')")
             ->assertSeeHtml("sortBy('jabatan')")
@@ -106,8 +105,8 @@ class JobHistoryTableTest extends TestCase
             ->assertDontSeeHtml("sortBy('jenis_mutasi')")
             ->assertDontSeeHtml("sortBy('nomor_sk')");
 
-        $this->assertCount(5, $component->instance()->rows->items());
-        $this->assertSame([5, 10, 25, 50], invade($component->instance())->perPageOptions());
+        $this->assertCount(7, $component->instance()->rows->items());
+        $this->assertSame([10, 25, 50, 100], invade($component->instance())->perPageOptions());
     }
 
     public function test_search_matches_declared_columns(): void
@@ -144,11 +143,19 @@ class JobHistoryTableTest extends TestCase
 
     public function test_page_name_is_isolated(): void
     {
+        // 25 newer positions fill page 1, so the seven seeded ones land on page 2.
+        for ($i = 1; $i <= 25; $i++) {
+            $this->makeHistory($this->employee, [
+                'jabatan' => sprintf('Tambahan %02d', $i),
+                'tmt_awal' => sprintf('2022-01-%02d', $i),
+            ]);
+        }
+
         $component = $this->table()
             ->call('gotoPage', 2, 'riwayat_jabatan_page')
             ->assertSet('paginators.riwayat_jabatan_page', 2)
             ->assertSee('Jabatan 02')
-            ->assertDontSee('Jabatan 07')
+            ->assertDontSee('Tambahan 25')
             ->assertSeeHtml("gotoPage(1, 'riwayat_jabatan_page')")
             ->assertSeeHtml('id="per-page-riwayat_jabatan_page"');
 

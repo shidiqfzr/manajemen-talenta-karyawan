@@ -239,8 +239,8 @@
             <template x-for="item in filteredUnits" :key="item.nama">
                 <button type="button"
                         @click="select(item.nama)"
-                        class="w-full text-left px-3 py-2 rounded-xl hover:bg-primary-50/70 transition flex items-center justify-between group cursor-pointer"
-                        :class="selectedUnit === item.nama ? 'bg-primary-50/80 text-primary-950 font-bold border border-primary-200/60' : 'text-surface-700'">
+                        class="w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between group cursor-pointer"
+                        :class="selectedUnit === item.nama ? 'bg-primary-50/80 text-primary-950 font-bold border border-primary-200/60' : 'text-surface-700 hover:bg-surface-100'">
                     <div class="flex items-center gap-2.5 min-w-0 pr-2">
                         <!-- Icon Badge -->
                         <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 transition"
@@ -248,8 +248,8 @@
                             <i class="fas" :class="getUnitIcon(item.nama).icon" aria-hidden="true"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-xs font-semibold group-hover:text-primary-800 truncate" x-text="item.nama"></div>
-                            <div class="text-[10px] text-surface-500 group-hover:text-primary-600/90 font-normal truncate" x-text="item.wilayah"></div>
+                            <div class="text-xs font-semibold truncate" x-text="item.nama"></div>
+                            <div class="text-[10px] text-surface-500 font-normal truncate" x-text="item.wilayah"></div>
                         </div>
                     </div>
                     <div class="shrink-0 flex items-center">

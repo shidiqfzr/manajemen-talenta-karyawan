@@ -250,7 +250,7 @@ class TrainingIndexTableTest extends TestCase
         $component = $this->table()
             ->assertSet('sortField', 'tanggal_mulai')
             ->assertSet('sortDirection', 'desc')
-            ->assertSet('perPage', 20);
+            ->assertSet('perPage', 25);
 
         $component->set('search', 'TAN');
         $this->assertSame(['Beta Kelas'], $this->titles($component));
@@ -296,9 +296,12 @@ class TrainingIndexTableTest extends TestCase
         $this->table()
             ->assertSeeHtml(route('admin.trainings.show', $training->id))
             ->assertSeeHtml(route('admin.trainings.edit', $training->id))
-            ->assertSeeHtml(route('admin.trainings.destroy', $training->id));
+            ->assertSeeHtml(route('admin.trainings.destroy', $training->id))
+            ->assertSeeHtml('name="alasan"')
+            ->assertSeeHtml('minlength="10"')
+            ->assertSeeHtml('maxlength="500"');
 
-        $this->delete(route('admin.trainings.destroy', $training->id))
+        $this->delete(route('admin.trainings.destroy', $training->id), ['alasan' => 'Data ganda hasil impor'])
             ->assertRedirect(route('admin.trainings.index'));
 
         $this->assertDatabaseMissing('trainings', ['id' => $training->id]);

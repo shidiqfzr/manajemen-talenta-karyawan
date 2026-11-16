@@ -89,6 +89,13 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->where('level', $this->filters['level']);
         }
 
+        // Ekspor bawaan hanya karyawan aktif; arsip pensiun diekspor lewat status_kepegawaian=pensiun.
+        if (($this->filters['status_kepegawaian'] ?? '') === 'pensiun') {
+            $query->berhenti();
+        } else {
+            $query->aktif();
+        }
+
         if (! empty($this->filters['rm_level'])) {
             $query->where('rm_level', $this->filters['rm_level']);
         }

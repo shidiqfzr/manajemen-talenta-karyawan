@@ -50,6 +50,26 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_modals_are_built_on_the_shared_modal_shell(): void
+    {
+        // Modal tengah hanya lewat x-admin.modal (DESIGN.md §7.6). Drawer samping punya pola tersendiri dan dikecualikan.
+        $shell = 'components/admin/modal.blade.php';
+        $drawers = [
+            'components/admin/personnel-drawer.blade.php',
+            'components/admin/mutasi/talent-drawer.blade.php',
+            'livewire/admin/mpp-supply-plan-editor.blade.php',
+            'admin/employees/partials/import-column-guide-modal.blade.php',
+        ];
+
+        $this->assertNoViolations(
+            array_values(array_filter(
+                $this->tags('div', fn (string $tag) => str_contains($tag, 'role="dialog"')),
+                fn (string $location) => ! in_array(explode(':', $location)[0], [$shell, ...$drawers], true)
+            )),
+            'Modal wajib memakai <x-admin.modal> agar overlay, kepala, footer, fokus, dan transisi seragam (DESIGN.md §7.6); jangan menulis role="dialog" sendiri.'
+        );
+    }
+
     public function test_tab_widgets_follow_the_aria_tabs_pattern(): void
     {
         $div = '/<div(?=[\s>])'.self::TAG_BODY.'>/';
@@ -190,6 +210,27 @@ class ViewDesignGuardTest extends TestCase
         $this->assertNoViolations($violations, 'Pesan validasi/notifikasi tidak boleh menyebut nama dokumen internal (AGENTS.md aturan 6).');
     }
 
+    public function test_unescaped_blade_output_is_limited_to_the_highlight_component(): void
+    {
+        $violations = array_filter(
+            $this->occurrences('/\{!!/'),
+            fn (string $location) => ! str_starts_with($location, 'components/highlight.blade.php')
+        );
+
+        $this->assertNoViolations(
+            array_values($violations),
+            'Keluaran Blade wajib di-escape ({{ }}); {!! !!} hanya untuk komponen highlight yang sudah menyaring teksnya (SECURITY.md, mitigasi XSS).'
+        );
+    }
+
+    public function test_retirement_rules_are_never_hardcoded_in_views(): void
+    {
+        $this->assertNoViolations(
+            $this->occurrences('/(?:parseInt\([^)]*\)|\byear|\bmonth)\s*[-+]\s*(?:56|6)\b/'),
+            'Batas Usia Pensiun & MBT wajib bersumber dari KepegawaianPolicy, bukan angka literal di view (DOMAIN.md Bab 5.1).'
+        );
+    }
+
     public function test_no_raw_tailwind_palette_classes_are_used_in_views(): void
     {
         $this->assertNoViolations(
@@ -247,6 +288,23 @@ class ViewDesignGuardTest extends TestCase
             $this->occurrences('/(?<![\w:-])animate-pulse(?![\w-])/'),
             'Gunakan motion-safe:animate-pulse agar hormat pada prefers-reduced-motion (DESIGN.md §3.7).'
         );
+    }
+
+    public function test_shared_header_and_form_components_carry_no_decorative_gradient(): void
+    {
+        // DESIGN.md §1 dan §5.2: gradien dekoratif dilarang. Kepala halaman dan komponen formulir dipakai
+        // di setiap halaman admin, sehingga pelanggaran di sini menyebar ke seluruh aplikasi.
+        $violations = [];
+
+        foreach (self::views() as $path => $source) {
+            $shared = $path === 'components/admin/page-header.blade.php' || str_starts_with($path, 'components/admin/form/');
+
+            if ($shared && str_contains($source, 'gradient')) {
+                $violations[] = $path;
+            }
+        }
+
+        $this->assertSame([], $violations, 'Komponen bersama tidak boleh memakai gradien dekoratif (DESIGN.md §1, §5.2).');
     }
 
     public function test_module_index_pages_use_the_shared_header_and_flash(): void

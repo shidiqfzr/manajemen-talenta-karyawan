@@ -10,7 +10,12 @@
     Panel memakai posisi fixed yang dihitung dari tombol, membuka ke atas bila ruang di bawah kurang,
     dan menutup saat halaman digulir, sehingga tidak terpotong oleh wadah tabel.
 --}}
-@props(['label', 'text' => null])
+@props(['label', 'text' => null, 'size' => 'md'])
+
+{{-- size "sm": tombol berlabel setinggi 32px (target tabel admin desktop, DESIGN.md §7.5) untuk baris tabel padat; "md" untuk menu tingkat halaman. --}}
+@php
+    $textButtonSize = $size === 'sm' ? 'h-8 px-3 rounded-lg text-xs font-medium' : 'px-3.5 py-2 rounded-xl text-sm font-semibold';
+@endphp
 
 <div class="relative inline-block text-left"
     x-data="{
@@ -50,7 +55,7 @@
     @if ($text)
         <button type="button" x-ref="trigger" @click="toggle()" @keydown.arrow-down.prevent="show('first')" @keydown.arrow-up.prevent="show('last')" @keydown.tab="close()"
             :aria-expanded="open.toString()" aria-haspopup="menu" aria-label="Aksi untuk {{ $label }}"
-            class="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-surface-50 text-surface-700 border border-surface-300 rounded-xl text-sm font-semibold transition cursor-pointer shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            class="inline-flex items-center gap-2 {{ $textButtonSize }} bg-white hover:bg-surface-50 text-surface-700 border border-surface-300 transition cursor-pointer shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <span>{{ $text }}</span>
             <i class="fas fa-chevron-down text-[10px] text-surface-500" aria-hidden="true"></i>
         </button>
@@ -70,7 +75,7 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="transform opacity-100 scale-100"
         x-transition:leave-end="transform opacity-0 scale-95"
-        class="fixed z-50 w-64 origin-top-right rounded-xl bg-white p-1 text-xs shadow-lg ring-1 ring-surface-900/5 border border-surface-200">
+        class="fixed z-50 w-max min-w-44 max-w-72 origin-top-right rounded-xl bg-white p-1 text-xs shadow-lg ring-1 ring-surface-900/5 border border-surface-200">
         {{ $slot }}
     </div>
 </div>

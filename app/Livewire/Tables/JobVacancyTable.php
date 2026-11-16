@@ -35,7 +35,14 @@ class JobVacancyTable extends Component
     #[Url(as: 'severity', except: '')]
     public string $severityFilter = '';
 
-    public int $perPage = 10;
+    /** Empty keeps the service order (longest vacant first, never-filled last). */
+    #[Url(as: 'sort', except: '')]
+    public string $sortField = '';
+
+    #[Url(as: 'direction', except: 'asc')]
+    public string $sortDirection = 'asc';
+
+    public int $perPage = 25;
 
     /** @var ?array<string, string> */
     private ?array $unitOptions = null;
@@ -56,6 +63,7 @@ class JobVacancyTable extends Component
 
         $this->search = $this->normaliseSearch($this->search);
         $this->normalisePerPage();
+        $this->normaliseSort();
 
         foreach ($this->filters() as $filter) {
             $this->normaliseFilter($filter);
@@ -68,6 +76,8 @@ class JobVacancyTable extends Component
             $this->search = $this->normaliseSearch($this->search);
         } elseif ($property === 'perPage') {
             $this->normalisePerPage();
+        } elseif ($property === 'sortField' || $property === 'sortDirection') {
+            $this->normaliseSort();
         } else {
             foreach ($this->filters() as $filter) {
                 if ($filter->property === $property) {
@@ -94,10 +104,35 @@ class JobVacancyTable extends Component
         ];
     }
 
+    /** Sortable column => property of the vacancy row. */
+    private const SORTABLE = [
+        'unit_kerja' => 'unit_kerja',
+        'jabatan' => 'jabatan',
+        'pejabat' => 'last_occupant_name',
+        'lama_kosong' => 'days_vacant',
+    ];
+
+    /** Same toggle as the Eloquent tables: first click ascending, second descending. */
+    public function sortBy(string $field): void
+    {
+        if (! array_key_exists($field, self::SORTABLE)) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+
+        $this->resetPage();
+    }
+
     /** @return array<int, int> */
     protected function perPageOptions(): array
     {
-        return [10, 25, 50];
+        return array_map('intval', config('hris.pagination.options'));
     }
 
     /** @return array<string, string> [filter property => value] for filters that are set and allowed. */
@@ -129,6 +164,29 @@ class JobVacancyTable extends Component
         $this->resetPage();
     }
 
+    /** Empty values (no holder, never filled) always sort last, whichever the direction. */
+    private function sortVacancies(Collection $vacancies): Collection
+    {
+        if ($this->sortField === '') {
+            return $vacancies;
+        }
+
+        $property = self::SORTABLE[$this->sortField];
+        $direction = $this->sortDirection === 'desc' ? -1 : 1;
+
+        $filled = $vacancies->filter(fn (object $row) => ($row->{$property} ?? null) !== null)
+            ->sort(function (object $a, object $b) use ($property, $direction): int {
+                $left = $a->{$property};
+                $right = $b->{$property};
+                $result = is_int($left) && is_int($right) ? $left <=> $right : strnatcasecmp((string) $left, (string) $right);
+
+                return $result * $direction;
+            });
+        $empty = $vacancies->filter(fn (object $row) => ($row->{$property} ?? null) === null);
+
+        return $filled->concat($empty)->values();
+    }
+
     public function render(JobVacancyService $service): View
     {
         // Re-validate on every render: a stale or tampered value must never reach the service.
@@ -136,6 +194,7 @@ class JobVacancyTable extends Component
             $this->normaliseFilter($filter);
         }
         $this->normalisePerPage();
+        $this->normaliseSort();
 
         $baseVacancies = $service->filterVacancies(
             $this->allVacancies($service),
@@ -154,6 +213,7 @@ class JobVacancyTable extends Component
         $filteredVacancies = $this->severityFilter
             ? $baseVacancies->where('severity', $this->severityFilter)
             : $baseVacancies;
+        $filteredVacancies = $this->sortVacancies($filteredVacancies);
 
         // In-memory pagination
         $currentPage = $this->getPage();
@@ -174,6 +234,8 @@ class JobVacancyTable extends Component
             'filterValues' => $this->activeFilterValues(),
             'hasActiveFilters' => $this->hasActiveFilters(),
             'perPageOptions' => $this->perPageOptions(),
+            'sortField' => $this->sortField,
+            'sortDirection' => $this->sortDirection,
         ]);
     }
 
@@ -202,7 +264,19 @@ class JobVacancyTable extends Component
     private function normalisePerPage(): void
     {
         if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = 10;
+            $this->perPage = (int) config('hris.pagination.default');
+        }
+    }
+
+    /** A tampered sort column or direction falls back to the default order. */
+    private function normaliseSort(): void
+    {
+        if (! array_key_exists($this->sortField, self::SORTABLE)) {
+            $this->sortField = '';
+        }
+
+        if (! in_array($this->sortDirection, ['asc', 'desc'], true)) {
+            $this->sortDirection = 'asc';
         }
     }
 

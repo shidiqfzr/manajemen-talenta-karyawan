@@ -579,7 +579,8 @@ class FormasiEditorTest extends TestCase
 
         $component = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
             ->assertSee('Formasi Jabatan')
-            ->assertSee('Total Kuota')
+            ->assertSee('Total kuota 1')
+            ->assertDontSee('Total Kuota')
             ->assertSee('1 formasi melebihi kuota');
 
         $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 1, 'filled' => 2, 'over' => 1, 'vacant' => 0, 'vacant_formasi' => 0], $component->instance()->overviewStats);

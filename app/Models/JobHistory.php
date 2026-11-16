@@ -69,6 +69,7 @@ class JobHistory extends Model
         'catatan',
         'is_dispensasi',
         'alasan_dispensasi',
+        'catatan_kepatuhan',
         'cancelled_by',
         'alasan_pembatalan',
     ];

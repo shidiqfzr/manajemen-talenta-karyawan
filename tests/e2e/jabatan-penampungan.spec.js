@@ -56,7 +56,8 @@ test('alur lengkap: buat jabatan, buka pada unit, lihat bezetting, tutup dengan 
 
     // Buka pada unit
     const row = page.locator('tbody tr', { hasText: 'Asisten Diperbantukan Uji' });
-    await row.getByRole('button', { name: 'Buka di Unit' }).click();
+    await row.getByRole('button', { name: /^Aksi untuk/ }).click();
+    await page.getByRole('menuitem', { name: 'Buka di Unit' }).click();
     const openDialog = page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' });
     await expect(openDialog).toBeVisible();
     await openDialog.getByLabel(/Unit Kerja/).selectOption({ label: 'Group Manager Kalbar' });
@@ -70,7 +71,8 @@ test('alur lengkap: buat jabatan, buka pada unit, lihat bezetting, tutup dengan 
     await expect(unitRow).toContainText('Dibuka');
 
     // Tutup: alasan wajib
-    await unitRow.getByRole('button', { name: 'Tutup' }).click();
+    await unitRow.getByRole('button', { name: /^Aksi untuk/ }).click();
+    await page.getByRole('menuitem', { name: 'Tutup di Unit' }).click();
     const closeDialog = page.getByRole('dialog', { name: 'Tutup Jabatan pada Unit' });
     await closeDialog.getByLabel(/Alasan Perubahan/).fill('pendek');
     await closeDialog.getByRole('button', { name: 'Tutup pada Unit' }).click();
@@ -145,11 +147,13 @@ test('jabatan yang masih dibuka tidak dapat dihapus dan pesan menunjuk tab ini',
     await createDialog.getByRole('button', { name: 'Simpan Jabatan' }).click();
 
     const row = page.locator('tbody tr', { hasText: 'Advisor Hapus Uji' });
-    await row.getByRole('button', { name: 'Buka di Unit' }).click();
+    await row.getByRole('button', { name: /^Aksi untuk/ }).click();
+    await page.getByRole('menuitem', { name: 'Buka di Unit' }).click();
     await page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' }).getByLabel(/Unit Kerja/).selectOption({ label: 'Group Manager Kalbar' });
     await page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' }).getByRole('button', { name: 'Buka pada Unit' }).click();
 
-    await row.getByRole('button', { name: /Hapus Advisor Hapus Uji/ }).click();
+    await row.getByRole('button', { name: /^Aksi untuk/ }).click();
+    await page.getByRole('menuitem', { name: 'Hapus Jabatan' }).click();
     const deleteDialog = page.getByRole('dialog', { name: 'Hapus Jabatan Penampungan' });
     await deleteDialog.getByLabel(/Alasan Perubahan/).fill('Dibuat keliru, belum pernah dipakai');
     await deleteDialog.getByRole('button', { name: 'Hapus Jabatan' }).click();

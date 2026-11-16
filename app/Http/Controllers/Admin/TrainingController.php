@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DeletionReasonRequest;
+use App\Http\Requests\Admin\TrainingRequest;
 use App\Models\Training;
 use App\Services\TrainingService;
-use Illuminate\Http\Request;
 
 class TrainingController extends Controller
 {
@@ -27,26 +28,9 @@ class TrainingController extends Controller
     }
 
     // Store new training
-    public function store(Request $request)
+    public function store(TrainingRequest $request)
     {
-        $validated = $request->validate([
-            'judul' => 'required|string|max:255',
-            'jenis' => 'required|string|max:255',
-            'metode' => 'required|string|max:255',
-            'tanggal_mulai' => 'required|date',
-            'tanggal_akhir' => 'required|date',
-            'biaya_tiket_peserta' => 'required|integer|min:0',
-            'biaya_pelatihan' => 'required|integer|min:0',
-            'penyelenggara' => 'required|string|max:255',
-            'nomor_surat' => 'required|string|max:255',
-            'tanggal_surat' => 'required|date',
-            'keterangan' => 'nullable|string',
-            'bidang_pelatihan' => 'required|string|max:255',
-            'jam_belajar_per_hari' => 'required|integer|min:1',
-        ]);
-
-        $training = Training::create($validated);
-        $this->trainingService->recalculateManHours($training);
+        $this->trainingService->create($request->validated());
 
         return redirect()->route('admin.trainings.index')->with('success', 'Pelatihan berhasil ditambahkan');
     }
@@ -69,34 +53,16 @@ class TrainingController extends Controller
         return view('admin.trainings.edit-training', compact('training'));
     }
 
-    public function update(Request $request, Training $training)
+    public function update(TrainingRequest $request, Training $training)
     {
-        $validated = $request->validate([
-            'judul' => 'required|string|max:255',
-            'jenis' => 'required|string|max:255',
-            'metode' => 'required|string|max:255',
-            'tanggal_mulai' => 'required|date',
-            'tanggal_akhir' => 'required|date',
-            'biaya_tiket_peserta' => 'required|integer|min:0',
-            'biaya_pelatihan' => 'required|integer|min:0',
-            'penyelenggara' => 'required|string|max:255',
-            'nomor_surat' => 'required|string|max:255',
-            'tanggal_surat' => 'required|date',
-            'keterangan' => 'nullable|string',
-            'bidang_pelatihan' => 'required|string|max:255',
-            'jam_belajar_per_hari' => 'required|integer|min:1',
-        ]);
-
-        $training->update($validated);
-        $this->trainingService->recalculateManHours($training);
+        $this->trainingService->update($training, $request->validated());
 
         return redirect()->route('admin.trainings.show', $training->id)->with('success', 'Data pelatihan berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(DeletionReasonRequest $request, Training $training)
     {
-        $training = Training::findOrFail($id);
-        $training->delete();
+        $this->trainingService->delete($training, $request->validated('alasan'));
 
         return redirect()->route('admin.trainings.index')->with('success', 'Pelatihan berhasil dihapus.');
     }

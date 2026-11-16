@@ -17,7 +17,7 @@
         icon="fas fa-file-excel"
         :breadcrumbs="[
             ['label' => 'Core HR'],
-            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
+            ['label' => 'Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Impor Data Spreadsheet']
         ]"
         back-url="{{ route('admin.employees.index') }}"

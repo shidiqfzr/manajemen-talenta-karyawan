@@ -21,10 +21,13 @@ use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
 use App\Services\FormasiSeatGuard;
 use App\Services\Import\EmployeeImportDictionary;
+use App\Services\PensiunService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
@@ -35,21 +38,21 @@ class EmployeeController extends Controller
     public function index()
     {
         // Fetch employees with expired sanctions (Diperban)
-        $expiredSanksiEmployees = Employee::sanctionExpired()
+        $expiredSanksiEmployees = Employee::aktif()->sanctionExpired()
             ->orderBy('tanggal_berakhir_sanksi', 'asc')
             ->get();
 
         // Fixed Global Headcount KPI Metrics (Executive Overview). The Karpim/Karpel counts use the same
         // equality condition as the table's `level` filter, so a card's count matches the rows it shows.
         $kpi = [
-            'total' => Employee::count(),
-            'units' => Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja'),
-            'karpim' => Employee::where('level', Employee::LEVEL_KARPIM)->count(),
-            'karpel' => Employee::where('level', Employee::LEVEL_KARPEL)->count(),
+            'total' => Employee::aktif()->count(),
+            'units' => Employee::aktif()->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja'),
+            'karpim' => Employee::aktif()->where('level', Employee::LEVEL_KARPIM)->count(),
+            'karpel' => Employee::aktif()->where('level', Employee::LEVEL_KARPEL)->count(),
             // Special governance metrics
-            'rangkap' => Employee::whereHas('concurrentJobs')->count(),
-            'sanksi' => Employee::sanctionActive()->count(),
-            'overflow' => Employee::overflow()->count(),
+            'rangkap' => Employee::aktif()->whereHas('concurrentJobs')->count(),
+            'sanksi' => Employee::aktif()->sanctionActive()->count(),
+            'overflow' => Employee::aktif()->overflow()->count(),
             'expired' => $expiredSanksiEmployees->count(),
         ];
 
@@ -169,11 +172,18 @@ class EmployeeController extends Controller
     {
         $employee = Employee::where('nik', $nik)->firstOrFail();
 
-        $histories = $employee->jobHistories()->paginate(10);
-        $trainings = $employee->trainings()->paginate(10);
-        $evaluations = $employee->evaluations()->latest()->paginate(5);
+        $histories = $employee->jobHistories()->paginate((int) config('hris.pagination.default'));
+        $trainings = $employee->trainings()->paginate((int) config('hris.pagination.default'));
+        $evaluations = $employee->evaluations()->latest()->paginate((int) config('hris.pagination.default'));
 
-        return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations'));
+        // Dampak pemberhentian yang ditampilkan pada modal sebelum eksekusi (DESIGN.md §7.2).
+        $separationImpact = [
+            'active_jobs' => $employee->activeJobs()->count(),
+            'scheduled' => $employee->scheduledJobs()->count(),
+            'pensiun' => $employee->effective_tanggal_pensiun?->toDateString(),
+        ];
+
+        return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations', 'separationImpact'));
     }
 
     /**
@@ -417,6 +427,11 @@ class EmployeeController extends Controller
 
         $validated = $request->validated();
 
+        // Karyawan yang sudah pensiun: data jabatan dan masa pensiun dibekukan sebagai arsip.
+        if ($employee->isSeparated()) {
+            $validated = array_diff_key($validated, array_flip(['status_penugasan', 'golongan', 'tanggal_dalam_jabatan', 'tmt_unit_kerja', 'job_grade', 'person_grade', 'tanggal_mbt', 'tanggal_pensiun']));
+        }
+
         if ($request->hasFile('foto')) {
             // Delete old foto if exists
             if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
@@ -430,13 +445,72 @@ class EmployeeController extends Controller
 
         // Standardize data (Uppercase nama & trim unit_kerja)
         $validated['nama'] = strtoupper(trim($validated['nama']));
-        $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
+        if (! $employee->isSeparated()) {
+            $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
+        }
 
         DB::transaction(function () use ($employee, $validated) {
             $employee->update($validated);
         });
 
         return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil diperbarui.');
+    }
+
+    /**
+     * Memberhentikan karyawan dari jabatan (pensiun dini, mengundurkan diri, meninggal dunia, PHK, atau pensiun yang
+     * dimajukan). Pensiun normal berjalan otomatis; tindakan ini wajib bertanggal dan tercatat pada Riwayat Perubahan.
+     */
+    public function separate(Request $request, $nik, PensiunService $pensiun)
+    {
+        Gate::authorize('separate-employee');
+
+        $validated = $request->validate([
+            'alasan' => ['required', Rule::in(Employee::ALASAN_BERHENTI)],
+            'tanggal_berhenti' => ['required', 'date'],
+            'nomor_sk' => ['nullable', 'string', 'max:100'],
+            'tanggal_sk' => ['nullable', 'date', 'required_with:nomor_sk'],
+        ], [
+            'alasan.required' => 'Alasan pemberhentian wajib dipilih.',
+            'tanggal_berhenti.required' => 'Tanggal berhenti wajib diisi.',
+            'tanggal_sk.required_with' => 'Tanggal SK wajib diisi bila nomor SK diisi.',
+        ]);
+
+        $employee = Employee::findOrFail($nik);
+
+        $done = $pensiun->separate(
+            $employee,
+            $validated['alasan'],
+            Carbon::parse($validated['tanggal_berhenti']),
+            $validated['nomor_sk'] ?? null,
+            isset($validated['tanggal_sk']) ? Carbon::parse($validated['tanggal_sk']) : null,
+            $request->user(),
+        );
+
+        return redirect()->route('admin.employees.show', $employee)->with(
+            $done ? 'success' : 'error',
+            $done ? 'Karyawan berhasil diberhentikan dari jabatan dan kursi formasinya dikosongkan.' : 'Karyawan sudah diberhentikan sebelumnya.'
+        );
+    }
+
+    /** Mencatat SK pemberhentian yang terbit setelah pemberhentian diproses. */
+    public function recordSeparationSk(Request $request, $nik, PensiunService $pensiun)
+    {
+        Gate::authorize('separate-employee');
+
+        $validated = $request->validate([
+            'nomor_sk' => ['required', 'string', 'max:100'],
+            'tanggal_sk' => ['required', 'date'],
+        ], [
+            'nomor_sk.required' => 'Nomor SK wajib diisi.',
+            'tanggal_sk.required' => 'Tanggal SK wajib diisi.',
+        ]);
+
+        $employee = Employee::findOrFail($nik);
+        abort_unless($employee->isSeparated(), 422, 'Karyawan belum diberhentikan.');
+
+        $pensiun->catatSk($employee, $validated['nomor_sk'], Carbon::parse($validated['tanggal_sk']), $request->user());
+
+        return redirect()->route('admin.employees.show', $employee)->with('success', 'SK pemberhentian berhasil dicatat.');
     }
 
     // Delete employee

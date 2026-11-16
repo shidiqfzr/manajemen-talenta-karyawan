@@ -188,11 +188,13 @@ class WithDataTableTest extends TestCase
             ->test(FixtureTableSmallPerPage::class)
             ->assertSet('perPage', 5);
 
-        // A default that is one of the options is kept as is (the three employee profile tables).
+        // A default that is one of the options is kept as is (including the three employee profile tables).
         $this->assertSame(25, invade(new FixtureTable)->resolvedDefaultPerPage());
 
+        // Every data table inherits the single standard from config('hris.pagination').
         foreach ([TrainingTable::class, EvaluationTable::class, JobHistoryTable::class] as $table) {
-            $this->assertSame(5, invade(new $table)->resolvedDefaultPerPage(), $table);
+            $this->assertSame(25, invade(new $table)->resolvedDefaultPerPage(), $table);
+            $this->assertSame([10, 25, 50, 100], invade(new $table)->perPageOptions(), $table);
         }
     }
 

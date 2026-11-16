@@ -17,7 +17,7 @@ class JobHistoryController extends Controller
      */
     public function index(Employee $employee)
     {
-        $histories = $employee->jobHistories()->paginate(10);
+        $histories = $employee->jobHistories()->paginate((int) config('hris.pagination.default'));
 
         return view('admin.employees.job-history.index', compact('employee', 'histories'));
     }

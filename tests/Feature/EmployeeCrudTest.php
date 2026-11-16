@@ -698,8 +698,8 @@ class EmployeeCrudTest extends TestCase
     {
         $employee = Employee::factory()->create();
 
-        // Six rows each so every table has a second page (five rows per page).
-        for ($i = 1; $i <= 6; $i++) {
+        // One row more than the shared page size, so every table has a second page.
+        for ($i = 1; $i <= (int) config('hris.pagination.default') + 1; $i++) {
             JobHistory::create([
                 'employee_nik' => $employee->nik,
                 'jabatan' => 'Jabatan Riwayat '.$i,

@@ -27,8 +27,6 @@ class PoolPositions extends Component
 {
     use WithPagination;
 
-    public const PER_PAGE_OPTIONS = [10, 25, 50];
-
     public const VIEW_JABATAN = 'jabatan';
 
     public const VIEW_UNIT = 'unit';
@@ -390,7 +388,7 @@ class PoolPositions extends Component
         return view('livewire.admin.master.pool-positions', [
             'rows' => $paginator,
             'stats' => $this->stats,
-            'perPageOptions' => self::PER_PAGE_OPTIONS,
+            'perPageOptions' => $this->perPageOptions(),
             'jenisLabels' => self::JENIS_LABELS,
             'rmLevels' => MasterFormasiService::POOL_RM_LEVELS,
             'openingPosition' => $this->openingPositionId ? Position::find($this->openingPositionId) : null,
@@ -428,6 +426,7 @@ class PoolPositions extends Component
         // Pemegang per (unit, jabatan) dengan kunci yang dinormalisasi.
         $holders = [];
         foreach (Employee::query()
+            ->aktif()
             ->whereIn('jabatan', $positions->pluck('nama'))
             ->selectRaw('unit_kerja, jabatan, count(*) as total')
             ->groupBy('unit_kerja', 'jabatan')
@@ -514,13 +513,24 @@ class PoolPositions extends Component
             $this->view = self::VIEW_JABATAN;
         }
 
-        if (! in_array($this->perPage, self::PER_PAGE_OPTIONS, true)) {
-            $this->perPage = 25;
+        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
+            $this->perPage = $this->defaultPerPage();
         }
     }
 
     private function authorizeAdmin(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
+
+    /** @return array<int, int> Opsi baris per halaman; satu standar untuk seluruh tabel (config hris.pagination). */
+    protected function perPageOptions(): array
+    {
+        return array_map('intval', config('hris.pagination.options'));
+    }
+
+    protected function defaultPerPage(): int
+    {
+        return (int) config('hris.pagination.default');
     }
 }

@@ -24,7 +24,7 @@
 }" class="space-y-6">
 
     <!-- Page Header & Action Bar -->
-    <x-admin.module-header title="Manajemen Karyawan" subtitle="Kelola data induk karyawan, struktur jabatan, formasi, dan rekam jejak talenta." :breadcrumbs="['Core HR', 'Manajemen Karyawan']">
+    <x-admin.module-header title="Manajemen Karyawan" subtitle="Kelola data induk karyawan, struktur jabatan, formasi, dan rekam jejak talenta." :breadcrumbs="['Core HR', 'Karyawan']">
         <!-- Import Page Navigation Button (Enterprise Workday / SAP Multi-Step Standard) -->
         <a href="{{ route('admin.employees.import.page') }}"
             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200 bg-white text-surface-700 hover:bg-surface-50 hover:text-surface-900 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer">
@@ -176,75 +176,25 @@
          (App\Livewire\Admin\Employees\EmployeeTable). Kartu dan strip mengubah filter tabel secara langsung; angka KPI dihitung di controller. --}}
     <livewire:admin.employees.employee-table :kpi="$kpi" />
 
-    {{-- MODAL: Delete Confirmation Modal (Destructive Action - DESIGN.md 6.5) --}}
-    <div x-show="deleteModalOpen"
-        x-cloak
-        class="fixed inset-0 z-50 overflow-y-auto"
-        aria-labelledby="delete-dialog-title" role="dialog" aria-modal="true" x-trap.noscroll="deleteModalOpen" tabindex="-1">
-        
-        <!-- Backdrop -->
-        <div x-show="deleteModalOpen"
-            x-transition:enter="ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
-            @click="deleteModalOpen = false"></div>
-
-        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-            <div x-show="deleteModalOpen"
-                x-transition:enter="ease-out duration-300"
-                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave="ease-in duration-200"
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-surface-200">
-                
-                <div class="p-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-2xl bg-danger-100 text-danger flex items-center justify-center text-xl shrink-0 border border-danger-200">
-                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                        </div>
-                        <div class="space-y-1.5 flex-1">
-                            <h3 class="text-lg font-bold text-surface-900" id="delete-dialog-title">Hapus Data Karyawan</h3>
-                            <p class="text-xs sm:text-sm text-surface-600 leading-relaxed">
-                                Apakah Anda yakin ingin menghapus data karyawan <strong class="text-surface-900 font-semibold" x-text="deleteNama"></strong> (NIK: <span class="font-mono text-surface-700 font-semibold" x-text="deleteNik"></span>)?
-                            </p>
-                            <p class="text-xs text-danger font-medium mt-2">
-                                <i class="fas fa-circle-exclamation mr-1" aria-hidden="true"></i> Data riwayat mutasi, pelatihan, dan evaluasi terkait akan ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <form :action="deleteAction" method="POST">
-                    @csrf
-                    @method('DELETE')
-                    <div class="px-6 pb-4">
-                        <label for="delete-reason" class="block text-xs font-semibold text-surface-700 mb-1">Alasan penghapusan <span class="text-danger">*</span></label>
-                        <textarea id="delete-reason" name="reason" rows="3" minlength="10" maxlength="500" required x-model="deleteReason"
-                            placeholder="Contoh: data ganda hasil impor, karyawan keluar sesuai SK Direksi (minimal 10 karakter)"
-                            class="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-                        <p class="mt-1 text-[11px] text-surface-500">Alasan dicatat bersama arsip data karyawan yang dihapus.</p>
-                    </div>
-                    <div class="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-end gap-2.5">
-                    <button type="button" autofocus @click="deleteModalOpen = false"
-                        class="px-4 py-2.5 rounded-lg border border-surface-300 bg-white text-surface-700 hover:bg-surface-100 text-xs sm:text-sm font-medium transition shadow-xs">
-                        Batal
-                    </button>
-                        <button type="submit"
-                            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-danger hover:bg-danger-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">
-                            <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
-                            <span>Ya, Hapus Data</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
+    {{-- Modal konfirmasi hapus karyawan: cangkang x-admin.modal (DESIGN.md §6.1, §7.6) --}}
+    <x-admin.modal open="deleteModalOpen" title-id="delete-dialog-title" tone="danger" title="Hapus Data Karyawan" icon="fas fa-triangle-exclamation" form method="DELETE" ::action="deleteAction">
+        <p class="text-sm text-surface-600 leading-relaxed">
+            Apakah Anda yakin ingin menghapus data karyawan <strong class="text-surface-900 font-semibold" x-text="deleteNama"></strong> (NIK: <span class="font-mono text-surface-700 font-semibold" x-text="deleteNik"></span>)?
+        </p>
+        <p class="text-xs text-danger font-medium">
+            <i class="fas fa-circle-exclamation mr-1" aria-hidden="true"></i> Data riwayat mutasi, pelatihan, dan evaluasi terkait akan ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan.
+        </p>
+        <div>
+            <label for="delete-reason" class="block text-xs font-semibold text-surface-700 mb-1">Alasan penghapusan <span class="text-danger">*</span></label>
+            <textarea id="delete-reason" name="reason" rows="3" minlength="10" maxlength="500" required x-model="deleteReason"
+                placeholder="Contoh: data ganda hasil impor, karyawan keluar sesuai SK Direksi (minimal 10 karakter)"
+                class="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"></textarea>
+            <p class="mt-1 text-[11px] text-surface-500">Alasan dicatat bersama arsip data karyawan yang dihapus.</p>
         </div>
-    </div>
+        <x-slot:footer>
+            <x-admin.button variant="danger" type="submit" icon="fas fa-trash-alt" once>Ya, Hapus Data</x-admin.button>
+        </x-slot:footer>
+    </x-admin.modal>
 
 </div>
 

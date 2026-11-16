@@ -145,9 +145,9 @@ class JobVacancyTableTest extends TestCase
     {
         Livewire::test(JobVacancyTable::class)
             ->set('perPage', 9999)
-            ->assertSet('perPage', 10)
-            ->set('perPage', 25)
-            ->assertSet('perPage', 25);
+            ->assertSet('perPage', 25)
+            ->set('perPage', 50)
+            ->assertSet('perPage', 50);
     }
 
     public function test_formasi_that_was_never_filled_is_listed_and_filterable(): void
@@ -259,6 +259,78 @@ class JobVacancyTableTest extends TestCase
         $html = preg_replace('/\s+/', ' ', Livewire::test(JobVacancyTable::class)->html());
 
         $this->assertStringContainsString(app(JobVacancyService::class)->getFormasiStatistics()['vacant_formasi'].' Formasi', $html);
+    }
+
+    public function test_rows_are_compact_indonesian_and_use_the_shared_table_patterns(): void
+    {
+        // The app locale defaults to 'en'; the dates and ages on this screen must stay Indonesian regardless.
+        app()->setLocale('en');
+        $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
+
+        $html = Livewire::test(JobVacancyTable::class)->html();
+        $text = preg_replace('/\s+/', ' ', strip_tags($html));
+
+        // Age is shown once, as a labelled badge with the start date, never as English relative text.
+        $this->assertStringContainsString('Kritis · 200 Hari', $text);
+        $this->assertStringContainsString('Perhatian · 60 Hari', $text);
+        $this->assertStringContainsString('Baru · 5 Hari', $text);
+        $this->assertStringContainsString('Sejak '.now()->subDays(200)->locale('id')->translatedFormat('d M Y'), $text);
+        $this->assertDoesNotMatchRegularExpression('/\b(ago|weeks?|months?|days?)\b/i', $text);
+        // Same value on every row is not a column; the never-filled state is stated once per row.
+        $this->assertStringNotContainsString('Formasi Operasional', $text);
+        $this->assertSame(1, substr_count($text, 'Belum pernah terisi') - substr_count($html, 'class="sr-only">Belum pernah terisi'));
+        // The formasi shows its RM Band (the structural anchor); Level and the last holder's golongan are not badges.
+        $this->assertStringContainsString('RM-3', $text);
+        $this->assertStringNotContainsString('Gol:', $text);
+        $this->assertStringNotContainsString('Level:', $text);
+        // One labelled "Isi Jabatan" menu per row with both ways to fill it (no icon-only kebab), and a loading skeleton that shares the rows' wire:target.
+        $this->assertStringContainsString('aria-haspopup="menu"', $html);
+        $this->assertStringContainsString('Isi Jabatan', $text);
+        $this->assertStringContainsString('Mutasi Internal', $text);
+        $this->assertStringContainsString('Rekrut Karyawan Baru', $text);
+        $this->assertStringNotContainsString('fa-ellipsis-v', $html);
+        $this->assertStringContainsString('aria-hidden="true" wire:loading.delay.class.remove="hidden"', $html);
+        $this->assertStringContainsString('aria-busy', $html);
+    }
+
+    public function test_columns_sort_ascending_then_descending_and_empty_values_stay_last(): void
+    {
+        $this->makeSeat('Jabatan Belum Pernah Terisi', 'Unit Gamma');
+        // Row order as rendered: the formasi names sorted by where they first appear in the table HTML.
+        $order = function ($component): array {
+            $html = $component->html();
+            $names = ['Jabatan Baru Alfa', 'Jabatan Sedang Beta', 'Jabatan Kritis Alfa', 'Jabatan Belum Pernah Terisi'];
+            usort($names, fn ($a, $b) => strpos($html, $a) <=> strpos($html, $b));
+
+            return $names;
+        };
+
+        $component = Livewire::test(JobVacancyTable::class)->call('sortBy', 'lama_kosong');
+        $component->assertSet('sortField', 'lama_kosong')->assertSet('sortDirection', 'asc')->assertSeeHtml('aria-sort="ascending"');
+        // Fewest days first; the never-filled formasi has no age and stays last.
+        $this->assertSame(['Jabatan Baru Alfa', 'Jabatan Sedang Beta', 'Jabatan Kritis Alfa', 'Jabatan Belum Pernah Terisi'], $order($component));
+
+        $component->call('sortBy', 'lama_kosong')->assertSet('sortDirection', 'desc');
+        $this->assertSame(['Jabatan Kritis Alfa', 'Jabatan Sedang Beta', 'Jabatan Baru Alfa', 'Jabatan Belum Pernah Terisi'], $order($component));
+
+        $component->call('sortBy', 'jabatan')->assertSet('sortDirection', 'asc');
+        $this->assertSame('Jabatan Baru Alfa', $order($component)[0]);
+
+        // A tampered column or direction falls back to the default order.
+        $component->call('sortBy', 'password')->assertSet('sortField', 'jabatan')
+            ->set('sortField', 'nik; drop')->assertSet('sortField', '')
+            ->set('sortDirection', 'sideways')->assertSet('sortDirection', 'asc');
+    }
+
+    public function test_partial_formasi_shows_one_status_badge_with_the_count(): void
+    {
+        $partial = $this->makeSeat('Jabatan Dua Kursi', 'Unit Gamma', 2);
+        Employee::factory()->create(['jabatan' => $partial->nama, 'unit_kerja' => 'Unit Gamma']);
+
+        $html = Livewire::test(JobVacancyTable::class)->html();
+
+        $this->assertStringContainsString('Sebagian kosong · 1 dari 2', preg_replace('/\s+/', ' ', strip_tags($html)));
+        $this->assertStringContainsString('title="1 dari 2 kosong"', $html);
     }
 
     public function test_reserved_vacancy_shows_the_reserved_employee_name(): void

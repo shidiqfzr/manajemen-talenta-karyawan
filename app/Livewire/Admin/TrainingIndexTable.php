@@ -219,17 +219,6 @@ class TrainingIndexTable extends Component
         return 'Daftar Pelatihan';
     }
 
-    /** @return array<int, int> */
-    protected function perPageOptions(): array
-    {
-        return [10, 20, 50, 100];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 20;
-    }
-
     protected function exportName(): ?string
     {
         return 'data_pelatihan';

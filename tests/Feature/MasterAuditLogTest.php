@@ -365,6 +365,6 @@ class MasterAuditLogTest extends TestCase
     {
         $html = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))->getContent();
 
-        $this->assertMatchesRegularExpression('/aria-label="Breadcrumb".*Core HR.*Master Formasi.*aria-current="page">Riwayat Perubahan</s', $html);
+        $this->assertMatchesRegularExpression('/aria-label="Breadcrumb".*Core HR.*Formasi.*aria-current="page">Riwayat Perubahan</s', $html);
     }
 }

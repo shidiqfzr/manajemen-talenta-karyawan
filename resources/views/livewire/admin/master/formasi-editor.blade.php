@@ -20,15 +20,14 @@
         @endphp
 
         <!-- Ringkasan -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3.5">
-            <x-admin.kpi-card title="Jumlah Jabatan" :value="$seats->count()" subtitle="Jabatan pada formasi unit ini" icon="fas fa-briefcase" theme="primary" />
-            <x-admin.kpi-card title="Total Kuota" :value="$seats->sum('kuota')" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
+            <x-admin.kpi-card title="Jumlah Jabatan" :value="$seats->count()" :subtitle="'Total kuota '.number_format((int) $seats->sum('kuota'), 0, ',', '.')" icon="fas fa-briefcase" theme="primary" />
             <x-admin.kpi-card title="Terisi" :value="$seats->sum('filled')" subtitle="Karyawan menempati formasi" icon="fas fa-user-check" theme="teal" />
             @php $vacantSlots = (int) $seats->sum('vacant_slots') @endphp
-            <x-admin.kpi-card title="Kosong" :value="$vacantSlots" :subtitle="$seatStatusFilter === 'vacant' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk melihat formasi yang belum terisi'" icon="fas fa-user-clock" :theme="$vacantSlots > 0 ? 'warning' : 'neutral'" :active="$seatStatusFilter === 'vacant'"
+            <x-admin.kpi-card title="Kosong" :value="$vacantSlots" subtitle="Kuota belum terisi" icon="fas fa-user-clock" :theme="$vacantSlots > 0 ? 'warning' : 'neutral'" :active="$seatStatusFilter === 'vacant'"
                 role="button" tabindex="0" aria-pressed="{{ $seatStatusFilter === 'vacant' ? 'true' : 'false' }}" wire:click="toggleVacantFilter" wire:keydown.enter="toggleVacantFilter" wire:keydown.space.prevent="toggleVacantFilter" />
             @if ($overQuota > 0 || $seatStatusFilter === 'over')
-                <x-admin.kpi-card title="Melebihi Kuota" :value="$overQuota" :subtitle="$seatStatusFilter === 'over' ? 'Filter aktif, klik untuk menampilkan semua' : 'Klik untuk menampilkan yang perlu ditinjau'" icon="fas fa-triangle-exclamation" theme="danger" :active="$seatStatusFilter === 'over'"
+                <x-admin.kpi-card title="Melebihi Kuota" :value="$overQuota" subtitle="Perlu ditinjau" icon="fas fa-triangle-exclamation" theme="danger" :active="$seatStatusFilter === 'over'"
                     role="button" tabindex="0" aria-pressed="{{ $seatStatusFilter === 'over' ? 'true' : 'false' }}" wire:click="toggleOverQuotaFilter" wire:keydown.enter="toggleOverQuotaFilter" wire:keydown.space.prevent="toggleOverQuotaFilter" />
             @else
                 <x-admin.kpi-card title="Melebihi Kuota" :value="0" subtitle="Tidak ada formasi melebihi kuota" icon="fas fa-triangle-exclamation" theme="neutral" />
@@ -151,12 +150,11 @@
         @endif
 
         <!-- Ringkasan lintas unit -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3.5">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
             <x-admin.kpi-card title="Unit Kerja" :value="$stats['units']" subtitle="Unit terdaftar" icon="fas fa-building" theme="teal" />
-            <x-admin.kpi-card title="Formasi Jabatan" :value="$stats['seats']" subtitle="Jabatan pada seluruh unit" icon="fas fa-briefcase" theme="primary" />
-            <x-admin.kpi-card title="Total Kuota" :value="$stats['kuota']" subtitle="Kuota formasi" icon="fas fa-table-cells" theme="info" />
+            <x-admin.kpi-card title="Formasi Jabatan" :value="$stats['seats']" :subtitle="'Total kuota '.number_format((int) $stats['kuota'], 0, ',', '.')" icon="fas fa-briefcase" theme="primary" />
             <x-admin.kpi-card title="Terisi" :value="$stats['filled']" :badge="$stats['kuota'] > 0 ? round($stats['filled'] / $stats['kuota'] * 100).'%' : null" :subtitle="$stats['over'].' formasi melebihi kuota'" icon="fas fa-user-check" theme="primary" />
-            <x-admin.kpi-card title="Formasi Kosong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' kuota kosong, klik untuk rincian'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.sebaran.index', ['status' => 'kosong'])" />
+            <x-admin.kpi-card title="Formasi Kosong" :value="$stats['vacant_formasi']" :subtitle="$stats['vacant'].' kuota kosong'" icon="fas fa-user-clock" :theme="$stats['vacant'] > 0 ? 'warning' : 'neutral'" :href="route('admin.master.sebaran.index', ['status' => 'kosong'])" />
         </div>
 
         <!-- Daftar unit: pencarian, filter, dan tabel dalam satu kartu (pola yang sama dengan modul Karyawan) -->
@@ -239,56 +237,47 @@
     <!-- Konfirmasi perubahan + panel dampak -->
     @if ($pendingOperation)
         @php $impact = $this->impact @endphp
-        <div x-data="{ open: true }" @keydown.escape.window="$wire.cancel()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="formasi-confirm-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="formasi-confirm-title" class="text-sm font-extrabold text-surface-900">{{ $this->operationTitle() }}</h3>
-                    <p class="text-[11px] text-surface-500">Tinjau dampak perubahan sebelum diterapkan.</p>
-                </div>
-
-                <div class="p-6 space-y-4">
-                    @if ($impact)
-                        @if ($impact->blockers)
-                            <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold space-y-1">
-                                @foreach ($impact->blockers as $blocker)
-                                    <p>{{ $blocker }}</p>
-                                @endforeach
-                            </div>
-                        @endif
-                        @if ($impact->warnings)
-                            <div class="p-3 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-800 font-semibold space-y-1">
-                                @foreach ($impact->warnings as $warning)
-                                    <p>{{ $warning }}</p>
-                                @endforeach
-                            </div>
-                        @endif
-                        @if (! $impact->blockers && ! $impact->warnings)
-                            <p class="text-xs text-surface-600">Tidak ada dampak pada karyawan. Perubahan siap diterapkan.</p>
-                        @endif
-                        @if ($impact->affectedEmployees > 0)
-                            <p class="text-[11px] text-surface-500">Karyawan terkait: {{ $impact->affectedEmployees }}</p>
-                        @endif
-                    @endif
-
-                    @if ($this->requiresReason())
-                        <div>
-                            <label for="formasi-alasan" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                            <textarea id="formasi-alasan" wire:model="reason" rows="3" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
+        <div x-data="{ open: true }">
+            <x-admin.modal close="$wire.cancel()" tone="primary" icon="fas fa-clipboard-check" size="lg" title-id="formasi-confirm-title">
+                <x-slot:heading>{{ $this->operationTitle() }}</x-slot:heading>
+                <x-slot:subheading>Tinjau dampak perubahan sebelum diterapkan.</x-slot:subheading>
+                @if ($impact)
+                    @if ($impact->blockers)
+                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold space-y-1">
+                            @foreach ($impact->blockers as $blocker)
+                                <p>{{ $blocker }}</p>
+                            @endforeach
                         </div>
                     @endif
+                    @if ($impact->warnings)
+                        <div class="p-3 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-800 font-semibold space-y-1">
+                            @foreach ($impact->warnings as $warning)
+                                <p>{{ $warning }}</p>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if (! $impact->blockers && ! $impact->warnings)
+                        <p class="text-xs text-surface-600">Tidak ada dampak pada karyawan. Perubahan siap diterapkan.</p>
+                    @endif
+                    @if ($impact->affectedEmployees > 0)
+                        <p class="text-[11px] text-surface-500">Karyawan terkait: {{ $impact->affectedEmployees }}</p>
+                    @endif
+                @endif
 
-                    @error('confirm')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
-                </div>
+                @if ($this->requiresReason())
+                    <div>
+                        <label for="formasi-alasan" class="block text-xs font-bold text-surface-700 mb-1.5">Alasan Perubahan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                        <textarea id="formasi-alasan" wire:model="reason" rows="3" placeholder="Jelaskan alasan perubahan ini (minimal 10 karakter). Alasan dicatat pada riwayat perubahan master." class="{{ $fieldClass }}"></textarea>
+                    </div>
+                @endif
 
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="cancel" wire:loading.attr="disabled" wire:target="confirm">Batal</x-admin.button>
+                @error('confirm')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button wire:click="confirm" target="confirm" :disabled="$impact && $impact->blocked" icon="fas fa-check">Terapkan Perubahan</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
@@ -323,109 +312,96 @@
                 get match() { return this.catalog[this.nama.trim().toLowerCase()] ?? null; },
                 get effectiveRm() { return this.match ? (this.match.rm ?? '') : this.rm; },
                 get ready() { return this.nama.trim() !== '' && this.bidang !== '' && (this.match || this.rm !== ''); }
-            }"
-            @keydown.escape.window="$wire.closeAddSeat()" @click.self="$wire.closeAddSeat()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="formasi-add-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="formasi-add-title" class="text-sm font-extrabold text-surface-900">Tambah Jabatan ke Formasi</h3>
-                    <p class="text-[11px] text-surface-500">Unit: {{ $this->unit->nama }}. Jabatan mendapat kuota dan bidang untuk unit ini saja.</p>
+            }">
+            <x-admin.modal close="$wire.closeAddSeat()" tone="primary" icon="fas fa-plus" size="lg" title-id="formasi-add-title">
+                <x-slot:heading>Tambah Jabatan ke Formasi</x-slot:heading>
+                <x-slot:subtitle>Unit: {{ $this->unit->nama }}</x-slot:subtitle>
+                <x-slot:subheading>Jabatan mendapat kuota dan bidang untuk unit ini saja.</x-slot:subheading>
+                <div>
+                    <label for="formasi-add-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
+                    <div class="relative" @click.outside="suggestOpen = false">
+                        <input id="formasi-add-nama" type="text" x-model="nama" maxlength="255" autocomplete="off" placeholder="Ketik nama jabatan…" class="{{ $fieldClass }}"
+                            role="combobox" aria-autocomplete="list" aria-controls="formasi-add-saran" x-bind:aria-expanded="(suggestOpen && suggestions.length > 0).toString()"
+                            @input="suggestOpen = true; activeIndex = -1"
+                            @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
+                            @keydown.enter="if (suggestOpen && activeIndex >= 0) { $event.preventDefault(); pick(suggestions[activeIndex]); }"
+                            @keydown.escape.stop="if (suggestOpen) { suggestOpen = false; } else { $wire.closeAddSeat(); }">
+                        <ul id="formasi-add-saran" role="listbox" x-show="suggestOpen && suggestions.length > 0" x-cloak
+                            class="absolute z-50 mt-1.5 w-full max-h-56 overflow-y-auto bg-white rounded-xl border border-surface-200 shadow-xl ring-1 ring-black/5 py-1">
+                            <template x-for="(item, index) in suggestions" :key="item.nama">
+                                <li role="option" :aria-selected="(index === activeIndex).toString()" @click="pick(item)" @mouseenter="activeIndex = index"
+                                    class="px-3 py-2 text-xs cursor-pointer flex items-center justify-between gap-2 transition"
+                                    :class="index === activeIndex ? 'bg-primary-50 text-primary-800' : 'text-surface-700 hover:bg-surface-50'">
+                                    <span class="truncate" x-text="item.nama"></span>
+                                    <span class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-100 text-surface-600" x-text="item.rm ?? '-'"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                    <p class="mt-1.5 text-[11px]" :class="match ? 'text-primary-700' : 'text-surface-500'" aria-live="polite"
+                        x-text="nama.trim() === ''
+                            ? 'Ketik nama jabatan. Bila mirip dengan jabatan yang sudah ada, saran akan muncul.'
+                            : (match ? 'Jabatan sudah terdaftar di master (' + (match.rm ?? '-') + '); RM Band mengikuti jabatan tersebut.' : 'Nama belum terdaftar: jabatan baru akan dibuat pada master.')"></p>
                 </div>
-                <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label for="formasi-add-nama" class="block text-xs font-bold text-surface-700 mb-1.5">Nama Jabatan <span class="text-danger-700" aria-hidden="true">*</span></label>
-                        <div class="relative" @click.outside="suggestOpen = false">
-                            <input id="formasi-add-nama" type="text" x-model="nama" maxlength="255" autocomplete="off" placeholder="Ketik nama jabatan…" class="{{ $fieldClass }}"
-                                role="combobox" aria-autocomplete="list" aria-controls="formasi-add-saran" x-bind:aria-expanded="(suggestOpen && suggestions.length > 0).toString()"
-                                @input="suggestOpen = true; activeIndex = -1"
-                                @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
-                                @keydown.enter="if (suggestOpen && activeIndex >= 0) { $event.preventDefault(); pick(suggestions[activeIndex]); }"
-                                @keydown.escape.stop="if (suggestOpen) { suggestOpen = false; } else { $wire.closeAddSeat(); }">
-                            <ul id="formasi-add-saran" role="listbox" x-show="suggestOpen && suggestions.length > 0" x-cloak
-                                class="absolute z-50 mt-1.5 w-full max-h-56 overflow-y-auto bg-white rounded-xl border border-surface-200 shadow-xl ring-1 ring-black/5 py-1">
-                                <template x-for="(item, index) in suggestions" :key="item.nama">
-                                    <li role="option" :aria-selected="(index === activeIndex).toString()" @click="pick(item)" @mouseenter="activeIndex = index"
-                                        class="px-3 py-2 text-xs cursor-pointer flex items-center justify-between gap-2 transition"
-                                        :class="index === activeIndex ? 'bg-primary-50 text-primary-800' : 'text-surface-700 hover:bg-surface-50'">
-                                        <span class="truncate" x-text="item.nama"></span>
-                                        <span class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-100 text-surface-600" x-text="item.rm ?? '-'"></span>
-                                    </li>
-                                </template>
-                            </ul>
-                        </div>
-                        <p class="mt-1.5 text-[11px]" :class="match ? 'text-primary-700' : 'text-surface-500'" aria-live="polite"
-                            x-text="nama.trim() === ''
-                                ? 'Ketik nama jabatan. Bila mirip dengan jabatan yang sudah ada, saran akan muncul.'
-                                : (match ? 'Jabatan sudah terdaftar di master (' + (match.rm ?? '-') + '); RM Band mengikuti jabatan tersebut.' : 'Nama belum terdaftar: jabatan baru akan dibuat pada master.')"></p>
+                        <label for="formasi-add-rm" class="block text-xs font-bold text-surface-700 mb-1.5">RM Band</label>
+                        <select id="formasi-add-rm" x-model="rm" x-bind:disabled="!!match" class="{{ $fieldClass }} disabled:opacity-60 disabled:cursor-not-allowed">
+                            @foreach ($rmOptions as $option)
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="formasi-add-rm" class="block text-xs font-bold text-surface-700 mb-1.5">RM Band</label>
-                            <select id="formasi-add-rm" x-model="rm" x-bind:disabled="!!match" class="{{ $fieldClass }} disabled:opacity-60 disabled:cursor-not-allowed">
-                                @foreach ($rmOptions as $option)
-                                    <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="formasi-add-bidang" class="block text-xs font-bold text-surface-700 mb-1.5">Bidang <span class="text-danger-700" aria-hidden="true">*</span></label>
-                            <select id="formasi-add-bidang" x-model="bidang" class="{{ $fieldClass }}">
-                                <option value="">— Pilih bidang —</option>
-                                @foreach ($bidangList as $code => $label)
-                                    <option value="{{ $code }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label for="formasi-add-bidang" class="block text-xs font-bold text-surface-700 mb-1.5">Bidang <span class="text-danger-700" aria-hidden="true">*</span></label>
+                        <select id="formasi-add-bidang" x-model="bidang" class="{{ $fieldClass }}">
+                            <option value="">— Pilih bidang —</option>
+                            @foreach ($bidangList as $code => $label)
+                                <option value="{{ $code }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="w-1/2 pr-1.5">
-                        <label for="formasi-add-kuota" class="block text-xs font-bold text-surface-700 mb-1.5">Kuota</label>
-                        <input id="formasi-add-kuota" type="number" min="1" x-model.number="kuota" class="{{ $fieldClass }}">
-                    </div>
-                    @error('add')
-                        <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
-                    @enderror
                 </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="closeAddSeat">Batal</x-admin.button>
+                <div class="w-1/2 pr-1.5">
+                    <label for="formasi-add-kuota" class="block text-xs font-bold text-surface-700 mb-1.5">Kuota</label>
+                    <input id="formasi-add-kuota" type="number" min="1" x-model.number="kuota" class="{{ $fieldClass }}">
+                </div>
+                @error('add')
+                    <div role="alert" class="p-3 bg-danger-50 border border-danger-200 rounded-xl text-xs text-danger-700 font-semibold">{{ $message }}</div>
+                @enderror
+                <x-slot:footer>
                     <x-admin.button x-bind:disabled="!ready" @click="$wire.startAddJabatan(nama, effectiveRm, bidang, kuota)" icon="fas fa-eye">Lanjut</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 
     <!-- Dialog Ubah Kuota & Bidang -->
     @if ($this->editSeat)
         @php $editing = $this->editSeat @endphp
-        <div x-data="{ open: true, kuota: {{ $editing->kuota }}, bidang: '{{ $editing->bidang }}' }" @keydown.escape.window="$wire.closeEditSeat()"
-            @click.self="$wire.closeEditSeat()"
-            class="fixed inset-0 z-50 overflow-y-auto bg-surface-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="formasi-edit-title" x-trap.noscroll="open" tabindex="-1">
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-2xl max-w-lg w-full overflow-hidden">
-                <div class="px-6 py-4 border-b border-surface-100 bg-surface-50/50">
-                    <h3 id="formasi-edit-title" class="text-sm font-extrabold text-surface-900">Ubah Kuota &amp; Bidang</h3>
-                    <p class="text-[11px] text-surface-500">{{ $editing->jabatan }} — {{ $this->unit?->nama }}</p>
+        <div x-data="{ open: true, kuota: {{ $editing->kuota }}, bidang: '{{ $editing->bidang }}' }">
+            <x-admin.modal close="$wire.closeEditSeat()" tone="primary" icon="fas fa-sliders" size="lg" title-id="formasi-edit-title">
+                <x-slot:heading>Ubah Kuota &amp; Bidang</x-slot:heading>
+                <x-slot:subtitle>{{ $editing->jabatan }} — {{ $this->unit?->nama }}</x-slot:subtitle>
+                <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="formasi-edit-bidang" class="block text-xs font-bold text-surface-700 mb-1.5">Bidang</label>
+                                <select id="formasi-edit-bidang" x-model="bidang" class="{{ $fieldClass }}">
+                                    <option value="">—</option>
+                                    @foreach ($bidangList as $code => $label)
+                                        <option value="{{ $code }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label for="formasi-edit-kuota" class="block text-xs font-bold text-surface-700 mb-1.5">Kuota</label>
+                                <input id="formasi-edit-kuota" type="number" min="1" x-model.number="kuota" class="{{ $fieldClass }}">
+                            </div>
                 </div>
-                <div class="p-6 grid grid-cols-2 gap-3">
-                    <div>
-                        <label for="formasi-edit-bidang" class="block text-xs font-bold text-surface-700 mb-1.5">Bidang</label>
-                        <select id="formasi-edit-bidang" x-model="bidang" class="{{ $fieldClass }}">
-                            <option value="">—</option>
-                            @foreach ($bidangList as $code => $label)
-                                <option value="{{ $code }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="formasi-edit-kuota" class="block text-xs font-bold text-surface-700 mb-1.5">Kuota</label>
-                        <input id="formasi-edit-kuota" type="number" min="1" x-model.number="kuota" class="{{ $fieldClass }}">
-                    </div>
-                </div>
-                <div class="px-6 py-4 bg-surface-50/80 border-t border-surface-100 flex items-center justify-end gap-2.5">
-                    <x-admin.button variant="secondary" wire:click="closeEditSeat">Batal</x-admin.button>
+                <x-slot:footer>
                     <x-admin.button @click="$wire.startUpdateSeat({{ $editing->id }}, kuota, bidang)" icon="fas fa-eye">Tinjau Dampak</x-admin.button>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-admin.modal>
         </div>
     @endif
 

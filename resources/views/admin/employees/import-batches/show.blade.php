@@ -6,13 +6,13 @@
     // Tombol pembatalan impor besar baru aktif setelah kata konfirmasi diketik.
     $confirmExpression = $typedConfirmation ? "confirmText.trim().toUpperCase() !== '".$confirmationWord."'" : 'false';
 @endphp
-<div x-data="{ rejectOpen: false, rollbackOpen: false, confirmText: '' }" @keydown.escape.window="rejectOpen = false; rollbackOpen = false" class="space-y-6">
+<div x-data="{ rejectOpen: false, rollbackOpen: false, confirmText: '' }" class="space-y-6">
     <x-admin.module-header
         title="Impor #{{ $log->id }}"
         subtitle="{{ $log->file_name }}"
         :breadcrumbs="[
             'Core HR',
-            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
+            ['label' => 'Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Riwayat & Persetujuan', 'url' => route('admin.employees.import.batches.index')],
             'Impor #'.$log->id,
         ]">
@@ -218,51 +218,43 @@
         </aside>
     </div>
 
-    {{-- Modal: tolak / tarik pengajuan --}}
+    {{-- Modal: tolak / tarik pengajuan (cangkang x-admin.modal, DESIGN.md §7.6) --}}
     @if ($isPending)
-        <div x-show="rejectOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-950/30" role="dialog" aria-modal="true" aria-labelledby="reject-title" x-trap.noscroll="rejectOpen" tabindex="-1">
-            <form method="POST" action="{{ route('admin.employees.import.batches.reject', $log) }}" @click.outside="rejectOpen = false" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
-                @csrf
-                <h3 id="reject-title" class="text-lg font-bold text-surface-900">{{ $isMaker ? 'Tarik pengajuan impor ini?' : 'Tolak pengajuan impor ini?' }}</h3>
-                <p class="text-sm text-surface-600 leading-relaxed">Data karyawan tidak akan berubah dan berkas pengajuan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
-                <div>
-                    <label for="reject-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan <span class="text-danger" aria-hidden="true">*</span></label>
-                    <textarea id="reject-reason" name="reason" rows="3" minlength="10" required placeholder="Jelaskan alasan (minimal 10 karakter)" class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500"></textarea>
-                </div>
-                <div class="flex justify-end gap-2">
-                    <x-admin.button type="button" variant="secondary" autofocus @click="rejectOpen = false">Batal</x-admin.button>
-                    <x-admin.button type="submit" variant="danger" once>{{ $isMaker ? 'Tarik Pengajuan' : 'Tolak Pengajuan' }}</x-admin.button>
-                </div>
-            </form>
-        </div>
+        <x-admin.modal open="rejectOpen" tone="danger" icon="fas fa-ban" form :action="route('admin.employees.import.batches.reject', $log)"
+            :title="$isMaker ? 'Tarik pengajuan impor ini?' : 'Tolak pengajuan impor ini?'"
+            description="Data karyawan tidak akan berubah dan berkas pengajuan dihapus. Tindakan ini tidak dapat dibatalkan.">
+            <div>
+                <label for="reject-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan <span class="text-danger" aria-hidden="true">*</span></label>
+                <textarea id="reject-reason" name="reason" rows="3" minlength="10" required placeholder="Jelaskan alasan (minimal 10 karakter)" class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500"></textarea>
+            </div>
+            <x-slot:footer>
+                <x-admin.button type="submit" variant="danger" once>{{ $isMaker ? 'Tarik Pengajuan' : 'Tolak Pengajuan' }}</x-admin.button>
+            </x-slot:footer>
+        </x-admin.modal>
     @endif
 
     {{-- Modal: batalkan impor (undo) --}}
     @if ($canRollback && ($readiness['ready'] ?? false))
-        <div x-show="rollbackOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-950/30" role="dialog" aria-modal="true" aria-labelledby="rollback-title" x-trap.noscroll="rollbackOpen" tabindex="-1">
-            <form method="POST" action="{{ route('admin.employees.import.batches.rollback', $log) }}" @click.outside="rollbackOpen = false" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
-                @csrf
-                <h3 id="rollback-title" class="text-lg font-bold text-surface-900">Batalkan impor #{{ $log->id }}?</h3>
-                <p class="text-sm text-surface-600 leading-relaxed">
-                    <strong>{{ $log->created_count }}</strong> karyawan baru akan dihapus dan <strong>{{ $log->updated_count }}</strong> karyawan dikembalikan ke kondisi sebelum impor.
-                    Karyawan baru yang dihapus tidak dapat dipulihkan dari layar ini.
-                </p>
+        <x-admin.modal open="rollbackOpen" tone="danger" icon="fas fa-rotate-left" form :action="route('admin.employees.import.batches.rollback', $log)"
+            :title="'Batalkan impor #'.$log->id.'?'">
+            <p class="text-sm text-surface-600 leading-relaxed">
+                <strong>{{ $log->created_count }}</strong> karyawan baru akan dihapus dan <strong>{{ $log->updated_count }}</strong> karyawan dikembalikan ke kondisi sebelum impor.
+                Karyawan baru yang dihapus tidak dapat dipulihkan dari layar ini.
+            </p>
+            <div>
+                <label for="rollback-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan pembatalan <span class="text-danger" aria-hidden="true">*</span></label>
+                <textarea id="rollback-reason" name="reason" rows="3" minlength="10" required placeholder="Jelaskan alasan (minimal 10 karakter)" class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500"></textarea>
+            </div>
+            @if ($typedConfirmation)
                 <div>
-                    <label for="rollback-reason" class="block text-sm font-medium text-surface-700 mb-1.5">Alasan pembatalan <span class="text-danger" aria-hidden="true">*</span></label>
-                    <textarea id="rollback-reason" name="reason" rows="3" minlength="10" required placeholder="Jelaskan alasan (minimal 10 karakter)" class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500"></textarea>
+                    <label for="rollback-confirmation" class="block text-sm font-medium text-surface-700 mb-1.5">Ketik <span class="font-mono font-semibold">{{ $confirmationWord }}</span> untuk mengonfirmasi <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input id="rollback-confirmation" name="confirmation" type="text" x-model="confirmText" autocomplete="off" required class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm font-mono focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                 </div>
-                @if ($typedConfirmation)
-                    <div>
-                        <label for="rollback-confirmation" class="block text-sm font-medium text-surface-700 mb-1.5">Ketik <span class="font-mono font-semibold">{{ $confirmationWord }}</span> untuk mengonfirmasi <span class="text-danger" aria-hidden="true">*</span></label>
-                        <input id="rollback-confirmation" name="confirmation" type="text" x-model="confirmText" autocomplete="off" required class="w-full rounded-xl border border-surface-200 px-3 py-2 text-sm font-mono focus:outline-hidden focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                    </div>
-                @endif
-                <div class="flex justify-end gap-2">
-                    <x-admin.button type="button" variant="secondary" autofocus @click="rollbackOpen = false">Batal</x-admin.button>
-                    <x-admin.button type="submit" variant="danger" once x-bind:disabled="{{ $confirmExpression }}">Batalkan Impor</x-admin.button>
-                </div>
-            </form>
-        </div>
+            @endif
+            <x-slot:footer>
+                <x-admin.button type="submit" variant="danger" once x-bind:disabled="{{ $confirmExpression }}">Batalkan Impor</x-admin.button>
+            </x-slot:footer>
+        </x-admin.modal>
     @endif
 </div>
 @endsection

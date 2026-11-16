@@ -219,7 +219,7 @@ class MasterFormasiService
                 throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' belum dibuka atau sudah ditutup pada unit '{$unit->nama}'.");
             }
 
-            $holders = Employee::where('unit_kerja', $unit->nama)->where('jabatan', $position->nama)->count();
+            $holders = Employee::aktif()->where('unit_kerja', $unit->nama)->where('jabatan', $position->nama)->count();
             if ($holders > 0) {
                 throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$holders} karyawan pada unit '{$unit->nama}'. Pindahkan karyawan tersebut lebih dulu melalui modul Mutasi.");
             }
@@ -931,7 +931,7 @@ class MasterFormasiService
 
     private function filled(string $unitNama, string $jabatan): int
     {
-        return Employee::where('unit_kerja', $unitNama)->where('jabatan', $jabatan)->count();
+        return Employee::aktif()->where('unit_kerja', $unitNama)->where('jabatan', $jabatan)->count();
     }
 
     private function seatLabel(string $unitNama, string $jabatan): string

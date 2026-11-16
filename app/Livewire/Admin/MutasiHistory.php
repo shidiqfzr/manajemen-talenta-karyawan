@@ -156,16 +156,6 @@ class MutasiHistory extends Component
         return ['tmt_awal', 'desc'];
     }
 
-    protected function defaultPerPage(): int
-    {
-        return 15;
-    }
-
-    protected function perPageOptions(): array
-    {
-        return [10, 15, 25, 50, 100];
-    }
-
     protected function tableLabel(): string
     {
         return 'Riwayat Mutasi';

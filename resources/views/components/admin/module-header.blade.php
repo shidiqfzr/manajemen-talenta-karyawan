@@ -3,7 +3,7 @@
     Dipakai bersama oleh modul Karyawan, Mutasi, dan Master Formasi agar tampilannya identik.
     Item breadcrumb berupa teks atau ['label' => ..., 'url' => ...]; item terakhir adalah halaman aktif.
 
-    <x-admin.module-header title="Manajemen Karyawan" subtitle="..." :breadcrumbs="['Core HR', 'Manajemen Karyawan']">
+    <x-admin.module-header title="Manajemen Karyawan" subtitle="..." :breadcrumbs="['Core HR', 'Karyawan']">
         <x-admin.button ...>Tambah</x-admin.button>
     </x-admin.module-header>
 --}}

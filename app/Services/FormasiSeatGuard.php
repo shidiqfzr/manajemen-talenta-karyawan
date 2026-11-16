@@ -36,7 +36,7 @@ class FormasiSeatGuard
         }
 
         $kuota = (int) $seat->pivot->kuota;
-        $terisi = Employee::where('unit_kerja', $unitName)
+        $terisi = Employee::aktif()->where('unit_kerja', $unitName)
             ->where('jabatan', $jabatan)
             ->where('status_penugasan', 'Definitif')
             ->count();

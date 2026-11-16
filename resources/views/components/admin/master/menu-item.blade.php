@@ -9,7 +9,7 @@
 
 @php
     $classes = 'w-full flex items-center gap-2 px-3 py-2 rounded-lg transition font-medium cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 '
-        .($tone === 'danger' ? 'text-danger-700 hover:bg-danger-50' : 'text-surface-700 hover:bg-surface-50');
+        .($tone === 'danger' ? 'text-danger-700 hover:bg-danger-50' : 'text-surface-700 hover:bg-primary-50 focus-visible:bg-primary-50');
 @endphp
 
 @if ($separated)

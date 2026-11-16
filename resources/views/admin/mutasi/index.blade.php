@@ -43,8 +43,21 @@
         </div>
     @endif
 
+    {{-- Hasil tindakan usulan yang tidak menerbitkan SK (dikembalikan, draf dihapus) --}}
+    @if (session()->has('mutasi_notice'))
+        <div role="status" class="p-4 bg-info-50 border border-info-200 text-info-900 rounded-xl flex items-center justify-between shadow-xs animate-fade-in">
+            <div class="flex items-center gap-3 text-sm font-medium">
+                <i class="fas fa-circle-info text-info" aria-hidden="true"></i>
+                <span>{{ session('mutasi_notice') }}</span>
+            </div>
+            <button aria-label="Tutup notifikasi" onclick="this.parentElement.remove()" class="text-info-700 hover:text-info-900 transition p-1 cursor-pointer">
+                <i class="fas fa-times text-xs" aria-hidden="true"></i>
+            </button>
+        </div>
+    @endif
+
     <!-- Page Header & Action Bar -->
-    <x-admin.module-header title="Mutasi & Penempatan" subtitle="Monitoring formasi kosong, Man Power Planning (MPP), dan audit riwayat karir karyawan." :breadcrumbs="['Core HR', 'Mutasi & Penempatan']">
+    <x-admin.module-header title="Mutasi & Penempatan" subtitle="Monitoring formasi kosong, Man Power Planning (MPP), dan audit riwayat karir karyawan." :breadcrumbs="['Core HR', 'Mutasi']">
         <!-- Primary Header Action: Split Dropdown Flow -->
         <div class="flex items-center gap-3 shrink-0" x-data="{ openDropdown: false }">
             <div class="inline-flex rounded-xl shadow-xs relative">
@@ -68,24 +81,24 @@
                     x-transition:leave-end="transform opacity-0 scale-95"
                     class="absolute right-0 top-full mt-1.5 w-64 rounded-2xl bg-white border border-surface-200 shadow-xl py-1.5 z-30 space-y-0.5">
                     <a href="{{ route('admin.mutasi.create') }}"
-                        class="flex items-start gap-3 px-3.5 py-2.5 hover:bg-surface-50 text-surface-800 transition text-xs">
-                        <div class="w-7 h-7 rounded-lg bg-surface-100 text-surface-700 flex items-center justify-center shrink-0 mt-0.5">
+                        class="flex items-start gap-3 px-3.5 py-2.5 hover:bg-primary-50 focus-visible:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 text-surface-800 transition text-xs">
+                        <div class="w-7 h-7 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 mt-0.5">
                             <i class="fas fa-user text-xs" aria-hidden="true"></i>
                         </div>
                         <div>
                             <div class="font-bold text-surface-900">Mutasi Tunggal &amp; Swap</div>
-                            <div class="text-[11px] text-surface-500">Pemindahan satu karyawan ke formasi kosong atau tukar posisi 2 arah</div>
+                            <div class="text-[11px] text-surface-500">Pindahkan satu karyawan ke formasi kosong atau tukar posisi</div>
                         </div>
                     </a>
                     <div class="border-t border-surface-100 my-1"></div>
                     <a href="{{ route('admin.mutasi.chain') }}"
-                        class="flex items-start gap-3 px-3.5 py-2.5 hover:bg-primary-50 text-surface-800 transition text-xs group">
-                        <div class="w-7 h-7 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary-600 group-hover:text-white transition">
+                        class="flex items-start gap-3 px-3.5 py-2.5 hover:bg-primary-50 focus-visible:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 text-surface-800 transition text-xs">
+                        <div class="w-7 h-7 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 mt-0.5">
                             <i class="fas fa-diagram-project text-xs" aria-hidden="true"></i>
                         </div>
                         <div>
-                            <div class="font-bold text-primary-950 group-hover:text-primary-800">Mutasi Berantai (Kolektif)</div>
-                            <div class="text-[11px] text-surface-500">Penyusunan rotasi gerbong (siklis/domino) multi-karyawan dalam 1 SK bersama</div>
+                            <div class="font-bold text-surface-900">Mutasi Berantai (Kolektif)</div>
+                            <div class="text-[11px] text-surface-500">Rotasi gerbong banyak karyawan sekaligus dalam 1 SK</div>
                         </div>
                     </a>
                 </div>
@@ -123,6 +136,22 @@
                     {{ $mppFormasiTotal }}
                 </span>
             </button>
+
+            @if ($canSeeProposals)
+                <!-- Tab: Usulan Mutasi Berantai (draf & persetujuan) -->
+                <button type="button" role="tab" id="tab-usulan" aria-controls="panel-usulan" :aria-selected="(activeTab === 'usulan').toString()" :tabindex="activeTab === 'usulan' ? 0 : -1" @click="setTab('usulan')"
+                    :class="activeTab === 'usulan'
+                        ? 'border-primary-600 text-primary-900 font-bold'
+                        : 'border-transparent text-surface-500 hover:text-surface-800 hover:border-surface-300 font-medium'"
+                    class="group inline-flex items-center gap-2 py-3 px-1 border-b-2 text-xs sm:text-sm transition whitespace-nowrap cursor-pointer">
+                    <i class="fas fa-file-signature text-xs" :class="activeTab === 'usulan' ? 'text-primary-600' : 'text-surface-400 group-hover:text-surface-600'" aria-hidden="true"></i>
+                    <span>Usulan Berantai</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums transition {{ $pendingProposals > 0 ? 'bg-warning-100 text-warning-800' : 'bg-surface-100 text-surface-600' }}"
+                        title="Usulan yang menunggu persetujuan">
+                        {{ $pendingProposals }}
+                    </span>
+                </button>
+            @endif
 
             <!-- Tab 3: Riwayat & Audit Log -->
             <button type="button" role="tab" id="tab-history" aria-controls="panel-history" :aria-selected="(activeTab === 'history').toString()" :tabindex="activeTab === 'history' ? 0 : -1" @click="setTab('history')"
@@ -186,6 +215,27 @@
     <div x-show="activeTab === 'mpp'" role="tabpanel" id="panel-mpp" aria-labelledby="tab-mpp" tabindex="0" x-cloak class="space-y-6">
         @livewire('admin.man-power-planning')
     </div>
+
+    @if ($canSeeProposals)
+        <!-- Tab Content: Usulan Mutasi Berantai -->
+        <div x-show="activeTab === 'usulan'" role="tabpanel" id="panel-usulan" aria-labelledby="tab-usulan" tabindex="0" x-cloak class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p class="text-xs text-surface-600 max-w-2xl">
+                    Draf mutasi berantai yang disimpan dan usulan yang menunggu persetujuan.
+                    @if (\App\Services\Mutasi\ChainProposalService::requiresApproval())
+                        SK diterbitkan setelah disetujui admin lain (persetujuan dua pihak).
+                    @endif
+                </p>
+                @can('mutasi.prepare')
+                    <a href="{{ route('admin.mutasi.chain') }}"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition shadow-xs shrink-0">
+                        <i class="fas fa-plus text-xs" aria-hidden="true"></i> Susun Usulan Baru
+                    </a>
+                @endcan
+            </div>
+            @livewire('admin.mutasi-chain-proposal-table')
+        </div>
+    @endif
 
     <!-- Tab 3 Content: Riwayat Mutasi & Audit Log -->
     <div x-show="activeTab === 'history'" role="tabpanel" id="panel-history" aria-labelledby="tab-history" tabindex="0" x-cloak class="space-y-6">

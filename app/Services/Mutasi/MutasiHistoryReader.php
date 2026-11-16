@@ -69,7 +69,7 @@ class MutasiHistoryReader
         ?string $jenisMutasi = null,
         ?bool $isApplied = null,
         bool $onlyDue = false,
-        int $perPage = 15,
+        ?int $perPage = null,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
         ?string $sumber = null,
@@ -83,7 +83,7 @@ class MutasiHistoryReader
             sortBy: $sortBy,
             sortDirection: $sortDirection,
             sumber: $sumber,
-        )->paginate($perPage);
+        )->paginate($perPage ?? (int) config('hris.pagination.default'));
     }
 
     /**

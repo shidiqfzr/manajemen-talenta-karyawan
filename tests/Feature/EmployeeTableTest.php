@@ -37,12 +37,12 @@ class EmployeeTableTest extends TestCase
     }
 
     /**
-     * 25 employees in `Kebun Legacy` whose jabatan sorts with their number (PGW-A01 .. PGW-A25),
+     * 30 employees in `Kebun Legacy` whose jabatan sorts with their number (PGW-A01 .. PGW-A30),
      * plus one employee in another unit.
      */
     private function seedLegacyUnit(): void
     {
-        foreach (range(1, 25) as $i) {
+        foreach (range(1, 30) as $i) {
             $n = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
             Employee::factory()->create([
                 'nama' => 'PGW-A'.$n,
@@ -62,7 +62,7 @@ class EmployeeTableTest extends TestCase
         $response = $this->get('/admin/employees?unit_kerja=Kebun%20Legacy&sort=jabatan&direction=desc&page=2')->assertOk();
         $content = $response->getContent();
 
-        // jabatan desc: page 1 holds 25..06 (20 rows), page 2 holds 05..01.
+        // jabatan desc: page 1 holds 30..06 (25 rows), page 2 holds 05..01.
         foreach (['PGW-A05', 'PGW-A04', 'PGW-A03', 'PGW-A02', 'PGW-A01'] as $name) {
             $response->assertSee($name);
         }
@@ -78,6 +78,23 @@ class EmployeeTableTest extends TestCase
             ->assertSee('PGW-A05')->assertDontSee('PGW-A06');
     }
 
+    public function test_status_kepegawaian_filter_separates_mbt_and_menjelang_mbt(): void
+    {
+        Employee::factory()->create(['nama' => 'KARYAWAN BIASA', 'tanggal_mbt' => null]);
+        Employee::factory()->create(['nama' => 'KARYAWAN MBT', 'tanggal_mbt' => today()->subMonth()]);
+        Employee::factory()->create(['nama' => 'KARYAWAN MENJELANG', 'tanggal_mbt' => today()->addMonths(2)]);
+
+        Livewire::test(EmployeeTable::class)
+            ->set('statusKepegawaian', 'mbt')
+            ->assertSee('KARYAWAN MBT')
+            ->assertDontSee('KARYAWAN MENJELANG')
+            ->assertDontSee('KARYAWAN BIASA')
+            ->set('statusKepegawaian', 'menjelang_mbt')
+            ->assertSee('KARYAWAN MENJELANG')
+            ->assertDontSee('KARYAWAN MBT')
+            ->assertDontSee('KARYAWAN BIASA');
+    }
+
     public function test_unknown_filter_values_are_ignored(): void
     {
         Employee::factory()->create(['nama' => 'KARYAWAN SATU', 'unit_kerja' => 'Kebun Satu']);
@@ -90,7 +107,7 @@ class EmployeeTableTest extends TestCase
             'rm_level' => 'RM-9',
             'unit_kerja' => 'Kebun Tidak Ada',
             'bidang' => 'XYZ',
-            'golongan' => 'ZZ/99',
+            'status_kepegawaian' => 'bogus',
             'tahun_masuk' => 'abcd',
             'bulan_masuk' => '13',
         ];
@@ -105,7 +122,7 @@ class EmployeeTableTest extends TestCase
             ->assertSet('rmLevel', '')
             ->assertSet('unitKerja', '')
             ->assertSet('bidang', '')
-            ->assertSet('golongan', '')
+            ->assertSet('statusKepegawaian', '')
             ->assertSet('tahunMasuk', '')
             ->assertSet('bulanMasuk', '')
             ->assertSee('KARYAWAN SATU')
@@ -262,14 +279,14 @@ class EmployeeTableTest extends TestCase
             ->assertSee(route('admin.employees.create'), false);
     }
 
-    public function test_pages_hold_twenty_rows(): void
+    public function test_pages_hold_the_standard_page_size(): void
     {
-        Employee::factory()->count(21)->create();
+        Employee::factory()->count(26)->create();
 
-        $component = Livewire::test(EmployeeTable::class)->assertSet('perPage', 20);
+        $component = Livewire::test(EmployeeTable::class)->assertSet('perPage', 25);
 
-        $this->assertCount(20, $component->instance()->rows->items());
-        $this->assertSame(21, $component->instance()->rows->total());
+        $this->assertCount(25, $component->instance()->rows->items());
+        $this->assertSame(26, $component->instance()->rows->total());
     }
 
     public function test_search_uses_the_omnisearch_scope(): void

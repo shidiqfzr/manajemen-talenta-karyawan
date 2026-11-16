@@ -78,14 +78,15 @@ class EmployeeTable extends Component
     #[Url(as: 'rm_level', except: '')]
     public string $rmLevel = '';
 
-    #[Url(except: '')]
-    public string $golongan = '';
-
     #[Url(as: 'status_penugasan', except: '')]
     public string $statusPenugasan = '';
 
     #[Url(as: 'status_khusus', except: '')]
     public string $statusKhusus = '';
+
+    /** Kosong = karyawan aktif (bawaan); `pensiun` = arsip karyawan yang sudah diberhentikan karena pensiun. */
+    #[Url(as: 'status_kepegawaian', except: '')]
+    public string $statusKepegawaian = '';
 
     #[Url(as: 'tahun_masuk', except: '')]
     public string $tahunMasuk = '';
@@ -123,6 +124,7 @@ class EmployeeTable extends Component
         $this->level = '';
         $this->statusKhusus = '';
         $this->statusPenugasan = '';
+        $this->statusKepegawaian = '';
 
         $this->resetPage($this->paginationName());
         $this->clearSelection();
@@ -153,13 +155,6 @@ class EmployeeTable extends Component
     public function unitOptions(): array
     {
         return $this->distinctOptions('unit_kerja');
-    }
-
-    /** @return array<string, string> */
-    #[Computed]
-    public function golonganOptions(): array
-    {
-        return $this->distinctOptions('golongan');
     }
 
     /**
@@ -216,9 +211,9 @@ class EmployeeTable extends Component
             'level' => 'level',
             'unitKerja' => 'unit_kerja',
             'rmLevel' => 'rm_level',
-            'golongan' => 'golongan',
             'statusPenugasan' => 'status_penugasan',
             'statusKhusus' => 'status_khusus',
+            'statusKepegawaian' => 'status_kepegawaian',
             'tahunMasuk' => 'tahun_masuk',
             'bulanMasuk' => 'bulan_masuk',
         ];
@@ -234,7 +229,15 @@ class EmployeeTable extends Component
 
     protected function baseQuery(): Builder
     {
-        return Employee::query()->with('concurrentJobs');
+        // Daftar bawaan hanya karyawan aktif: yang sudah pensiun tidak lagi menempati jabatan (DOMAIN.md §5.1).
+        $query = Employee::query()->with('concurrentJobs');
+
+        return match ($this->statusKepegawaian) {
+            'pensiun' => $query->berhenti(),
+            'mbt' => $query->mbt(),
+            'menjelang_mbt' => $query->menjelangMbt(),
+            default => $query->aktif(),
+        };
     }
 
     protected function rowKey(): string
@@ -284,10 +287,6 @@ class EmployeeTable extends Component
                 ->icon('fas fa-layer-group')
                 ->allLabel('Semua Eselon / RM Band')
                 ->apply(fn (Builder $query, string $value) => $query->where('rm_level', $value)),
-            Filter::select('golongan', 'Golongan', $this->golonganOptions)
-                ->icon('fas fa-signal')
-                ->allLabel('Semua Golongan')
-                ->apply(fn (Builder $query, string $value) => $query->where('golongan', $value)),
             // Period filters (TMT Bekerja) stay reachable through links and the export; the panel shows four primary filters.
             Filter::select('tahunMasuk', 'Tahun Masuk (TMT)', $this->yearOptions)
                 ->withoutControl()
@@ -295,6 +294,15 @@ class EmployeeTable extends Component
             Filter::select('bulanMasuk', 'Bulan Masuk (TMT)', self::MONTHS)
                 ->withoutControl()
                 ->apply(fn (Builder $query, string $value) => $query->whereMonth('tmt_bekerja', $value)),
+            // Status Kepegawaian: bawaan Aktif; "Pensiun" membuka arsip; MBT / Menjelang MBT menyaring masa bebas tugas. Kondisinya dipasang di baseQuery().
+            Filter::select('statusKepegawaian', 'Status Kepegawaian', [
+                'menjelang_mbt' => 'Menjelang MBT',
+                'mbt' => 'MBT',
+                'pensiun' => 'Pensiun',
+            ])
+                ->icon('fas fa-user-clock')
+                ->allLabel('Karyawan Aktif')
+                ->apply(fn (Builder $query, string $value) => $query),
             // Driven by the KPI cards above the table.
             Filter::select('level', 'Strata', $this->levelOptions)
                 ->withoutControl()
@@ -336,17 +344,6 @@ class EmployeeTable extends Component
     protected function tableLabel(): string
     {
         return 'Daftar Karyawan';
-    }
-
-    /** @return array<int, int> */
-    protected function perPageOptions(): array
-    {
-        return [10, 20, 50, 100];
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return 20;
     }
 
     /** @return array<int, BulkAction> */

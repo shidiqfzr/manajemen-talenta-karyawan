@@ -27,6 +27,16 @@ class AdminButtonTest extends TestCase
         $view->assertSee('border-surface-300', false);
     }
 
+    public function test_soft_variant_is_a_borderless_primary_tint_and_keeps_livewire_loading_protection(): void
+    {
+        $view = $this->blade('<x-admin.button variant="soft" size="sm" wire:click="openModal" target="openModal">Tambah</x-admin.button>');
+
+        $view->assertSee('bg-primary-50', false);
+        $view->assertSee('text-primary-700', false);
+        $view->assertSee('border-transparent', false);
+        $view->assertSee('wire:target="openModal"', false);
+    }
+
     public function test_danger_variant_uses_the_danger_token_with_a_passing_contrast_pair(): void
     {
         $view = $this->blade('<x-admin.button variant="danger">Hapus</x-admin.button>');

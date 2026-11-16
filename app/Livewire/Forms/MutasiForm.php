@@ -3,6 +3,7 @@
 namespace App\Livewire\Forms;
 
 use App\Models\JobHistory;
+use App\Services\Mutasi\DispensasiBasis;
 use Illuminate\Validation\ValidationException;
 use Livewire\Form;
 
@@ -31,6 +32,15 @@ class MutasiForm extends Form
     public ?string $newJobGrade = '';
 
     // ── Dispensasi SSOT ───────────────────────────────────────────────────
+    // One piece of evidence shown to the admin: document reference (alasanDispensasiDireksi) + approval date.
+    // $dispensasiDireksi is derived from that evidence by validateForm() (never typed by the admin) and
+    // is fanned out to the per-rule fields below.
+    public bool $dispensasiDireksi = false;
+
+    public string $alasanDispensasiDireksi = '';
+
+    public string $tanggalDispensasiDireksi = '';
+
     public bool $dispensasiTenure = false;
 
     public string $alasanDispensasiTenure = '';
@@ -74,6 +84,9 @@ class MutasiForm extends Form
         $this->isTargetDiperban = false;
         $this->isTargetOverflow = false;
         $this->tanggalBerakhirSanksi = '';
+        $this->dispensasiDireksi = false;
+        $this->alasanDispensasiDireksi = '';
+        $this->tanggalDispensasiDireksi = '';
         $this->dispensasiTenure = false;
         $this->alasanDispensasiTenure = '';
         $this->dispensasiPromosi = false;
@@ -93,11 +106,11 @@ class MutasiForm extends Form
      */
     public function validateForm(
         ?array $tenureAnalysis,
-        ?array $promotionAnalysis,
         ?array $targetAnalysis,
         ?array $employeeDetails,
         bool $isSwapAllowed,
-        ?string $swapIncompatibilityMessage
+        ?string $swapIncompatibilityMessage,
+        ?array $promotionAnalysis = null
     ): bool {
         // 1. Domain Rule: Cek Formasi Dipesan (Reserved Position Guard)
         if ($targetAnalysis && ($targetAnalysis['is_reserved'] ?? false)) {
@@ -193,21 +206,41 @@ class MutasiForm extends Form
             'tanggalBerakhirSanksi.after_or_equal' => 'Tanggal kedaluwarsa sanksi tidak boleh sebelum TMT awal.',
         ];
 
-        // Tenure Guard validation
-        if ($tenureAnalysis && ! $tenureAnalysis['is_compliant']) {
-            $rules['dispensasiTenure'] = 'accepted';
-            $rules['alasanDispensasiTenure'] = 'required|string|min:5|max:255';
-            $messages['dispensasiTenure.accepted'] = 'Masa dinas di unit belum mencapai 2 tahun. Wajib mencentang persetujuan Dispensasi Khusus Direksi.';
-            $messages['alasanDispensasiTenure.required'] = 'Alasan pertimbangan dispensasi masa dinas unit wajib diisi.';
+        // One Direksi dispensation covers every rule exception of this mutasi (masa dinas unit, kualifikasi promosi).
+        // It is evidenced by one document reference + the approval date (DispensasiBasis); the approval flag is
+        // derived from that evidence, fanned out to the per-rule flags that the service and audit trail use,
+        // and never left true for a rule that is actually met.
+        $needsTenureDispensation = (bool) ($tenureAnalysis
+            && ! $tenureAnalysis['is_compliant']
+            && ($tenureAnalysis['is_applicable'] ?? true));
+        $needsPromotionDispensation = (bool) ($promotionAnalysis
+            && ($promotionAnalysis['is_applicable'] ?? false)
+            && ! ($promotionAnalysis['is_eligible'] ?? true));
+
+        if ($needsTenureDispensation || $needsPromotionDispensation) {
+            $rules['alasanDispensasiDireksi'] = 'required|string|min:'.DispensasiBasis::MIN_REFERENCE_LENGTH.'|max:'.DispensasiBasis::MAX_REFERENCE_LENGTH;
+            $rules['tanggalDispensasiDireksi'] = 'required|date_format:Y-m-d|before_or_equal:today';
+            $messages['alasanDispensasiDireksi.required'] = 'Nomor nota dinas / SK persetujuan Direksi wajib diisi karena terdapat pengecualian regulasi.';
+            $messages['alasanDispensasiDireksi.min'] = 'Nomor nota dinas / SK persetujuan Direksi minimal '.DispensasiBasis::MIN_REFERENCE_LENGTH.' karakter.';
+            $messages['alasanDispensasiDireksi.max'] = 'Nomor nota dinas / SK persetujuan Direksi maksimal '.DispensasiBasis::MAX_REFERENCE_LENGTH.' karakter.';
+            $messages['tanggalDispensasiDireksi.required'] = 'Tanggal persetujuan Direksi wajib diisi.';
+            $messages['tanggalDispensasiDireksi.date_format'] = 'Tanggal persetujuan Direksi tidak valid.';
+            $messages['tanggalDispensasiDireksi.before_or_equal'] = 'Tanggal persetujuan Direksi tidak boleh melewati hari ini.';
+        } else {
+            $this->alasanDispensasiDireksi = '';
+            $this->tanggalDispensasiDireksi = '';
         }
 
-        // Promotion Eligibility validation
-        if ($promotionAnalysis && ! $promotionAnalysis['is_eligible']) {
-            $rules['dispensasiPromosi'] = 'accepted';
-            $rules['alasanDispensasiPromosi'] = 'required|string|min:5|max:255';
-            $messages['dispensasiPromosi.accepted'] = 'Kriteria formal promosi belum terpenuhi. Wajib mencentang persetujuan Dispensasi Promosi.';
-            $messages['alasanDispensasiPromosi.required'] = 'Alasan pertimbangan dispensasi promosi wajib diisi.';
-        }
+        $this->dispensasiDireksi = ($needsTenureDispensation || $needsPromotionDispensation)
+            && DispensasiBasis::isComplete($this->alasanDispensasiDireksi, $this->tanggalDispensasiDireksi);
+        $basis = $this->dispensasiDireksi
+            ? DispensasiBasis::compose($this->alasanDispensasiDireksi, $this->tanggalDispensasiDireksi)
+            : '';
+
+        $this->dispensasiTenure = $needsTenureDispensation && $this->dispensasiDireksi;
+        $this->alasanDispensasiTenure = $this->dispensasiTenure ? $basis : '';
+        $this->dispensasiPromosi = $needsPromotionDispensation && $this->dispensasiDireksi;
+        $this->alasanDispensasiPromosi = $this->dispensasiPromosi ? $basis : '';
 
         try {
             $this->validate($rules, $messages);

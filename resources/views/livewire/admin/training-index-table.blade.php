@@ -53,36 +53,6 @@
         @endforeach
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5" role="group" aria-label="Ringkasan investasi pelatihan sesuai pencarian dan filter">
-        <x-admin.kpi-card
-            title="Total Man Hours"
-            :value="number_format($totalManHours, 0, ',', '.')"
-            subtitle="Total jam pelatihan seluruh peserta"
-            icon="fas fa-clock"
-            theme="primary" />
-
-        <x-admin.kpi-card
-            title="Total Tiket Peserta"
-            value="Rp {{ number_format($summary['tiket'], 0, ',', '.') }}"
-            subtitle="Total tiket peserta pelatihan"
-            icon="fas fa-ticket-alt"
-            theme="info" />
-
-        <x-admin.kpi-card
-            title="Total Biaya Investasi"
-            value="Rp {{ number_format($summary['biaya'], 0, ',', '.') }}"
-            subtitle="Total anggaran pelatihan"
-            icon="fas fa-money-bill-wave"
-            theme="neutral" />
-
-        <x-admin.kpi-card
-            title="Rata-rata JPL / Karyawan"
-            :value="$totalKaryawan > 0 ? number_format($totalManHours / $totalKaryawan, 2, ',', '.') : '-'"
-            :subtitle="$totalKaryawan > 0 ? 'Jam pelatihan per '.number_format($totalKaryawan, 0, ',', '.').' karyawan' : 'Belum ada data karyawan'"
-            icon="fas fa-chart-line"
-            theme="earth" />
-    </div>
-
     <x-admin.table.card :notice="$tableNotice">
         <x-admin.table.toolbar
             :table-id="$this->getId()"
@@ -92,6 +62,30 @@
             :search="$search"
             search-placeholder="Cari judul atau bidang pelatihan..." />
         <x-admin.table.header title="Daftar Pelatihan" :paginator="$rows" noun="Pelatihan" :export="$this->exportName() !== null" />
+
+        {{-- Ringkasan investasi (DESIGN.md §8.7): strip statis di dalam kartu tabel, mengikuti pencarian dan filter aktif; bukan kartu KPI. --}}
+        <dl role="group" aria-label="Ringkasan investasi pelatihan sesuai pencarian dan filter"
+            class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 px-5 py-3 bg-surface-50 border-b border-surface-200">
+            <div>
+                <dt class="text-[11px] font-medium text-surface-500">Total Man Hours</dt>
+                <dd class="font-mono tabular-nums text-sm font-bold text-surface-900">{{ number_format($totalManHours, 0, ',', '.') }} <span class="font-sans text-[11px] font-normal text-surface-500">jam</span></dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-medium text-surface-500">Total Tiket Peserta</dt>
+                <dd class="font-mono tabular-nums text-sm font-bold text-surface-900">Rp {{ number_format($summary['tiket'], 0, ',', '.') }}</dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-medium text-surface-500">Total Biaya Investasi</dt>
+                <dd class="font-mono tabular-nums text-sm font-bold text-surface-900">Rp {{ number_format($summary['biaya'], 0, ',', '.') }}</dd>
+            </div>
+            <div>
+                <dt class="text-[11px] font-medium text-surface-500">Rata-rata JPL / Karyawan</dt>
+                <dd class="font-mono tabular-nums text-sm font-bold text-surface-900">
+                    {{ $totalKaryawan > 0 ? number_format($totalManHours / $totalKaryawan, 2, ',', '.') : '-' }}
+                    <span class="font-sans text-[11px] font-normal text-surface-500">{{ $totalKaryawan > 0 ? 'jam per '.number_format($totalKaryawan, 0, ',', '.').' karyawan' : 'Belum ada data karyawan' }}</span>
+                </dd>
+            </div>
+        </dl>
 
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs" wire:loading.attr="aria-busy" wire:target="{{ $loadingTargets }}">
@@ -142,5 +136,5 @@
         <x-admin.table.pagination :paginator="$rows" noun="pelatihan" :per-page-options="$this->perPageOptions()" />
     </x-admin.table.card>
 
-    <x-admin.confirm-delete-modal title="Hapus Pelatihan" noun="pelatihan" consequence="Data peserta pada pelatihan ini ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan." />
+    <x-admin.confirm-delete-modal title="Hapus Pelatihan" noun="pelatihan" reason consequence="Data peserta pada pelatihan ini ikut terhapus permanen. Tindakan ini tidak dapat dibatalkan." />
 </div>

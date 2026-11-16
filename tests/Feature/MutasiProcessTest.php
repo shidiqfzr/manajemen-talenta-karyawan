@@ -24,6 +24,9 @@ class MutasiProcessTest extends TestCase
     {
         parent::setUp();
 
+        // The screen is admin-only; every Livewire test below runs as an admin unless it says otherwise
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
         // Base Setup for all tests
         Unit::factory()->create(['nama' => 'Bagian SDM', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)']);
         Unit::factory()->create(['nama' => 'Kebun Sawit A', 'wilayah' => 'Wilayah Kalimantan Barat']);
@@ -34,17 +37,19 @@ class MutasiProcessTest extends TestCase
         // Emp is RM-3
         $emp = Employee::factory()->create(['jabatan' => 'Asisten SDM', 'unit_kerja' => 'Bagian SDM']);
         Position::factory()->create(['nama' => 'Asisten SDM', 'rm_level' => 'RM-3']);
-        Position::factory()->create(['nama' => 'Kepala Bagian SDM', 'rm_level' => 'RM-1']);
+        Position::factory()->create(['nama' => 'Kepala Bagian SDM', 'rm_level' => 'RM-2']);
+        Position::factory()->create(['nama' => 'General Manager SDM', 'rm_level' => 'RM-1']);
         Position::factory()->create(['nama' => 'Staff SDM', 'rm_level' => 'RM-4']);
 
         $unit = Unit::where('nama', 'Bagian SDM')->first();
-        $unit->positions()->attach(Position::whereIn('nama', ['Asisten SDM', 'Kepala Bagian SDM', 'Staff SDM'])->pluck('id')->toArray());
+        $unit->positions()->attach(Position::whereIn('nama', ['Asisten SDM', 'Kepala Bagian SDM', 'General Manager SDM', 'Staff SDM'])->pluck('id')->toArray());
 
         Livewire::test(MutasiProcess::class)
             ->set('form.employeeNik', $emp->nik)
             ->set('form.jenisMutasi', 'PROMOSI')
             ->set('form.targetUnitKerja', 'Bagian SDM')
             ->assertSeeHtml('<option value="Kepala Bagian SDM">Kepala Bagian SDM</option>')
+            ->assertDontSeeHtml('<option value="General Manager SDM">General Manager SDM</option>') // Two bands up must not appear
             ->assertDontSeeHtml('<option value="Staff SDM">Staff SDM</option>') // Lower rank should not appear
             ->assertDontSeeHtml('<option value="Asisten SDM">Asisten SDM</option>'); // Same rank should not appear
     }
@@ -173,8 +178,6 @@ class MutasiProcessTest extends TestCase
             ->set('form.targetUnitKerja', 'Bagian SDM')
             ->set('form.targetJabatan', 'Kasubag B')
             ->set('form.swapConfirmed', true)
-            ->set('form.dispensasiPromosi', true)
-            ->set('form.alasanDispensasiPromosi', 'Dispensasi khusus')
             ->set('form.tmtAwal', now()->toDateString())
             ->set('form.nomorSk', 'SK/123')
             ->set('form.tanggalSk', now()->toDateString())
@@ -449,9 +452,9 @@ class MutasiProcessTest extends TestCase
             ->set('form.tanggalSk', now()->toDateString())
             ->set('form.catatan', 'Rotasi kebun')
             ->call('submitMutasi')
-            ->assertHasErrors(['form.dispensasiTenure']);
+            ->assertHasErrors(['form.alasanDispensasiDireksi', 'form.tanggalDispensasiDireksi']);
 
-        // With dispensation checked and reason filled, it should pass
+        // Reference without the approval date: both pieces of evidence are required, same as in Mutasi Berantai
         Livewire::test(MutasiProcess::class)
             ->set('form.employeeNik', $emp->nik)
             ->set('form.jenisMutasi', 'MUTASI_UNIT')
@@ -461,13 +464,70 @@ class MutasiProcessTest extends TestCase
             ->set('form.nomorSk', 'SK/123')
             ->set('form.tanggalSk', now()->toDateString())
             ->set('form.catatan', 'Rotasi kebun')
-            ->set('form.dispensasiTenure', true)
-            ->set('form.alasanDispensasiTenure', 'Kebutuhan mendesak operasional Kebun B')
+            ->set('form.alasanDispensasiDireksi', 'ND-012/DIR/2026')
+            ->call('submitMutasi')
+            ->assertHasErrors(['form.tanggalDispensasiDireksi'])
+            ->assertHasNoErrors(['form.alasanDispensasiDireksi'])
+            ->assertSee('Dasar Persetujuan Direksi')
+            ->assertDontSee('Persetujuan Dispensasi Direksi');
+
+        // With the document reference and approval date filled, it should pass
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Kebun B')
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/123')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Rotasi kebun')
+            ->set('form.alasanDispensasiDireksi', 'ND-012/DIR/2026')
+            ->set('form.tanggalDispensasiDireksi', now()->toDateString())
             ->call('submitMutasi')
             ->assertHasNoErrors();
+
+        // The approval is derived from the evidence and stored on the SK together with its reference and date.
+        $history = JobHistory::where('employee_nik', $emp->nik)->latest('id')->first();
+        $this->assertTrue((bool) $history->is_dispensasi);
+        $this->assertStringContainsString('ND-012/DIR/2026 (disetujui '.now()->format('d/m/Y').')', (string) $history->alasan_dispensasi);
     }
 
-    public function test_promosi_requires_dispensasi_when_not_eligible(): void
+    public function test_dispensation_evidence_requires_a_real_reference_and_a_non_future_date(): void
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'tmt_unit_kerja' => now()->subMonths(6)->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Asisten Kebun B', 'rm_level' => 'RM-3']);
+        Unit::factory()->create(['nama' => 'Kebun Sawit B']);
+
+        $component = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'MUTASI_UNIT')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Asisten Kebun B')
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/123')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Rotasi kebun');
+
+        // A throw-away reference is not evidence
+        $component->set('form.alasanDispensasiDireksi', 'ok')
+            ->set('form.tanggalDispensasiDireksi', now()->toDateString())
+            ->call('submitMutasi')
+            ->assertHasErrors(['form.alasanDispensasiDireksi' => 'min']);
+
+        // Direksi cannot have approved it in the future
+        $component->set('form.alasanDispensasiDireksi', 'ND-012/DIR/2026')
+            ->set('form.tanggalDispensasiDireksi', now()->addDay()->toDateString())
+            ->call('submitMutasi')
+            ->assertHasErrors(['form.tanggalDispensasiDireksi' => 'before_or_equal']);
+
+        $this->assertDatabaseMissing('job_histories', ['employee_nik' => $emp->nik, 'unit_kerja' => 'Kebun Sawit B']);
+    }
+
+    public function test_unmet_promotion_requires_direksi_dispensation_and_is_recorded_in_audit_trail(): void
     {
         // Emp is RM-3 with Gol IIIA and 1 year tenure (not eligible for RM-2 without dispensation)
         $emp = Employee::factory()->create([
@@ -479,8 +539,7 @@ class MutasiProcessTest extends TestCase
         ]);
         Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
 
-        // Submitting promotion without dispensation should fail
-        Livewire::test(MutasiProcess::class)
+        $component = Livewire::test(MutasiProcess::class)
             ->set('form.employeeNik', $emp->nik)
             ->set('form.jenisMutasi', 'PROMOSI')
             ->set('form.targetUnitKerja', 'Kebun Sawit A')
@@ -488,24 +547,108 @@ class MutasiProcessTest extends TestCase
             ->set('form.tmtAwal', now()->toDateString())
             ->set('form.nomorSk', 'SK/PROMOSI/01')
             ->set('form.tanggalSk', now()->toDateString())
-            ->set('form.catatan', 'Promosi askep')
-            ->call('submitMutasi')
-            ->assertHasErrors(['form.dispensasiPromosi']);
+            ->set('form.catatan', 'Promosi askep');
 
-        // With dispensation checked and reason filled, it should pass
-        Livewire::test(MutasiProcess::class)
-            ->set('form.employeeNik', $emp->nik)
-            ->set('form.jenisMutasi', 'PROMOSI')
-            ->set('form.targetUnitKerja', 'Kebun Sawit A')
-            ->set('form.targetJabatan', 'Askep Tanaman')
-            ->set('form.tmtAwal', now()->toDateString())
-            ->set('form.nomorSk', 'SK/PROMOSI/01')
-            ->set('form.tanggalSk', now()->toDateString())
-            ->set('form.catatan', 'Promosi askep')
-            ->set('form.dispensasiPromosi', true)
-            ->set('form.alasanDispensasiPromosi', 'Prestasi panen unggul dan rekomendasi Direksi')
+        // Like the tenure rule: without the Direksi approval the process is blocked
+        $component->call('submitMutasi')->assertHasErrors(['form.alasanDispensasiDireksi', 'form.tanggalDispensasiDireksi']);
+        $this->assertDatabaseMissing('job_histories', ['employee_nik' => $emp->nik, 'jabatan' => 'Askep Tanaman']);
+
+        // Reference without the approval date: the date is required too
+        $component->set('form.alasanDispensasiDireksi', 'Rekomendasi asesmen 2026')
+            ->call('submitMutasi')
+            ->assertHasErrors(['form.tanggalDispensasiDireksi']);
+
+        $component->set('form.tanggalDispensasiDireksi', now()->toDateString())
             ->call('submitMutasi')
             ->assertHasNoErrors();
+
+        // The unmet qualification and its approval are snapshotted on the job history; tenure flag stays untouched
+        $history = JobHistory::where('employee_nik', $emp->nik)->latest('id')->first();
+        $this->assertStringContainsString('belum terpenuhi', (string) $history->catatan_kepatuhan);
+        $this->assertFalse((bool) $history->is_dispensasi);
+    }
+
+    public function test_single_dispensation_covers_tenure_and_promotion_exceptions_together(): void
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subMonths(6)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+        Unit::factory()->create(['nama' => 'Kebun Sawit B']);
+
+        $component = Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit B')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/PROMOSI/03')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Promosi askep');
+
+        // Both exceptions are listed in one card with a single approval
+        $component->assertSee('Pengecualian regulasi yang diajukan')
+            ->assertSee('Masa Dinas Unit Kerja')
+            ->assertSee('Kualifikasi Promosi')
+            // The tenure exception states the standard and the shortfall (24 - 6 = 18 months), computed by the service
+            ->assertSee('Masa Dinas Unit Kerja')
+            ->assertSee('(min. 2 tahun)')
+            ->assertSee('Saat ini 0 th 6 bln', false)
+            ->assertSee('kurang 1 th 6 bln')
+            ->assertSeeHtml('data-dispensasi-card')
+            ->assertSee('Perlu Dispensasi');
+        $this->assertSame(1, substr_count($component->html(), 'data-dispensasi-block'));
+
+        $component->call('submitMutasi')->assertHasErrors(['form.alasanDispensasiDireksi', 'form.tanggalDispensasiDireksi']);
+
+        $component->set('form.alasanDispensasiDireksi', 'Nota Dinas Direksi No. 77/2026')
+            ->set('form.tanggalDispensasiDireksi', now()->toDateString())
+            // Complete evidence turns the status to recorded before anything is submitted
+            ->assertSee('Dispensasi Tercatat')
+            ->call('submitMutasi')
+            ->assertHasNoErrors();
+
+        // The one approval is stored for both rules in the audit trail
+        $history = JobHistory::where('employee_nik', $emp->nik)->latest('id')->first();
+        $this->assertTrue((bool) $history->is_dispensasi);
+        $this->assertStringContainsString('Nota Dinas Direksi No. 77/2026', (string) $history->alasan_dispensasi);
+        $this->assertStringContainsString('Dispensasi promosi disetujui: Nota Dinas Direksi No. 77/2026', (string) $history->catatan_kepatuhan);
+    }
+
+    public function test_promotion_dispensation_is_recorded_without_waiving_tenure(): void
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
+
+        Livewire::test(MutasiProcess::class)
+            ->set('form.employeeNik', $emp->nik)
+            ->set('form.jenisMutasi', 'PROMOSI')
+            ->set('form.targetUnitKerja', 'Kebun Sawit A')
+            ->set('form.targetJabatan', 'Askep Tanaman')
+            ->assertSeeHtml('wire:model.live.debounce.300ms="form.alasanDispensasiDireksi"')
+            ->set('form.alasanDispensasiDireksi', 'Rekomendasi asesmen 2026')
+            ->set('form.tanggalDispensasiDireksi', now()->toDateString())
+            ->set('form.tmtAwal', now()->toDateString())
+            ->set('form.nomorSk', 'SK/PROMOSI/02')
+            ->set('form.tanggalSk', now()->toDateString())
+            ->set('form.catatan', 'Promosi askep')
+            ->call('submitMutasi')
+            ->assertHasNoErrors();
+
+        $history = JobHistory::where('employee_nik', $emp->nik)->latest('id')->first();
+        $this->assertStringContainsString('Dispensasi promosi disetujui: Rekomendasi asesmen 2026', (string) $history->catatan_kepatuhan);
+        // Promotion approval never flips the tenure dispensation flag
+        $this->assertFalse((bool) $history->is_dispensasi);
     }
 
     public function test_retired_employees_are_excluded_from_candidate_dropdown(): void
@@ -652,23 +795,33 @@ class MutasiProcessTest extends TestCase
         $c = $this->blockedPromotion();
 
         $this->assertStringContainsString('Mutasi Berantai', $c->instance()->blockingReason);
-        $c->assertSeeHtml('data-blocked="true"');
-        $this->assertMatchesRegularExpression('/<fieldset\s+disabled/', $c->html());
-        $this->assertDoesNotMatchRegularExpression('/<button[^>]*wire:click="openSummaryModal"/', $c->html());
+        $c->assertSeeHtml('data-blocked="true"')
+            ->assertSeeHtml('data-sk-locked="true"')
+            ->assertSee('Dibuka setelah kendala penempatan di atas diselesaikan')
+            ->assertDontSeeHtml('wire:model.live.debounce.300ms="form.nomorSk"');
+        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
     }
 
-    public function test_occupied_block_shows_chain_link_instead_of_review_button()
+    public function test_unblocked_target_renders_sk_form_without_lock_row()
+    {
+        $this->blockedPromotion()->set('form.targetJabatan', 'Kasubag Kosong')
+            ->assertDontSeeHtml('data-sk-locked="true"')
+            ->assertSeeHtml('wire:model.live.debounce.300ms="form.nomorSk"');
+    }
+
+    public function test_occupied_block_has_single_chain_cta_and_disabled_review_button()
     {
         $c = $this->blockedPromotion();
 
         $this->assertTrue($c->instance()->resolvableByChain);
         $c->assertSee('Selesaikan melalui Mutasi Berantai')
             ->assertSee('Pejabat petahana perlu dipindahkan lebih dulu.')
-            ->assertDontSee('Tinjau &amp; Eksekusi Mutasi', false)
+            ->assertSee('Tinjau &amp; Eksekusi Mutasi', false)
             ->assertSeeHtml('data-blocked="true"');
 
-        // card + action bar
-        $this->assertGreaterThanOrEqual(2, substr_count($c->html(), 'href="'.route('admin.mutasi.chain').'"'));
+        // One primary CTA: only the blocker card links to the chain flow; the action bar keeps a disabled review button.
+        $this->assertSame(1, substr_count($c->html(), 'href="'.route('admin.mutasi.chain').'"'));
+        $this->assertMatchesRegularExpression('/<button[^>]*wire:click="openSummaryModal"[^>]*\sdisabled/', $c->html());
     }
 
     #[DataProvider('nonChainBlocks')]
@@ -861,7 +1014,7 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('Memerlukan Perhatian / Dispensasi');
     }
 
-    public function test_waivable_promotion_shows_dispensation_status_not_blocking()
+    public function test_unmet_promotion_shows_required_dispensation_status()
     {
         $emp = Employee::factory()->create([
             'jabatan' => 'Asisten Kebun A',
@@ -878,7 +1031,14 @@ class MutasiProcessTest extends TestCase
             ->set('form.targetUnitKerja', 'Kebun Sawit A')
             ->set('form.targetJabatan', 'Askep Tanaman')
             ->assertSee('Perlu Dispensasi')
-            ->assertDontSee('Memerlukan Perhatian / Dispensasi')
+            ->assertSee('Kualifikasi Promosi')
+            ->assertSee('Dasar Persetujuan Direksi')
+            // Every requirement reads "requirement - verdict" with its facts on one line; a missing assessment can be completed
+            ->assertSee('terpenuhi')
+            ->assertSee('belum terpenuhi')
+            ->assertSee('Gol: IIIA')
+            ->assertSee('Masa Dinas: 1 th 0 bln')
+            ->assertSee('Lengkapi data evaluasi')
             ->assertDontSee('Tidak Dapat Diproses Tunggal');
     }
 
@@ -902,11 +1062,20 @@ class MutasiProcessTest extends TestCase
             ->set('form.targetJabatan', 'Kabag Penuh');
     }
 
-    public function test_promotion_dispensation_uses_warning_palette()
+    public function test_promotion_advisory_never_uses_indigo_palette()
     {
         $c = $this->blockedPromotion();
 
-        $c->assertSee('Perlu Dispensasi')->assertDontSee('indigo-');
+        $c->assertSee('Kualifikasi Promosi')->assertDontSee('indigo-');
+    }
+
+    public function test_primary_action_buttons_use_shared_button_component()
+    {
+        $html = $this->blockedPromotion()->html();
+
+        // Shared component markup carries the disabled-primary treatment; no hand-rolled green button remains.
+        $this->assertStringContainsString('disabled:bg-surface-200', $html);
+        $this->assertStringNotContainsString('bg-primary-700 hover:bg-primary-800 text-white font-bold text-xs', $html);
     }
 
     public function test_incumbent_uses_profile_card_without_status_badges()
@@ -918,49 +1087,67 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('Occupied');
     }
 
-    public function test_candidate_and_incumbent_tenure_are_separate_values()
+    public function test_dispensation_fields_are_locked_while_the_formasi_is_occupied()
+    {
+        $c = $this->occupiedRm1Promotion();
+
+        // The card stays readable while the formasi is occupied, but approval cannot be entered until it is available.
+        $c->assertSee('Kualifikasi Promosi')
+            ->assertSee('Pengecualian regulasi yang diajukan')
+            ->assertSee('Belum Tersedia')
+            ->assertDontSee('Perlu Dispensasi')
+            ->assertSee('Dasar Persetujuan Direksi')
+            ->assertSee('Tersedia setelah kendala penempatan di atas selesai.')
+            ->assertSeeHtml('data-promotion-criteria')
+            ->assertSeeHtml('data-dispensasi-locked')
+            ->assertDontSee('Lihat detail kriteria')
+            ->assertDontSee('Langkah 1 dari 2')
+            ->assertDontSee('Langkah 2 dari 2');
+
+        $html = $c->html();
+        $this->assertMatchesRegularExpression('/<input[^>]*form\.alasanDispensasiDireksi"[^>]*\sdisabled/s', $html);
+        $this->assertMatchesRegularExpression('/<input[^>]*form\.tanggalDispensasiDireksi"[^>]*\sdisabled/s', $html);
+        // The approval is no longer a self-attested checkbox
+        $this->assertStringNotContainsString('form.dispensasiDireksi"', $html);
+    }
+
+    public function test_action_bar_summarises_every_outstanding_issue_with_a_count()
+    {
+        // Occupied formasi (blocking) + unmet promotion without Direksi evidence = two things still to resolve
+        $this->occupiedRm1Promotion()
+            ->assertSee('2 hal perlu diselesaikan')
+            ->assertSee('Pejabat petahana perlu dipindahkan lebih dulu.')
+            ->assertSee('Dasar persetujuan Direksi belum dilengkapi.')
+            ->assertSee('id="blocking-reason"', false);
+
+        // Eligible candidate (Gol IIIC + good evaluation): the formasi is the only issue, shown as a plain sentence without a count
+        $this->blockedPromotion(['golongan' => 'IIIC'], withGoodEvaluation: true)
+            ->assertDontSee('hal perlu diselesaikan')
+            ->assertDontSee('Dasar persetujuan Direksi belum dilengkapi.')
+            ->assertSee('Pejabat petahana perlu dipindahkan lebih dulu.');
+    }
+
+    public function test_compliance_header_has_only_title_and_status()
+    {
+        $this->occupiedRm1Promotion()
+            ->assertSee('Uji Kelayakan Regulasi &amp; Kepatuhan Penugasan', false)
+            ->assertSee('Tidak Dapat Diproses Tunggal')
+            ->assertDontSee('Pemeriksaan kesesuaian masa dinas unit');
+    }
+
+    public function test_incumbent_card_shows_same_profile_format_as_selected_employee()
+    {
+        $this->occupiedRm1Promotion()
+            ->assertSee('Profil Pejabat Petahana Saat Ini')
+            ->assertSee('Kesiapan Talenta &amp; Masa Kerja', false)
+            ->assertSee('Klasifikasi Karyawan');
+    }
+
+    public function test_incumbent_unit_tenure_is_shown_once_and_separate_from_candidate()
     {
         $c = $this->occupiedRm1Promotion(['tmt_unit_kerja' => now()->subYears(3)->toDateString()]);
 
-        $html = $c->html();
-        $this->assertMatchesRegularExpression('/Masa Dinas Jabatan Madya.*?1 th 7 bln/s', $html);
-        $this->assertMatchesRegularExpression('/Masa Dinas Unit:.*?3 th 0 bln/s', $html);
-        $this->assertDoesNotMatchRegularExpression('/Masa Dinas Unit:\s*<\/span>\s*<span[^>]*>\s*1 th 7 bln/s', $html);
-        $this->assertSame(1, substr_count($html, '3 th 0 bln'));
-    }
-
-    public function test_dispensation_is_locked_while_formasi_is_occupied()
-    {
-        $c = $this->occupiedRm1Promotion();
-
-        $this->assertNotNull($c->instance()->blockingReason);
-        $c->assertSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
-        $this->assertMatchesRegularExpression(
-            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
-            $c->html()
-        );
-    }
-
-    public function test_blocked_promotion_with_failed_criteria_lists_all_outstanding_issues()
-    {
-        $c = $this->occupiedRm1Promotion();
-
-        $issues = $c->instance()->outstandingIssues;
-        $this->assertCount(2, $issues);
-        $this->assertSame($c->instance()->blockingReason, $issues[0]);
-        $c->assertSee('2 hal perlu diselesaikan');
-    }
-
-    public function test_single_issue_does_not_show_summary()
-    {
-        $c = $this->blockedPromotion([
-            'golongan' => 'IIIC',
-            'tmt_unit_kerja' => now()->subYears(5)->toDateString(),
-            'tanggal_dalam_jabatan' => now()->subYears(5)->toDateString(),
-        ], withGoodEvaluation: true);
-
-        $this->assertCount(1, $c->instance()->outstandingIssues);
-        $c->assertDontSee('hal perlu diselesaikan');
+        $this->assertSame(1, substr_count($c->html(), '3 th 0 bln'));
     }
 
     public function test_promotion_block_message_is_short()
@@ -972,37 +1159,6 @@ class MutasiProcessTest extends TestCase
             $c->instance()->swapIncompatibilityMessage
         );
         $c->assertDontSee('Swap Bilateral');
-    }
-
-    public function test_dispensation_unlocks_when_target_becomes_valid()
-    {
-        $this->occupiedRm1Promotion()
-            ->set('form.targetJabatan', 'Kabag Kosong')
-            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
-    }
-
-    public function test_dispensation_stays_interactive_for_waivable_promotion()
-    {
-        $emp = Employee::factory()->create([
-            'jabatan' => 'Asisten Kebun A',
-            'unit_kerja' => 'Kebun Sawit A',
-            'golongan' => 'IIIA',
-            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
-            'tanggal_dalam_jabatan' => now()->subYear()->toDateString(),
-        ]);
-        Position::factory()->create(['nama' => 'Askep Tanaman', 'rm_level' => 'RM-2']);
-
-        $c = Livewire::test(MutasiProcess::class)
-            ->set('form.employeeNik', $emp->nik)
-            ->set('form.jenisMutasi', 'PROMOSI')
-            ->set('form.targetUnitKerja', 'Kebun Sawit A')
-            ->set('form.targetJabatan', 'Askep Tanaman')
-            ->assertSee('Perlu Dispensasi')
-            ->assertDontSee('Dapat diisi setelah kendala penempatan di atas diselesaikan');
-        $this->assertDoesNotMatchRegularExpression(
-            '/<input[^>]*wire:model\.live="form\.dispensasiPromosi"[^>]*\bdisabled\b/s',
-            $c->html()
-        );
     }
 
     public function test_same_unit_promotion_does_not_claim_unit_tenure_compliance()
@@ -1037,6 +1193,8 @@ class MutasiProcessTest extends TestCase
             ->assertDontSee('9-Box Lengkap')
             // unblocked state shows the action-bar subline, which must not use developer wording either
             ->set('form.targetJabatan', 'Kasubag Kosong')
+            ->set('form.alasanDispensasiDireksi', 'ND-012/DIR/2026')
+            ->set('form.tanggalDispensasiDireksi', now()->toDateString())
             ->assertDontSee('atomik')
             ->assertSee('disimpan sekaligus');
     }
@@ -1130,14 +1288,36 @@ class MutasiProcessTest extends TestCase
             ->set('form.targetJabatan', 'Asisten Afdeling 1')
             ->assertSee('aria-describedby="blocking-reason"', false)
             ->assertSee('id="blocking-reason"', false)
-            ->assertSeeHtml('min-h-11 px-5');
+            ->assertSeeHtml('min-h-11');
     }
 
     public function test_action_controls_meet_touch_target()
     {
         $html = $this->blockedPromotion()->html();
 
-        // Kartu formasi terisi (CTA), tautan bar, dan Batal: masing-masing min-h-11 (44px).
-        $this->assertGreaterThanOrEqual(3, substr_count($html, 'min-h-11'));
+        // Tombol tinjau di bar dan Batal: masing-masing min-h-11 (44px).
+        $this->assertGreaterThanOrEqual(2, substr_count($html, 'min-h-11'));
+        // CTA Mutasi Berantai pada kartu formasi terisi dibuat ringkas (36px), tetap di atas minimum WCAG AA (24px).
+        $this->assertStringContainsString('min-h-9', $html);
+    }
+
+    public function test_non_admin_cannot_mount_the_component(): void
+    {
+        $staff = User::factory()->create(['role' => 'user']);
+
+        Livewire::actingAs($staff)->test(MutasiProcess::class)->assertForbidden();
+    }
+
+    public function test_a_single_mutation_takes_effect_at_once_so_it_needs_the_approve_permission(): void
+    {
+        config(['hris.permissions' => [
+            'mutasi.prepare' => ['admin', 'hr_staff'],
+            'mutasi.approve' => ['admin', 'hr_manager'],
+        ]]);
+
+        // Preparer role: may draft chain proposals, but cannot issue a placement on its own
+        Livewire::actingAs(User::factory()->create(['role' => 'hr_staff']))->test(MutasiProcess::class)->assertForbidden();
+
+        Livewire::actingAs(User::factory()->create(['role' => 'hr_manager']))->test(MutasiProcess::class)->assertOk();
     }
 }

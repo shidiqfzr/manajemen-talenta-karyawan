@@ -7,7 +7,7 @@
         subtitle="Pengajuan, persetujuan, dan pembatalan impor data karyawan. Setiap keputusan tercatat beserta pelaku dan alasannya."
         :breadcrumbs="[
             'Core HR',
-            ['label' => 'Daftar Karyawan', 'url' => route('admin.employees.index')],
+            ['label' => 'Karyawan', 'url' => route('admin.employees.index')],
             ['label' => 'Impor Data Spreadsheet', 'url' => route('admin.employees.import.page')],
             'Riwayat & Persetujuan',
         ]">

@@ -88,15 +88,14 @@ class EvaluationTableTest extends TestCase
         $this->assertSame(7, $component->instance()->rows->total());
     }
 
-    public function test_default_sort_and_five_per_page(): void
+    public function test_default_sort_and_standard_page_size(): void
     {
         $component = $this->table()
             ->assertSet('sortField', 'tanggal_pelaksanaan_asesmen')
             ->assertSet('sortDirection', 'desc')
-            ->assertSet('perPage', 5)
+            ->assertSet('perPage', 25)
             ->assertSeeInOrder(['Bidang 07', 'Bidang 06', 'Bidang 05', 'Bidang 04', 'Bidang 03'])
-            ->assertDontSee('Bidang 02')
-            ->assertSeeHtml('aria-label="Halaman evaluasi"')
+            ->assertSeeHtml('id="per-page-evaluasi_page"')
             // Sortable headers: Periode Asesmen, Nilai Tertimbang, Bidang Tugas only.
             ->assertSeeHtml("sortBy('tanggal_pelaksanaan_asesmen')")
             ->assertSeeHtml("sortBy('nilai_tertimbang')")
@@ -107,8 +106,8 @@ class EvaluationTableTest extends TestCase
             ->assertSeeHtml('event.stopImmediatePropagation()')
             ->assertDontSeeHtml('return confirm(');
 
-        $this->assertCount(5, $component->instance()->rows->items());
-        $this->assertSame([5, 10, 25, 50], invade($component->instance())->perPageOptions());
+        $this->assertCount(7, $component->instance()->rows->items());
+        $this->assertSame([10, 25, 50, 100], invade($component->instance())->perPageOptions());
     }
 
     public function test_search_matches_declared_columns(): void
@@ -145,11 +144,19 @@ class EvaluationTableTest extends TestCase
 
     public function test_page_name_is_isolated(): void
     {
+        // 25 newer evaluations fill page 1, so the seven seeded ones land on page 2.
+        for ($i = 1; $i <= 25; $i++) {
+            $this->makeEvaluation($this->employee, [
+                'bidang_tugas' => sprintf('Tambahan %02d', $i),
+                'tanggal_pelaksanaan_asesmen' => sprintf('2025-01-%02d', $i),
+            ]);
+        }
+
         $component = $this->table()
             ->call('gotoPage', 2, 'evaluasi_page')
             ->assertSet('paginators.evaluasi_page', 2)
             ->assertSee('Bidang 02')
-            ->assertDontSee('Bidang 07')
+            ->assertDontSee('Tambahan 25')
             ->assertSeeHtml("gotoPage(1, 'evaluasi_page')")
             ->assertSeeHtml('id="per-page-evaluasi_page"');
 

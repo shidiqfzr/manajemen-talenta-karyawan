@@ -26,6 +26,7 @@ class MutasiLookup
     public function getSelectableEmployees(?string $unitKerja = null): Collection
     {
         return Employee::query()
+            ->aktif()
             ->where(fn ($q) => $q->whereNull('tanggal_pensiun')->orWhere('tanggal_pensiun', '>=', now()->startOfMonth()))
             ->when($unitKerja, fn ($q) => $q->where('unit_kerja', $unitKerja))
             ->orderBy('nama')

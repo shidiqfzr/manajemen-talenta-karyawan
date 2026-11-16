@@ -6,9 +6,10 @@
 
     <x-admin.table.pagination :paginator="$this->pagedSeats" noun="jabatan" :per-page-options="[10, 25, 50, 100]" />
 --}}
-@props(['paginator', 'noun' => 'data', 'perPageOptions' => [10, 25, 50, 100]])
+@props(['paginator', 'noun' => 'data', 'perPageOptions' => null])
 
 @php
+    $perPageOptions ??= config('hris.pagination.options');
     $current = $paginator->currentPage();
     $last = $paginator->lastPage();
     $window = collect([1, $last, $current - 1, $current, $current + 1])
@@ -25,7 +26,7 @@
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div class="flex items-center gap-2">
             <label for="{{ $perPageId }}" class="whitespace-nowrap">Tampilkan</label>
-            <select id="{{ $perPageId }}" wire:model.live="perPage" class="py-1.5 pl-2.5 pr-7 bg-white border border-surface-300 rounded-lg text-xs text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-600 cursor-pointer shadow-2xs">
+            <select id="{{ $perPageId }}" wire:model.live="perPage" class="w-14 h-7 py-0 pl-2 pr-5 appearance-none bg-white select-chevron border border-surface-300 rounded-md text-xs leading-none text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-600 cursor-pointer shadow-2xs">
                 @foreach ($perPageOptions as $option)
                     <option value="{{ $option }}">{{ $option }}</option>
                 @endforeach
