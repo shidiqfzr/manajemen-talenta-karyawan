@@ -11,7 +11,7 @@
 ## Daftar Isi
 1. [Tujuan & Filosofi Domain](#1-tujuan--filosofi-domain)
 2. [Terminologi & Kamus Data Domain (Data Dictionary)](#2-terminologi--kamus-data-domain-data-dictionary)
-3. [Struktur Wilayah & Master Data 45 Unit Kerja](#3-struktur-wilayah--master-data-45-unit-kerja)
+3. [Struktur Wilayah & Master Data 47 Unit Kerja](#3-struktur-wilayah--master-data-47-unit-kerja)
 4. [Strata Karyawan, RM Band, & 4 Bidang Fungsional](#4-strata-karyawan-rm-band--4-bidang-fungsional)
 5. [Aturan Bisnis HR & Rumus Perhitungan](#5-aturan-bisnis-hr--rumus-perhitungan)
 6. [Manajemen Kinerja & Matriks Talenta (9-Box Grid)](#6-manajemen-kinerja--matriks-talenta-9-box-grid)
@@ -58,7 +58,7 @@ Aturan: identifier kode (kelas, tabel, kolom, rute, kunci kolom tabel) tidak diu
 | `rm_level` | `string/enum` | Eselon manajemen dan formasi: RM-1, RM-2, RM-3 (Karpim), dan RM-4 s.d. RM-7 (Karpel). | `RM-1`, `RM-3`, `RM-5` |
 | `bidang` | `string` | Bidang fungsional operasional karyawan. | `KEU`, `TAN`, `TEK`, `UMU` |
 | `jabatan` | `string` | Nomenklatur jabatan dinas yang sedang diemban saat ini. | `Manajer Kebun`, `Askep Tanaman`, `Asisten Afdeling` |
-| `unit_kerja` | `string` | Nama unit kerja definitif dari 45 unit resmi perusahaan (§3). | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
+| `unit_kerja` | `string` | Nama unit kerja definitif dari 47 unit resmi perusahaan (§3). | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
 | `golongan` | `string` | Tingkat golongan kepangkatan beserta berkala genap (`[Gol]/[Berkala]`). | `IIIA/00`, `IIID/05`, `IVA/05` |
 | `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel (RM-4 s.d. RM-7): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
 | `person_grade` | `integer` | Tingkat kompetensi individual karyawan (1 s.d. 16). | Karpel (RM-4 s.d. RM-7): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
@@ -131,9 +131,9 @@ Aturan: identifier kode (kelas, tabel, kolom, rute, kunci kolom tabel) tidak diu
 
 ---
 
-## 3. Struktur Wilayah & Master Data 45 Unit Kerja
+## 3. Struktur Wilayah & Master Data 47 Unit Kerja
 
-Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 45 unit kerja aktif, bersumber dari Excel formasi, lihat §3.6):
+Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 47 unit kerja aktif, bersumber dari Excel struktur organisasi, lihat §3.6):
 
 ### 3.1 Regional Office (Kantor Direksi / Head Office Pontianak)
 *Kode Wilayah: `REG`*
@@ -145,56 +145,58 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 5. **Bagian Akuntansi & Keuangan** *(Tipe: KANDIR | Bidang: KEU)*
 6. **Bagian Pengadaan & Teknologi Informasi** *(Tipe: KANDIR | Bidang: UMU)*
 7. **Bagian Sekretariat & Hukum** *(Tipe: KANDIR | Bidang: UMU)*
-8. **Bagian Sumber Daya Manusia & Sistem Manajemen** *(Tipe: KANDIR | Bidang: UMU)*
+8. **Bagian Sumber Daya Manusia** *(Tipe: KANDIR | Bidang: UMU)*
 9. **Distrik Petani Mitra** *(Tipe: DISTRIK | Bidang: TAN)*
-10. **PMO Investasi Tanaman Wilayah Kalbar** *(Tipe: KANDIR | Bidang: TAN)*
-11. **PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng** *(Tipe: KANDIR | Bidang: TAN)*
-12. **PMO Batu Bara & Bisnis Lainnya** *(Tipe: KANDIR | Bidang: UMU)*
-13. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: KEU)*
+10. **Kebun Kemitraan Area Kalbar** *(Tipe: KEBUN | Bidang: TAN)*
+11. **Kebun Kemitraan Area Kaltim-Sel** *(Tipe: KEBUN | Bidang: TAN)*
+12. **PMO Investasi Tanaman Wilayah Kalbar** *(Tipe: KANDIR | Bidang: TAN)*
+13. **PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng** *(Tipe: KANDIR | Bidang: TAN)*
+14. **PMO Batu Bara & Bisnis Lainnya** *(Tipe: KANDIR | Bidang: UMU)*
+15. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: KEU)*
 
 ### 3.2 Wilayah Kalimantan Barat
 *Kode Wilayah: `KALBAR`*
 
-14. **Group Manager Kalbar** *(Tipe: GROUP | Bidang: TAN)*
-15. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN)*
-16. **PKS Gunung Meliau** *(Tipe: PKS | Bidang: TEK)*
-17. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN)*
-18. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN)*
-19. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN)*
-20. **PKS Rimba Belian** *(Tipe: PKS | Bidang: TEK)*
-21. **Kebun Sintang** *(Tipe: KEBUN | Bidang: TAN)*
-22. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN)*
-23. **PKS Ngabang** *(Tipe: PKS | Bidang: TEK)*
-24. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN)*
-25. **PKS Parindu** *(Tipe: PKS | Bidang: TEK)*
-26. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN)*
-27. **PKS Kembayan** *(Tipe: PKS | Bidang: TEK)*
+16. **Unit Group Kalimantan Barat** *(Tipe: GROUP | Bidang: TAN)*
+17. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN)*
+18. **PKS Gunung Meliau** *(Tipe: PKS | Bidang: TEK)*
+19. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN)*
+20. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN)*
+21. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN)*
+22. **PKS Rimba Belian** *(Tipe: PKS | Bidang: TEK)*
+23. **Kebun Sintang** *(Tipe: KEBUN | Bidang: TAN)*
+24. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN)*
+25. **PKS Ngabang** *(Tipe: PKS | Bidang: TEK)*
+26. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN)*
+27. **PKS Parindu** *(Tipe: PKS | Bidang: TEK)*
+28. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN)*
+29. **PKS Kembayan** *(Tipe: PKS | Bidang: TEK)*
 
 ### 3.3 Wilayah Kalimantan Selatan & Kalimantan Tengah
 *Kode Wilayah: `KALSELTENG`*
 
-28. **Group Manager Kalselteng** *(Tipe: GROUP | Bidang: TAN)*
-29. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN)*
-30. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN)*
-31. **PKS Pamukan** *(Tipe: PKS | Bidang: TEK)*
-32. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN)*
-33. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN)*
-34. **PKS Pelaihari** *(Tipe: PKS | Bidang: TEK)*
-35. **Kebun Kumai** *(Tipe: KEBUN | Bidang: TAN)*
-36. **PKR Tambarangan** *(Tipe: PKR | Bidang: TEK)*
-37. **Proyek Batubara Danau Salak** *(Tipe: PROYEK | Bidang: UMU)*
-38. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN)*
+30. **Unit Group Kalimantan Selatan/Tengah** *(Tipe: GROUP | Bidang: TAN)*
+31. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN)*
+32. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN)*
+33. **PKS Pamukan** *(Tipe: PKS | Bidang: TEK)*
+34. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN)*
+35. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN)*
+36. **PKS Pelaihari** *(Tipe: PKS | Bidang: TEK)*
+37. **Kebun Kumai** *(Tipe: KEBUN | Bidang: TAN)*
+38. **PKR Tambarangan** *(Tipe: PKR | Bidang: TEK)*
+39. **Proyek Batubara Danau Salak** *(Tipe: PROYEK | Bidang: UMU)*
+40. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN)*
 
 ### 3.4 Wilayah Kalimantan Timur
 *Kode Wilayah: `KALTIM`*
 
-39. **Group Manager Kaltim** *(Tipe: GROUP | Bidang: TAN)*
-40. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN)*
-41. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN)*
-42. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN)*
-43. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
-44. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
-45. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
+41. **Unit Group Kalimantan Timur** *(Tipe: GROUP | Bidang: TAN)*
+42. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN)*
+43. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN)*
+44. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN)*
+45. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
+46. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
+47. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
 
 ### 3.5 Tata Kelola Master Data Dinamis (Hybrid Architecture)
 
@@ -224,16 +226,22 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 ### 3.6 Sumber Master Formasi Karpim (Excel)
 1. **Baseline awal**: master formasi Karpim ini diturunkan satu kali dari berkas acuan `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas tersebut hanya pengetahuan domain untuk memperbaiki master dan tidak disimpan di repositori; setelah master diperbaiki, **basis data adalah sumber kebenaran** dan perubahan selanjutnya dilakukan melalui Master Data di Admin Panel (§3.5).
 2. **Alur baseline**: Excel → `php artisan formasi:build-seed <berkas>` (alat konversi sekali pakai) → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`. Seeder hanya untuk instalasi baru dan pengembangan; seeder tidak boleh dijalankan ulang pada basis data produksi karena menyelaraskan ulang atribut master.
-3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas; `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
+3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas format lama atau nilai kolom `Kuota` pada berkas struktur organisasi (kosong berarti 0); `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
 4. **Penulisan nama**: nama unit memakai `&` (bukan "dan"); singkatan (mis. QC, ESG, SDM, ERP) dan angka romawi tetap huruf besar; salah ketik yang diketahui dikoreksi oleh `FormasiNormalizer`.
-5. **Total formasi**: 45 unit, 491 kombinasi jabatan-unit, 619 kursi. Karpim: 401 kombinasi, 458 kursi (RM-1: 45, RM-2: 75, RM-3: 338). Karpel: 90 kombinasi, 161 kursi (seluruhnya RM-5). Per bidang: KEU 87, TAN 253, TEK 97, UMU 175.
+5. **Total formasi**: 47 unit, 492 kombinasi jabatan-unit, 619 kursi. Karpim: 402 kombinasi, 458 kursi (RM-1: 45, RM-2: 75, RM-3: 338). Karpel: 90 kombinasi, 161 kursi (seluruhnya RM-5). Per bidang: KEU 92, TAN 248, TEK 98, UMU 181.
 6. **Di luar berkas**: jabatan pool (Advisor RM-n, Karyawan Diperbantukan RM-n, serta Kepala Bagian, Kepala Sub Bagian, dan Staf Pimpinan Diperbantukan) dibuat seeder sebagai infrastruktur sistem tanpa kuota formasi. Jabatan pool baru, misalnya "Asisten Diperbantukan" atau "Manajer Diperbantukan", dibuat admin pada tab **Jabatan Penampungan** (`MasterFormasiService::createPoolPosition()`), bukan sebagai formasi unit. Agar karyawan dapat ditempatkan pada jabatan itu di sebuah unit (penambahan manual, impor Excel, dan daftar jabatan pada template), jabatan harus **dibuka pada unit** tersebut (`openPoolPosition()`: baris `position_unit` berkuota 0 sebagai tanda dibuka); jabatan pool tidak menghabiskan kuota dan tidak dihitung sebagai formasi atau kekosongan. Menutupnya (`closePoolPosition()`) wajib beralasan dan diblokir selama masih ada karyawan yang menjabat.
-7. **Unit yang tidak lagi menjadi bagian formasi** pada revisi ini: Divisi Sistem Manajemen & Sustainability, Project Management Office (PMO), Satuan Pengawasan Internal (SPI), Unit Group Kalimantan Barat, Unit Group Kalimantan Selatan/Tengah, Unit Group Wilayah Kalimantan Timur, Kebun PKR Sintang, dan Proyek Batubara Danau Salak & Buntok. Pada basis data yang sudah berjalan, restrukturisasi tetap mengikuti §3.5 (`is_active`, riwayat tidak dihapus); pengosongan basis data hanya dilakukan pada fase pengembangan.
+7. **Unit yang berganti nama atau berpindah formasi** pada revisi 1 September 2026 dicatat pada butir 12. Pada basis data yang sudah berjalan, restrukturisasi tetap mengikuti §3.5 (`is_active`, riwayat tidak dihapus); pengosongan basis data hanya dilakukan pada fase pengembangan.
 8. **RM Band dan Bidang karyawan bersifat turunan, bukan input bebas**: RM Band karyawan mengikuti `positions.rm_level` jabatannya dan Bidang mengikuti `position_unit.bidang` (§4.3). Form tambah karyawan menampilkan RM Band hanya-baca dan `StoreEmployeeRequest` menolak nilai yang berbeda dari formasi. Import Data Karyawan tidak memiliki kolom Bidang, Level, maupun RM Level pada template: ketiganya diturunkan dari Master Formasi. Berkas lama yang masih memuat kolom `LEVEL` atau `RM LEVEL` tetap diterima dan nilainya hanya dianggap konfirmasi (kosong → diturunkan, berbeda dari formasi → baris ditolak, baik karyawan baru maupun eksisting). Perubahan jabatan, unit, atau RM Band hanya melalui modul Mutasi agar tercatat pada `job_histories`.
 9. **Pratinjau klasifikasi pada form**: `ManPowerPlanningService@classifyPosition` (dipanggil endpoint `api.classify-position`) mengembalikan `bidang`, `rm_band`, serta penanda `bidang_from_formasi` dan `rm_from_formasi`. Nilai dari Master Formasi ditampilkan dengan badge "Master Formasi"; nilai dari pendeteksian cadangan (jabatan pool, Karpel, atau data lama) ditampilkan dengan badge "Perkiraan". RM Band master selalu didahulukan daripada heuristik golongan/grade.
 10. **Position control pada penambahan karyawan manual**: jabatan wajib menempati kursi aktif pada unit dan strata yang dipilih, dan jumlah pemangku definitif tidak boleh melebihi `kuota` (`FormasiSeatGuard`, sama dengan aturan import). Pemeriksaan dilakukan dalam `DB::transaction()` yang sama dengan penyimpanan karyawan. Jabatan pool dan penugasan non-definitif tidak menghabiskan kuota. Form karyawan **tidak** menyediakan pembuatan unit atau jabatan baru; perubahan master hanya melalui Master Data (§3.5) agar tercatat pada riwayat master dan kuota tidak dapat dilewati saat onboarding. Jabatan penampungan yang sudah dibuka pada unit (§3.6 butir 6) lolos pemeriksaan ini tanpa menghabiskan kuota.
 11. **Cakupan master saat ini**: master formasi mencakup seluruh Karpim serta Karpel pada 10 unit Regional Office; Karpel di unit lain (kebun, PKS, dan seterusnya) belum tercantum pada berkas acuan. Strata `RM 5` pada berkas disimpan sebagai `RM-5` dengan level `Karpel`. Karpel yang jabatannya belum memiliki band pada master diperkirakan `RM-4` oleh `determineRmLevel`. Standar Formasi dan matriks MPP hanya menghitung RM-1 s.d. RM-3, sehingga kursi Karpel tidak memengaruhi angka MPP.
-12. **Revisi Struktur Organisasi**: `database/data/master_formasi.json` mengikuti berkas `Struktur_Organisasi_PTPN_IV_Reg_V.xlsx` (kolom `Unit/Bagian`, `Sub Bagian`, `Jabatan`, `Strata RM`, `Bidang`, `Kuota`; satu baris memuat kuota eksplisit). Regional Office: 13 unit, 223 kombinasi jabatan-unit, 323 kursi. Tim Penguatan ERP SAP kembali menjadi bagian formasi; Kebun Kemitraan Area Kalbar dan Kaltim-Sel menjadi bagian Distrik Petani Mitra. Kolom `Sub Bagian` tidak disimpan pada master, sehingga baris jabatan sama pada satu unit dijumlahkan kuotanya. Enam jabatan Karpel berkuota kosong pada berkas disimpan dengan kuota 0 sampai kuotanya ditetapkan. Tata letak berkas ini berbeda dari masukan `formasi:build-seed`, sehingga perintah tersebut tidak dipakai untuk berkas ini.
+12. **Revisi Struktur Organisasi (1 September 2026)**: `database/data/master_formasi.json` mengikuti berkas `Struktur_Organisasi_PTPN_IV_Reg_V_1 September 2026.xlsx` (kolom `No`, `Unit/Bagian`, `Sub Bagian`, `Jabatan`, `Strata RM`, `Bidang`, `Kuota`, `Keterangan`; satu baris memuat kuota eksplisit). `formasi:build-seed` membaca tata letak ini maupun format lama 4 kolom (dikenali dari baris judul); `RM 5` ditulis `RM-5` dan level Karpim/Karpel diturunkan dari strata RM. Regional Office: 15 unit, 229 kombinasi jabatan-unit, 330 kursi. Perubahan dari revisi sebelumnya:
+    - **Ganti nama unit**: Group Manager Kalbar, Kalselteng, dan Kaltim menjadi Unit Group Kalimantan Barat, Kalimantan Selatan/Tengah, dan Kalimantan Timur (kode `Unit Group`); Bagian Sumber Daya Manusia & Sistem Manajemen menjadi Bagian Sumber Daya Manusia. Nama lama dicatat sebagai alias (butir 13).
+    - **Formasi Sistem Manajemen & Sustainability** (10 kursi) keluar dari Bagian Sumber Daya Manusia: sembilan kursi ke Bagian Teknik & Pengolahan dan Asisten Manajemen Risiko ke Bagian Akuntansi & Keuangan.
+    - **Kebun Kemitraan Area Kalbar (8 kursi) dan Kebun Kemitraan Area Kaltim-Sel (9 kursi)** menjadi unit tersendiri di Regional Office (kode `Kebun`), terpisah dari Distrik Petani Mitra.
+    - **Bidang berubah** untuk delapan jabatan: lima jabatan Distrik Petani Mitra (TAN menjadi UMU atau KEU), Asisten Penggajian dan Asisten Manajemen Risiko (UMU menjadi KEU), dan Coordinator Bisnis Batu Bara (UMU menjadi TEK).
+    - Kolom `Sub Bagian` dan `Keterangan` tidak disimpan pada master, sehingga baris jabatan sama pada satu unit dijumlahkan kuotanya. Enam jabatan Karpel berkuota kosong pada berkas (berbasis norma) disimpan dengan kuota 0 sampai kuotanya ditetapkan.
+    - Total kuota tetap 619. Berkas ini hanya mengubah master baseline; pada basis data yang sudah berjalan, perubahan unit, kursi, dan bidang harus diterapkan melalui Master Data (§3.5), bukan dengan menjalankan ulang seeder.
 13. **Alias unit (nama lama)**: tabel `unit_aliases` menyimpan nama lama atau variasi penulisan unit agar berkas karyawan lama tetap terpetakan ke nama unit master saat ini. Alias dicatat otomatis saat unit diubah namanya (`MasterFormasiService@updateUnit`), dimuat dari baseline (`aliases` pada `unit_metadata.json` dan `master_formasi.json`), dan hanya berlaku untuk unit aktif. Tidak ada pemetaan nama unit yang tertanam di kode impor.
 14. **Template impor dan Strata turunan**: kolom template berurutan Unit Kerja lalu Jabatan (24 kolom A–X). Dropdown Jabatan bergantung pada Unit Kerja yang dipilih: daftar diambil langsung dari baris unit tersebut pada sheet `Formasi per Unit` (dibuat dari Master Formasi saat template diunduh, dikelompokkan per unit, tanpa kolom bantu). Sheet itu dikunci tanpa kata sandi; penyaringan boleh, pengurutan tidak, karena merusak pengelompokan per unit. Sheet itu juga menampilkan strata, RM Band, bidang, kuota, terisi, dan sisa kuota setiap Formasi Jabatan. **Strata dan RM Band diturunkan, bukan input**: template tidak memiliki kolom Level maupun RM Level; karyawan baru memakai strata dan RM Band Formasi Jabatan pada unit tersebut, karyawan eksisting memakai strata tercatatnya. Keduanya dapat dilihat pada sheet `Formasi per Unit`. Pesan galat pasangan Unit–Jabatan memuat petunjuk perbaikan: strata berbeda, unit lain yang memiliki jabatan itu, jabatan serupa pada unit, dan Formasi Jabatan yang masih kosong. Template perlu diunduh ulang bila Master Formasi berubah.
 ---

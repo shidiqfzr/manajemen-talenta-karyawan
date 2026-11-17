@@ -438,6 +438,48 @@
                 "level": "Karpel",
                 "rm_level": "RM-5",
                 "kuota": 3
+            },
+            {
+                "nama": "Kepala Sub Bagian Sistem Manajemen & Sustainability",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-2",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Sistem Manajemen & Sertifikasi",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 2
+            },
+            {
+                "nama": "Asisten ESG & Sustainability",
+                "bidang": "UMU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Krani Sertifikasi (RSPO/ISPO/ISO)",
+                "bidang": "UMU",
+                "level": "Karpel",
+                "rm_level": "RM-5",
+                "kuota": 2
+            },
+            {
+                "nama": "Krani ESG (Proper & Pengelolaan Lingkungan)",
+                "bidang": "UMU",
+                "level": "Karpel",
+                "rm_level": "RM-5",
+                "kuota": 2
+            },
+            {
+                "nama": "Krani SMK3 & Admi Manajemen Sertifikasi",
+                "bidang": "UMU",
+                "level": "Karpel",
+                "rm_level": "RM-5",
+                "kuota": 1
             }
         ]
     },
@@ -576,6 +618,13 @@
             },
             {
                 "nama": "Asisten ICOFR",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Manajemen Risiko",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1064,14 +1113,17 @@
         ]
     },
     {
-        "nama": "Bagian Sumber Daya Manusia & Sistem Manajemen",
+        "nama": "Bagian Sumber Daya Manusia",
         "kode": "Bagian",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
         "urutan": 8,
+        "aliases": [
+            "Bagian Sumber Daya Manusia & Sistem Manajemen"
+        ],
         "positions": [
             {
-                "nama": "Kepala Bagian Sumber Daya Manusia & Sistem Manajemen",
+                "nama": "Kepala Bagian Sumber Daya Manusia",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-1",
@@ -1121,7 +1173,7 @@
             },
             {
                 "nama": "Asisten Penggajian",
-                "bidang": "UMU",
+                "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
@@ -1209,55 +1261,6 @@
                 "level": "Karpel",
                 "rm_level": "RM-5",
                 "kuota": 1
-            },
-            {
-                "nama": "Kepala Sub Bagian Sistem Manajemen & Sustainability",
-                "bidang": "UMU",
-                "level": "Karpim",
-                "rm_level": "RM-2",
-                "kuota": 1
-            },
-            {
-                "nama": "Asisten Sistem Manajemen & Sertifikasi",
-                "bidang": "UMU",
-                "level": "Karpim",
-                "rm_level": "RM-3",
-                "kuota": 2
-            },
-            {
-                "nama": "Asisten ESG & Sustainability",
-                "bidang": "UMU",
-                "level": "Karpim",
-                "rm_level": "RM-3",
-                "kuota": 1
-            },
-            {
-                "nama": "Asisten Manajemen Risiko",
-                "bidang": "UMU",
-                "level": "Karpim",
-                "rm_level": "RM-3",
-                "kuota": 1
-            },
-            {
-                "nama": "Krani Sertifikasi (RSPO/ISPO/ISO)",
-                "bidang": "UMU",
-                "level": "Karpel",
-                "rm_level": "RM-5",
-                "kuota": 2
-            },
-            {
-                "nama": "Krani ESG (Proper & Pengelolaan Lingkungan)",
-                "bidang": "UMU",
-                "level": "Karpel",
-                "rm_level": "RM-5",
-                "kuota": 2
-            },
-            {
-                "nama": "Krani SMK3 & Admi Manajemen Sertifikasi",
-                "bidang": "UMU",
-                "level": "Karpel",
-                "rm_level": "RM-5",
-                "kuota": 1
             }
         ]
     },
@@ -1277,7 +1280,7 @@
             },
             {
                 "nama": "Kepala Bidang Kemitraan & Kelembagaan",
-                "bidang": "TAN",
+                "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-2",
                 "kuota": 1
@@ -1326,14 +1329,14 @@
             },
             {
                 "nama": "Kepala Bidang Administrasi Plasma/KKPA & Pembelian Bahan Baku",
-                "bidang": "TAN",
+                "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-2",
                 "kuota": 1
             },
             {
                 "nama": "Asisten Bidang Administrasi Plasma/KKPA & Pembelian Bahan Baku",
-                "bidang": "TAN",
+                "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
@@ -1347,14 +1350,14 @@
             },
             {
                 "nama": "Kepala Bidang Operasional Pembelian Bahan Baku",
-                "bidang": "TAN",
+                "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-2",
                 "kuota": 1
             },
             {
                 "nama": "Asisten Bidang Operasional Pembelian Bahan Baku",
-                "bidang": "TAN",
+                "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
@@ -1365,7 +1368,16 @@
                 "level": "Karpel",
                 "rm_level": "RM-5",
                 "kuota": 1
-            },
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Kemitraan Area Kalbar",
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
+        "is_active": true,
+        "urutan": 10,
+        "positions": [
             {
                 "nama": "Manajer Kebun Kemitraan Area Kalbar",
                 "bidang": "TAN",
@@ -1378,7 +1390,7 @@
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
-                "kuota": 2
+                "kuota": 1
             },
             {
                 "nama": "Asisten Kepala Kemitraan Area Kalbar",
@@ -1421,12 +1433,28 @@
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
-            },
+            }
+        ]
+    },
+    {
+        "nama": "Kebun Kemitraan Area Kaltim-Sel",
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
+        "is_active": true,
+        "urutan": 11,
+        "positions": [
             {
                 "nama": "Manajer Kebun Kemitraan Area Kaltim-Sel",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-1",
+                "kuota": 1
+            },
+            {
+                "nama": "Asisten Tata Usaha",
+                "bidang": "KEU",
+                "level": "Karpim",
+                "rm_level": "RM-3",
                 "kuota": 1
             },
             {
@@ -1485,7 +1513,7 @@
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
-        "urutan": 10,
+        "urutan": 12,
         "positions": [
             {
                 "nama": "Head of PMO Investasi Tanaman Wilayah Kalbar",
@@ -1529,7 +1557,7 @@
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
-        "urutan": 11,
+        "urutan": 13,
         "aliases": [
             "PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG",
             "PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG"
@@ -1591,7 +1619,7 @@
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
-        "urutan": 12,
+        "urutan": 14,
         "aliases": [
             "PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA"
         ],
@@ -1612,7 +1640,7 @@
             },
             {
                 "nama": "Coordinator Bisnis Batu Bara",
-                "bidang": "UMU",
+                "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
@@ -1641,11 +1669,14 @@
         ]
     },
     {
-        "nama": "Group Manager Kalbar",
-        "kode": "Group",
+        "nama": "Unit Group Kalimantan Barat",
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 14,
+        "urutan": 16,
+        "aliases": [
+            "Group Manager Kalbar"
+        ],
         "positions": [
             {
                 "nama": "Group Manager",
@@ -1685,11 +1716,14 @@
         ]
     },
     {
-        "nama": "Group Manager Kalselteng",
-        "kode": "Group",
+        "nama": "Unit Group Kalimantan Selatan/Tengah",
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 28,
+        "urutan": 30,
+        "aliases": [
+            "Group Manager Kalselteng"
+        ],
         "positions": [
             {
                 "nama": "Group Manager",
@@ -1729,11 +1763,14 @@
         ]
     },
     {
-        "nama": "Group Manager Kaltim",
-        "kode": "Group",
+        "nama": "Unit Group Kalimantan Timur",
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 39,
+        "urutan": 41,
+        "aliases": [
+            "Group Manager Kaltim"
+        ],
         "positions": [
             {
                 "nama": "Group Manager",
@@ -1784,7 +1821,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 32,
+        "urutan": 34,
         "positions": [
             {
                 "nama": "Manajer",
@@ -1849,7 +1886,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 29,
+        "urutan": 31,
         "positions": [
             {
                 "nama": "Manajer",
@@ -1970,7 +2007,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 17,
+        "urutan": 19,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2056,7 +2093,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 15,
+        "urutan": 17,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2163,7 +2200,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 42,
+        "urutan": 44,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2235,7 +2272,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 18,
+        "urutan": 20,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2328,7 +2365,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 26,
+        "urutan": 28,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2414,7 +2451,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 35,
+        "urutan": 37,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2486,7 +2523,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 22,
+        "urutan": 24,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2565,7 +2602,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 30,
+        "urutan": 32,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2630,7 +2667,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 24,
+        "urutan": 26,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2716,7 +2753,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 33,
+        "urutan": 35,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2781,7 +2818,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 38,
+        "urutan": 40,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2825,7 +2862,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 19,
+        "urutan": 21,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2904,7 +2941,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 21,
+        "urutan": 23,
         "positions": [
             {
                 "nama": "Manajer",
@@ -2941,7 +2978,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 40,
+        "urutan": 42,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3041,7 +3078,7 @@
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 41,
+        "urutan": 43,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3134,7 +3171,7 @@
         "kode": "Kebun-PKS",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 45,
+        "urutan": 47,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3227,7 +3264,7 @@
         "kode": "PKR",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 36,
+        "urutan": 38,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3271,7 +3308,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 16,
+        "urutan": 18,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3322,7 +3359,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 27,
+        "urutan": 29,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3373,7 +3410,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 43,
+        "urutan": 45,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3431,7 +3468,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 23,
+        "urutan": 25,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3482,7 +3519,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 31,
+        "urutan": 33,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3533,7 +3570,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 25,
+        "urutan": 27,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3591,7 +3628,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 34,
+        "urutan": 36,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3642,7 +3679,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
         "is_active": true,
-        "urutan": 20,
+        "urutan": 22,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3693,7 +3730,7 @@
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Timur",
         "is_active": true,
-        "urutan": 44,
+        "urutan": 46,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3744,7 +3781,7 @@
         "kode": "Proyek",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
         "is_active": true,
-        "urutan": 37,
+        "urutan": 39,
         "positions": [
             {
                 "nama": "Manajer",
@@ -3774,7 +3811,7 @@
         "kode": "Tim",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "is_active": true,
-        "urutan": 13,
+        "urutan": 15,
         "positions": [
             {
                 "nama": "Lead of ERP SAP",

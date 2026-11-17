@@ -5,7 +5,7 @@ Repositori ini berpedoman pada **4 Pilar Single Source of Truth (SSOT)** yang **
 
 ### 1. [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) — Business Domain & Enterprise Logic
 - **Kamus Data & Validasi**: Format baku NIK (8 digit string), format golongan (`[Gol]/[Berkala]`), relasi model Eloquent (`Employee`, `JobHistory`, `Evaluation`, `Training`).
-- **Hierarki Organisasi & Unit**: 45 unit kerja PTPN IV Regional V (Regional Office, Kalbar, Kalselteng, Kaltim).
+- **Hierarki Organisasi & Unit**: 47 unit kerja PTPN IV Regional V (Regional Office, Kalbar, Kalselteng, Kaltim).
 - **Klasifikasi Karyawan & Eselon**: Pembedaan Karpim vs Karpel, 7 RM Band (`RM-1`, `RM-2`, `RM-3` untuk Karpim; `RM-4` s.d. `RM-7` untuk Karpel), dan 4 Bidang Fungsional (`KEU`, `TAN`, `TEK`, `UMU`).
 - **Formula & Aturan Bisnis HR**: Perhitungan otomatis Batas Usia Pensiun (56 tahun) dan MBT (6 bulan sebelum pensiun), siklus mutasi (straight vs swap transfer, auto chain vacancy), serta matriks talenta 9-box.
 - **Service Layer**: Wajib menggunakan `ManPowerPlanningService`, `MutasiService`, dan `JobVacancyService`. Dilarang melakukan hardcode kalkulasi RM/bidang di Blade views atau controllers.

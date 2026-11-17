@@ -60,14 +60,14 @@ test('alur lengkap: buat jabatan, buka pada unit, lihat bezetting, tutup dengan 
     await page.getByRole('menuitem', { name: 'Buka di Unit' }).click();
     const openDialog = page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' });
     await expect(openDialog).toBeVisible();
-    await openDialog.getByLabel(/Unit Kerja/).selectOption({ label: 'Group Manager Kalbar' });
+    await openDialog.getByLabel(/Unit Kerja/).selectOption({ label: 'Unit Group Kalimantan Barat' });
     await openDialog.getByRole('button', { name: 'Buka pada Unit' }).click();
-    await expect(page.getByRole('status').filter({ hasText: "dibuka pada unit 'Group Manager Kalbar'" })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: "dibuka pada unit 'Unit Group Kalimantan Barat'" })).toBeVisible();
 
     // Bezetting per unit
     await page.getByRole('radio', { name: 'Per Unit' }).click();
     const unitRow = page.locator('tbody tr', { hasText: 'Asisten Diperbantukan Uji' });
-    await expect(unitRow).toContainText('Group Manager Kalbar');
+    await expect(unitRow).toContainText('Unit Group Kalimantan Barat');
     await expect(unitRow).toContainText('Dibuka');
 
     // Tutup: alasan wajib
@@ -149,7 +149,7 @@ test('jabatan yang masih dibuka tidak dapat dihapus dan pesan menunjuk tab ini',
     const row = page.locator('tbody tr', { hasText: 'Advisor Hapus Uji' });
     await row.getByRole('button', { name: /^Aksi untuk/ }).click();
     await page.getByRole('menuitem', { name: 'Buka di Unit' }).click();
-    await page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' }).getByLabel(/Unit Kerja/).selectOption({ label: 'Group Manager Kalbar' });
+    await page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' }).getByLabel(/Unit Kerja/).selectOption({ label: 'Unit Group Kalimantan Barat' });
     await page.getByRole('dialog', { name: 'Buka Jabatan pada Unit' }).getByRole('button', { name: 'Buka pada Unit' }).click();
 
     await row.getByRole('button', { name: /^Aksi untuk/ }).click();

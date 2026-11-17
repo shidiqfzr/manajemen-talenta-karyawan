@@ -38,7 +38,7 @@ class Employee extends Model
     protected $keyType = 'string';
 
     /**
-     * Master 45 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
+     * Master 47 Unit Kerja resmi PTPN IV Regional V dikelompokkan per Wilayah (DOMAIN.md Bab 3).
      * Hanya cadangan saat tabel `units` kosong; sumber utama adalah database (diisi dari Excel formasi).
      */
     public const GROUPED_UNITS = [
@@ -50,15 +50,17 @@ class Employee extends Model
             'Bagian Akuntansi & Keuangan',
             'Bagian Pengadaan & Teknologi Informasi',
             'Bagian Sekretariat & Hukum',
-            'Bagian Sumber Daya Manusia & Sistem Manajemen',
+            'Bagian Sumber Daya Manusia',
             'Distrik Petani Mitra',
+            'Kebun Kemitraan Area Kalbar',
+            'Kebun Kemitraan Area Kaltim-Sel',
             'PMO Investasi Tanaman Wilayah Kalbar',
             'PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng',
             'PMO Batu Bara & Bisnis Lainnya',
             'Tim Penguatan ERP SAP',
         ],
         'Wilayah Kalimantan Barat' => [
-            'Group Manager Kalbar',
+            'Unit Group Kalimantan Barat',
             'Kebun Inti Gunung Meliau',
             'PKS Gunung Meliau',
             'Kebun Gunung Emas',
@@ -74,7 +76,7 @@ class Employee extends Model
             'PKS Kembayan',
         ],
         'Wilayah Kalimantan Selatan/Tengah' => [
-            'Group Manager Kalselteng',
+            'Unit Group Kalimantan Selatan/Tengah',
             'Kebun Danau Salak',
             'Kebun Pamukan',
             'PKS Pamukan',
@@ -87,7 +89,7 @@ class Employee extends Model
             'Kebun Raren Batuah',
         ],
         'Wilayah Kalimantan Timur' => [
-            'Group Manager Kaltim',
+            'Unit Group Kalimantan Timur',
             'Kebun Tabara',
             'Kebun Tajati',
             'Kebun Inti Pandawa',

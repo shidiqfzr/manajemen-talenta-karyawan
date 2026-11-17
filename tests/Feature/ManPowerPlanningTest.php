@@ -269,8 +269,8 @@ class ManPowerPlanningTest extends TestCase
         $service = new ManPowerPlanningService;
         $this->assertSame([
             'RM-1' => ['KEU' => 2, 'TAN' => 30, 'TEK' => 11, 'UMU' => 5],
-            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 18],
-            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 68],
+            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 20],
+            'RM-3' => ['KEU' => 66, 'TAN' => 146, 'TEK' => 61, 'UMU' => 65],
         ], $service->standarFormasi());
         $this->assertSame(461, $service->getMppMatrix(2026, 11)['stats']['total_formasi']);
     }
@@ -1204,7 +1204,7 @@ class ManPowerPlanningTest extends TestCase
     {
         $this->seed(PositionUnitSeeder::class);
 
-        $employee = new Employee(['jabatan' => 'Asisten Tata Usaha', 'unit_kerja' => 'Distrik Petani Mitra']);
+        $employee = new Employee(['jabatan' => 'Asisten Tata Usaha', 'unit_kerja' => 'Kebun Kemitraan Area Kalbar']);
 
         $this->assertSame('KEU', (new ManPowerPlanningService)->determineBidang($employee));
     }

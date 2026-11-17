@@ -34,25 +34,38 @@
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 7
     },
-    "Bagian Sumber Daya Manusia & Sistem Manajemen": {
+    "Bagian Sumber Daya Manusia": {
         "kode": "Bagian",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 8
+        "urutan": 8,
+        "aliases": [
+            "Bagian Sumber Daya Manusia & Sistem Manajemen"
+        ]
     },
     "Distrik Petani Mitra": {
         "kode": "Distrik",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
         "urutan": 9
     },
+    "Kebun Kemitraan Area Kalbar": {
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
+        "urutan": 10
+    },
+    "Kebun Kemitraan Area Kaltim-Sel": {
+        "kode": "Kebun",
+        "wilayah": "Regional Office (Kantor Direksi Pontianak)",
+        "urutan": 11
+    },
     "PMO Investasi Tanaman Wilayah Kalbar": {
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 10
+        "urutan": 12
     },
     "PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng": {
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 11,
+        "urutan": 13,
         "aliases": [
             "PROJECT MANAGEMENT OFFICE (PMO) INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG",
             "PMO INVESTASI TANAMAN WILAYAH KALTIM & KALSEL-TENG"
@@ -61,7 +74,7 @@
     "PMO Batu Bara & Bisnis Lainnya": {
         "kode": "PMO",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 12,
+        "urutan": 14,
         "aliases": [
             "PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA"
         ]
@@ -69,166 +82,175 @@
     "Tim Penguatan ERP SAP": {
         "kode": "Tim",
         "wilayah": "Regional Office (Kantor Direksi Pontianak)",
-        "urutan": 13
+        "urutan": 15
     },
-    "Group Manager Kalbar": {
-        "kode": "Group",
+    "Unit Group Kalimantan Barat": {
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 14
+        "urutan": 16,
+        "aliases": [
+            "Group Manager Kalbar"
+        ]
     },
     "Kebun Inti Gunung Meliau": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 15
+        "urutan": 17
     },
     "PKS Gunung Meliau": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 16
+        "urutan": 18
     },
     "Kebun Gunung Emas": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 17
+        "urutan": 19
     },
     "Kebun Inti Sungai Dekan": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 18
+        "urutan": 20
     },
     "Kebun Rimba Belian": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 19
+        "urutan": 21
     },
     "PKS Rimba Belian": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 20
+        "urutan": 22
     },
     "Kebun Sintang": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 21
+        "urutan": 23
     },
     "Kebun Ngabang": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 22
+        "urutan": 24
     },
     "PKS Ngabang": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 23
+        "urutan": 25
     },
     "Kebun Parindu": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 24
+        "urutan": 26
     },
     "PKS Parindu": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 25
+        "urutan": 27
     },
     "Kebun Kembayan": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 26
+        "urutan": 28
     },
     "PKS Kembayan": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Barat",
-        "urutan": 27
+        "urutan": 29
     },
-    "Group Manager Kalselteng": {
-        "kode": "Group",
+    "Unit Group Kalimantan Selatan/Tengah": {
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 28
+        "urutan": 30,
+        "aliases": [
+            "Group Manager Kalselteng"
+        ]
     },
     "Kebun Danau Salak": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 29
+        "urutan": 31
     },
     "Kebun Pamukan": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 30
+        "urutan": 32
     },
     "PKS Pamukan": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 31
+        "urutan": 33
     },
     "Kebun Batulicin": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 32
+        "urutan": 34
     },
     "Kebun Pelaihari": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 33
+        "urutan": 35
     },
     "PKS Pelaihari": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 34
+        "urutan": 36
     },
     "Kebun Kumai": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 35
+        "urutan": 37
     },
     "PKR Tambarangan": {
         "kode": "PKR",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 36
+        "urutan": 38
     },
     "Proyek Batubara Danau Salak": {
         "kode": "Proyek",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 37
+        "urutan": 39
     },
     "Kebun Raren Batuah": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Selatan/Tengah",
-        "urutan": 38
+        "urutan": 40
     },
-    "Group Manager Kaltim": {
-        "kode": "Group",
+    "Unit Group Kalimantan Timur": {
+        "kode": "Unit Group",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 39
+        "urutan": 41,
+        "aliases": [
+            "Group Manager Kaltim"
+        ]
     },
     "Kebun Tabara": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 40
+        "urutan": 42
     },
     "Kebun Tajati": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 41
+        "urutan": 43
     },
     "Kebun Inti Pandawa": {
         "kode": "Kebun",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 42
+        "urutan": 44
     },
     "PKS Longpinang": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 43
+        "urutan": 45
     },
     "PKS Samuntai": {
         "kode": "PKS",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 44
+        "urutan": 46
     },
     "Kebun-PKS Longkali": {
         "kode": "Kebun-PKS",
         "wilayah": "Wilayah Kalimantan Timur",
-        "urutan": 45
+        "urutan": 47
     }
 }

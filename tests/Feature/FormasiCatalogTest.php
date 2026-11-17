@@ -20,8 +20,8 @@ class FormasiCatalogTest extends TestCase
 
         $this->assertSame([
             'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
-            'RM-2' => ['KEU' => 4, 'TAN' => 41, 'TEK' => 12, 'UMU' => 18],
-            'RM-3' => ['KEU' => 62, 'TAN' => 148, 'TEK' => 60, 'UMU' => 68],
+            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 20],
+            'RM-3' => ['KEU' => 66, 'TAN' => 146, 'TEK' => 61, 'UMU' => 65],
         ], app(FormasiCatalog::class)->standarFormasi());
     }
 

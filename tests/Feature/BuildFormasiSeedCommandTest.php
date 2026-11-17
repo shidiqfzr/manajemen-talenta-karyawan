@@ -93,6 +93,31 @@ class BuildFormasiSeedCommandTest extends TestCase
         ], json_decode(file_get_contents($out), true));
     }
 
+    public function test_builds_karpel_level_for_rm_5_from_struktur_organisasi_workbook(): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['No', 'Unit/Bagian', 'Sub Bagian', 'Jabatan', 'Strata RM', 'Bidang', 'Kuota', 'Keterangan'],
+            [1, 'Bagian Tanaman', '-', 'Kepala Bagian Tanaman', 'RM 1', 'TAN', 1, null],
+            [2, 'Bagian Tanaman', 'Pemetaan', 'Krani Pemetaan', 'RM 5', 'TAN', 8, null],
+        ], null, 'A1');
+        $excel = $this->tempPath('.xlsx');
+        (new Xlsx($spreadsheet))->save($excel);
+        $metadata = $this->metadata([
+            'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'urutan' => 3],
+        ]);
+        $out = $this->tempPath('.json');
+
+        $this->artisan('formasi:build-seed', ['file' => $excel, '--out' => $out, '--metadata' => $metadata])
+            ->assertExitCode(0);
+
+        $positions = json_decode(file_get_contents($out), true)[0]['positions'];
+        $this->assertEquals([
+            ['nama' => 'Kepala Bagian Tanaman', 'bidang' => 'TAN', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'kuota' => 1],
+            ['nama' => 'Krani Pemetaan', 'bidang' => 'TAN', 'level' => 'Karpel', 'rm_level' => 'RM-5', 'kuota' => 8],
+        ], $positions);
+    }
+
     public function test_fails_and_lists_units_missing_from_metadata(): void
     {
         $excel = $this->workbook([
