@@ -35,7 +35,7 @@ test('tab menampilkan jabatan bawaan, KPI, dan keterangan bahwa bukan formasi', 
     await openTab(page);
 
     await expect(page.getByRole('navigation', { name: 'Tampilan Formasi' }).getByRole('link', { name: 'Jabatan Penampungan' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Struktur & Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('Advisor RM-2', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Karyawan Diperbantukan RM-3', { exact: true }).first()).toBeVisible();
     // Aturan berada pada popover info agar header tabel tidak penuh: buka dahulu, lalu aturannya terbaca.

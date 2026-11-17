@@ -91,6 +91,17 @@
                                     <span class="text-surface-500">&mdash;</span>
                                 @endif
                             </td>
+                            <td class="px-4 py-3 text-surface-700">
+                                @php($placement = $structure[$history->id] ?? ['structure_sk' => null, 'in_structure' => null])
+                                @if ($placement['structure_sk'] === null)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-100 text-surface-700">Sebelum SK struktur pertama</span>
+                                @else
+                                    <span class="block text-surface-900">{{ $placement['structure_sk'] }}</span>
+                                    @if ($placement['in_structure'] === false)
+                                        <span class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-100 text-warning-900"><i class="fas fa-triangle-exclamation text-[10px]" aria-hidden="true"></i> Tidak tercantum pada struktur SK</span>
+                                    @endif
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-center whitespace-nowrap">
                                 @include('admin.employees.partials.job-history-actions', ['row' => $history])
                             </td>

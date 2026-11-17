@@ -34,17 +34,11 @@ class StructureVersionsPage extends Component
     use WithCollectionTable;
     use WithPagination;
 
-    public const TABS = ['struktur', 'karyawan'];
-
     public const VIEWS = ['jabatan', 'unit'];
 
     public const FILL_STATES = ['terisi' => 'Terisi', 'kosong' => 'Kosong', 'melebihi' => 'Melebihi kuota'];
 
     private const SEARCH_MAX_LENGTH = 100;
-
-    /** Tab: struktur (tabel versi) atau karyawan (riwayat jabatan seorang karyawan). */
-    #[Url(except: 'struktur')]
-    public string $tab = 'struktur';
 
     /** Tanggal yang dilihat (Y-m-d). Kosong atau tidak valid kembali ke hari ini. */
     #[Url(except: '')]
@@ -87,7 +81,6 @@ class StructureVersionsPage extends Component
     public function mount(): void
     {
         $this->perPage = $this->defaultPerPage();
-        $this->tab = in_array($this->tab, self::TABS, true) ? $this->tab : 'struktur';
         $this->view = in_array($this->view, self::VIEWS, true) ? $this->view : 'jabatan';
         $this->normaliseDate();
         $this->normaliseSearch();
@@ -117,11 +110,6 @@ class StructureVersionsPage extends Component
     public function updatedCompare(): void
     {
         $this->normaliseCompare();
-    }
-
-    public function updatedTab(): void
-    {
-        $this->tab = in_array($this->tab, self::TABS, true) ? $this->tab : 'struktur';
     }
 
     public function setView(string $view): void

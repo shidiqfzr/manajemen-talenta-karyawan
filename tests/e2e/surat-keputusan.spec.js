@@ -37,7 +37,7 @@ test('daftar: bagian Surat Keputusan aktif, SK baseline tampil, dan tanpa istila
     await openIndex(page);
 
     const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
-    for (const label of ['Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
+    for (const label of ['Struktur & Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
         await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
     // Pengalih tampilan Formasi hanya ada di dalam Formasi, bukan pada alur Surat Keputusan.
@@ -179,7 +179,7 @@ test('versi struktur: tampilan Formasi, satu kendali waktu, data langsung terlih
     // Daftar SK tidak memuat jalan masuk ke Versi Struktur; tampilannya ada di dalam bagian Formasi.
     await expect(page.getByRole('link', { name: 'Versi Struktur' })).toHaveCount(0);
 
-    await page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Formasi', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Struktur & Formasi', exact: true }).click();
     await page.waitForURL(/\/admin\/master\/formasi$/, { timeout: 30_000 });
     const views = page.getByRole('navigation', { name: 'Tampilan Formasi' });
     await views.getByRole('link', { name: 'Versi Struktur', exact: true }).click();
@@ -239,24 +239,6 @@ test('versi struktur: memilih versi lampau, mencari pemangku, tampilan per unit,
     await expect(page.locator('#version')).toBeVisible();
 });
 
-test('versi struktur: riwayat jabatan karyawan terhadap versi struktur, tanpa NIK utuh', async ({ page }) => {
-    await openVersions(page);
-    await page.getByRole('button', { name: 'Riwayat Jabatan Karyawan' }).click();
-    await expect(page.getByText(/minimal 3 karakter/)).toBeVisible();
-
-    await page.getByPlaceholder(/Ketik nama atau NIK karyawan/).fill('Budi Uji');
-    await page.getByRole('button', { name: /Budi Uji Versi/ }).click();
-
-    await expect(page.getByRole('heading', { name: 'Budi Uji Versi' })).toBeVisible();
-    await expect(page.getByText('SK/MUTASI/UJI/1')).toBeVisible();
-    await expect(page.getByText('DPSB/SKPTS/401/X/2026').first()).toBeVisible();
-    await expect(page.getByText('DPSB/SKPTS/352/IX/2026').first()).toBeVisible();
-    await expect(page.getByText('sekarang').first()).toBeVisible();
-    expect(await page.locator('main').innerText()).not.toMatch(/\b\d{8}\b/);
-
-    await page.getByRole('button', { name: 'Ganti karyawan' }).click();
-    await expect(page.getByPlaceholder(/Ketik nama atau NIK karyawan/)).toBeVisible();
-});
 for (const [name, width] of [['ponsel 375px', 375], ['laptop 1366px', 1366], ['layar lebar 1920px', 1920]]) {
     test(`tanpa overflow horizontal pada ${name}`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });

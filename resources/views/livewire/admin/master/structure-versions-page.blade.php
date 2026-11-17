@@ -10,20 +10,10 @@
     $format = fn (int $n) => number_format($n, 0, ',', '.');
     $day = fn ($value) => $value->locale('id')->translatedFormat('d M Y');
     $loading = 'date,version,search,perPage,compare,view,wilayahFilter,rmFilter,bidangFilter,isiFilter,gotoPage,previousPage,nextPage';
-    $tabs = ['struktur' => 'Struktur', 'karyawan' => 'Riwayat Jabatan Karyawan'];
     $selectClass = 'w-full h-10 pl-3 pr-8 appearance-none bg-surface-50/70 select-chevron border border-surface-200 rounded-lg text-xs sm:text-sm font-medium text-surface-800 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:border-primary-500 transition cursor-pointer';
 @endphp
 <div class="space-y-6">
-    <nav class="flex flex-wrap items-center gap-1 border-b border-surface-200" aria-label="Tampilan Versi Struktur">
-        @foreach ($tabs as $key => $label)
-            <button type="button" wire:key="vtab-{{ $key }}" wire:click="$set('tab', '{{ $key }}')" @if ($tab === $key) aria-current="page" @endif
-                class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px rounded-t cursor-pointer transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $tab === $key ? 'border-primary-600 text-primary-800' : 'border-transparent text-surface-600 hover:text-surface-900 hover:border-surface-300' }}">{{ $label }}</button>
-        @endforeach
-    </nav>
-
-    @if ($tab === 'karyawan')
-        <livewire:admin.master.structure-employee-timeline wire:key="employee-timeline" />
-    @elseif ($versions === [])
+    @if ($versions === [])
         <div class="bg-white rounded-2xl border border-surface-200 shadow-xs px-6 py-10 text-center" role="status">
             <i class="fas fa-box-archive text-2xl text-surface-400 mb-2" aria-hidden="true"></i>
             <p class="font-semibold text-surface-900">Belum ada SK yang diterapkan</p>
@@ -71,7 +61,10 @@
                     </span>
                 </p>
             @endif
-        </section>
+
+            <p class="mt-2 text-xs text-surface-600">
+                Riwayat jabatan seorang karyawan, beserta SK struktur yang berlaku pada setiap penempatannya, ada pada profil <a href="{{ route('admin.employees.index') }}" wire:navigate class="font-semibold text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">Karyawan</a>, tab Riwayat Karir.
+            </p>        </section>
 
         @if ($report === null)
             <div class="bg-white rounded-2xl border border-surface-200 shadow-xs px-6 py-10 text-center" role="status">

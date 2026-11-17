@@ -21,10 +21,10 @@ test('navigasi: tiga bagian utama, Formasi aktif dengan tampilan Sebaran Jabatan
     await openSebaran(page);
 
     const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
-    for (const label of ['Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
+    for (const label of ['Struktur & Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
         await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
-    await expect(nav.getByRole('link', { name: 'Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Struktur & Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
 
     // Empat tampilan Formasi berada pada satu pengalih, bukan tab terpisah.
     const views = page.getByRole('navigation', { name: 'Tampilan Formasi' });

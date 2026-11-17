@@ -4,6 +4,7 @@ namespace App\Livewire\Tables;
 
 use App\Livewire\Concerns\WithDataTable;
 use App\Models\JobHistory;
+use App\Services\Structure\PlacementStructureService;
 use App\Support\DataTable\Column;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,6 +49,7 @@ class JobHistoryTable extends Component
             Column::make('level', 'Level / Golongan'),
             Column::make('jenis_mutasi', 'Mutasi')->searchable(),
             Column::make('nomor_sk', 'Nomor & Tanggal SK')->searchable(),
+            Column::make('structure', 'Struktur yang Berlaku'),
             Column::make('aksi', 'Aksi')->align('center'),
         ];
     }
@@ -79,6 +81,9 @@ class JobHistoryTable extends Component
 
     public function render(): View
     {
-        return view('livewire.tables.job-history-table');
+        return view('livewire.tables.job-history-table', [
+            // Versi struktur yang berlaku pada tanggal mulai setiap penempatan di halaman ini (DOMAIN.md §3.7).
+            'structure' => app(PlacementStructureService::class)->annotate($this->rows->getCollection()),
+        ]);
     }
 }

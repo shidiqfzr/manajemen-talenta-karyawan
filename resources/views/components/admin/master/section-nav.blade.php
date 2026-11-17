@@ -2,7 +2,7 @@
     Navigasi Master Data dua tingkat (DESIGN.md §8.5): tiga bagian utama menurut tujuan pengguna, dan pengalih tampilan khusus
     di dalam Formasi.
 
-    Bagian utama (tab bergaris bawah, satu entri sidebar): Formasi (struktur dan formasi jabatan) · Surat Keputusan (alur
+    Bagian utama (tab bergaris bawah, satu entri sidebar bernama Formasi): Struktur & Formasi (struktur dan formasi jabatan) · Surat Keputusan (alur
     perubahan struktur dari Holding) · Riwayat Perubahan (log audit). Formasi memuat empat tampilan yang saling berkaitan dan
     hanya tampil di bagian itu: Unit Kerja (kelola), Sebaran Jabatan, Jabatan Penampungan, dan Versi Struktur.
 
@@ -13,7 +13,7 @@
     $formasiRoutes = ['admin.master.formasi.*', 'admin.master.sebaran.*', 'admin.master.penampungan.*', 'admin.master.versi.*'];
 
     $sections = [
-        ['label' => 'Formasi', 'route' => 'admin.master.formasi.index', 'match' => $formasiRoutes, 'icon' => 'fa-table-list'],
+        ['label' => 'Struktur & Formasi', 'route' => 'admin.master.formasi.index', 'match' => $formasiRoutes, 'icon' => 'fa-table-list'],
         ['label' => 'Surat Keputusan', 'route' => 'admin.master.sk.index', 'match' => ['admin.master.sk.*'], 'icon' => 'fa-file-signature'],
         ['label' => 'Riwayat Perubahan', 'route' => 'admin.master.riwayat.index', 'match' => ['admin.master.riwayat.*'], 'icon' => 'fa-clock-rotate-left'],
     ];

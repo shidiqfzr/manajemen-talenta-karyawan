@@ -424,17 +424,17 @@ class MasterDataTest extends TestCase
         $links = [];
         preg_match_all('/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s', $nav[0] ?? '', $links, PREG_SET_ORDER);
 
-        return [array_map(fn ($link) => [html_entity_decode($link[1]), trim(strip_tags($link[2])), str_contains($link[0], 'aria-current="page"')], $links), $nav[0] ?? ''];
+        return [array_map(fn ($link) => [html_entity_decode($link[1]), trim(html_entity_decode(strip_tags($link[2]))), str_contains($link[0], 'aria-current="page"')], $links), $nav[0] ?? ''];
     }
 
     public function test_master_pages_share_three_primary_sections_with_the_owning_one_marked_current(): void
     {
         // Formasi memuat empat tampilan (Unit Kerja, Sebaran Jabatan, Penampungan, Versi Struktur), jadi tetap satu bagian utama.
         $pages = [
-            'admin.master.formasi.index' => 'Formasi',
-            'admin.master.sebaran.index' => 'Formasi',
-            'admin.master.penampungan.index' => 'Formasi',
-            'admin.master.versi.index' => 'Formasi',
+            'admin.master.formasi.index' => 'Struktur & Formasi',
+            'admin.master.sebaran.index' => 'Struktur & Formasi',
+            'admin.master.penampungan.index' => 'Struktur & Formasi',
+            'admin.master.versi.index' => 'Struktur & Formasi',
             'admin.master.sk.index' => 'Surat Keputusan',
             'admin.master.riwayat.index' => 'Riwayat Perubahan',
         ];
@@ -490,7 +490,7 @@ class MasterDataTest extends TestCase
 
         [$primary] = $this->navLinks($html, 'Bagian Master Data');
         [$views] = $this->navLinks($html, 'Tampilan Formasi');
-        $this->assertSame(['Formasi'], array_column(array_filter($primary, fn ($link) => $link[2]), 1));
+        $this->assertSame(['Struktur & Formasi'], array_column(array_filter($primary, fn ($link) => $link[2]), 1));
         $this->assertSame(['Unit Kerja'], array_column(array_filter($views, fn ($link) => $link[2]), 1));
     }
 

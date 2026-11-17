@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\Tables\JobHistoryTable;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\StructureDecree;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
@@ -210,5 +211,33 @@ class JobHistoryTableTest extends TestCase
         $this->table()
             ->assertSeeHtml("onclick=\"confirm('Hapus riwayat jabatan ini?') || event.stopImmediatePropagation()\"")
             ->assertDontSeeHtml('return confirm(');
+    }
+
+    public function test_structure_in_force_column_matches_each_placement_with_the_decree_in_force_at_its_start(): void
+    {
+        StructureDecree::create([
+            'sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'Perubahan Struktur', 'sk_date' => '2020-06-01', 'effective_date' => '2020-06-01',
+            'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'decrees/352.xlsx', 'source_sha256' => str_repeat('a', 64), 'applied_at' => now(),
+            'snapshot' => ['units' => ['Kebun Umum' => ['kode' => 'Kebun', 'wilayah' => 'W', 'urutan' => 1, 'is_active' => true, 'seats' => [
+                'Jabatan 07' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+            ]]]],
+        ]);
+
+        $html = Livewire::test(JobHistoryTable::class, ['employeeId' => $this->employee->nik])
+            ->assertSee('Struktur yang Berlaku')
+            ->assertSee('DPSB/SKPTS/352/IX/2026')
+            ->assertSee('Tidak tercantum pada struktur SK')
+            ->assertSee('Sebelum SK struktur pertama')
+            ->html();
+
+        // Jabatan 07 (1 Jul 2020) ada pada versi itu; Jabatan 06 (hari berlakunya SK) tidak tercantum.
+        $this->assertSame(1, substr_count($html, 'Tidak tercantum pada struktur SK'));
+    }
+
+    public function test_structure_in_force_column_says_before_first_decree_when_no_decree_exists(): void
+    {
+        Livewire::test(JobHistoryTable::class, ['employeeId' => $this->employee->nik])
+            ->assertSee('Sebelum SK struktur pertama')
+            ->assertDontSee('Tidak tercantum pada struktur SK');
     }
 }

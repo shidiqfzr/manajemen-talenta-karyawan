@@ -309,14 +309,14 @@ class StructureVersionsPageTest extends TestCase
         $this->page()->set('compare', 'aneh')->assertSet('compare', '')->set('compare', (string) $this->first->id)->assertSet('compare', '', 'sebuah versi tidak dibandingkan dengan dirinya sendiri');
     }
 
-    public function test_the_employee_tab_is_available_and_switches_without_losing_the_time_control(): void
+    public function test_the_page_has_no_second_tab_row_and_points_to_the_employee_profile_for_placement_history(): void
     {
-        $this->page()
-            ->assertSet('tab', 'struktur')
-            ->set('tab', 'karyawan')
-            ->assertSee('Cari karyawan')
-            ->set('tab', 'sembarang')
-            ->assertSet('tab', 'struktur');
+        $html = $this->page()->html();
+
+        $this->assertStringNotContainsString('aria-label="Tampilan Versi Struktur"', $html, 'tidak ada baris tab ketiga di dalam halaman');
+        $this->assertStringNotContainsString('Riwayat Jabatan Karyawan', $html);
+        $this->assertStringContainsString('Riwayat Karir', $html, 'petunjuk ke profil karyawan');
+        $this->assertStringContainsString(route('admin.employees.index'), $html);
     }
 
     public function test_export_downloads_a_workbook_and_is_audited_without_personal_data(): void
