@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Exceptions\MppPeriodRuleViolationException;
 use App\Models\MasterAuditLog;
 use App\Models\MppPeriod;
+use App\Models\Position;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
 use App\Services\Mpp\MppPeriodService;
@@ -48,6 +50,52 @@ class MppPeriodServiceTest extends TestCase
         } catch (MppPeriodRuleViolationException $e) {
             $this->assertSame($message, $e->getMessage());
         }
+    }
+
+    /** Menambah kuota satu formasi Karpim sebesar 3 sehingga total formasi RM-1 s.d. RM-3 naik dari 458 menjadi 461. */
+    private function bumpFormasi(): void
+    {
+        DB::table('position_unit')
+            ->where('unit_id', Unit::where('nama', 'Kebun Tajati')->value('id'))
+            ->where('position_id', Position::where('nama', 'Manajer')->value('id'))
+            ->increment('kuota', 3);
+    }
+
+    public function test_freeze_before_captures_the_previous_month_with_the_structure_as_it_is_now(): void
+    {
+        $period = $this->service->freezeBefore(Carbon::parse('2026-11-01'), null);
+        $this->bumpFormasi();
+
+        $this->assertNotNull($period);
+        $this->assertSame([2026, 10], [$period->year, $period->month]);
+        $this->assertSame(458, $this->service->find(2026, 10)->snapshot['stats']['total_formasi']);
+    }
+
+    public function test_freeze_before_leaves_a_closed_period_untouched(): void
+    {
+        $this->service->capture(2026, 10, $this->admin);
+        $this->service->close(2026, 10, null, $this->admin);
+        $this->bumpFormasi();
+
+        $this->assertNull($this->service->freezeBefore(Carbon::parse('2026-11-01'), null));
+        $this->assertSame(458, $this->service->find(2026, 10)->snapshot['stats']['total_formasi']);
+    }
+
+    public function test_freeze_before_keeps_a_draft_captured_today_and_refreshes_an_older_draft(): void
+    {
+        $this->service->capture(2026, 10, $this->admin);
+        $this->bumpFormasi();
+
+        $this->assertSame(458, $this->service->freezeBefore(Carbon::parse('2026-11-01'), null)->snapshot['stats']['total_formasi']);
+
+        Carbon::setTestNow('2026-11-06 09:00:00');
+        $this->assertSame(461, $this->service->freezeBefore(Carbon::parse('2026-11-01'), null)->snapshot['stats']['total_formasi']);
+    }
+
+    public function test_freeze_before_does_nothing_when_the_previous_month_is_not_yet_closable(): void
+    {
+        $this->assertNull($this->service->freezeBefore(Carbon::parse('2026-12-01'), null));
+        $this->assertNull($this->service->find(2026, 11));
     }
 
     public function test_capture_freezes_matrix_and_members(): void

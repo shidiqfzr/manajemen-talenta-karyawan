@@ -8,7 +8,9 @@ use App\Models\MasterAuditLog;
 use App\Models\MppPeriod;
 use App\Models\MppPeriodMember;
 use App\Models\User;
+use App\Services\Formasi\FormasiCatalog;
 use App\Services\ManPowerPlanningService;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +69,8 @@ class MppPeriodService
 
         // Instans baru: ManPowerPlanningService menyimpan pembacaan karyawan selama hidupnya, sedangkan
         // perekaman harus selalu membaca data terkini (juga bila layanan ini dipakai berulang kali).
+        // FormasiCatalog (scoped) menyimpan struktur formasi selama satu proses; lepaskan agar struktur terkini yang dibaca.
+        app()->forgetInstance(FormasiCatalog::class);
         $planning = app(ManPowerPlanningService::class);
         $matrix = $planning->getMppMatrix($year, $month);
         $members = $planning->getPositionMembers($year, $month);
@@ -100,6 +104,38 @@ class MppPeriodService
 
             return $period;
         }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Bekukan periode bulan sebelum $effectiveDate sebelum struktur organisasi berubah (penerapan SK, DOMAIN.md §3.7),
+     * agar perekaman bulanan berikutnya tidak memakai struktur baru. Periode tertutup tidak disentuh, draf yang sudah
+     * direkam hari ini dibiarkan, dan draf yang lebih lama direkam ulang dari data saat ini.
+     *
+     * @return MppPeriod|null null bila tidak ada yang perlu dibekukan (bulan belum dapat direkam, sudah ditutup,
+     *                        atau di luar rentang tahun perencanaan)
+     */
+    public function freezeBefore(CarbonInterface $effectiveDate, ?User $user): ?MppPeriod
+    {
+        $previous = $effectiveDate->copy()->startOfMonth()->subMonth();
+        [$year, $month] = [(int) $previous->year, (int) $previous->month];
+
+        if (! $this->isClosable($year, $month)) {
+            return null;
+        }
+
+        $period = $this->find($year, $month);
+        if ($period?->status === MppPeriod::STATUS_CLOSED) {
+            return null;
+        }
+        if ($period?->captured_at?->isToday()) {
+            return $period;
+        }
+
+        try {
+            return $this->capture($year, $month, $user);
+        } catch (MppPeriodRuleViolationException) {
+            return null;
+        }
     }
 
     /**

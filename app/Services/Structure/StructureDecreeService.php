@@ -10,8 +10,10 @@ use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Formasi\FormasiCatalog;
 use App\Services\Formasi\FormasiExcelParser;
 use App\Services\Formasi\MasterFormasiService;
+use App\Services\Mpp\MppPeriodService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -373,6 +375,9 @@ class StructureDecreeService
                 throw new StructureDecreeException('Admin yang menyetujui SK tidak ditemukan.');
             }
 
+            // Bekukan periode MPP bulan sebelumnya dengan struktur lama sebelum struktur berubah.
+            app(MppPeriodService::class)->freezeBefore($decree->effective_date, null);
+
             DB::transaction(function () use ($decree, $actor, $previousStatus): void {
                 MasterAuditLog::forDecree($decree->id, function () use ($decree, $actor, $previousStatus): void {
                     $warnings = $this->applyChanges($decree, $actor);
@@ -400,6 +405,10 @@ class StructureDecreeService
             }
 
             return $decree;
+        } finally {
+            // FormasiCatalog (scoped) menyimpan struktur selama satu proses; lepaskan agar pembacaan berikutnya
+            // pada proses yang sama melihat struktur setelah penerapan.
+            app()->forgetInstance(FormasiCatalog::class);
         }
 
         return $decree;

@@ -52,6 +52,20 @@ class MppCapturePeriodCommandTest extends TestCase
         $this->assertSame($revision, $service->find(2026, 10)->revision);
     }
 
+    public function test_skips_a_draft_captured_today(): void
+    {
+        $service = app(MppPeriodService::class);
+        $service->capture(2026, 10, null);
+        $capturedAt = $service->find(2026, 10)->captured_at;
+        Carbon::setTestNow(Carbon::parse('2026-11-01 01:30:00'));
+
+        $this->artisan('hris:mpp-capture-period')
+            ->expectsOutputToContain('Periode MPP Okt 2026 sudah direkam hari ini; dilewati.')
+            ->assertExitCode(0);
+
+        $this->assertEquals($capturedAt, $service->find(2026, 10)->captured_at);
+    }
+
     public function test_options_select_a_month(): void
     {
         $this->artisan('hris:mpp-capture-period', ['--year' => 2026, '--month' => 9])

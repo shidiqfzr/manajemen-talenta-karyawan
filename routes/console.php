@@ -40,8 +40,17 @@ Artisan::command('hris:mpp-capture-period {--year= : Tahun periode (default: bul
     $label = $planning->monthLabel($month, $year);
 
     try {
-        if ($periods->find($year, $month)?->status === MppPeriod::STATUS_CLOSED) {
+        $existing = $periods->find($year, $month);
+
+        if ($existing?->status === MppPeriod::STATUS_CLOSED) {
             $this->info("Periode MPP {$label} sudah ditutup; dilewati.");
+
+            return 0;
+        }
+
+        // Salinan yang dibekukan hari ini (mis. sebelum SK struktur diterapkan) tidak ditimpa dengan struktur baru.
+        if ($existing?->captured_at?->isToday()) {
+            $this->info("Periode MPP {$label} sudah direkam hari ini; dilewati.");
 
             return 0;
         }

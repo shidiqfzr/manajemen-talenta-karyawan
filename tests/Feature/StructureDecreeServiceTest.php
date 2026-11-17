@@ -12,6 +12,8 @@ use App\Models\Unit;
 use App\Models\UnitAlias;
 use App\Models\User;
 use App\Services\Formasi\MasterFormasiService;
+use App\Services\ManPowerPlanningService;
+use App\Services\Mpp\MppPeriodService;
 use App\Services\Structure\StructureDecreeService;
 use App\Services\Structure\StructureReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +44,8 @@ class StructureDecreeServiceTest extends TestCase
         parent::setUp();
 
         Storage::fake('local');
+        // Jam tetap: tanggal berlaku "masa lalu" dan "masa depan" pada pengujian tidak bergantung pada hari menjalankan.
+        $this->travelTo('2026-11-17 08:00:00');
         $this->service = app(StructureDecreeService::class);
         $this->admin = User::factory()->create(['role' => 'admin']);
         $this->baseStructure();
@@ -564,6 +568,35 @@ class StructureDecreeServiceTest extends TestCase
 
         $this->assertSame(StructureDecree::STATUS_APPLIED, $retried->status);
         $this->assertTrue(Unit::where('nama', 'Kebun Tajati Baru')->exists());
+    }
+
+    public function test_apply_freezes_the_previous_mpp_month_before_changing_the_structure(): void
+    {
+        $service = app(MppPeriodService::class);
+        $before = app(ManPowerPlanningService::class)->getMppMatrix(2026, 8)['stats']['total_formasi'];
+
+        $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1], ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 12]]);
+
+        $this->assertSame($before, $service->find(2026, 8)->snapshot['stats']['total_formasi']);
+
+        // Perekaman bulanan pukul 01:00 tidak menimpa salinan yang dibekukan sebelum SK diterapkan.
+        $this->artisan('hris:mpp-capture-period', ['--year' => 2026, '--month' => 8])->assertExitCode(0);
+        $this->assertSame($before, $service->find(2026, 8)->snapshot['stats']['total_formasi']);
+        $this->assertSame($before + 10, app(ManPowerPlanningService::class)->getMppMatrix(2026, 11)['stats']['total_formasi']);
+    }
+
+    public function test_a_closed_mpp_period_is_unchanged_by_apply(): void
+    {
+        $service = app(MppPeriodService::class);
+        $service->capture(2026, 8, null);
+        $service->close(2026, 8, null, $this->admin);
+        $before = $service->find(2026, 8)->snapshot['stats']['total_formasi'];
+
+        $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1], ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 12]]);
+
+        $period = $service->find(2026, 8);
+        $this->assertSame('closed', $period->status);
+        $this->assertSame($before, $period->snapshot['stats']['total_formasi']);
     }
 
     public function test_a_rejected_or_cancelled_sk_number_can_be_used_again(): void
