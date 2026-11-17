@@ -165,11 +165,51 @@ test('detail SK baseline: diterapkan, tidak dapat dibatalkan, dan tanpa unduhan 
     expect(text).not.toMatch(FORBIDDEN_TERMS);
 });
 
+async function openAsOf(page) {
+    await page.goto('/admin/master/sk/struktur', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Struktur per Tanggal' }).first()).toBeVisible();
+}
+
+test('struktur per tanggal: mengikuti SK yang berlaku, tanggal sebelum SK pertama tidak direkonstruksi, NIK tersamar', async ({ page }) => {
+    await openIndex(page);
+    await page.getByRole('link', { name: 'Struktur per Tanggal' }).click();
+    await page.waitForURL(/\/admin\/master\/sk\/struktur$/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Struktur per Tanggal' }).first()).toBeVisible({ timeout: 30_000 });
+
+    // Bawaan hari ini: mengacu pada SK baseline, dengan tabel jabatan dan paginasi bersama.
+    await expect(page.getByText(/Mengacu pada/)).toBeVisible();
+    await expect(page.getByRole('link', { name: BASELINE_NUMBER })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Pemangku Jabatan' })).toBeVisible();
+    await expect(page.getByText(/\d+ baris per halaman|baris per halaman/)).toBeVisible();
+
+    // NIK delapan digit tidak boleh tampil utuh pada halaman ini.
+    expect(await page.locator('main').innerText()).not.toMatch(/\b\d{8}\b/);
+
+    // Satu hari sebelum SK baseline berlaku: tidak ada struktur karangan.
+    await page.getByLabel('Tanggal Struktur').fill('2026-08-31');
+    await expect(page.getByText('Struktur belum tersedia untuk tanggal ini')).toBeVisible();
+
+    // Pada hari berlakunya, SK baseline kembali dipakai.
+    await page.getByLabel('Tanggal Struktur').fill('2026-09-01');
+    await expect(page.getByText(/Mengacu pada/)).toBeVisible();
+
+    // Perbandingan dengan struktur sekarang: struktur baseline sama dengan struktur sekarang pada basis data uji.
+    await page.getByLabel('Bandingkan dengan struktur sekarang').check();
+    await expect(page.getByRole('heading', { name: 'Selisih dengan struktur sekarang' })).toBeVisible();
+    await expect(page.getByText('Tidak ada perbedaan')).toBeVisible();
+
+    const text = (await page.locator('body').innerText()).toLowerCase();
+    expect(text).not.toMatch(FORBIDDEN_TERMS);
+});
+
 for (const [name, width] of [['ponsel 375px', 375], ['laptop 1366px', 1366], ['layar lebar 1920px', 1920]]) {
     test(`tanpa overflow horizontal pada ${name}`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
 
         await openIndex(page);
+        expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+        await openAsOf(page);
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 
         await openForm(page);
@@ -188,6 +228,10 @@ test('daftar, formulir, dan detail lolos pemindaian aksesibilitas', async ({ pag
     await openForm(page);
     result = await scanMain(page);
     expect(result.violations, `formulir: ${JSON.stringify(result.violations.map((v) => `${v.id}: ${v.nodes.length}`))}`).toEqual([]);
+
+    await openAsOf(page);
+    result = await scanMain(page);
+    expect(result.violations, `struktur per tanggal: ${JSON.stringify(result.violations.map((v) => `${v.id}: ${v.nodes.length}`))}`).toEqual([]);
 
     await openBaselineDetail(page);
     result = await scanMain(page);
