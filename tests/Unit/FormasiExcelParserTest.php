@@ -135,6 +135,31 @@ class FormasiExcelParserTest extends TestCase
         ], $result['seats']);
     }
 
+    public function test_parser_does_not_leak_library_deprecation_notices_to_the_error_handler(): void
+    {
+        // Berkas contoh dibuat lebih dulu: hanya pembacaan oleh parser yang diukur.
+        $file = $this->workbook([
+            ['BAGIAN TANAMAN', 'ASISTEN PEMETAAN', 'RM-3', 'TAN'],
+            ['BAGIAN TANAMAN', 'KEPALA BAGIAN', 'RM-1', 'TAN'],
+        ]);
+
+        $notices = 0;
+        set_error_handler(function () use (&$notices): bool {
+            $notices++;
+
+            return true;
+        }, E_DEPRECATED);
+
+        try {
+            $result = (new FormasiExcelParser)->parse($file);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertCount(2, $result['seats']);
+        $this->assertSame(0, $notices, 'Pembacaan Excel membanjiri penangan galat dengan notis deprecated dari pustaka.');
+    }
+
     public function test_level_for_rm_maps_rm_1_to_3_to_karpim_and_the_rest_to_karpel(): void
     {
         $this->assertSame('Karpim', FormasiExcelParser::levelForRm('RM-1'));

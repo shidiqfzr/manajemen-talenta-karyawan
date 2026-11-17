@@ -1,5 +1,6 @@
 {{-- Detail SK struktur organisasi: linimasa, selisih, dampak, keputusan, dan daftar penempatan ulang (DESIGN.md §8.5a). --}}
-<div class="space-y-6" x-data="{ approveOpen: false, rejectOpen: false, cancelOpen: false }">
+<div class="space-y-6" x-data="{ approveOpen: false, rejectOpen: false, cancelOpen: false }"
+    @decree-action-finished.window="approveOpen = false; rejectOpen = false; cancelOpen = false">
     <x-admin.flash />
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -62,7 +63,11 @@
             {{-- Selisih --}}
             <section class="bg-white border border-surface-200 rounded-2xl p-5 sm:p-6" aria-labelledby="detail-selisih">
                 <h3 id="detail-selisih" class="text-sm font-bold text-surface-900 mb-3">Perubahan Struktur</h3>
-                <x-admin.structure.diff-list :diff="$diff" />
+                @if (str_starts_with((string) $decree->source_path, 'baseline:'))
+                    <p class="text-sm text-surface-600">SK dasar instalasi: struktur awal dimuat dari data baseline, sehingga tidak ada selisih yang tercatat. Perubahan oleh SK berikutnya dibandingkan dengan struktur ini.</p>
+                @else
+                    <x-admin.structure.diff-list :diff="$diff" />
+                @endif
             </section>
 
             @if ($impact !== null)

@@ -3,10 +3,12 @@
 namespace App\Services\Structure;
 
 use App\Services\Formasi\FormasiExcelParser;
+use App\Support\PhpSpreadsheetGuard;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * Template lampiran SK struktur organisasi: berkas Excel berisi struktur saat ini dalam format yang dibaca
@@ -21,12 +23,22 @@ class StructureTemplateBuilder
 
     public function build(): Spreadsheet
     {
-        $book = new Spreadsheet;
-        $this->fillStructureSheet($book);
-        $this->fillInstructionSheet($book);
-        $book->setActiveSheetIndex(0);
+        return PhpSpreadsheetGuard::run(function (): Spreadsheet {
+            $book = new Spreadsheet;
+            $this->fillStructureSheet($book);
+            $this->fillInstructionSheet($book);
+            $book->setActiveSheetIndex(0);
 
-        return $book;
+            return $book;
+        });
+    }
+
+    /** Menyusun dan menulis template ke $target (jalur berkas atau `php://output`). */
+    public function writeTo(string $target): void
+    {
+        $book = $this->build();
+
+        PhpSpreadsheetGuard::run(fn () => (new Xlsx($book))->save($target));
     }
 
     private function fillStructureSheet(Spreadsheet $book): void

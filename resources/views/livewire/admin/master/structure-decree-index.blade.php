@@ -9,7 +9,8 @@
             <x-admin.button href="{{ route('admin.master.sk.create') }}" icon="fas fa-plus" wire:navigate>Catat SK dari Holding</x-admin.button>
         </div>
 
-        <div class="overflow-x-auto">
+        {{-- relative: header sr-only bersifat absolute; tanpa penampung berposisi ia lolos dari overflow dan melebarkan halaman di ponsel. --}}
+        <div class="relative overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead class="bg-surface-50 text-surface-600">
                     <tr>

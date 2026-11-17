@@ -63,6 +63,28 @@ class StructureTemplateBuilderTest extends TestCase
         )->diff['changes'];
     }
 
+    public function test_writing_the_template_does_not_leak_library_deprecation_notices(): void
+    {
+        $notices = 0;
+        set_error_handler(function () use (&$notices): bool {
+            $notices++;
+
+            return true;
+        }, E_DEPRECATED);
+        $path = tempnam(sys_get_temp_dir(), 'tpl').'.xlsx';
+        $this->workbookFiles[] = $path;
+
+        try {
+            app(StructureTemplateBuilder::class)->writeTo($path);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame(0, $notices, 'Penulisan template membanjiri penangan galat dengan notis deprecated dari pustaka.');
+        $this->assertGreaterThan(1000, filesize($path));
+        $this->assertSame([], app(FormasiExcelParser::class)->parse($path)['errors']);
+    }
+
     public function test_template_lists_the_current_structure_in_the_upload_format(): void
     {
         $file = $this->save(app(StructureTemplateBuilder::class)->build());

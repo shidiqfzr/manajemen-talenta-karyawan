@@ -218,9 +218,11 @@ class StructureDecreeScreensTest extends TestCase
             ->set('reason', 'pendek')
             ->call('reject')
             ->assertHasErrors('reason')
+            ->assertNotDispatched('decree-action-finished') // dialog tetap terbuka selama alasan belum valid
             ->set('reason', 'Lampiran belum sesuai SK asli.')
             ->call('reject')
             ->assertHasNoErrors()
+            ->assertDispatched('decree-action-finished') // dialog ditutup setelah aksi selesai
             ->assertSee('Ditolak');
 
         $this->assertSame('Lampiran belum sesuai SK asli.', $decree->fresh()->decision_reason);
@@ -252,6 +254,15 @@ class StructureDecreeScreensTest extends TestCase
                 $response->assertDontSee($forbidden, false);
             }
         }
+    }
+
+    public function test_the_baseline_record_explains_that_it_is_the_starting_structure_not_a_comparison(): void
+    {
+        $baseline = StructureDecree::create(['sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'Baseline', 'sk_date' => '2026-09-01', 'effective_date' => '2026-09-01', 'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'baseline:database/data/master_formasi.json', 'source_sha256' => str_repeat('a', 64)]);
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $baseline])
+            ->assertSee('struktur awal')
+            ->assertDontSee('Tidak ada perubahan dibandingkan dengan struktur saat ini');
     }
 
     public function test_source_files_download_for_admins_only_and_not_for_the_baseline_record(): void

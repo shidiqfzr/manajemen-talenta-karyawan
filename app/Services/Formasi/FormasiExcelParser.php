@@ -2,6 +2,7 @@
 
 namespace App\Services\Formasi;
 
+use App\Support\PhpSpreadsheetGuard;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
@@ -38,7 +39,7 @@ class FormasiExcelParser
      */
     public function parse(string $path): array
     {
-        $rows = IOFactory::load($path)->getSheet(0)->toArray(null, true, false, false);
+        $rows = PhpSpreadsheetGuard::run(fn () => IOFactory::load($path)->getSheet(0)->toArray(null, true, false, false));
 
         $format = $this->detectFormat($rows[0] ?? []);
         if ($format === null) {

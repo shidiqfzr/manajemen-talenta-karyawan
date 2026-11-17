@@ -93,6 +93,9 @@ class StructureDecreeDetail extends Component
         $this->reason = '';
         $this->resetErrorBag();
         $this->decree->refresh();
+
+        // Menutup dialog konfirmasi setelah aksi selesai (berhasil maupun ditolak aturan); pesan hasil tampil pada halaman.
+        $this->dispatch('decree-action-finished');
     }
 
     private function authorizeAdmin(): void
