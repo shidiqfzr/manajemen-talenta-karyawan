@@ -135,6 +135,13 @@ class FormasiExcelParserTest extends TestCase
         ], $result['seats']);
     }
 
+    public function test_level_for_rm_maps_rm_1_to_3_to_karpim_and_the_rest_to_karpel(): void
+    {
+        $this->assertSame('Karpim', FormasiExcelParser::levelForRm('RM-1'));
+        $this->assertSame('Karpim', FormasiExcelParser::levelForRm('RM-3'));
+        $this->assertSame('Karpel', FormasiExcelParser::levelForRm('RM-5'));
+    }
+
     public function test_parser_rejects_invalid_kuota_in_struktur_organisasi_format(): void
     {
         $result = (new FormasiExcelParser)->parse($this->workbook([

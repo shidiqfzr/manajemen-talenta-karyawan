@@ -54,8 +54,7 @@ class BuildFormasiSeed extends Command
             $units[$seat['unit']][] = [
                 'nama' => $seat['jabatan'],
                 'bidang' => $seat['bidang'],
-                // RM-1 s.d. RM-3 = Karpim; strata RM di bawahnya (RM-5) = Karpel.
-                'level' => in_array($seat['rm_level'], ['RM-1', 'RM-2', 'RM-3'], true) ? 'Karpim' : 'Karpel',
+                'level' => FormasiExcelParser::levelForRm($seat['rm_level']),
                 'rm_level' => $seat['rm_level'],
                 'kuota' => $seat['kuota'],
             ];

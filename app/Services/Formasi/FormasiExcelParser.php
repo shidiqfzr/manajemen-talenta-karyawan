@@ -24,6 +24,12 @@ class FormasiExcelParser
 
     public const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
 
+    /** RM-1 s.d. RM-3 adalah Karyawan Pimpinan (Karpim); strata RM di bawahnya Karyawan Pelaksana (Karpel). */
+    public static function levelForRm(string $rm): string
+    {
+        return in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true) ? 'Karpim' : 'Karpel';
+    }
+
     /**
      * @return array{
      *     seats: list<array{unit: string, jabatan: string, rm_level: string, bidang: string, kuota: int}>,
