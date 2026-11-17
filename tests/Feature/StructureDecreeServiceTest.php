@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exceptions\StructureDecreeException;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Models\Unit;
@@ -230,6 +231,110 @@ class StructureDecreeServiceTest extends TestCase
         $decree = $this->service->updateReview($decree, [], [], [], ['Kepala Bagian' => 'Kepala Bagian Tanaman'], $this->admin);
 
         $this->assertStringContainsString('Kebun Tajati', implode(' ', $this->service->blockers($decree)));
+    }
+
+    private function submittedDecree(?User $by = null): StructureDecree
+    {
+        $decree = $this->service->createDraft($this->data(), $this->changedWorkbook(), null, $this->admin);
+
+        return $this->service->submit($decree, $by ?? $this->admin);
+    }
+
+    public function test_submit_is_blocked_while_blockers_exist(): void
+    {
+        $decree = $this->service->createDraft($this->data(), $this->upload([
+            ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 2],
+        ]), null, $this->admin);
+
+        $this->assertDecreeError(fn () => $this->service->submit($decree, $this->admin), 'Tidak ada perubahan');
+        $this->assertSame(StructureDecree::STATUS_DRAFT, $decree->fresh()->status);
+    }
+
+    public function test_submit_freezes_the_review_digest_and_records_the_submitter(): void
+    {
+        $decree = $this->submittedDecree();
+
+        $this->assertSame(StructureDecree::STATUS_SUBMITTED, $decree->status);
+        $this->assertSame($this->service->preview($decree)->digest(), $decree->review_digest);
+        $this->assertSame($this->admin->id, $decree->submitted_by);
+        $this->assertNotNull($decree->submitted_at);
+    }
+
+    public function test_approval_required_blocks_the_submitter_from_approving(): void
+    {
+        config(['hris.structure.require_approval' => true]);
+        $decree = $this->submittedDecree();
+        $checker = User::factory()->create(['role' => 'admin']);
+
+        $this->assertDecreeError(fn () => $this->service->approve($decree, $this->admin), 'empat mata');
+
+        $approved = $this->service->approve($decree->fresh(), $checker);
+        $this->assertSame(StructureDecree::STATUS_APPROVED, $approved->status);
+        $this->assertSame($checker->id, $approved->decided_by);
+    }
+
+    public function test_approval_not_required_lets_the_submitter_approve(): void
+    {
+        config(['hris.structure.require_approval' => false]);
+
+        $approved = $this->service->approve($this->submittedDecree(), $this->admin);
+
+        $this->assertSame(StructureDecree::STATUS_APPROVED, $approved->status);
+    }
+
+    public function test_reject_and_cancel_need_a_reason_of_ten_characters_and_free_the_open_slot(): void
+    {
+        $decree = $this->submittedDecree();
+
+        $this->assertDecreeError(fn () => $this->service->reject($decree, $this->admin, 'pendek'), '10 karakter');
+        $rejected = $this->service->reject($decree, $this->admin, 'Lampiran belum sesuai SK asli.');
+        $this->assertSame(StructureDecree::STATUS_REJECTED, $rejected->status);
+        $this->assertSame('Lampiran belum sesuai SK asli.', $rejected->decision_reason);
+
+        $next = $this->service->createDraft($this->data(['sk_number' => 'DPSB/SKPTS/353/X/2026']), $this->changedWorkbook(), null, $this->admin);
+        $this->assertDecreeError(fn () => $this->service->cancel($next, $this->admin, 'pendek'), '10 karakter');
+        $cancelled = $this->service->cancel($next, $this->admin, 'Salah unggah lampiran.');
+        $this->assertSame(StructureDecree::STATUS_CANCELLED, $cancelled->status);
+
+        $this->service->createDraft($this->data(['sk_number' => 'DPSB/SKPTS/354/X/2026']), $this->changedWorkbook(), null, $this->admin);
+        $this->assertSame(1, StructureDecree::whereIn('status', StructureDecree::OPEN_STATUSES)->count());
+    }
+
+    public function test_a_decree_goes_stale_when_the_structure_changes_after_submission(): void
+    {
+        $decree = $this->submittedDecree();
+        DB::table('position_unit')->where('unit_id', Unit::where('nama', 'Bagian Tanaman')->value('id'))
+            ->where('position_id', Position::where('nama', 'Asisten Pemetaan')->value('id'))->update(['kuota' => 5]);
+
+        $this->assertTrue($this->service->isStale($decree));
+        $this->assertDecreeError(fn () => $this->service->approve($decree, $this->admin), 'tinjau ulang');
+        $this->assertSame(StructureDecree::STATUS_STALE, $decree->fresh()->status);
+
+        // Tinjau ulang: kembali ke draf, ajukan lagi, lalu disetujui.
+        $draft = $this->service->updateReview($decree->fresh(), [], [], [], [], $this->admin);
+        $this->assertSame(StructureDecree::STATUS_DRAFT, $draft->status);
+        $approved = $this->service->approve($this->service->submit($draft, $this->admin), $this->admin);
+        $this->assertSame(StructureDecree::STATUS_APPROVED, $approved->status);
+    }
+
+    public function test_each_transition_writes_a_master_audit_entry_with_the_decree_id(): void
+    {
+        $decree = $this->service->approve($this->submittedDecree(), $this->admin);
+
+        $actions = MasterAuditLog::where('decree_id', $decree->id)->orderBy('id')->pluck('action')->all();
+
+        $this->assertSame(['decree.submitted', 'decree.approved'], $actions);
+    }
+
+    public function test_a_user_without_the_permission_cannot_transition(): void
+    {
+        $decree = $this->submittedDecree();
+        $user = User::factory()->create(['role' => 'user']);
+
+        $this->assertDecreeError(fn () => $this->service->approve($decree, $user), 'tidak berwenang');
+        $this->assertDecreeError(fn () => $this->service->reject($decree, $user, 'Alasan yang cukup panjang'), 'tidak berwenang');
+        $this->assertDecreeError(fn () => $this->service->cancel($decree, $user, 'Alasan yang cukup panjang'), 'tidak berwenang');
     }
 
     public function test_impact_lists_holders_over_quota_seats_and_scheduled_mutations_for_a_removed_seat(): void

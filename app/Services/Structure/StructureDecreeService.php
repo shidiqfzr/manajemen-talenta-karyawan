@@ -5,6 +5,7 @@ namespace App\Services\Structure;
 use App\Exceptions\StructureDecreeException;
 use App\Models\Employee;
 use App\Models\JobHistory;
+use App\Models\MasterAuditLog;
 use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Models\User;
@@ -266,6 +267,149 @@ class StructureDecreeService
         }
 
         return ['affected_employees' => $affected, 'over_quota_seats' => $overQuota, 'scheduled_mutations' => $scheduled];
+    }
+
+    /**
+     * Ajukan SK untuk persetujuan; sidik selisih dibekukan agar penyetuju melihat persis yang diajukan.
+     *
+     * @throws StructureDecreeException
+     */
+    public function submit(StructureDecree $decree, User $user): StructureDecree
+    {
+        $this->authorize($user, 'struktur.prepare');
+        $this->assertStatus($decree, [StructureDecree::STATUS_DRAFT], 'diajukan');
+
+        if (($blockers = $this->blockers($decree)) !== []) {
+            throw new StructureDecreeException(implode(' ', $blockers));
+        }
+
+        return DB::transaction(function () use ($decree, $user): StructureDecree {
+            $decree = $this->lock($decree);
+            $this->assertStatus($decree, [StructureDecree::STATUS_DRAFT], 'diajukan');
+
+            $decree->fill([
+                'status' => StructureDecree::STATUS_SUBMITTED,
+                'review_digest' => $this->preview($decree)->digest(),
+                'submitted_by' => $user->id,
+                'submitted_at' => now(),
+            ])->save();
+            $this->audit($user, 'decree.submitted', $decree, StructureDecree::STATUS_DRAFT);
+
+            return $decree;
+        });
+    }
+
+    /**
+     * Setujui SK. Bila kebijakan empat mata aktif, pengaju tidak dapat menyetujui SK-nya sendiri. Bila struktur
+     * berubah sejak diajukan, SK menjadi "Perlu Tinjau Ulang" dan tidak ada yang disetujui.
+     *
+     * @throws StructureDecreeException
+     */
+    public function approve(StructureDecree $decree, User $checker): StructureDecree
+    {
+        $this->authorize($checker, 'struktur.approve');
+
+        $stale = false;
+        $result = DB::transaction(function () use ($decree, $checker, &$stale): StructureDecree {
+            $decree = $this->lock($decree);
+            $this->assertStatus($decree, [StructureDecree::STATUS_SUBMITTED], 'disetujui');
+
+            if (config('hris.structure.require_approval') && $decree->submitted_by === $checker->id) {
+                throw new StructureDecreeException('SK tidak dapat disetujui oleh pengajunya sendiri. Persetujuan harus dilakukan admin lain (prinsip empat mata).');
+            }
+
+            if ($this->isStale($decree)) {
+                $decree->update(['status' => StructureDecree::STATUS_STALE]);
+                $stale = true;
+
+                return $decree;
+            }
+
+            $decree->fill(['status' => StructureDecree::STATUS_APPROVED, 'decided_by' => $checker->id, 'decided_at' => now()])->save();
+            $this->audit($checker, 'decree.approved', $decree, StructureDecree::STATUS_SUBMITTED);
+
+            return $decree;
+        });
+
+        if ($stale) {
+            throw new StructureDecreeException('Struktur organisasi berubah sejak SK diajukan. SK perlu ditinjau ulang dan diajukan kembali.');
+        }
+
+        return $result;
+    }
+
+    /** @throws StructureDecreeException */
+    public function reject(StructureDecree $decree, User $checker, string $reason): StructureDecree
+    {
+        $this->authorize($checker, 'struktur.approve');
+        $reason = $this->requireReason($reason);
+
+        return DB::transaction(function () use ($decree, $checker, $reason): StructureDecree {
+            $decree = $this->lock($decree);
+            $this->assertStatus($decree, [StructureDecree::STATUS_SUBMITTED], 'ditolak');
+
+            $decree->fill(['status' => StructureDecree::STATUS_REJECTED, 'decided_by' => $checker->id, 'decided_at' => now(), 'decision_reason' => $reason])->save();
+            $this->audit($checker, 'decree.rejected', $decree, StructureDecree::STATUS_SUBMITTED, $reason);
+
+            return $decree;
+        });
+    }
+
+    /** Batalkan SK yang belum diterapkan. SK yang sudah diterapkan dikoreksi dengan SK baru. */
+    public function cancel(StructureDecree $decree, User $user, string $reason): StructureDecree
+    {
+        $this->authorize($user, 'struktur.prepare');
+        $reason = $this->requireReason($reason);
+
+        return DB::transaction(function () use ($decree, $user, $reason): StructureDecree {
+            $decree = $this->lock($decree);
+            $this->assertStatus($decree, StructureDecree::OPEN_STATUSES, 'dibatalkan');
+            $old = $decree->status;
+
+            $decree->fill(['status' => StructureDecree::STATUS_CANCELLED, 'decided_by' => $user->id, 'decided_at' => now(), 'decision_reason' => $reason])->save();
+            $this->audit($user, 'decree.cancelled', $decree, $old, $reason);
+
+            return $decree;
+        });
+    }
+
+    /** Struktur saat ini sudah berbeda dari yang ditinjau saat SK diajukan. */
+    public function isStale(StructureDecree $decree): bool
+    {
+        return $decree->review_digest !== null && $this->preview($decree)->digest() !== $decree->review_digest;
+    }
+
+    private function lock(StructureDecree $decree): StructureDecree
+    {
+        return StructureDecree::whereKey($decree->id)->lockForUpdate()->firstOrFail();
+    }
+
+    /** @param  list<string>  $allowed */
+    private function assertStatus(StructureDecree $decree, array $allowed, string $action): void
+    {
+        if (! in_array($decree->status, $allowed, true)) {
+            $label = StructureDecree::STATUS_LABELS[$decree->status] ?? $decree->status;
+
+            throw new StructureDecreeException("SK berstatus {$label} sehingga tidak dapat {$action}.");
+        }
+    }
+
+    private function requireReason(string $reason): string
+    {
+        $reason = trim($reason);
+        if (mb_strlen($reason) < 10) {
+            throw new StructureDecreeException('Alasan wajib diisi minimal 10 karakter.');
+        }
+
+        return $reason;
+    }
+
+    private function audit(User $user, string $action, StructureDecree $decree, string $oldStatus, ?string $reason = null): void
+    {
+        MasterAuditLog::forDecree($decree->id, fn () => MasterAuditLog::record(
+            $user, $action, 'decree', $decree->id, $decree->sk_number,
+            ['status' => $oldStatus], ['status' => $decree->status], $reason
+        ));
     }
 
     /** @return list<array{unit: string, jabatan: string, rm_level: string, bidang: string, kuota: int}> */
