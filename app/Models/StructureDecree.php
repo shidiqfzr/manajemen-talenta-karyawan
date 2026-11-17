@@ -28,8 +28,11 @@ class StructureDecree extends Model
 
     public const STATUS_FAILED = 'failed';
 
-    /** Status yang masih menahan satu-satunya slot SK terbuka. */
-    public const OPEN_STATUSES = [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_APPROVED, self::STATUS_STALE];
+    /**
+     * Status yang masih menahan satu-satunya slot SK terbuka. SK Gagal tetap terbuka: dapat diterapkan ulang setelah
+     * penyebabnya diperbaiki, atau dibatalkan.
+     */
+    public const OPEN_STATUSES = [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_APPROVED, self::STATUS_STALE, self::STATUS_FAILED];
 
     public const STATUS_LABELS = [
         self::STATUS_DRAFT => 'Draf',

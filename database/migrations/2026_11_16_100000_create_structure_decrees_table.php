@@ -14,7 +14,9 @@ return new class extends Migration
     {
         Schema::create('structure_decrees', function (Blueprint $table) {
             $table->id();
-            $table->string('sk_number')->unique()->comment('Nomor SK ternormalisasi tanpa spasi di sekitar garis miring');
+            // Tidak unik di basis data: nomor SK yang ditolak atau dibatalkan boleh dipakai lagi; keunikan di antara SK
+            // lain dijaga oleh StructureDecreeService.
+            $table->string('sk_number')->index()->comment('Nomor SK ternormalisasi tanpa spasi di sekitar garis miring');
             $table->string('title', 500)->comment('Baris "Tentang" pada SK');
             $table->text('revokes')->nullable()->comment('SK yang dicabut atau digantikan');
             $table->text('note')->nullable();

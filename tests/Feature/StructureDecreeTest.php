@@ -60,10 +60,10 @@ class StructureDecreeTest extends TestCase
         $this->assertFalse(Gate::forUser($user)->allows('struktur.approve'));
     }
 
-    public function test_open_statuses_exclude_terminal_ones(): void
+    public function test_open_statuses_keep_the_slot_until_the_decree_is_applied_rejected_or_cancelled(): void
     {
         $this->assertSame(
-            [StructureDecree::STATUS_DRAFT, StructureDecree::STATUS_SUBMITTED, StructureDecree::STATUS_APPROVED, StructureDecree::STATUS_STALE],
+            [StructureDecree::STATUS_DRAFT, StructureDecree::STATUS_SUBMITTED, StructureDecree::STATUS_APPROVED, StructureDecree::STATUS_STALE, StructureDecree::STATUS_FAILED],
             StructureDecree::OPEN_STATUSES
         );
         $this->assertArrayHasKey(StructureDecree::STATUS_FAILED, StructureDecree::STATUS_LABELS);

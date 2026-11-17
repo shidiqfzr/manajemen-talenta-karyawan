@@ -9,8 +9,11 @@ use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Models\User;
+use App\Services\Formasi\MasterFormasiService;
 use App\Services\Structure\StructureDecreeService;
+use App\Services\Structure\StructureReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -235,7 +238,8 @@ class StructureDecreeServiceTest extends TestCase
 
     private function submittedDecree(?User $by = null): StructureDecree
     {
-        $decree = $this->service->createDraft($this->data(), $this->changedWorkbook(), null, $this->admin);
+        // Tanggal berlaku di masa depan: persetujuan tidak langsung menerapkan SK (Terjadwal).
+        $decree = $this->service->createDraft($this->data(['effective_date' => now()->addMonth()->toDateString()]), $this->changedWorkbook(), null, $this->admin);
 
         return $this->service->submit($decree, $by ?? $this->admin);
     }
@@ -335,6 +339,242 @@ class StructureDecreeServiceTest extends TestCase
         $this->assertDecreeError(fn () => $this->service->approve($decree, $user), 'tidak berwenang');
         $this->assertDecreeError(fn () => $this->service->reject($decree, $user, 'Alasan yang cukup panjang'), 'tidak berwenang');
         $this->assertDecreeError(fn () => $this->service->cancel($decree, $user, 'Alasan yang cukup panjang'), 'tidak berwenang');
+    }
+
+    // ───────────────────────── Apply ─────────────────────────
+
+    /**
+     * Draft, review choices, submit and approve in one go; a decree whose effective date has arrived is applied by approve.
+     *
+     * @param  array{mapping?: array, closed?: array, new_units?: array, positions?: array, effective?: ?string}  $choices
+     */
+    private function approvedDecree(array $rows, array $choices = [], ?User $approver = null): StructureDecree
+    {
+        $decree = $this->service->createDraft($this->data(['effective_date' => $choices['effective'] ?? '2026-09-01']), $this->upload($rows), null, $this->admin);
+        $decree = $this->service->updateReview($decree, $choices['mapping'] ?? [], $choices['closed'] ?? [], $choices['new_units'] ?? [], $choices['positions'] ?? [], $this->admin);
+
+        return $this->service->approve($this->service->submit($decree, $this->admin), $approver ?? $this->admin);
+    }
+
+    public function test_apply_reproduces_the_workbook_structure_and_leaves_uncovered_units_alone(): void
+    {
+        $lain = Unit::create(['nama' => 'Bagian Lain', 'kode' => 'Bagian', 'wilayah' => self::RO, 'is_active' => true, 'urutan' => 3]);
+        $this->seat($lain, 'Kepala Lain', 'RM-1', 'UMU', 1);
+        $before = app(StructureReader::class)->current()['units']['Bagian Lain'];
+
+        $rows = [
+            ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'KEU', 3],
+            ['Bagian Tanaman', 'Krani Pemetaan', 'RM 5', 'TAN', 8],
+            ['Kebun Tajati Baru', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Kebun Tajati Baru', 'Manajer', 'RM 1', 'TAN', 1],
+            ['Kebun Tajati Baru', 'Asisten Kebun', 'RM 3', 'TAN', 1],
+            ['Kebun Kemitraan', 'Manajer Kemitraan', 'RM 1', 'TAN', 1],
+        ];
+        $decree = $this->approvedDecree($rows, [
+            'mapping' => ['Kebun Tajati' => 'Kebun Tajati Baru'],
+            'new_units' => ['Kebun Kemitraan' => ['kode' => 'Kebun', 'wilayah' => self::RO, 'urutan' => 10]],
+        ]);
+
+        $this->assertSame(StructureDecree::STATUS_APPLIED, $decree->status);
+        $current = app(StructureReader::class)->current()['units'];
+        $this->assertSame(['Kepala Bagian', 'Asisten Pemetaan', 'Krani Pemetaan'], array_keys($current['Bagian Tanaman']['seats']));
+        $this->assertEquals(['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'KEU', 'kuota' => 3], $current['Bagian Tanaman']['seats']['Asisten Pemetaan']);
+        $this->assertEquals(['rm_level' => 'RM-5', 'level' => 'Karpel', 'bidang' => 'TAN', 'kuota' => 8], $current['Bagian Tanaman']['seats']['Krani Pemetaan']);
+        $this->assertArrayNotHasKey('Kebun Tajati', $current);
+        $this->assertEqualsCanonicalizing(['Kepala Bagian', 'Manajer', 'Asisten Kebun'], array_keys($current['Kebun Tajati Baru']['seats']));
+        $this->assertSame('Regional Office (Kantor Direksi Pontianak)', $current['Kebun Kemitraan']['wilayah']);
+        $this->assertSame($before, $current['Bagian Lain']);
+    }
+
+    public function test_apply_records_aliases_and_audit_entries_linked_to_the_decree(): void
+    {
+        $decree = $this->approvedDecree([
+            ['Kebun Tajati Baru', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Kebun Tajati Baru', 'Manajer', 'RM 1', 'TAN', 1],
+        ], ['mapping' => ['Kebun Tajati' => 'Kebun Tajati Baru']]);
+
+        $unitId = Unit::where('nama', 'Kebun Tajati Baru')->value('id');
+        $this->assertSame($unitId, UnitAlias::where('alias_key', UnitAlias::keyFor('Kebun Tajati'))->value('unit_id'));
+        $logs = MasterAuditLog::where('decree_id', $decree->id)->get();
+        $this->assertContains('unit.renamed', $logs->pluck('action')->all());
+        $this->assertSame('Penerapan SK DPSB/SKPTS/352/IX/2026', $logs->firstWhere('action', 'unit.renamed')->reason);
+    }
+
+    public function test_apply_stores_a_snapshot_and_sets_applied_at(): void
+    {
+        $decree = $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 4]]);
+
+        $this->assertNotNull($decree->applied_at);
+        $this->assertSame(4, $decree->snapshot['units']['Bagian Tanaman']['seats']['Kepala Bagian']['kuota']);
+    }
+
+    public function test_seat_removed_with_holders_gets_quota_zero_and_the_holders_stay_on_the_worklist(): void
+    {
+        Employee::factory()->count(2)->create(['unit_kerja' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan']);
+
+        $decree = $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]]);
+
+        $seats = app(StructureReader::class)->current()['units']['Bagian Tanaman']['seats'];
+        $this->assertSame(0, $seats['Asisten Pemetaan']['kuota']);
+        $this->assertSame(2, Employee::where('unit_kerja', 'Bagian Tanaman')->where('jabatan', 'Asisten Pemetaan')->count());
+        $worklist = $this->service->worklist($decree);
+        $this->assertCount(2, $worklist);
+        $this->assertSame(['Asisten Pemetaan'], $worklist->pluck('jabatan')->unique()->values()->all());
+    }
+
+    public function test_seat_without_holders_is_removed_and_a_closed_unit_with_employees_stays_active_and_is_reported(): void
+    {
+        Unit::create(['nama' => 'Kebun Sepi', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => true, 'urutan' => 5]);
+        Employee::factory()->create(['unit_kerja' => 'Kebun Tajati', 'jabatan' => 'Manajer']);
+
+        $decree = $this->approvedDecree(
+            [['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]],
+            ['closed' => ['Kebun Tajati', 'Kebun Sepi']],
+        );
+
+        $this->assertDatabaseMissing('position_unit', ['position_id' => Position::where('nama', 'Asisten Pemetaan')->value('id')]);
+        $this->assertTrue((bool) Unit::where('nama', 'Kebun Tajati')->value('is_active'));
+        $this->assertFalse((bool) Unit::where('nama', 'Kebun Sepi')->value('is_active'));
+        $this->assertStringContainsString('Kebun Tajati', implode(' ', $decree->unit_mapping['apply_warnings']));
+    }
+
+    public function test_apply_creates_a_new_norm_seat_with_quota_zero(): void
+    {
+        $this->approvedDecree([
+            ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 2],
+            ['Bagian Tanaman', 'Supir Pool', 'RM 5', 'UMU', null],
+        ]);
+
+        $seat = app(StructureReader::class)->current()['units']['Bagian Tanaman']['seats']['Supir Pool'];
+        $this->assertSame(0, $seat['kuota']);
+        $this->assertSame('Karpel', $seat['level']);
+    }
+
+    public function test_apply_reactivates_an_inactive_unit_listed_in_the_workbook(): void
+    {
+        $tidur = Unit::create(['nama' => 'Kebun Tidur', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => false, 'urutan' => 6]);
+        $this->seat($tidur, 'Manajer', 'RM-1', 'TAN', 1);
+
+        $this->approvedDecree([['Kebun Tidur', 'Manajer', 'RM 1', 'TAN', 2]]);
+
+        $this->assertTrue((bool) $tidur->fresh()->is_active);
+        $this->assertSame(2, (int) DB::table('position_unit')->where('unit_id', $tidur->id)->value('kuota'));
+    }
+
+    public function test_apply_leaves_jabatan_penampungan_rows_untouched(): void
+    {
+        $advisor = Position::create(['nama' => 'Advisor RM-2', 'level' => 'Karpim', 'rm_level' => 'RM-2', 'is_active' => true, 'is_overflow' => true]);
+        DB::table('position_unit')->insert(['unit_id' => Unit::where('nama', 'Bagian Tanaman')->value('id'), 'position_id' => $advisor->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]]);
+
+        $this->assertDatabaseHas('position_unit', ['position_id' => $advisor->id, 'kuota' => 0]);
+    }
+
+    public function test_position_rename_keeps_holders_on_their_seat_and_syncs_their_jabatan(): void
+    {
+        $positionId = Position::where('nama', 'Asisten Pemetaan')->value('id');
+        $holder = Employee::factory()->create(['unit_kerja' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan']);
+
+        $this->approvedDecree([
+            ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Bagian Tanaman', 'Asisten Pemetaan & Survei', 'RM 3', 'TAN', 2],
+        ], ['positions' => ['Asisten Pemetaan' => 'Asisten Pemetaan & Survei']]);
+
+        $this->assertSame('Asisten Pemetaan & Survei', Position::find($positionId)->nama);
+        $this->assertSame('Asisten Pemetaan & Survei', $holder->fresh()->jabatan);
+        $this->assertSame(2, (int) DB::table('position_unit')->where('position_id', $positionId)->value('kuota'));
+    }
+
+    public function test_an_rm_change_across_the_karpim_karpel_boundary_updates_level_and_band(): void
+    {
+        $this->approvedDecree([
+            ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 5', 'TAN', 2],
+        ]);
+
+        $position = Position::where('nama', 'Asisten Pemetaan')->first();
+        $this->assertSame(['Karpel', 'RM-5'], [$position->level, $position->rm_level]);
+    }
+
+    public function test_future_effective_date_is_not_applied_by_approve_and_stays_scheduled(): void
+    {
+        $future = now()->addMonth()->toDateString();
+
+        $decree = $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 7]], ['effective' => $future]);
+
+        $this->assertSame(StructureDecree::STATUS_APPROVED, $decree->status);
+        $this->assertSame(1, (int) DB::table('position_unit')->where('position_id', Position::where('nama', 'Kepala Bagian')->value('id'))->where('unit_id', Unit::where('nama', 'Bagian Tanaman')->value('id'))->value('kuota'));
+        $this->assertDecreeError(fn () => $this->service->apply($decree), 'belum berlaku');
+    }
+
+    public function test_scheduled_apply_acts_as_the_approving_admin(): void
+    {
+        $approver = User::factory()->create(['role' => 'admin', 'name' => 'Penyetuju Utama']);
+        $future = now()->addMonth();
+        $decree = $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 7]], ['effective' => $future->toDateString()], $approver);
+
+        $this->travelTo($future->copy()->addDay());
+        $applied = $this->service->apply($decree);
+
+        $this->assertSame(StructureDecree::STATUS_APPLIED, $applied->status);
+        $this->assertSame($approver->id, MasterAuditLog::where('decree_id', $decree->id)->where('action', 'seat.updated')->value('user_id'));
+    }
+
+    public function test_a_decree_that_went_stale_after_approval_is_not_applied(): void
+    {
+        $future = now()->addMonth();
+        $decree = $this->approvedDecree([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 7]], ['effective' => $future->toDateString()]);
+        DB::table('position_unit')->where('unit_id', Unit::where('nama', 'Bagian Tanaman')->value('id'))->where('position_id', Position::where('nama', 'Kepala Bagian')->value('id'))->update(['kuota' => 3]);
+
+        $this->travelTo($future->copy()->addDay());
+        $result = $this->service->apply($decree);
+
+        $this->assertSame(StructureDecree::STATUS_STALE, $result->status);
+        $this->assertSame(3, (int) DB::table('position_unit')->where('unit_id', Unit::where('nama', 'Bagian Tanaman')->value('id'))->where('position_id', Position::where('nama', 'Kepala Bagian')->value('id'))->value('kuota'));
+    }
+
+    public function test_failure_rolls_everything_back_marks_the_decree_failed_and_keeps_the_slot_until_retried(): void
+    {
+        $this->app->bind(MasterFormasiService::class, fn () => new class extends MasterFormasiService
+        {
+            public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user, bool $allowZero = false): int
+            {
+                throw new \RuntimeException('boom');
+            }
+        });
+
+        $decree = $this->approvedDecree([
+            ['Kebun Tajati Baru', 'Kepala Bagian', 'RM 1', 'TAN', 1],
+            ['Kebun Tajati Baru', 'Manajer', 'RM 1', 'TAN', 1],
+            ['Kebun Tajati Baru', 'Asisten Kebun', 'RM 3', 'TAN', 1],
+        ], ['mapping' => ['Kebun Tajati' => 'Kebun Tajati Baru']]);
+
+        $this->assertSame(StructureDecree::STATUS_FAILED, $decree->status);
+        $this->assertStringContainsString('boom', $decree->failure_message);
+        $this->assertTrue(Unit::where('nama', 'Kebun Tajati')->exists());
+        $this->assertFalse(Unit::where('nama', 'Kebun Tajati Baru')->exists());
+        $this->assertContains('decree.failed', MasterAuditLog::where('decree_id', $decree->id)->pluck('action')->all());
+        $this->assertDecreeError(fn () => $this->service->createDraft($this->data(['sk_number' => 'DPSB/SKPTS/353/X/2026']), $this->changedWorkbook(), null, $this->admin), 'Masih terbuka');
+
+        $this->app->bind(MasterFormasiService::class, fn () => new MasterFormasiService);
+        $retried = $this->service->apply($decree->fresh());
+
+        $this->assertSame(StructureDecree::STATUS_APPLIED, $retried->status);
+        $this->assertTrue(Unit::where('nama', 'Kebun Tajati Baru')->exists());
+    }
+
+    public function test_a_rejected_or_cancelled_sk_number_can_be_used_again(): void
+    {
+        $decree = $this->submittedDecree();
+        $this->service->reject($decree, $this->admin, 'Lampiran belum sesuai SK asli.');
+
+        $again = $this->service->createDraft($this->data(), $this->changedWorkbook(), null, $this->admin);
+
+        $this->assertSame($decree->sk_number, $again->sk_number);
+        $this->assertSame(2, StructureDecree::where('sk_number', $decree->sk_number)->count());
     }
 
     public function test_impact_lists_holders_over_quota_seats_and_scheduled_mutations_for_a_removed_seat(): void

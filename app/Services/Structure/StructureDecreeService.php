@@ -6,15 +6,19 @@ use App\Exceptions\StructureDecreeException;
 use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
+use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Formasi\FormasiExcelParser;
+use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -71,7 +75,7 @@ class StructureDecreeService
         $number = StructureDecree::normalizeNumber($data['sk_number']);
         $effective = $data['effective_date'] ?? null ?: $data['sk_date'];
 
-        if (StructureDecree::where('sk_number', $number)->exists()) {
+        if (StructureDecree::where('sk_number', $number)->whereNotIn('status', [StructureDecree::STATUS_REJECTED, StructureDecree::STATUS_CANCELLED])->exists()) {
             throw new StructureDecreeException("Nomor SK {$number} sudah terdaftar.");
         }
         if (StructureDecree::whereIn('status', StructureDecree::OPEN_STATUSES)->exists()) {
@@ -335,7 +339,194 @@ class StructureDecreeService
             throw new StructureDecreeException('Struktur organisasi berubah sejak SK diajukan. SK perlu ditinjau ulang dan diajukan kembali.');
         }
 
-        return $result;
+        // SK yang tanggal berlakunya sudah tiba langsung diterapkan; selebihnya menunggu penjadwal (Terjadwal).
+        return $result->effective_date->toDateString() <= now()->toDateString() ? $this->apply($result) : $result;
+    }
+
+    /**
+     * Terapkan SK yang disetujui, dalam satu transaksi, atas nama admin yang menyetujuinya. Bila struktur berubah
+     * sejak diajukan, tidak ada yang diterapkan (Perlu Tinjau Ulang). Bila terjadi galat, seluruh perubahan dibatalkan
+     * dan SK berstatus Gagal (tetap terbuka, dapat diterapkan ulang).
+     *
+     * @throws StructureDecreeException bila SK belum berlaku atau tidak berstatus Disetujui/Gagal
+     */
+    public function apply(StructureDecree $decree): StructureDecree
+    {
+        $decree = StructureDecree::findOrFail($decree->id);
+        $this->assertStatus($decree, [StructureDecree::STATUS_APPROVED, StructureDecree::STATUS_FAILED], 'diterapkan');
+
+        if ($decree->effective_date->toDateString() > now()->toDateString()) {
+            throw new StructureDecreeException('SK belum berlaku; tanggal berlaku '.$decree->effective_date->toDateString().'.');
+        }
+
+        if ($this->isStale($decree)) {
+            $decree->update(['status' => StructureDecree::STATUS_STALE]);
+
+            return $decree;
+        }
+
+        $actor = $decree->decider ?? $decree->submitter;
+        $previousStatus = $decree->status;
+
+        try {
+            if ($actor === null) {
+                throw new StructureDecreeException('Admin yang menyetujui SK tidak ditemukan.');
+            }
+
+            DB::transaction(function () use ($decree, $actor, $previousStatus): void {
+                MasterAuditLog::forDecree($decree->id, function () use ($decree, $actor, $previousStatus): void {
+                    $warnings = $this->applyChanges($decree, $actor);
+
+                    $mapping = $decree->unit_mapping ?? [];
+                    $mapping['apply_warnings'] = $warnings;
+                    $decree->fill([
+                        'status' => StructureDecree::STATUS_APPLIED,
+                        'applied_at' => now(),
+                        'snapshot' => $this->reader->current(),
+                        'unit_mapping' => $mapping,
+                        'failure_message' => null,
+                    ])->save();
+                    $this->audit($actor, 'decree.applied', $decree, $previousStatus);
+                });
+            });
+        } catch (Throwable $e) {
+            report($e);
+
+            // Transaksi sudah dibatalkan; muat ulang agar tidak membawa perubahan yang dibatalkan.
+            $decree = StructureDecree::findOrFail($decree->id);
+            $decree->fill(['status' => StructureDecree::STATUS_FAILED, 'failure_message' => Str::limit($e->getMessage(), 1000)])->save();
+            if ($actor !== null) {
+                $this->audit($actor, 'decree.failed', $decree, $previousStatus, Str::limit($e->getMessage(), 500));
+            }
+
+            return $decree;
+        }
+
+        return $decree;
+    }
+
+    /**
+     * Karyawan yang perlu ditempatkan ulang melalui Mutasi: pemegang Formasi Jabatan yang dihapus atau dikurangi
+     * hingga melebihi kuota, serta karyawan pada unit yang ditutup tetapi masih berpenghuni.
+     *
+     * @return Collection<int, Employee>
+     */
+    public function worklist(StructureDecree $decree): Collection
+    {
+        $employees = collect();
+        $holders = fn (string $unit, ?string $jabatan = null) => Employee::aktif()->where('unit_kerja', $unit)
+            ->when($jabatan !== null, fn ($q) => $q->where('jabatan', $jabatan))->get(['nik', 'nama', 'jabatan', 'unit_kerja']);
+
+        foreach (StructureDiff::fromArray($decree->diff ?? [])->changes as $change) {
+            if (in_array($change['type'], ['seat.remove', 'seat.update'], true)) {
+                $kuota = (int) DB::table('position_unit')
+                    ->join('units', 'units.id', '=', 'position_unit.unit_id')
+                    ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+                    ->where('units.nama', $change['unit'])->where('positions.nama', $change['jabatan'])
+                    ->value('position_unit.kuota');
+                $filled = $holders($change['unit'], $change['jabatan']);
+
+                if ($filled->count() > $kuota) {
+                    $employees = $employees->concat($filled);
+                }
+            } elseif ($change['type'] === 'unit.close') {
+                $employees = $employees->concat($holders($change['unit']));
+            }
+        }
+
+        return $employees->unique('nik')->values();
+    }
+
+    /**
+     * Menjalankan perubahan hasil selisih melalui MasterFormasiService (aturan dan jejak audit yang sama dengan
+     * editor Master Formasi). Dipanggil di dalam transaksi.
+     *
+     * @return list<string> peringatan yang tidak menggagalkan penerapan
+     */
+    private function applyChanges(StructureDecree $decree, User $actor): array
+    {
+        $service = app(MasterFormasiService::class);
+        $diff = $this->preview($decree);
+        $attributes = ($decree->unit_mapping ?? [])['new_units'] ?? [];
+        $reason = 'Penerapan SK '.$decree->sk_number;
+        $warnings = [];
+
+        foreach ($diff->ofType('unit.rename') as $change) {
+            $service->updateUnit(Unit::where('nama', $change['from'])->firstOrFail(), ['nama' => $change['to']], $reason, $actor);
+        }
+
+        foreach ($diff->ofType('unit.add') as $change) {
+            $unit = $attributes[$change['unit']] ?? [];
+            $service->createUnit(['nama' => $change['unit'], 'kode' => $unit['kode'] ?? null, 'wilayah' => $unit['wilayah'] ?? null, 'urutan' => $unit['urutan'] ?? null], $actor);
+        }
+
+        foreach ($diff->ofType('unit.reactivate') as $change) {
+            $service->setUnitActive(Unit::where('nama', $change['unit'])->firstOrFail(), true, $reason, $actor);
+        }
+
+        foreach ($diff->ofType('position.rename') as $change) {
+            $service->updatePosition(Position::where('nama', $change['from'])->firstOrFail(), ['nama' => $change['to']], $reason, $actor);
+        }
+
+        foreach ($diff->ofType('position.rm_change') as $change) {
+            $service->updatePosition(Position::where('nama', $change['jabatan'])->firstOrFail(), ['level' => $change['level'], 'rm_level' => $change['to']], $reason, $actor);
+        }
+
+        foreach ($diff->ofType('seat.add') as $change) {
+            $position = Position::where('nama', $change['jabatan'])->first()
+                ?? $service->createPosition(['nama' => $change['jabatan'], 'level' => $change['level'], 'rm_level' => $change['rm_level']], $actor);
+            $service->addSeat(Unit::where('nama', $change['unit'])->firstOrFail(), $position, $change['kuota'], $change['bidang'], $actor, true);
+        }
+
+        foreach ($diff->ofType('seat.update') as $change) {
+            // Selisih hanya memuat kolom yang berubah; kolom lain dibaca dari formasi saat ini.
+            $seat = $this->seat($change['unit'], $change['jabatan']);
+            $service->updateSeat(
+                (int) $seat->id,
+                $change['new']['kuota'] ?? (int) $seat->kuota,
+                array_key_exists('bidang', $change['new']) ? $change['new']['bidang'] : $seat->bidang,
+                $actor,
+                true,
+            );
+        }
+
+        foreach ($diff->ofType('seat.remove') as $change) {
+            $seat = $this->seat($change['unit'], $change['jabatan']);
+            $seatId = (int) $seat->id;
+            $occupied = Employee::aktif()->where('unit_kerja', $change['unit'])->where('jabatan', $change['jabatan'])->exists()
+                || JobHistory::where('is_applied', false)->where('unit_kerja', $change['unit'])->where('jabatan', $change['jabatan'])->exists();
+
+            // Formasi berpenghuni atau menjadi tujuan mutasi terjadwal tidak dihapus: kuota 0, tampil melebihi kuota.
+            $occupied
+                ? $service->updateSeat($seatId, 0, $seat->bidang, $actor, true)
+                : $service->removeSeat($seatId, $reason, $actor);
+        }
+
+        foreach ($diff->ofType('unit.close') as $change) {
+            $unit = Unit::where('nama', $change['unit'])->firstOrFail();
+            $holders = Employee::aktif()->where('unit_kerja', $unit->nama)->count()
+                + JobHistory::where('is_applied', false)->where('unit_kerja', $unit->nama)->count();
+
+            if ($holders > 0) {
+                $warnings[] = "Unit '{$unit->nama}' tetap aktif karena masih memiliki {$holders} karyawan atau mutasi terjadwal; pindahkan melalui Mutasi lalu nonaktifkan unit.";
+
+                continue;
+            }
+
+            $service->setUnitActive($unit, false, $reason, $actor);
+        }
+
+        return $warnings;
+    }
+
+    /** Formasi (position_unit) saat ini untuk pasangan unit dan jabatan: id, kuota, bidang. */
+    private function seat(string $unit, string $jabatan): object
+    {
+        return DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('units.nama', $unit)->where('positions.nama', $jabatan)
+            ->firstOrFail(['position_unit.id', 'position_unit.kuota', 'position_unit.bidang']);
     }
 
     /** @throws StructureDecreeException */

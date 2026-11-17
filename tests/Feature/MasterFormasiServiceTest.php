@@ -58,6 +58,22 @@ class MasterFormasiServiceTest extends TestCase
         Employee::factory()->count($count)->create(['unit_kerja' => $unit->nama, 'jabatan' => $position->nama]);
     }
 
+    public function test_editor_rejects_a_quota_of_zero_but_the_decree_path_allows_it(): void
+    {
+        $unit = $this->unit();
+        $seatId = $this->seat($unit, $this->position(), 2);
+        $other = $this->position('Asisten', 'Karpim', 'RM-3');
+
+        $this->assertThrows(fn () => $this->service->updateSeat($seatId, 0, 'TAN', $this->admin), FormasiRuleViolationException::class, 'minimal 1');
+        $this->assertThrows(fn () => $this->service->addSeat($unit, $other, 0, 'TAN', $this->admin), FormasiRuleViolationException::class, 'minimal 1');
+
+        $this->service->updateSeat($seatId, 0, 'TAN', $this->admin, true);
+        $newId = $this->service->addSeat($unit, $other, 0, 'TAN', $this->admin, true);
+
+        $this->assertSame(0, (int) DB::table('position_unit')->where('id', $seatId)->value('kuota'));
+        $this->assertSame(0, (int) DB::table('position_unit')->where('id', $newId)->value('kuota'));
+    }
+
     // ───────────────────────── Jabatan penampungan (Advisor, Diperbantukan) ─────────────────────────
 
     public function test_create_pool_position_makes_an_advisor_without_any_quota_or_unit(): void

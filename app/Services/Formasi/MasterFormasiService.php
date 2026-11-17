@@ -33,11 +33,11 @@ class MasterFormasiService
     /**
      * @return int id formasi jabatan (position_unit) yang dibuat
      */
-    public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user): int
+    public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user, bool $allowZero = false): int
     {
-        return DB::transaction(function () use ($unit, $position, $kuota, $bidang, $user): int {
+        return DB::transaction(function () use ($unit, $position, $kuota, $bidang, $user, $allowZero): int {
             $this->lockUnit($unit->id);
-            $this->assertSeatInput($position, $kuota, $bidang);
+            $this->assertSeatInput($position, $kuota, $bidang, $allowZero);
             $this->assertNotBlocked($this->previewImpact('seat.add', ['unit_id' => $unit->id, 'position_id' => $position->id]));
 
             try {
@@ -62,12 +62,16 @@ class MasterFormasiService
         });
     }
 
-    public function updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User $user): void
+    /**
+     * @param  bool  $allowZero  hanya untuk penerapan SK struktur: formasi berbasis norma atau berpenghuni dapat berkuota 0
+     *                           (tidak ada kursi); editor Master Formasi tetap menolak kuota di bawah 1
+     */
+    public function updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User $user, bool $allowZero = false): void
     {
-        DB::transaction(function () use ($positionUnitId, $kuota, $bidang, $user): void {
+        DB::transaction(function () use ($positionUnitId, $kuota, $bidang, $user, $allowZero): void {
             $seat = $this->findSeatLocked($positionUnitId);
             $position = Position::findOrFail($seat->position_id);
-            $this->assertSeatInput($position, $kuota, $bidang);
+            $this->assertSeatInput($position, $kuota, $bidang, $allowZero);
 
             if ($seat->kuota === $kuota && $seat->bidang === $bidang) {
                 return;
@@ -878,9 +882,9 @@ class MasterFormasiService
         }
     }
 
-    private function assertSeatInput(Position $position, int $kuota, ?string $bidang): void
+    private function assertSeatInput(Position $position, int $kuota, ?string $bidang, bool $allowZero = false): void
     {
-        if ($kuota < 1) {
+        if ($kuota < ($allowZero ? 0 : 1)) {
             throw new FormasiRuleViolationException('Kuota harus berupa bilangan bulat minimal 1.');
         }
 
