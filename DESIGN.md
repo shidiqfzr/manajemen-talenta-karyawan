@@ -568,6 +568,17 @@ Satu modul, satu entri sidebar ("Master Formasi"), dua bagian pada navigasi seks
 
 ---
 
+### 8.5a Surat Keputusan Struktur (SK)
+
+Bagian ketiga navigasi seksi Master Data (`/admin/master/sk`), halaman server-render dengan `x-admin.module-header` (breadcrumb "Core HR › Master Formasi › Surat Keputusan Struktur").
+
+1. **Daftar**: nomor SK, "Tentang", tanggal SK, tanggal berlaku, dan status memakai lencana semantik (Draf netral, Diajukan `info`, Disetujui/Terjadwal `primary`, Diterapkan `success`, Ditolak/Dibatalkan netral, Perlu Tinjau Ulang `warning`, Gagal `danger`); warna selalu disertai teks (§5.1). Satu aksi utama "Buat SK Baru".
+2. **Formulir bertahap** "Data SK" → "Tinjau Perubahan" → "Ajukan". Tanggal berlaku terisi otomatis sama dengan tanggal SK dan dapat diubah. Tahap tinjau memuat selisih per jenis (unit baru, ganti nama, jabatan, kuota, bidang, RM Band), total sebelum dan sesudah, pasangan unit dan jabatan yang namanya berubah, pilihan "Tutup unit", isian kode, wilayah, dan urutan untuk unit baru, serta panel dampak §7.2 (blokir `danger`, peringatan `warning`, jumlah karyawan terdampak, mutasi terjadwal yang terkena).
+3. **Detail**: linimasa keputusan (diajukan, disetujui, ditolak, diterapkan beserta pelaku, waktu, alasan), tombol Setujui/Tolak/Batalkan lewat dialog konfirmasi §7.6 (Batal fokus awal, tombol `danger` di kanan, alasan minimal 10 karakter) dan setelah diterapkan tabel "Karyawan Perlu Penempatan Ulang" dengan tautan ke modul Mutasi. Tombol Setujui hanya untuk penyetuju yang berhak (bukan pengaju bila empat mata aktif). Tidak ada tombol batalkan setelah diterapkan.
+4. **Istilah**: antarmuka memakai "Surat Keputusan" dan "SK"; nama dokumen pedoman internal tidak pernah tampil.
+
+---
+
 ### 8.6 Riwayat & Persetujuan Impor Karyawan
 
 Layar server-render di bawah modul Karyawan (`/admin/employees/import/batches`), memakai `x-admin.module-header`.

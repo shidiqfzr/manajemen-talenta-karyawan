@@ -82,6 +82,7 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - `App\Services\EmployeeExportService`: Orkestrasi ekspor data kepegawaian berstandar UU PDP No. 27/2022, sanitasi parameter filter, penyematan metadata/print footer rahasia, dan pencatatan audit trail.
   - `App\Services\EmployeeImportService`: Validasi pra-impor, preview dry-run, dan jejak audit impor tanpa data pribadi.
   - `App\Services\EmployeeImportGovernanceService`: Persetujuan empat mata (maker-checker), pembatalan (undo) impor, dan pembersihan pengajuan/rekaman kedaluwarsa; kebijakan diatur pada `config/hris.php`.
+  - `App\Services\Structure\StructureDecreeService`: Siklus SK struktur organisasi (draf, tinjau, ajukan, setujui, terapkan). Penerapan berjalan dalam satu `DB::transaction()` dan memanggil operasi `MasterFormasiService`, bukan menulis tabel master langsung; `StructureDiffCalculator` murni (tanpa akses basis data). Perintah `hr:apply-structure-decrees` dijadwalkan harian 00:00 (UTC), sebelum `hr:apply-effective-mutations`; izin `struktur.prepare` dan `struktur.approve` pada `config/hris.php`. Lihat DOMAIN.md §3.7.
   - `App\Services\KepegawaianPolicy`: Satu-satunya sumber Batas Usia Pensiun (56), MBT (T-1), dan rentang grade per strata Karpim/Karpel. Dilarang menulis ulang angka-angka ini di model, validator, atau layar.
 
 ### 2.2 Eloquent Models & Database Practices
