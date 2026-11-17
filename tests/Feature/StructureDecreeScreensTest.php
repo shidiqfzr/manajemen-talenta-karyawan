@@ -199,14 +199,16 @@ class StructureDecreeScreensTest extends TestCase
 
     public function test_approving_a_due_decree_applies_it_and_shows_the_worklist(): void
     {
-        Employee::factory()->create(['unit_kerja' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan']);
+        $employee = Employee::factory()->create(['unit_kerja' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan']);
         $decree = $this->submitted([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]], '2026-09-01');
 
         Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $decree])
             ->call('approve')
             ->assertSee('Diterapkan')
             ->assertSee('Karyawan Perlu Penempatan Ulang')
-            ->assertSee('Asisten Pemetaan');
+            ->assertSee('Asisten Pemetaan')
+            // NIK tidak boleh muncul di HTML daftar (UU PDP), termasuk pada atribut wire:key.
+            ->assertDontSee($employee->nik, false);
 
         $this->assertSame(StructureDecree::STATUS_APPLIED, $decree->fresh()->status);
     }

@@ -130,6 +130,23 @@ class StructureDecreeServiceTest extends TestCase
         $this->assertDecreeError(fn () => $this->service->createDraft($this->data(['sk_number' => 'DPSB/SKPTS/353/X/2026', 'effective_date' => '2026-08-01']), $this->changedWorkbook(), null, $this->admin), 'tanggal berlaku');
     }
 
+    public function test_a_failure_after_the_files_are_stored_removes_the_row_and_the_files_but_not_other_decrees_files(): void
+    {
+        Storage::disk('local')->put('structure-decrees/99/source.xlsx', 'milik SK lain');
+        $this->decreeRow(['status' => StructureDecree::STATUS_REJECTED, 'source_path' => 'structure-decrees/99/source.xlsx']);
+        StructureDecree::updating(fn () => throw new \RuntimeException('simpan gagal'));
+
+        try {
+            $this->service->createDraft($this->data(), $this->changedWorkbook(), null, $this->admin);
+            $this->fail('Kegagalan penyimpanan seharusnya diteruskan.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('simpan gagal', $e->getMessage());
+        }
+
+        $this->assertSame(1, StructureDecree::count());
+        $this->assertSame(['structure-decrees/99/source.xlsx'], Storage::disk('local')->allFiles());
+    }
+
     public function test_wrong_headers_or_non_xlsx_are_rejected_with_a_message_and_store_nothing(): void
     {
         $this->assertDecreeError(fn () => $this->service->createDraft($this->data(), $this->uploadWorkbook([['Bagian Tanaman', 'X', 'RM 1', 'TAN', 1]], ['A', 'B']), null, $this->admin), 'Judul kolom');

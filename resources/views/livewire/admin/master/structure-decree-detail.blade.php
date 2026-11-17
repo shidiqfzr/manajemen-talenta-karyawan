@@ -99,7 +99,8 @@
                                 </thead>
                                 <tbody class="divide-y divide-surface-200 text-surface-800">
                                     @foreach ($worklist as $employee)
-                                        <tr wire:key="worklist-{{ $employee->nik }}"><td class="px-3 py-2">{{ $employee->nama }}</td><td class="px-3 py-2">{{ $employee->jabatan }}</td><td class="px-3 py-2">{{ $employee->unit_kerja }}</td></tr>
+                                        {{-- Kunci baris memakai urutan, bukan NIK, agar NIK tidak muncul pada HTML (UU PDP). --}}
+                                        <tr wire:key="worklist-{{ $loop->index }}"><td class="px-3 py-2">{{ $employee->nama }}</td><td class="px-3 py-2">{{ $employee->jabatan }}</td><td class="px-3 py-2">{{ $employee->unit_kerja }}</td></tr>
                                     @endforeach
                                 </tbody>
                             </table>

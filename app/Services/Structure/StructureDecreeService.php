@@ -92,8 +92,10 @@ class StructureDecreeService
         $target = $this->reader->fromParsedSeats($parsed);
         $diff = $this->calculator->calculate($target, $this->reader->current());
 
+        $storedDirectory = null;
+
         try {
-            return DB::transaction(function () use ($data, $number, $effective, $workbook, $pdf, $target, $diff): StructureDecree {
+            return DB::transaction(function () use ($data, $number, $effective, $workbook, $pdf, $target, $diff, &$storedDirectory): StructureDecree {
                 $decree = StructureDecree::create([
                     'sk_number' => $number,
                     'title' => trim($data['title']),
@@ -109,21 +111,19 @@ class StructureDecreeService
                     'unit_mapping' => ['mapping' => [], 'closed' => [], 'new_units' => [], 'positions' => []],
                 ]);
 
-                $directory = "structure-decrees/{$decree->id}";
-                $decree->source_path = (string) $workbook->storeAs($directory, 'source.xlsx', self::DISK);
+                $storedDirectory = "structure-decrees/{$decree->id}";
+                $decree->source_path = (string) $workbook->storeAs($storedDirectory, 'source.xlsx', self::DISK);
                 if ($pdf !== null) {
-                    $decree->pdf_path = (string) $pdf->storeAs($directory, 'sk.pdf', self::DISK);
+                    $decree->pdf_path = (string) $pdf->storeAs($storedDirectory, 'sk.pdf', self::DISK);
                 }
                 $decree->save();
 
                 return $decree;
             });
         } catch (Throwable $e) {
-            // Transaksi dibatalkan; berkas yang sempat tersimpan tidak boleh tertinggal tanpa pemilik.
-            foreach (Storage::disk(self::DISK)->directories('structure-decrees') as $directory) {
-                if (Storage::disk(self::DISK)->allFiles($directory) !== [] && ! StructureDecree::where('source_path', 'like', $directory.'/%')->exists()) {
-                    Storage::disk(self::DISK)->deleteDirectory($directory);
-                }
+            // Transaksi dibatalkan; berkas yang sempat tersimpan di folder SK ini tidak boleh tertinggal tanpa pemilik.
+            if ($storedDirectory !== null) {
+                Storage::disk(self::DISK)->deleteDirectory($storedDirectory);
             }
 
             throw $e;
