@@ -43,10 +43,10 @@ class StructureDecreeScreensTest extends TestCase
     }
 
     /** @param list<array> $rows */
-    private function draft(array $rows, ?string $effective = null): StructureDecree
+    private function draft(array $rows, ?string $effective = null, string $number = 'DPSB/SKPTS/352/IX/2026'): StructureDecree
     {
         return $this->service->createDraft(
-            ['sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'Perubahan Struktur Organisasi Region Office', 'sk_date' => '2026-09-01', 'effective_date' => $effective],
+            ['sk_number' => $number, 'title' => 'Perubahan Struktur Organisasi Region Office', 'sk_date' => '2026-09-01', 'effective_date' => $effective],
             $this->uploadWorkbook($rows),
             null,
             $this->admin,
@@ -74,15 +74,87 @@ class StructureDecreeScreensTest extends TestCase
         }
     }
 
-    public function test_index_lists_decrees_with_number_status_and_the_create_action(): void
+    public function test_index_lists_decrees_with_number_subject_dates_and_status(): void
     {
         $this->draft($this->changedRows());
 
         Livewire::actingAs($this->admin)->test(StructureDecreeIndex::class)
             ->assertSee('DPSB/SKPTS/352/IX/2026')
             ->assertSee('Perubahan Struktur Organisasi Region Office')
+            ->assertSee('01 Sep 2026')
             ->assertSee('Draf')
-            ->assertSee('Catat SK dari Holding');
+            ->assertSee('Surat Keputusan Struktur');
+    }
+
+    public function test_index_page_has_the_primary_action_in_the_header_and_the_approval_policy_banner(): void
+    {
+        config(['hris.structure.require_approval' => true]);
+        $this->actingAs($this->admin)->get(route('admin.master.sk.index'))
+            ->assertOk()
+            ->assertSee('Catat SK dari Holding')
+            ->assertSee('Persetujuan dua pihak (empat mata) aktif');
+
+        config(['hris.structure.require_approval' => false]);
+        $this->actingAs($this->admin)->get(route('admin.master.sk.index'))
+            ->assertSee('Persetujuan dua pihak (empat mata) belum diaktifkan');
+    }
+
+    public function test_index_is_forbidden_to_non_admin_users_even_through_livewire(): void
+    {
+        Livewire::actingAs(User::factory()->create(['role' => 'user']))->test(StructureDecreeIndex::class)->assertForbidden();
+    }
+
+    /** SK pertama dibatalkan (menjadi "Ditutup") agar SK kedua boleh dibuat: hanya satu SK terbuka pada satu waktu. */
+    private function twoDecrees(): void
+    {
+        $first = $this->draft($this->changedRows(), null, 'AAA/1/2026');
+        $this->service->cancel($first, $this->admin, 'Dibatalkan untuk uji daftar SK.');
+        $this->draft($this->changedRows(), null, 'BBB/2/2026');
+    }
+
+    public function test_index_search_filters_by_number_or_subject(): void
+    {
+        $this->twoDecrees();
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeIndex::class)
+            ->assertSee('AAA/1/2026')->assertSee('BBB/2/2026')
+            ->set('search', 'AAA')
+            ->assertSee('AAA/1/2026')->assertDontSee('BBB/2/2026')
+            ->set('search', 'Region Office')
+            ->assertSee('AAA/1/2026')->assertSee('BBB/2/2026')
+            ->set('search', 'tidak-ada-yang-cocok')
+            ->assertSee('Tidak ada SK yang cocok');
+    }
+
+    public function test_index_status_tabs_filter_the_list_and_show_their_counts(): void
+    {
+        $this->twoDecrees();
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeIndex::class)
+            ->assertSeeInOrder(['Semua', '2', 'Berjalan', '1', 'Diterapkan', '0', 'Ditutup', '1'])
+            ->set('status', 'closed')
+            ->assertSee('AAA/1/2026')->assertDontSee('BBB/2/2026')
+            ->set('status', 'open')
+            ->assertSee('BBB/2/2026')->assertDontSee('AAA/1/2026')
+            ->set('status', '')
+            ->assertSee('AAA/1/2026')->assertSee('BBB/2/2026');
+    }
+
+    public function test_index_sorts_by_number_in_both_directions(): void
+    {
+        $this->twoDecrees();
+
+        $component = Livewire::actingAs($this->admin)->test(StructureDecreeIndex::class)->call('sortBy', 'sk_number');
+        $this->assertSame(['AAA/1/2026', 'BBB/2/2026'], $component->instance()->rows->pluck('sk_number')->all());
+
+        $component->call('sortBy', 'sk_number');
+        $this->assertSame(['BBB/2/2026', 'AAA/1/2026'], $component->instance()->rows->pluck('sk_number')->all());
+    }
+
+    public function test_index_shows_a_guiding_empty_state_when_there_is_no_decree(): void
+    {
+        Livewire::actingAs($this->admin)->test(StructureDecreeIndex::class)
+            ->assertSee('Belum ada SK struktur organisasi');
     }
 
     public function test_the_form_explains_the_holding_sk_and_offers_the_template(): void
