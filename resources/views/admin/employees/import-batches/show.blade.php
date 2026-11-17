@@ -192,29 +192,7 @@
                 @include('admin.employees.import-batches.partials.timeline', ['log' => $log])
             </section>
 
-            <section class="bg-white rounded-2xl border border-surface-200/80 p-5 shadow-xs" aria-labelledby="verify-title">
-                <h3 id="verify-title" class="text-base font-bold text-surface-900 mb-3">Verifikasi Berkas</h3>
-                @php $fileHash = $log->file_sha256 ?? ($log->metadata['file_sha256'] ?? null); @endphp
-                <dl class="space-y-3">
-                    <div>
-                        <dt class="text-xs font-medium text-surface-500">Ukuran</dt>
-                        <dd class="text-sm font-semibold text-surface-900">{{ number_format($log->file_size / 1024, 1, ',', '.') }} KB</dd>
-                    </div>
-                    <div x-data="{ copied: false }">
-                        <dt class="text-xs font-medium text-surface-500" title="Kode unik berkas (SHA-256) untuk memastikan berkas yang disimpan sama dengan yang ditinjau.">Kode Verifikasi Berkas</dt>
-                        <dd class="mt-1 flex items-start gap-2">
-                            <span class="flex-1 font-mono text-xs text-surface-700 break-all">{{ $fileHash ?? '-' }}</span>
-                            @if ($fileHash)
-                                <button type="button" @click="navigator.clipboard.writeText('{{ $fileHash }}'); copied = true; setTimeout(() => copied = false, 2000)"
-                                    aria-label="Salin kode verifikasi berkas"
-                                    class="shrink-0 w-8 h-8 rounded-lg border border-surface-200 text-surface-600 hover:bg-surface-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                                    <i class="fas" :class="copied ? 'fa-check text-primary-700' : 'fa-copy'" aria-hidden="true"></i>
-                                </button>
-                            @endif
-                        </dd>
-                    </div>
-                </dl>
-            </section>
+            <x-admin.file-verification :hash="$log->file_sha256 ?? ($log->metadata['file_sha256'] ?? null)" :size="$log->file_size" />
         </aside>
     </div>
 

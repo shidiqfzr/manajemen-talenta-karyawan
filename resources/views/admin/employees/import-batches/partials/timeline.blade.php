@@ -1,6 +1,7 @@
 {{--
     Linimasa keputusan impor: diajukan/diimpor, keputusan penyetuju, disimpan, dan pembatalan, beserta pelaku,
     waktu, dan alasan. Langkah yang belum terjadi tidak ditampilkan, kecuali menunggu persetujuan.
+    Tampilannya dirender oleh x-admin.decision-timeline (komponen bersama dengan Surat Keputusan Struktur).
 
     @include('admin.employees.import-batches.partials.timeline', ['log' => $log])
 --}}
@@ -27,26 +28,6 @@
     if ($log->rolled_back_at) {
         $steps[] = ['icon' => 'fa-rotate-left', 'tone' => 'closed', 'title' => 'Dibatalkan', 'who' => $log->rolled_back_by_name, 'at' => $log->rolled_back_at, 'note' => $log->rollback_reason];
     }
-
-    $dot = ['done' => 'bg-primary-100 text-primary-800', 'current' => 'bg-warning-100 text-warning-800', 'closed' => 'bg-surface-200 text-surface-700'];
 @endphp
 
-<ol class="relative space-y-5 border-l border-surface-200 ml-3 pl-6">
-    @foreach ($steps as $step)
-        <li class="relative">
-            <span class="absolute -left-[2.25rem] top-0 flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-white {{ $dot[$step['tone']] }}">
-                <i class="fas {{ $step['icon'] }} text-[10px]" aria-hidden="true"></i>
-            </span>
-            <p class="text-sm font-semibold text-surface-900">{{ $step['title'] }}</p>
-            @if ($step['who'])
-                <p class="text-xs text-surface-600">{{ $step['who'] }}</p>
-            @endif
-            @if ($step['at'])
-                <p class="text-xs text-surface-500">{{ $step['at']->format('d/m/Y H:i') }}</p>
-            @endif
-            @if ($step['note'])
-                <p class="mt-1 text-xs text-surface-700">&ldquo;{{ $step['note'] }}&rdquo;</p>
-            @endif
-        </li>
-    @endforeach
-</ol>
+<x-admin.decision-timeline :steps="$steps" />
