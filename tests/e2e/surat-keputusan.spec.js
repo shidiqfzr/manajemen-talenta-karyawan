@@ -23,7 +23,7 @@ async function openIndex(page) {
 // jadi tunggu perpindahan URL dan beri waktu lebih sebelum memeriksa judul.
 async function openBaselineDetail(page) {
     await openIndex(page);
-    await page.getByRole('row', { name: new RegExp(BASELINE_NUMBER) }).getByRole('link', { name: 'Lihat' }).click();
+    await page.getByRole('row', { name: new RegExp(BASELINE_NUMBER) }).getByRole('link', { name: 'Lihat Detail' }).click();
     await page.waitForURL(/\/admin\/master\/sk\/\d+$/, { timeout: 30_000 });
     await expect(page.getByRole('heading', { name: BASELINE_NUMBER }).first()).toBeVisible({ timeout: 30_000 });
 }
@@ -47,9 +47,33 @@ test('daftar: bagian Surat Keputusan aktif, SK baseline tampil, dan tanpa istila
     await expect(row.getByText('Diterapkan')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Catat SK dari Holding' })).toBeVisible();
 
+    // Banner kebijakan persetujuan dua pihak, seperti pada Riwayat & Persetujuan Impor.
+    await expect(page.getByText(/Persetujuan dua pihak \(empat mata\)/).first()).toBeVisible();
+
     const text = (await page.locator('body').innerText()).toLowerCase();
     expect(text).not.toMatch(FORBIDDEN_TERMS);
     expect(text).not.toContain('buat sk baru');
+});
+
+test('daftar: memakai tabel data bersama (pencarian, tab status, bilah judul, paginasi)', async ({ page }) => {
+    await openIndex(page);
+
+    const tabs = page.getByRole('navigation', { name: 'Filter status SK' });
+    for (const label of ['Semua', 'Berjalan', 'Diterapkan', 'Ditutup']) {
+        await expect(tabs.getByRole('button', { name: new RegExp('^' + label) })).toBeVisible();
+    }
+    await expect(tabs.getByRole('button', { name: /^Semua/ })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByPlaceholder('Cari nomor SK atau perihal...')).toBeVisible();
+    await expect(page.getByText(/Menampilkan/).first()).toBeVisible();
+    await expect(page.getByLabel('baris per halaman', { exact: false }).or(page.getByText('baris per halaman')).first()).toBeVisible();
+
+    // Tab Diterapkan menyaring ke SK baseline; pencarian tanpa hasil memperlihatkan empty state yang mengarahkan tindakan.
+    await tabs.getByRole('button', { name: /^Diterapkan/ }).click();
+    await expect(page.getByRole('row', { name: new RegExp(BASELINE_NUMBER) })).toBeVisible();
+    await page.getByPlaceholder('Cari nomor SK atau perihal...').fill('tidak-ada-yang-cocok');
+    await expect(page.getByText('Tidak ada SK yang cocok dengan filter ini.')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset Filter' }).first().click();
+    await expect(page.getByRole('row', { name: new RegExp(BASELINE_NUMBER) })).toBeVisible();
 });
 
 test('formulir: menjelaskan SK dari Holding, template dapat diunduh, dan isian bertanda wajib', async ({ page }) => {
@@ -84,7 +108,7 @@ test('alur: template tanpa perubahan menunjukkan tidak ada perubahan dan tidak d
     await page.getByLabel('Nomor SK').fill('UJI/E2E/1/XII/2026');
     await page.getByLabel('Tanggal SK').fill('2026-12-01');
     await page.getByLabel('Tentang').fill('Uji alur Catat SK dari Holding');
-    await page.getByLabel('Lampiran SK (.xlsx)').setInputFiles({
+    await page.locator('#workbook').setInputFiles({
         name: 'lampiran.xlsx',
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         buffer: await template.body(),
@@ -96,7 +120,8 @@ test('alur: template tanpa perubahan menunjukkan tidak ada perubahan dan tidak d
     // dan menyusun tinjauan. Di server uji berutas tunggal dengan basis data berkas ini bisa memakan puluhan detik.
     await expect(page.getByText('Tidak ada perubahan dibandingkan dengan struktur saat ini.').first()).toBeVisible({ timeout: 90_000 });
     await expect(page.getByText('Tinjau Perubahan').first()).toBeVisible();
-    await expect(page.getByText('SK belum dapat diajukan')).toBeVisible();
+    await expect(page.getByText(/hal perlu diselesaikan sebelum SK dapat diajukan/)).toBeVisible();
+    await expect(page.getByText(/Ajukan nonaktif sampai/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ajukan untuk Persetujuan' })).toBeDisabled();
 
     const scan = await scanMain(page);
@@ -107,7 +132,7 @@ test('alur: template tanpa perubahan menunjukkan tidak ada perubahan dan tidak d
     await page.waitForURL(/\/admin\/master\/sk$/);
     const row = page.getByRole('row', { name: /UJI\/E2E\/1\/XII\/2026/ });
     await expect(row.getByText('Draf')).toBeVisible();
-    await row.getByRole('link', { name: 'Lihat' }).click();
+    await row.getByRole('link', { name: 'Lihat Detail' }).click();
     await page.waitForURL(/\/admin\/master\/sk\/\d+$/);
 
     await page.getByRole('button', { name: 'Batalkan SK' }).first().click();
@@ -126,6 +151,11 @@ test('alur: template tanpa perubahan menunjukkan tidak ada perubahan dan tidak d
 test('detail SK baseline: diterapkan, tidak dapat dibatalkan, dan tanpa unduhan lampiran', async ({ page }) => {
     await openBaselineDetail(page);
     await expect(page.getByText('struktur awal dimuat dari data baseline')).toBeVisible();
+    // Pola layar detail yang sama dengan Riwayat & Persetujuan Impor.
+    for (const heading of ['Ringkasan SK', 'Perubahan Struktur', 'Keputusan', 'Jejak Keputusan', 'Verifikasi Berkas']) {
+        await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    }
+    await expect(page.getByText('Total Kuota', { exact: true })).toBeVisible();
     await expect(page.getByText('Diterapkan').first()).toBeVisible();
     await expect(page.getByText('SK yang sudah diterapkan tidak dapat dibatalkan')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Batalkan SK' })).toHaveCount(0);

@@ -84,6 +84,9 @@ class AdminSharedComponentsTest extends TestCase
         $view->assertSee('45,1 KB');
         $view->assertSee($hash);
         $view->assertSee('Salin kode verifikasi berkas');
+        // Dokumentasi komponen tidak boleh bocor sebagai teks halaman.
+        $view->assertDontSee('size: byte', false);
+        $view->assertDontSee('--}}', false);
     }
 
     public function test_stepper_marks_the_current_step_and_completed_steps(): void

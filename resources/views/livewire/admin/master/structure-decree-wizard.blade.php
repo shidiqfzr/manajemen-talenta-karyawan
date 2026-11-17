@@ -70,9 +70,9 @@
         {{-- Kartu bernilai tetap dibuat netral agar perhatian tertuju pada angka yang berubah (DESIGN.md §5.3). --}}
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <x-admin.kpi-card title="Unit" :value="$after['units'] ?? 0" :subtitle="'Sebelumnya '.($before['units'] ?? 0)" icon="fas fa-building" :theme="($after['units'] ?? 0) !== ($before['units'] ?? 0) ? 'primary' : 'neutral'" />
-            <x-admin.kpi-card title="Formasi Jabatan" :value="$after['pairs'] ?? 0" :subtitle="'Sebelumnya '.($before['pairs'] ?? 0)" icon="fas fa-table-list" :theme="($after['pairs'] ?? 0) !== ($before['pairs'] ?? 0) ? 'primary' : 'neutral'" />
+            <x-admin.kpi-card title="Formasi" :value="$after['pairs'] ?? 0" :subtitle="'Sebelumnya '.($before['pairs'] ?? 0)" icon="fas fa-table-list" :theme="($after['pairs'] ?? 0) !== ($before['pairs'] ?? 0) ? 'primary' : 'neutral'" />
             <x-admin.kpi-card title="Total Kuota" :value="$after['kuota'] ?? 0" :subtitle="'Sebelumnya '.($before['kuota'] ?? 0)" icon="fas fa-users" :theme="($after['kuota'] ?? 0) !== ($before['kuota'] ?? 0) ? 'primary' : 'neutral'" />
-            <x-admin.kpi-card title="Jumlah Perubahan" :value="$changeCount" subtitle="Terhadap struktur saat ini" icon="fas fa-list-check" :theme="$changeCount > 0 ? 'warning' : 'neutral'" />
+            <x-admin.kpi-card title="Perubahan" :value="$changeCount" subtitle="Dari struktur lama" icon="fas fa-list-check" :theme="$changeCount > 0 ? 'warning' : 'neutral'" />
         </div>
 
         <form wire:submit="submit" class="space-y-6">
@@ -106,16 +106,23 @@
 
                     @php($closeable = array_values(array_diff($currentOnly, $chosenOld)))
                     @if ($closeable !== [])
-                        <fieldset class="space-y-2">
-                            <legend class="text-xs font-bold text-surface-700 mb-1.5">Tutup unit yang tidak lagi ada pada struktur</legend>
-                            @foreach ($closeable as $name)
-                                <label wire:key="close-{{ $name }}" class="flex items-center gap-2 text-sm text-surface-700">
-                                    <input type="checkbox" wire:model="closed" value="{{ $name }}" class="rounded border-surface-300 text-primary-600 focus-visible:ring-primary-500">
-                                    {{ $name }}
-                                </label>
-                            @endforeach
-                            <p class="text-[10px] text-surface-500">Unit yang masih berpenghuni tetap aktif sampai karyawannya dipindahkan melalui Mutasi.</p>
-                        </fieldset>
+                        {{-- Opsional dan tertutup bawaannya: SK dapat mengatur sebagian struktur, jadi unit yang tidak tercantum tidak diubah. --}}
+                        <details wire:key="close-units" class="rounded-xl border border-surface-200 px-4 py-3" @if ($closed !== []) open @endif>
+                            <summary class="cursor-pointer text-sm font-semibold text-surface-800 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                                Tutup unit (opsional)
+                                <span class="font-normal text-surface-500">· {{ count($closeable) }} unit tidak tercantum pada lampiran dan tidak diubah</span>
+                            </summary>
+                            <fieldset class="mt-3 space-y-2">
+                                <legend class="sr-only">Unit yang ditutup</legend>
+                                <p class="text-xs text-surface-600">Centang hanya unit yang ditutup oleh SK ini. Unit yang masih berpenghuni tetap aktif sampai karyawannya dipindahkan melalui Mutasi.</p>
+                                @foreach ($closeable as $name)
+                                    <label wire:key="close-{{ $name }}" class="flex items-center gap-2 text-sm text-surface-700">
+                                        <input type="checkbox" wire:model="closed" value="{{ $name }}" class="rounded border-surface-300 text-primary-600 focus-visible:ring-primary-500">
+                                        {{ $name }}
+                                    </label>
+                                @endforeach
+                            </fieldset>
+                        </details>
                     @endif
 
                     @foreach ($positionPairs as $i => $pair)

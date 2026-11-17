@@ -255,8 +255,9 @@ class StructureDecreeScreensTest extends TestCase
             ->assertSee('belum memiliki kode')
             ->assertSee('hal perlu diselesaikan sebelum SK dapat diajukan')
             ->assertSee('Ajukan nonaktif sampai')
-            ->assertSee('Jumlah Perubahan')
             ->assertSee('Total Kuota')
+            ->assertSee('Sebelumnya')
+            ->assertSee('Tutup unit (opsional)')
             ->call('submit');
         $this->assertSame(StructureDecree::STATUS_DRAFT, $decree->fresh()->status);
 
@@ -306,7 +307,7 @@ class StructureDecreeScreensTest extends TestCase
 
         Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $decree])
             ->assertSee('Ringkasan SK')
-            ->assertSee('Jumlah Perubahan')
+            ->assertSee('Perubahan')
             ->assertSee('Total Kuota')
             ->assertSee('Jejak Keputusan')
             ->assertSeeInOrder(['Diajukan', 'Menunggu persetujuan'])
@@ -337,7 +338,7 @@ class StructureDecreeScreensTest extends TestCase
 
         Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $baseline])
             ->assertSee('SK dasar instalasi')
-            ->assertSeeInOrder(['Unit', '2', 'Formasi Jabatan', '4', 'Total Kuota', '5']);
+            ->assertSeeInOrder(['Unit', '2', 'Formasi', '4', 'Total Kuota', '5']);
     }
 
     public function test_detail_follows_the_shared_layout_for_a_failed_decree_too(): void

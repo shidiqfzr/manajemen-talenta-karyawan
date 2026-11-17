@@ -3,7 +3,7 @@
     sama dengan yang ditinjau (SECURITY.md §4.4). Dipakai oleh Riwayat & Persetujuan Impor dan Surat Keputusan Struktur.
 
     <x-admin.file-verification :hash="$log->file_sha256" :size="$log->file_size" />
-    <x-admin.file-verification :hash="$decree->source_sha256" />   {{-- ukuran tidak diketahui: baris Ukuran disembunyikan --}}
+    <x-admin.file-verification :hash="$decree->source_sha256" />   (ukuran tidak diketahui: baris Ukuran disembunyikan)
 
     size: byte (opsional). Tanpa hash tampil "-" dan tombol salin tidak dirender.
 --}}

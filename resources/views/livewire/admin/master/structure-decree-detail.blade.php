@@ -58,9 +58,9 @@
                 @php $before = $summary['before']; @endphp
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <x-admin.kpi-card title="Unit" :value="$summary['units']" :subtitle="$before ? 'Sebelumnya '.$before['units'] : 'Struktur setelah SK'" icon="fas fa-building" :theme="$before && $before['units'] !== $summary['units'] ? 'primary' : 'neutral'" />
-                    <x-admin.kpi-card title="Formasi Jabatan" :value="$summary['pairs']" :subtitle="$before ? 'Sebelumnya '.$before['pairs'] : 'Struktur setelah SK'" icon="fas fa-table-list" :theme="$before && $before['pairs'] !== $summary['pairs'] ? 'primary' : 'neutral'" />
+                    <x-admin.kpi-card title="Formasi" :value="$summary['pairs']" :subtitle="$before ? 'Sebelumnya '.$before['pairs'] : 'Struktur setelah SK'" icon="fas fa-table-list" :theme="$before && $before['pairs'] !== $summary['pairs'] ? 'primary' : 'neutral'" />
                     <x-admin.kpi-card title="Total Kuota" :value="$summary['kuota']" :subtitle="$before ? 'Sebelumnya '.$before['kuota'] : 'Struktur setelah SK'" icon="fas fa-users" :theme="$before && $before['kuota'] !== $summary['kuota'] ? 'primary' : 'neutral'" />
-                    <x-admin.kpi-card title="Jumlah Perubahan" :value="$summary['changes']" :subtitle="$summary['baseline'] ? 'SK dasar instalasi' : 'Terhadap struktur sebelumnya'" icon="fas fa-list-check" :theme="$summary['changes'] > 0 ? 'warning' : 'neutral'" />
+                    <x-admin.kpi-card title="Perubahan" :value="$summary['changes']" :subtitle="$summary['baseline'] ? 'SK dasar instalasi' : 'Dari struktur lama'" icon="fas fa-list-check" :theme="$summary['changes'] > 0 ? 'warning' : 'neutral'" />
                 </div>
             </section>
 

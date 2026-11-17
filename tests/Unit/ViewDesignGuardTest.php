@@ -336,6 +336,88 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_blade_comments_are_never_nested_so_documentation_never_leaks_onto_the_page(): void
+    {
+        // Komentar {{-- --}} berakhir pada `--}}` pertama: komentar bersarang memotong komentar luar dan sisa teksnya tampil di halaman.
+        $root = dirname(__DIR__, 2).'/resources/views';
+        $violations = [];
+
+        foreach (self::files($root, 'php') as $file) {
+            if (! str_ends_with($file, '.blade.php')) {
+                continue;
+            }
+
+            $source = (string) file_get_contents($file);
+            preg_match_all('/\{\{--|--\}\}/', $source, $tokens, PREG_OFFSET_CAPTURE);
+
+            $open = false;
+            foreach ($tokens[0] as [$token, $offset]) {
+                $line = substr_count($source, "\n", 0, $offset) + 1;
+                $location = str_replace('\\', '/', substr($file, strlen($root) + 1)).':'.$line;
+
+                if ($token === '{{--' && $open) {
+                    $violations[] = $location.' (komentar bersarang)';
+                } elseif ($token === '--}}' && ! $open) {
+                    $violations[] = $location.' (penutup tanpa pembuka)';
+                }
+
+                $open = $token === '{{--';
+            }
+
+            if ($open) {
+                $violations[] = str_replace('\\', '/', substr($file, strlen($root) + 1)).' (komentar tidak ditutup)';
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Komentar Blade tidak boleh bersarang atau menggantung; jangan menulis {{-- di dalam komentar (DESIGN.md §6, docblock komponen).'
+        );
+    }
+
+    public function test_file_uploads_use_the_shared_upload_component(): void
+    {
+        // Utang desain tercatat (DESIGN.md §17 D20): form lama yang belum dimigrasi ke x-admin.file-upload. Tidak boleh bertambah.
+        $debt = [
+            'components/admin/file-upload.blade.php',
+            'components/admin/employee-form.blade.php',
+            'admin/employees/partials/import-step1.blade.php',
+            'admin/trainings/add-participant.blade.php',
+            'admin/trainings/edit-participant.blade.php',
+        ];
+
+        $violations = array_values(array_filter(
+            $this->tags('input', fn (string $tag) => preg_match('/type=["\']file["\']/', $tag) === 1),
+            fn (string $location) => ! in_array(explode(':', $location)[0], $debt, true),
+        ));
+
+        $this->assertNoViolations(
+            $violations,
+            'Unggah berkas wajib memakai <x-admin.file-upload> (progres dan nama berkas terlihat, accept spesifik); jangan menulis <input type="file"> sendiri (DESIGN.md §6.1).'
+        );
+    }
+
+    public function test_table_cards_always_carry_the_shared_table_header(): void
+    {
+        // Pengecualian: cangkang komponen itu sendiri dan tabel sematan profil pengguna non-admin (utang D21).
+        $allowed = ['components/admin/table/card.blade.php', 'user/trainings/show.blade.php'];
+
+        $violations = [];
+        foreach (self::views() as $path => $source) {
+            if (in_array($path, $allowed, true)) {
+                continue;
+            }
+            if (str_contains($source, '<x-admin.table.card') && ! str_contains($source, '<x-admin.table.header')) {
+                $violations[] = $path;
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Kartu tabel (x-admin.table.card) wajib memuat bilah judul bersama x-admin.table.header; dilarang membuat header tabel sendiri (DESIGN.md §7.5).'
+        );
+    }
+
     /**
      * @return array<string, string> path relatif => isi view dengan komentar Blade/HTML diganti baris kosong
      */
