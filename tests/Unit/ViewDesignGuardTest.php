@@ -336,6 +336,31 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_multi_step_flows_use_the_shared_stepper_and_never_hand_roll_one(): void
+    {
+        // DESIGN.md §6.1: satu penanda tahap untuk semua alur bertahap (Impor Karyawan, Catat SK Struktur, dan berikutnya).
+        $root = dirname(__DIR__, 2).'/resources/views';
+        $handRolled = [];
+
+        foreach (self::files($root, 'php') as $file) {
+            $relative = str_replace('\\', '/', substr($file, strlen($root) + 1));
+            if (! str_ends_with($file, '.blade.php') || $relative === 'components/admin/stepper.blade.php') {
+                continue;
+            }
+
+            // Ciri kartu tahap tulisan tangan: kicker huruf kapital berisi "Tahap N".
+            if (preg_match('/tracking-wider[^>]*>\s*Tahap\s+\d/', (string) file_get_contents($file)) === 1) {
+                $handRolled[] = $relative;
+            }
+        }
+
+        $this->assertSame([], $handRolled, "Penanda tahap tulisan tangan; pakai <x-admin.stepper>:\n".implode("\n", $handRolled));
+
+        foreach (['admin/employees/import.blade.php', 'livewire/admin/master/structure-decree-wizard.blade.php'] as $wizard) {
+            $this->assertStringContainsString('<x-admin.stepper', (string) file_get_contents($root.'/'.$wizard), "{$wizard} harus memakai x-admin.stepper");
+        }
+    }
+
     public function test_blade_comments_are_never_nested_so_documentation_never_leaks_onto_the_page(): void
     {
         // Komentar {{-- --}} berakhir pada `--}}` pertama: komentar bersarang memotong komentar luar dan sisa teksnya tampil di halaman.

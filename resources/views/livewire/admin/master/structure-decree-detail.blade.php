@@ -40,8 +40,8 @@
                     <x-admin.decree-status :status="$decree->status" :effective-date="$decree->effective_date" />
                 </div>
                 <dl class="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-surface-600">
-                    <div class="flex items-center gap-1.5"><dt class="sr-only">Tanggal SK</dt><dd><i class="far fa-calendar text-surface-400 mr-1" aria-hidden="true"></i>SK {{ $decree->sk_date->translatedFormat('d M Y') }}</dd></div>
-                    <div class="flex items-center gap-1.5"><dt class="sr-only">Tanggal berlaku</dt><dd><i class="far fa-calendar-check text-surface-400 mr-1" aria-hidden="true"></i>Berlaku {{ $decree->effective_date->translatedFormat('d M Y') }}</dd></div>
+                    <div class="flex items-center gap-1.5"><dt class="sr-only">Tanggal SK</dt><dd><i class="far fa-calendar text-surface-400 mr-1" aria-hidden="true"></i>SK {{ $decree->sk_date->locale('id')->translatedFormat('d M Y') }}</dd></div>
+                    <div class="flex items-center gap-1.5"><dt class="sr-only">Tanggal berlaku</dt><dd><i class="far fa-calendar-check text-surface-400 mr-1" aria-hidden="true"></i>Berlaku {{ $decree->effective_date->locale('id')->translatedFormat('d M Y') }}</dd></div>
                     @if ($decree->submitter)
                         <div class="flex items-center gap-1.5"><dt class="sr-only">Pengaju</dt><dd><i class="fas fa-user text-surface-400 mr-1" aria-hidden="true"></i>{{ $decree->submitter->name }}</dd></div>
                     @endif
@@ -120,7 +120,7 @@
                 @if ($decree->status === 'approved')
                     <p class="text-sm text-surface-600">
                         @if ($decree->effective_date->toDateString() > now()->toDateString())
-                            SK disetujui dan diterapkan otomatis pada {{ $decree->effective_date->translatedFormat('d M Y') }}.
+                            SK disetujui dan diterapkan otomatis pada {{ $decree->effective_date->locale('id')->translatedFormat('d M Y') }}.
                         @else
                             SK disetujui dan menunggu penerapan otomatis oleh penjadwal harian.
                         @endif

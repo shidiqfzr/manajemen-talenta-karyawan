@@ -1,6 +1,11 @@
 {{-- Formulir bertahap SK struktur: Data SK → Tinjau Perubahan → Ajukan, dari komponen bersama (DESIGN.md §7.1, §8.5a). --}}
 <div class="space-y-6">
-    <x-admin.stepper :steps="['Data SK', 'Tinjau Perubahan', 'Ajukan']" :current="$step" label="Tahap pencatatan SK" />
+    {{-- Komponen yang sama dengan Impor Data Karyawan (DESIGN.md §6.1). --}}
+    <x-admin.stepper :current="$step" label="Tahap pencatatan SK" :steps="[
+        ['title' => 'Data SK', 'description' => 'Nomor, tanggal, dan lampiran'],
+        ['title' => 'Tinjau Perubahan', 'description' => 'Selisih, dampak, dan pasangan unit'],
+        ['title' => 'Ajukan', 'description' => 'Persetujuan dan penerapan'],
+    ]" />
 
     @if ($step === 1)
         <div class="flex items-start gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-900" role="status">
@@ -64,7 +69,7 @@
             <p class="text-xs font-bold uppercase tracking-wide text-surface-500">Tinjau Perubahan</p>
             <h2 id="review-title" class="text-lg font-bold text-surface-900">{{ $decree->sk_number }}</h2>
             <p class="text-sm text-surface-600">{{ $decree->title }}</p>
-            <p class="text-xs text-surface-500">Tanggal SK {{ $decree->sk_date->translatedFormat('d M Y') }} · Berlaku {{ $decree->effective_date->translatedFormat('d M Y') }}</p>
+            <p class="text-xs text-surface-500">Tanggal SK {{ $decree->sk_date->locale('id')->translatedFormat('d M Y') }} · Berlaku {{ $decree->effective_date->locale('id')->translatedFormat('d M Y') }}</p>
         </section>
 
         {{-- Kartu bernilai tetap dibuat netral agar perhatian tertuju pada angka yang berubah (DESIGN.md §5.3). --}}

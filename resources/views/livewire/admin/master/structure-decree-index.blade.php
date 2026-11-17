@@ -53,8 +53,8 @@
                             <td class="px-4 py-3 text-surface-700 max-w-[320px]">
                                 <span class="block truncate" title="{{ $decree->title }}">{{ $decree->title }}</span>
                             </td>
-                            <td class="px-4 py-3 text-surface-600 whitespace-nowrap tabular-nums">{{ $decree->sk_date->translatedFormat('d M Y') }}</td>
-                            <td class="px-4 py-3 text-surface-600 whitespace-nowrap tabular-nums">{{ $decree->effective_date->translatedFormat('d M Y') }}</td>
+                            <td class="px-4 py-3 text-surface-600 whitespace-nowrap tabular-nums">{{ $decree->sk_date->locale('id')->translatedFormat('d M Y') }}</td>
+                            <td class="px-4 py-3 text-surface-600 whitespace-nowrap tabular-nums">{{ $decree->effective_date->locale('id')->translatedFormat('d M Y') }}</td>
                             <td class="px-4 py-3">
                                 <x-admin.decree-status :status="$decree->status" :effective-date="$decree->effective_date" />
                                 @if ($decree->decider && in_array($decree->status, ['approved', 'applied', 'rejected', 'cancelled'], true))

@@ -99,6 +99,35 @@ class AdminSharedComponentsTest extends TestCase
         $this->assertSame(1, substr_count($view->__toString(), 'aria-current="step"'));
     }
 
+    public function test_stepper_renders_the_card_bar_with_descriptions_and_completion_icons(): void
+    {
+        $steps = "[['title' => 'Data SK', 'description' => 'Nomor dan lampiran'], ['title' => 'Tinjau Perubahan', 'description' => 'Selisih dan dampak'], 'Ajukan']";
+        $view = $this->blade('<x-admin.stepper :steps="'.$steps.'" :current="2" label="Tahap pencatatan SK" />');
+
+        $view->assertSeeInOrder(['Tahap 1', 'Data SK', 'Nomor dan lampiran', 'Tahap 2', 'Tinjau Perubahan', 'Selisih dan dampak', 'Tahap 3', 'Ajukan']);
+        $view->assertSee('md:grid-cols-3', false);
+        $view->assertSee('fa-check', false); // tahap 1 selesai
+        $view->assertDontSee('fa-check-double', false); // tahap terakhir belum berjalan
+        $view->assertSee('bg-surface-200 text-surface-700', false); // tahap 3 belum tiba: netral, tanpa opasitas
+        $view->assertDontSee('opacity-', false); // opasitas menurunkan kontras di bawah 4.5:1
+    }
+
+    public function test_stepper_shows_the_final_check_when_the_last_step_is_current_and_supports_two_steps(): void
+    {
+        $this->blade('<x-admin.stepper :steps="[\'Satu\', \'Dua\', \'Tiga\']" :current="3" />')->assertSee('fa-check-double', false);
+        $this->blade('<x-admin.stepper :steps="[\'Satu\', \'Dua\']" :current="1" />')->assertSee('md:grid-cols-2', false)->assertDontSee('md:grid-cols-3', false);
+    }
+
+    public function test_stepper_in_alpine_mode_binds_to_the_callers_expression_instead_of_fixed_classes(): void
+    {
+        $view = $this->blade('<x-admin.stepper :steps="[\'Satu\', \'Dua\', \'Tiga\']" current-expression="currentStep" label="Tahap impor" />');
+
+        $view->assertSee('currentStep === 2', false);
+        $view->assertSee('x-if="currentStep > 1"', false);
+        $view->assertSee(':aria-current="currentStep === 3', false);
+        $view->assertDontSee('aria-current="step"', false);
+    }
+
     public function test_file_verification_without_a_hash_shows_a_dash_and_no_copy_button(): void
     {
         $view = $this->blade('<x-admin.file-verification :hash="null" />');

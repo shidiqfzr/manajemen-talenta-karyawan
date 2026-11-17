@@ -168,6 +168,75 @@ class StructureAsOfServiceTest extends TestCase
         $this->assertSame(2, $report['outside_structure']);
     }
 
+    public function test_versions_list_each_applied_decree_with_its_period_and_totals_newest_first(): void
+    {
+        $this->travelTo('2026-12-15 08:00:00');
+        $first = $this->decree('SK/1', '2026-09-01', $this->seat('Bagian Lama', 'Kepala Lama', 3));
+        $second = $this->decree('SK/2', '2026-12-01', ['units' => [
+            'Bagian Baru' => ['kode' => 'Bagian', 'wilayah' => 'Wilayah X', 'urutan' => 1, 'is_active' => true, 'seats' => [
+                'Kepala Baru' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+                'Asisten Baru' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 4],
+            ]],
+            'Bagian Tutup' => ['kode' => 'Bagian', 'wilayah' => 'Wilayah X', 'urutan' => 2, 'is_active' => false, 'seats' => []],
+        ]]);
+        $this->decree('SK/draft', '2026-12-10', null, StructureDecree::STATUS_DRAFT);
+
+        $versions = $this->service->versions();
+
+        $this->assertSame([$second->id, $first->id], array_map(fn (array $v): int => $v['decree']->id, $versions));
+        $this->assertSame(['2026-12-01', null], [$versions[0]['from']->toDateString(), $versions[0]['to']?->toDateString()]);
+        $this->assertSame(['2026-09-01', '2026-11-30'], [$versions[1]['from']->toDateString(), $versions[1]['to']->toDateString()]);
+        $this->assertSame([true, false], [$versions[0]['is_current'], $versions[1]['is_current']]);
+        $this->assertSame(['units' => 1, 'seats' => 2, 'kuota' => 5], collect($versions[0])->only(['units', 'seats', 'kuota'])->all(), 'hanya unit aktif dihitung');
+        $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 3], collect($versions[1])->only(['units', 'seats', 'kuota'])->all());
+    }
+
+    public function test_version_totals_count_the_same_jabatan_name_once_per_unit(): void
+    {
+        $seat = fn (int $kuota): array => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => $kuota];
+        $this->decree('SK/1', '2026-09-01', ['units' => [
+            'Kebun A' => ['kode' => 'Kebun', 'wilayah' => 'W', 'urutan' => 1, 'is_active' => true, 'seats' => ['Manajer' => $seat(1), 'Asisten' => $seat(2)]],
+            'Kebun B' => ['kode' => 'Kebun', 'wilayah' => 'W', 'urutan' => 2, 'is_active' => true, 'seats' => ['Manajer' => $seat(1), 'Asisten' => $seat(3)]],
+        ]]);
+
+        $version = $this->service->versions()[0];
+
+        $this->assertSame(['units' => 2, 'seats' => 4, 'kuota' => 7], collect($version)->only(['units', 'seats', 'kuota'])->all());
+        $this->assertSame($version['seats'], $this->service->report(Carbon::parse('2026-10-01'))['totals']['seats'], 'daftar versi dan ringkasan harus sama');
+        $this->assertSame($version['kuota'], $this->service->report(Carbon::parse('2026-10-01'))['totals']['kuota']);
+    }
+
+    public function test_versions_is_empty_without_any_applied_decree(): void
+    {
+        $this->assertSame([], $this->service->versions());
+    }
+
+    public function test_report_groups_seats_per_unit_with_totals_for_the_overview_table(): void
+    {
+        $this->decree('SK/1', '2026-09-01', ['units' => [
+            'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Wilayah X', 'urutan' => 1, 'is_active' => true, 'seats' => [
+                'Kepala Bagian' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+                'Asisten Pemetaan' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 2],
+            ]],
+            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Wilayah Y', 'urutan' => 2, 'is_active' => true, 'seats' => [
+                'Manajer' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+            ]],
+        ]]);
+        $this->holder('10000001', 'Ahmad', 'Bagian Tanaman', 'Kepala Bagian', '2026-09-01');
+        $this->holder('10000002', 'Budi', 'Bagian Tanaman', 'Asisten Pemetaan', '2026-09-01');
+
+        $report = $this->service->report(Carbon::parse('2026-10-01'));
+
+        $this->assertSame(['Bagian Tanaman', 'Kebun Tajati'], array_column($report['units'], 'unit'));
+        $this->assertSame(
+            ['unit' => 'Bagian Tanaman', 'wilayah' => 'Wilayah X', 'seat_count' => 2, 'kuota' => 3, 'filled' => 2],
+            collect($report['units'][0])->only(['unit', 'wilayah', 'seat_count', 'kuota', 'filled'])->all()
+        );
+        $this->assertCount(2, $report['units'][0]['seats']);
+        $this->assertSame(['units' => 2, 'seats' => 3, 'kuota' => 4, 'filled' => 2], $report['totals']);
+        $this->assertSame(2, $report['holder_total'], 'seluruh pemangku pada struktur dan di luarnya');
+    }
+
     public function test_compare_with_current_structure_lists_differences(): void
     {
         $this->decree('SK/1', '2026-09-01', $this->seat('Bagian Lama', 'Kepala Lama', 3));

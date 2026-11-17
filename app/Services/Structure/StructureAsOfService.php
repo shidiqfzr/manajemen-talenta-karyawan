@@ -4,6 +4,7 @@ namespace App\Services\Structure;
 
 use App\Models\JobHistory;
 use App\Models\StructureDecree;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -31,7 +32,56 @@ class StructureAsOfService
     }
 
     /**
-     * @return array{decree: StructureDecree, rows: list<array<string, mixed>>, outside_structure: int}|null
+     * Seluruh versi struktur (SK Diterapkan berisi snapshot), terbaru dahulu. `to` adalah hari terakhir versi itu
+     * (sehari sebelum versi berikutnya berlaku), null bila versi tersebut masih berlaku. Hanya unit aktif yang dihitung.
+     *
+     * @return list<array{decree: StructureDecree, from: CarbonImmutable, to: ?CarbonImmutable, is_current: bool, units: int, seats: int, kuota: int}>
+     */
+    public function versions(?CarbonInterface $today = null): array
+    {
+        $today ??= now();
+
+        $decrees = StructureDecree::query()
+            ->where('status', StructureDecree::STATUS_APPLIED)
+            ->whereNotNull('snapshot')
+            ->orderByDesc('effective_date')
+            ->orderByDesc('applied_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $currentId = $this->decreeFor($today)?->id;
+        $versions = [];
+        $nextStart = null;
+
+        foreach ($decrees as $decree) {
+            $units = array_filter($decree->snapshot['units'] ?? [], fn (array $unit): bool => (bool) ($unit['is_active'] ?? true));
+            // Jumlah per unit lalu dijumlahkan: nama jabatan yang sama pada unit berbeda (mis. "Manajer") adalah formasi berbeda,
+            // jadi tidak boleh digabung lewat flatMap (kunci string akan saling menimpa).
+            $seatCount = 0;
+            $kuota = 0;
+            foreach ($units as $unit) {
+                $seatCount += count($unit['seats'] ?? []);
+                $kuota += array_sum(array_map(fn (array $seat): int => (int) ($seat['kuota'] ?? 0), $unit['seats'] ?? []));
+            }
+
+            $versions[] = [
+                'decree' => $decree,
+                'from' => $decree->effective_date->toImmutable(),
+                'to' => $nextStart?->subDay(),
+                'is_current' => $decree->id === $currentId,
+                'units' => count($units),
+                'seats' => $seatCount,
+                'kuota' => $kuota,
+            ];
+
+            $nextStart = $decree->effective_date->toImmutable();
+        }
+
+        return $versions;
+    }
+
+    /**
+     * @return array{decree: StructureDecree, rows: list<array<string, mixed>>, units: list<array<string, mixed>>, totals: array{units: int, seats: int, kuota: int, filled: int}, holder_total: int, outside_structure: int}|null
      */
     public function report(CarbonInterface $date): ?array
     {
@@ -41,14 +91,16 @@ class StructureAsOfService
         }
 
         $holders = $this->holders($date);
+        $holderTotal = array_sum(array_map(fn (array $byJabatan): int => array_sum(array_map('count', $byJabatan)), $holders));
         $rows = [];
+        $units = [];
 
         foreach ($decree->snapshot['units'] ?? [] as $unit => $data) {
             foreach ($data['seats'] ?? [] as $jabatan => $seat) {
                 $placed = $holders[$unit][$jabatan] ?? [];
                 unset($holders[$unit][$jabatan]);
 
-                $rows[] = [
+                $row = [
                     'unit' => (string) $unit,
                     'wilayah' => $data['wilayah'] ?? null,
                     'is_active' => (bool) ($data['is_active'] ?? true),
@@ -60,13 +112,36 @@ class StructureAsOfService
                     'holder_count' => count($placed),
                     'holders' => $placed,
                 ];
+                $rows[] = $row;
+                $units[$unit]['seats'][] = $row;
             }
+
+            $units[$unit] = [
+                'unit' => (string) $unit,
+                'wilayah' => $data['wilayah'] ?? null,
+                'is_active' => (bool) ($data['is_active'] ?? true),
+                'seats' => $units[$unit]['seats'] ?? [],
+            ];
+            $units[$unit]['seat_count'] = count($units[$unit]['seats']);
+            $units[$unit]['kuota'] = array_sum(array_column($units[$unit]['seats'], 'kuota'));
+            $units[$unit]['filled'] = array_sum(array_column($units[$unit]['seats'], 'holder_count'));
         }
+
+        $units = array_values($units);
+        $active = array_filter($units, fn (array $unit): bool => $unit['is_active']);
 
         return [
             'decree' => $decree,
             'rows' => $rows,
-            'outside_structure' => array_sum(array_map(fn (array $byJabatan): int => array_sum(array_map('count', $byJabatan)), $holders)),
+            'units' => $units,
+            'totals' => [
+                'units' => count($active),
+                'seats' => array_sum(array_column($active, 'seat_count')),
+                'kuota' => array_sum(array_column($active, 'kuota')),
+                'filled' => array_sum(array_column($active, 'filled')),
+            ],
+            'holder_total' => $holderTotal,
+            'outside_structure' => $holderTotal - array_sum(array_column($rows, 'holder_count')),
         ];
     }
 

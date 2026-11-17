@@ -8,6 +8,7 @@ use App\Models\StructureDecree;
 use App\Services\Structure\StructureAsOfService;
 use App\Services\Structure\StructureDiff;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -20,16 +21,17 @@ use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Struktur Organisasi per Tanggal (DOMAIN.md §3.7): versi struktur menurut SK yang berlaku pada tanggal pilihan beserta
- * pemangku jabatannya dari riwayat jabatan. Baca-saja; NIK selalu tersamar dan setiap ekspor tercatat pada log audit.
+ * Versi Struktur (DOMAIN.md §3.7): setiap SK yang diterapkan menjadi satu versi struktur organisasi. Layar baca-saja ini
+ * menampilkan daftar versi, lalu struktur beserta pemangku jabatan pada versi atau tanggal yang dipilih (untuk penelusuran
+ * dan audit). NIK selalu tersamar dan setiap ekspor tercatat pada log audit.
  */
-class StructureAsOfPage extends Component
+class StructureVersionsPage extends Component
 {
     use WithPagination;
 
     private const SEARCH_MAX_LENGTH = 100;
 
-    /** Tanggal struktur (Y-m-d). Kosong atau tidak valid kembali ke hari ini. */
+    /** Tanggal yang dilihat (Y-m-d). Kosong atau tidak valid kembali ke hari ini. */
     #[Url(except: '')]
     public string $date = '';
 
@@ -53,6 +55,16 @@ class StructureAsOfPage extends Component
         $this->perPage = $this->defaultPerPage();
         $this->normaliseDate();
         $this->normaliseSearch();
+    }
+
+    /** Pilih versi: versi yang sedang berlaku membuka hari ini, versi lampau membuka hari pertama berlakunya. */
+    public function selectVersion(int $decreeId): void
+    {
+        $version = collect($this->versions)->first(fn (array $v): bool => $v['decree']->id === $decreeId);
+        abort_if($version === null, 404);
+
+        $this->date = $version['is_current'] ? now()->toDateString() : $version['from']->toDateString();
+        $this->resetPage();
     }
 
     public function updatedDate(): void
@@ -82,7 +94,14 @@ class StructureAsOfPage extends Component
         $this->resetPage();
     }
 
-    /** @return array{decree: StructureDecree, rows: list<array<string, mixed>>, outside_structure: int}|null */
+    /** @return list<array{decree: StructureDecree, from: CarbonImmutable, to: ?CarbonImmutable, is_current: bool, units: int, seats: int, kuota: int}> */
+    #[Computed]
+    public function versions(): array
+    {
+        return app(StructureAsOfService::class)->versions();
+    }
+
+    /** @return array<string, mixed>|null */
     #[Computed]
     public function report(): ?array
     {
@@ -95,28 +114,29 @@ class StructureAsOfPage extends Component
         return $this->compare ? app(StructureAsOfService::class)->compareWithCurrent(Carbon::parse($this->date)) : null;
     }
 
-    /** @return Collection<int, array<string, mixed>> */
+    /** Unit yang cocok dengan pencarian: nama unit, wilayah, atau salah satu jabatannya. @return Collection<int, array<string, mixed>> */
     #[Computed]
-    public function filteredRows(): Collection
+    public function filteredUnits(): Collection
     {
         $term = mb_strtolower(trim($this->search));
-        $rows = collect($this->report['rows'] ?? []);
+        $units = collect($this->report['units'] ?? []);
 
         if ($term === '') {
-            return $rows;
+            return $units;
         }
 
-        return $rows->filter(fn (array $row): bool => str_contains(mb_strtolower($row['unit'].' '.$row['jabatan'].' '.$row['wilayah']), $term))->values();
+        return $units->filter(fn (array $unit): bool => str_contains(mb_strtolower($unit['unit'].' '.$unit['wilayah']), $term)
+            || collect($unit['seats'])->contains(fn (array $seat): bool => str_contains(mb_strtolower($seat['jabatan']), $term)))->values();
     }
 
     #[Computed]
-    public function pagedRows(): LengthAwarePaginator
+    public function pagedUnits(): LengthAwarePaginator
     {
-        $rows = $this->filteredRows;
+        $units = $this->filteredUnits;
         $perPage = in_array($this->perPage, $this->perPageOptions(), true) ? $this->perPage : $this->defaultPerPage();
-        $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $perPage)));
+        $page = max(1, min($this->getPage(), (int) ceil($units->count() / $perPage)));
 
-        return new LengthAwarePaginator($rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page);
+        return new LengthAwarePaginator($units->forPage($page, $perPage)->values(), $units->count(), $perPage, $page);
     }
 
     public function export(): BinaryFileResponse
@@ -126,35 +146,38 @@ class StructureAsOfPage extends Component
         $report = $this->report;
         abort_if($report === null, 404);
 
-        $rows = $this->filteredRows->values()->map(fn (array $row, int $i): array => [
-            $i + 1,
-            $row['unit'],
-            $row['wilayah'] ?? '-',
-            $row['is_active'] ? 'Aktif' : 'Nonaktif',
-            $row['jabatan'],
-            $row['rm_level'] ?? '-',
-            $row['bidang'] ?? '-',
-            $row['kuota'],
-            $row['holder_count'],
-            collect($row['holders'])->map(fn (array $holder): string => $holder['nama'].' ('.$holder['nik_masked'].')')->implode('; '),
-        ]);
+        $rows = $this->filteredUnits
+            ->flatMap(fn (array $unit): array => array_map(fn (array $seat): array => $seat + ['is_active' => $unit['is_active']], $unit['seats']))
+            ->values()
+            ->map(fn (array $row, int $i): array => [
+                $i + 1,
+                $row['unit'],
+                $row['wilayah'] ?? '-',
+                $row['is_active'] ? 'Aktif' : 'Nonaktif',
+                $row['jabatan'],
+                $row['rm_level'] ?? '-',
+                $row['bidang'] ?? '-',
+                $row['kuota'],
+                $row['holder_count'],
+                collect($row['holders'])->map(fn (array $holder): string => $holder['nama'].' ('.$holder['nik_masked'].')')->implode('; '),
+            ]);
 
         // Log audit hanya memuat versi dan cakupan ekspor, tidak memuat data pribadi pemangku.
-        MasterAuditLog::record(auth()->user(), 'structure_as_of.export', 'structure_as_of', null, 'Struktur per Tanggal', null, [
+        MasterAuditLog::record(auth()->user(), 'structure_as_of.export', 'structure_as_of', null, 'Versi Struktur', null, [
             'date' => $this->date,
             'sk_number' => $report['decree']->sk_number,
             'rows' => $rows->count(),
             'search' => $this->search !== '' ? $this->search : null,
         ]);
 
-        $export = new FormasiExport('Struktur per Tanggal', ['NO', 'UNIT KERJA', 'WILAYAH', 'STATUS UNIT', 'JABATAN', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'PEMANGKU'], $rows, auth()->user());
+        $export = new FormasiExport('Versi Struktur', ['NO', 'UNIT KERJA', 'WILAYAH', 'STATUS UNIT', 'JABATAN', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'PEMANGKU'], $rows, auth()->user());
 
-        return Excel::download($export, 'Struktur_per_Tanggal_'.str_replace('-', '', $this->date).'_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx');
+        return Excel::download($export, 'Versi_Struktur_'.str_replace('-', '', $this->date).'_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx');
     }
 
     public function render(): View
     {
-        return view('livewire.admin.master.structure-as-of-page', [
+        return view('livewire.admin.master.structure-versions-page', [
             'perPageOptions' => $this->perPageOptions(),
         ]);
     }

@@ -179,7 +179,7 @@ Route::prefix('admin')
             Route::view('sk', 'admin.master.sk.index')->name('sk.index');
             Route::view('sk/baru', 'admin.master.sk.create')->name('sk.create');
             Route::get('sk/template', StructureDecreeTemplateController::class)->name('sk.template');
-            Route::view('sk/struktur', 'admin.master.sk.struktur')->name('sk.struktur');
+            Route::view('sk/versi', 'admin.master.sk.versi')->name('sk.versions');
             Route::get('sk/{decree}/tinjau', fn (StructureDecree $decree) => view('admin.master.sk.create', ['decree' => $decree]))->name('sk.review');
             Route::get('sk/{decree}/unduh/{berkas}', StructureDecreeDownloadController::class)->name('sk.download');
             Route::get('sk/{decree}', fn (StructureDecree $decree) => view('admin.master.sk.show', ['decree' => $decree]))->name('sk.show');
