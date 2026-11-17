@@ -40,4 +40,19 @@ class FormasiNormalizerTest extends TestCase
         $this->assertSame('Key User Modul PP, QM, dan Jembatan Timbang', FormasiNormalizer::jabatan('KEY USER MODUL PP, QM, DAN JEMBATAN TIMBANG'));
         $this->assertSame('Key User Modul FM,PS,BKM,SPB, dan D-Farm', FormasiNormalizer::jabatan('KEY USER MODUL FM,PS,BKM,SPB, DAN D-FARM'));
     }
+
+    public function test_normalizer_keeps_tax_and_certification_acronyms_and_roman_suffixes_c_and_d(): void
+    {
+        $this->assertSame('Ketua Tim Audit VC', FormasiNormalizer::jabatan('Ketua Tim Audit VC'));
+        $this->assertSame('Asisten Auditor VD', FormasiNormalizer::jabatan('Asisten Auditor VD'));
+        $this->assertSame('Krani PBB & Tagihan Jasa', FormasiNormalizer::jabatan('Krani PBB & Tagihan Jasa'));
+        $this->assertSame('Krani Admi PPN Masukan & Keluaran', FormasiNormalizer::jabatan('KRANI ADMI PPN MASUKAN & KELUARAN'));
+        $this->assertSame('Krani PPh Pasal 21 & 23', FormasiNormalizer::jabatan('KRANI PPH PASAL 21 & 23'));
+        $this->assertSame('Asisten ICOFR', FormasiNormalizer::jabatan('Asisten ICOFR'));
+        $this->assertSame('Krani Penagihan PUMK', FormasiNormalizer::jabatan('KRANI PENAGIHAN PUMK'));
+        $this->assertSame('Krani Admi & BPJS Kesehatan', FormasiNormalizer::jabatan('KRANI ADMI & BPJS KESEHATAN'));
+        $this->assertSame('Krani Bidang Pengelolaan PSR/KKPA', FormasiNormalizer::jabatan('KRANI BIDANG PENGELOLAAN PSR/KKPA'));
+        $this->assertSame('Krani Sertifikasi (RSPO/ISPO/ISO)', FormasiNormalizer::jabatan('KRANI SERTIFIKASI (RSPO/ISPO/ISO)'));
+        $this->assertSame('Krani SMK3 & Admi Manajemen Sertifikasi', FormasiNormalizer::jabatan('KRANI SMK3 & ADMI MANAJEMEN SERTIFIKASI'));
+    }
 }

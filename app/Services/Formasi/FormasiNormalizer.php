@@ -21,13 +21,17 @@ class FormasiNormalizer
     private const ACRONYMS = [
         'PKS', 'PKR', 'PMO', 'ERP', 'SAP', 'TI', 'TJSL', 'UMK', 'HPS', 'URTA', 'KKPA', 'T3M', 'PSDM', 'SDM',
         'QC', 'ESG', 'HI', 'CO', 'FI', 'HCM', 'MM', 'PM', 'SD', 'PP', 'QM', 'FM', 'PS', 'BKM', 'SPB',
+        'PBB', 'PPN', 'ICOFR', 'PUMK', 'BPJS', 'PSR', 'RSPO', 'ISPO', 'ISO', 'SMK3',
     ];
+
+    /** Singkatan dengan huruf kecil di dalamnya (kunci: huruf besar semua). */
+    private const MIXED_CASE_ACRONYMS = ['PPH' => 'PPh'];
 
     /** Kata sambung yang ditulis huruf kecil. */
     private const LOWERCASE_WORDS = ['DAN' => 'dan', 'OF' => 'of'];
 
-    /** Angka romawi I sampai XXXIX, dengan akhiran huruf A/B (mis. IIA). */
-    private const ROMAN_PATTERN = '/^(?=[IVXL]+[AB]?$)X{0,3}(?:IX|IV|V?I{0,3})[AB]?$/';
+    /** Angka romawi I sampai XXXIX, dengan akhiran huruf A sampai D (mis. IIA, VC). */
+    private const ROMAN_PATTERN = '/^(?=[IVXL]+[A-D]?$)X{0,3}(?:IX|IV|V?I{0,3})[A-D]?$/';
 
     public static function unit(string $raw): string
     {
@@ -54,6 +58,10 @@ class FormasiNormalizer
 
             if (in_array($word, self::ACRONYMS, true) || preg_match(self::ROMAN_PATTERN, $word)) {
                 return $word;
+            }
+
+            if (isset(self::MIXED_CASE_ACRONYMS[$word])) {
+                return self::MIXED_CASE_ACRONYMS[$word];
             }
 
             if (isset(self::LOWERCASE_WORDS[$word])) {
