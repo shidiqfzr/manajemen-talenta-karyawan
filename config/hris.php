@@ -58,6 +58,23 @@ return [
     'permissions' => [
         'mutasi.prepare' => ['admin'],
         'mutasi.approve' => ['admin'],
+        'struktur.prepare' => ['admin'],
+        'struktur.approve' => ['admin'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tata Kelola SK Struktur Organisasi
+    |--------------------------------------------------------------------------
+    |
+    | require_approval : kebijakan empat mata (maker-checker). Bila aktif, admin yang mengajukan SK tidak
+    |                    dapat menyetujuinya sendiri; admin LAIN yang menyetujui atau menolak.
+    |                    Bila nonaktif, pengaju yang berhak dapat langsung menyetujui.
+    |
+    */
+
+    'structure' => [
+        'require_approval' => (bool) env('HRIS_STRUCTURE_REQUIRE_APPROVAL', false),
     ],
 
     /*

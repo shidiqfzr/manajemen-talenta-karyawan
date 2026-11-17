@@ -27,7 +27,11 @@ class MasterAuditLog extends Model
         'old_values',
         'new_values',
         'reason',
+        'decree_id',
     ];
+
+    /** SK yang sedang diterapkan; diisi oleh forDecree() agar setiap catatan memuat tautan ke SK-nya. */
+    private static ?int $ambientDecreeId = null;
 
     protected $casts = [
         'old_values' => 'array',
@@ -53,6 +57,12 @@ class MasterAuditLog extends Model
         'position.deleted' => 'Jabatan dihapus',
         'pool.opened' => 'Jabatan penampungan dibuka pada unit',
         'pool.closed' => 'Jabatan penampungan ditutup pada unit',
+        'decree.submitted' => 'SK struktur diajukan',
+        'decree.approved' => 'SK struktur disetujui',
+        'decree.rejected' => 'SK struktur ditolak',
+        'decree.cancelled' => 'SK struktur dibatalkan',
+        'decree.applied' => 'SK struktur diterapkan',
+        'decree.failed' => 'SK struktur gagal diterapkan',
         'mpp_supply.created' => 'Rencana pasokan MPP dibuat',
         'mpp_supply.updated' => 'Rencana pasokan MPP diubah',
         'mpp_period.captured' => 'Draf periode MPP direkam',
@@ -78,6 +88,7 @@ class MasterAuditLog extends Model
         'unit' => 'Unit Kerja',
         'position' => 'Jabatan',
         'seat' => 'Formasi Jabatan',
+        'decree' => 'Surat Keputusan Struktur',
         'pool_seat' => 'Jabatan Penampungan',
         'employee' => 'Karyawan',
         'evaluation' => 'Penilaian Karyawan',
@@ -231,6 +242,22 @@ class MasterAuditLog extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Jalankan $callback sehingga setiap catatan yang dibuat di dalamnya tertaut ke SK $decreeId.
+     * Penanda dibersihkan walau $callback melempar galat.
+     */
+    public static function forDecree(int $decreeId, callable $callback): mixed
+    {
+        $previous = self::$ambientDecreeId;
+        self::$ambientDecreeId = $decreeId;
+
+        try {
+            return $callback();
+        } finally {
+            self::$ambientDecreeId = $previous;
+        }
+    }
+
     public static function record(
         ?User $user,
         string $action,
@@ -251,6 +278,7 @@ class MasterAuditLog extends Model
             'old_values' => $old,
             'new_values' => $new,
             'reason' => $reason,
+            'decree_id' => self::$ambientDecreeId,
         ]);
     }
 }
