@@ -23,7 +23,7 @@
                 <x-admin.form.input name="skNumber" label="Nomor SK" wire:model="skNumber" required hint="Contoh: DPSB/SKPTS/352/IX/2026" />
                 <x-admin.form.input name="skDate" type="date" label="Tanggal SK" wire:model="skDate" required />
             </div>
-            <x-admin.form.input name="title" label="Tentang" wire:model="title" required hint="Judul SK pada baris &quot;Tentang&quot;." />
+            <x-admin.form.input name="title" label="Tentang" wire:model="title" required hint='Judul SK pada baris "Tentang".' />
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <x-admin.form.input name="effectiveDate" type="date" label="Tanggal Berlaku" wire:model="effectiveDate" hint="Kosongkan bila SK berlaku sejak tanggal ditetapkan (sama dengan Tanggal SK)." />
                 <x-admin.form.input name="revokes" label="Mencabut / Menggantikan" wire:model="revokes" hint="SK sebelumnya yang dicabut atau digantikan (opsional)." />

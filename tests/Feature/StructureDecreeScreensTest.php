@@ -104,6 +104,13 @@ class StructureDecreeScreensTest extends TestCase
         $this->assertSame('2026-09-01', $decree->effective_date->toDateString());
     }
 
+    public function test_wizard_form_text_is_not_double_escaped(): void
+    {
+        Livewire::actingAs($this->admin)->test(StructureDecreeWizard::class)
+            ->assertSee('Judul SK pada baris "Tentang".')
+            ->assertDontSee('&amp;quot;', false);
+    }
+
     public function test_wizard_shows_the_service_message_instead_of_failing(): void
     {
         StructureDecree::create(['sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'SK Lama', 'sk_date' => '2026-01-01', 'effective_date' => '2026-01-01', 'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'baseline:x', 'source_sha256' => str_repeat('a', 64)]);
