@@ -171,6 +171,32 @@ class StructureDecreeScreensTest extends TestCase
             ->assertSee('Cara menyiapkan lampiran');
     }
 
+    public function test_step_one_is_built_from_numbered_sections_the_shared_upload_and_the_shared_footer(): void
+    {
+        Livewire::actingAs($this->admin)->test(StructureDecreeWizard::class)
+            ->assertSee('Data SK')
+            ->assertSee('Lampiran')
+            ->assertSee('Kolom bertanda')
+            ->assertSee('fa-file-excel', false)
+            ->assertSee('Belum ada lampiran dipilih')
+            ->assertSee('Lanjut ke Tinjauan')
+            ->assertSee('wire:target="createDraft"', false)
+            ->assertDontSee('addEventListener', false); // tombol kirim tidak boleh terkunci permanen pada form Livewire
+    }
+
+    public function test_a_server_error_is_summarised_at_the_top_of_the_form(): void
+    {
+        StructureDecree::create(['sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'SK Lama', 'sk_date' => '2026-01-01', 'effective_date' => '2026-01-01', 'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'baseline:x', 'source_sha256' => str_repeat('a', 64)]);
+        $file = $this->uploadWorkbook($this->changedRows());
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeWizard::class)
+            ->set('skNumber', 'DPSB/SKPTS/352/IX/2026')->set('title', 'Perubahan Struktur')->set('skDate', '2026-09-01')
+            ->set('workbook', UploadedFile::fake()->createWithContent('lampiran.xlsx', (string) file_get_contents($file->getRealPath())))
+            ->call('createDraft')
+            ->assertSee('isian perlu diperbaiki')
+            ->assertSee('sudah terdaftar');
+    }
+
     public function test_template_downloads_for_admins_only(): void
     {
         $user = User::factory()->create(['role' => 'user']);
@@ -226,6 +252,10 @@ class StructureDecreeScreensTest extends TestCase
 
         $component = Livewire::actingAs($this->admin)->test(StructureDecreeWizard::class, ['decree' => $decree])
             ->assertSee('belum memiliki kode')
+            ->assertSee('hal perlu diselesaikan sebelum SK dapat diajukan')
+            ->assertSee('Ajukan nonaktif sampai')
+            ->assertSee('Jumlah Perubahan')
+            ->assertSee('Total Kuota')
             ->call('submit');
         $this->assertSame(StructureDecree::STATUS_DRAFT, $decree->fresh()->status);
 

@@ -86,6 +86,16 @@ class AdminSharedComponentsTest extends TestCase
         $view->assertSee('Salin kode verifikasi berkas');
     }
 
+    public function test_stepper_marks_the_current_step_and_completed_steps(): void
+    {
+        $view = $this->blade('<x-admin.stepper :steps="[\'Data SK\', \'Tinjau Perubahan\', \'Ajukan\']" :current="2" label="Tahap pencatatan SK" />');
+
+        $view->assertSeeInOrder(['Data SK', 'Tinjau Perubahan', 'Ajukan']);
+        $view->assertSee('aria-label="Tahap pencatatan SK"', false);
+        $view->assertSee('aria-current="step"', false);
+        $this->assertSame(1, substr_count($view->__toString(), 'aria-current="step"'));
+    }
+
     public function test_file_verification_without_a_hash_shows_a_dash_and_no_copy_button(): void
     {
         $view = $this->blade('<x-admin.file-verification :hash="null" />');
