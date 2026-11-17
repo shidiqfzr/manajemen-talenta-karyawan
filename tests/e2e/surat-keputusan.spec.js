@@ -37,9 +37,11 @@ test('daftar: bagian Surat Keputusan aktif, SK baseline tampil, dan tanpa istila
     await openIndex(page);
 
     const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
-    for (const label of ['Formasi', 'Sebaran Formasi', 'Jabatan Penampungan', 'Surat Keputusan', 'Riwayat Perubahan']) {
+    for (const label of ['Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
         await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
+    // Pengalih tampilan Formasi hanya ada di dalam Formasi, bukan pada alur Surat Keputusan.
+    await expect(page.getByRole('navigation', { name: 'Tampilan Formasi' })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Surat Keputusan', exact: true })).toHaveAttribute('aria-current', 'page');
 
     const row = page.getByRole('row', { name: new RegExp(BASELINE_NUMBER) });
@@ -172,16 +174,17 @@ async function openVersions(page) {
 // Basis data E2E memuat dua versi: SK 352 (1 Sep 2026) dan SK 401 (1 Okt 2026), serta dua karyawan uji (seed-structure-versions.php).
 const SECOND_NUMBER = 'DPSB/SKPTS/401/X/2026';
 
-test('versi struktur: tab tersendiri, satu kendali waktu, data langsung terlihat, dan tanpa NIK utuh', async ({ page }) => {
+test('versi struktur: tampilan Formasi, satu kendali waktu, data langsung terlihat, dan tanpa NIK utuh', async ({ page }) => {
     await openIndex(page);
-    const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
-    await expect(nav.getByRole('link', { name: 'Versi Struktur', exact: true })).toBeVisible();
-    // Tab adalah satu-satunya jalan masuk: tidak ada tombol terpendam lagi pada daftar SK.
-    await expect(page.getByRole('link', { name: 'Versi Struktur' })).toHaveCount(1);
+    // Daftar SK tidak memuat jalan masuk ke Versi Struktur; tampilannya ada di dalam bagian Formasi.
+    await expect(page.getByRole('link', { name: 'Versi Struktur' })).toHaveCount(0);
 
-    await nav.getByRole('link', { name: 'Versi Struktur', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Formasi', exact: true }).click();
+    await page.waitForURL(/\/admin\/master\/formasi$/, { timeout: 30_000 });
+    const views = page.getByRole('navigation', { name: 'Tampilan Formasi' });
+    await views.getByRole('link', { name: 'Versi Struktur', exact: true }).click();
     await page.waitForURL(/\/admin\/master\/versi$/, { timeout: 30_000 });
-    await expect(nav.getByRole('link', { name: 'Versi Struktur', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(views.getByRole('link', { name: 'Versi Struktur', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name: 'Versi Struktur', exact: true }).first()).toBeVisible({ timeout: 30_000 });
 
     // Tanpa banner penjelasan panjang; ringkasan dan tabel jabatan langsung tampil.

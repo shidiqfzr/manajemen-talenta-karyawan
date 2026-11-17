@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Employee;
 use App\Models\JobHistory;
-use App\Models\StructureDecree;
 use App\Services\Structure\EmployeePositionTimelineService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesStructureVersions;
 use Tests\TestCase;
 
 /**
@@ -15,6 +14,7 @@ use Tests\TestCase;
  */
 class EmployeePositionTimelineServiceTest extends TestCase
 {
+    use CreatesStructureVersions;
     use RefreshDatabase;
 
     private EmployeePositionTimelineService $service;
@@ -26,40 +26,9 @@ class EmployeePositionTimelineServiceTest extends TestCase
         $this->service = app(EmployeePositionTimelineService::class);
     }
 
-    private function decree(string $number, string $effective, array $units): StructureDecree
-    {
-        return StructureDecree::create([
-            'sk_number' => $number, 'title' => 'Perubahan Struktur', 'sk_date' => $effective, 'effective_date' => $effective,
-            'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'decrees/'.md5($number).'.xlsx', 'source_sha256' => str_repeat('a', 64),
-            'applied_at' => now(), 'snapshot' => ['units' => $units],
-        ]);
-    }
-
-    private function unit(string $jabatan): array
-    {
-        return ['kode' => 'Bagian', 'wilayah' => 'W', 'urutan' => 1, 'is_active' => true, 'seats' => [$jabatan => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1]]];
-    }
-
-    private function employee(string $nik, string $nama, array $attributes = []): Employee
-    {
-        $employee = Employee::factory()->create(['nik' => $nik, 'nama' => $nama] + $attributes);
-        // EmployeeObserver menulis baris data_awal; uji ini mengatur riwayatnya sendiri.
-        JobHistory::withTrashed()->where('employee_nik', $nik)->forceDelete();
-
-        return $employee;
-    }
-
-    private function history(string $nik, string $unit, string $jabatan, string $from, ?string $until = null, array $extra = []): JobHistory
-    {
-        return JobHistory::create($extra + [
-            'employee_nik' => $nik, 'unit_kerja' => $unit, 'jabatan' => $jabatan, 'tmt_awal' => $from, 'tmt_akhir' => $until,
-            'is_applied' => true, 'sumber' => JobHistory::SUMBER_MUTASI,
-        ]);
-    }
-
     public function test_search_needs_at_least_three_characters(): void
     {
-        $this->employee('10000001', 'Dewi Lestari');
+        $this->employeeWithoutHistory('10000001', 'Dewi Lestari');
 
         $this->assertSame([], $this->service->search(''));
         $this->assertSame([], $this->service->search('de'));
@@ -68,8 +37,8 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_search_matches_name_case_insensitively_and_exact_nik_and_never_returns_the_full_nik(): void
     {
-        $this->employee('12345678', 'Dewi Lestari', ['jabatan' => 'Manajer', 'unit_kerja' => 'Kebun Kumai']);
-        $this->employee('87654321', 'Budi Santoso');
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari', ['jabatan' => 'Manajer', 'unit_kerja' => 'Kebun Kumai']);
+        $this->employeeWithoutHistory('87654321', 'Budi Santoso');
 
         $byName = $this->service->search('LESTARI');
         $byNik = $this->service->search('12345678');
@@ -84,7 +53,7 @@ class EmployeePositionTimelineServiceTest extends TestCase
     public function test_search_treats_like_wildcards_and_injection_text_as_plain_text_and_caps_results(): void
     {
         foreach (range(1, 12) as $i) {
-            $this->employee(sprintf('2000%04d', $i), 'Sari Nomor '.$i);
+            $this->employeeWithoutHistory(sprintf('2000%04d', $i), 'Sari Nomor '.$i);
         }
 
         $this->assertSame([], $this->service->search('%%%'));
@@ -94,7 +63,7 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_a_token_resolves_to_its_nik_and_a_tampered_token_resolves_to_nothing(): void
     {
-        $this->employee('12345678', 'Dewi Lestari');
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
         $token = $this->service->search('Dewi')[0]['token'];
 
         $this->assertSame('12345678', $this->service->resolve($token));
@@ -106,7 +75,7 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_a_token_for_a_deleted_employee_resolves_to_nothing(): void
     {
-        $employee = $this->employee('12345678', 'Dewi Lestari');
+        $employee = $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
         $token = $this->service->search('Dewi')[0]['token'];
         $employee->forceDelete();
 
@@ -115,11 +84,11 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_timeline_lists_placements_newest_first_with_the_structure_version_in_force_at_each_start(): void
     {
-        $this->decree('SK/1', '2026-09-01', ['Bagian A' => $this->unit('Kepala A')]);
-        $this->decree('SK/2', '2026-11-01', ['Bagian B' => $this->unit('Kepala B')]);
-        $this->employee('12345678', 'Dewi Lestari');
-        $this->history('12345678', 'Bagian A', 'Kepala A', '2026-09-15', '2026-10-31');
-        $this->history('12345678', 'Bagian B', 'Kepala B', '2026-11-01', null, ['status_penugasan' => 'Plt']);
+        $this->appliedDecree('SK/1', '2026-09-01', ['units' => ['Bagian A' => $this->snapshotUnit('Kepala A')]]);
+        $this->appliedDecree('SK/2', '2026-11-01', ['units' => ['Bagian B' => $this->snapshotUnit('Kepala B')]]);
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
+        $this->placement('12345678', 'Bagian A', 'Kepala A', '2026-09-15', '2026-10-31');
+        $this->placement('12345678', 'Bagian B', 'Kepala B', '2026-11-01', null, ['status_penugasan' => 'Plt']);
 
         $timeline = $this->service->timeline('12345678');
 
@@ -132,10 +101,10 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_timeline_flags_placements_before_the_first_decree_and_outside_the_structure(): void
     {
-        $this->decree('SK/1', '2026-09-01', ['Bagian A' => $this->unit('Kepala A')]);
-        $this->employee('12345678', 'Dewi Lestari');
-        $this->history('12345678', 'Bagian Lama', 'Kepala Lama', '2026-01-01', '2026-08-31');
-        $this->history('12345678', 'Bagian A', 'Jabatan Penampungan', '2026-09-01');
+        $this->appliedDecree('SK/1', '2026-09-01', ['units' => ['Bagian A' => $this->snapshotUnit('Kepala A')]]);
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
+        $this->placement('12345678', 'Bagian Lama', 'Kepala Lama', '2026-01-01', '2026-08-31');
+        $this->placement('12345678', 'Bagian A', 'Jabatan Penampungan', '2026-09-01');
 
         $timeline = $this->service->timeline('12345678');
 
@@ -145,21 +114,21 @@ class EmployeePositionTimelineServiceTest extends TestCase
 
     public function test_timeline_excludes_unapplied_and_deleted_rows_and_other_employees(): void
     {
-        $this->employee('12345678', 'Dewi Lestari');
-        $this->employee('87654321', 'Budi Santoso');
-        $this->history('12345678', 'Bagian A', 'Terjadwal', '2026-12-01', null, ['is_applied' => false]);
-        $this->history('12345678', 'Bagian A', 'Dihapus', '2026-09-01')->delete();
-        $this->history('12345678', 'Bagian A', 'Aktif', '2026-09-02');
-        $this->history('87654321', 'Bagian A', 'Orang Lain', '2026-09-02');
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
+        $this->employeeWithoutHistory('87654321', 'Budi Santoso');
+        $this->placement('12345678', 'Bagian A', 'Terjadwal', '2026-12-01', null, ['is_applied' => false]);
+        $this->placement('12345678', 'Bagian A', 'Dihapus', '2026-09-01')->delete();
+        $this->placement('12345678', 'Bagian A', 'Aktif', '2026-09-02');
+        $this->placement('87654321', 'Bagian A', 'Orang Lain', '2026-09-02');
 
         $this->assertSame(['Aktif'], array_column($this->service->timeline('12345678'), 'jabatan'));
     }
 
     public function test_timeline_keeps_the_official_sk_number_only_for_real_mutations(): void
     {
-        $this->employee('12345678', 'Dewi Lestari');
-        $this->history('12345678', 'Bagian A', 'Kepala A', '2026-09-01', '2026-09-30', ['nomor_sk' => 'SK/MUTASI/9', 'jenis_mutasi' => 'PROMOSI']);
-        $this->history('12345678', 'Bagian A', 'Kepala B', '2026-10-01', null, ['sumber' => JobHistory::SUMBER_DATA_AWAL]);
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
+        $this->placement('12345678', 'Bagian A', 'Kepala A', '2026-09-01', '2026-09-30', ['nomor_sk' => 'SK/MUTASI/9', 'jenis_mutasi' => 'PROMOSI']);
+        $this->placement('12345678', 'Bagian A', 'Kepala B', '2026-10-01', null, ['sumber' => JobHistory::SUMBER_DATA_AWAL]);
 
         $timeline = $this->service->timeline('12345678');
 

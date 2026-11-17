@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\Master\StructureVersionsPage;
-use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\StructureDecree;
@@ -11,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\Concerns\CreatesStructureVersions;
 use Tests\TestCase;
 
 /**
@@ -19,6 +19,7 @@ use Tests\TestCase;
  */
 class StructureVersionsPageTest extends TestCase
 {
+    use CreatesStructureVersions;
     use RefreshDatabase;
 
     private User $admin;
@@ -32,7 +33,7 @@ class StructureVersionsPageTest extends TestCase
         $this->travelTo('2026-11-17 08:00:00');
         $this->admin = User::factory()->create(['role' => 'admin']);
 
-        $this->first = $this->decree('DPSB/SKPTS/352/IX/2026', '2026-09-01', ['units' => [
+        $this->first = $this->appliedDecree('DPSB/SKPTS/352/IX/2026', '2026-09-01', ['units' => [
             'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office', 'urutan' => 1, 'is_active' => true, 'seats' => [
                 'Kepala Bagian' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
                 'Asisten Pemetaan' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TEK', 'kuota' => 2],
@@ -42,30 +43,14 @@ class StructureVersionsPageTest extends TestCase
             ]],
         ]]);
 
-        Employee::factory()->create(['nik' => '12345678', 'nama' => 'Dewi Lestari']);
-        JobHistory::withTrashed()->where('employee_nik', '12345678')->forceDelete();
-        JobHistory::create(['employee_nik' => '12345678', 'jabatan' => 'Kepala Bagian', 'unit_kerja' => 'Bagian Tanaman', 'tmt_awal' => '2026-09-01', 'is_applied' => true, 'sumber' => JobHistory::SUMBER_MUTASI]);
-    }
-
-    private function decree(string $number, string $effective, array $snapshot): StructureDecree
-    {
-        return StructureDecree::create([
-            'sk_number' => $number,
-            'title' => 'Perubahan Struktur Organisasi Region Office',
-            'sk_date' => $effective,
-            'effective_date' => $effective,
-            'status' => StructureDecree::STATUS_APPLIED,
-            'source_path' => 'decrees/'.md5($number).'.xlsx',
-            'source_sha256' => str_repeat('a', 64),
-            'applied_at' => now(),
-            'snapshot' => $snapshot,
-        ]);
+        $this->employeeWithoutHistory('12345678', 'Dewi Lestari');
+        $this->placement('12345678', 'Bagian Tanaman', 'Kepala Bagian', '2026-09-01');
     }
 
     /** SK kedua (1 Nov 2026) yang menggantikan struktur dengan satu unit baru. */
     private function secondVersion(): StructureDecree
     {
-        return $this->decree('DPSB/SKPTS/400/XI/2026', '2026-11-01', ['units' => [
+        return $this->appliedDecree('DPSB/SKPTS/400/XI/2026', '2026-11-01', ['units' => [
             'Bagian Baru' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office', 'urutan' => 1, 'is_active' => true, 'seats' => [
                 'Kepala Baru' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
             ]],
@@ -89,10 +74,10 @@ class StructureVersionsPageTest extends TestCase
     public function test_page_is_its_own_master_data_tab_and_is_not_reached_through_a_buried_button(): void
     {
         $html = $this->actingAs($this->admin)->get(route('admin.master.versi.index'))->assertOk()->getContent();
-        preg_match('/<nav aria-label="Bagian Master Data".*?<\/nav>/s', $html, $nav);
+        preg_match('/<nav aria-label="Tampilan Formasi".*?<\/nav>/s', $html, $views);
 
-        $this->assertSame(1, substr_count($nav[0], 'aria-current="page"'));
-        $this->assertMatchesRegularExpression('/aria-current="page"[^>]*>.*?Versi Struktur/s', $nav[0]);
+        $this->assertSame(1, substr_count($views[0], 'aria-current="page"'));
+        $this->assertMatchesRegularExpression('/aria-current="page"[^>]*>.*?Versi Struktur/s', $views[0], 'Versi Struktur adalah salah satu tampilan Formasi');
 
         $sk = $this->actingAs($this->admin)->get(route('admin.master.sk.index'))->assertOk()->getContent();
         $this->assertStringNotContainsString('>Versi Struktur</x', $sk);
@@ -179,9 +164,8 @@ class StructureVersionsPageTest extends TestCase
 
     public function test_a_seat_with_more_holders_than_its_quota_is_flagged_in_both_views(): void
     {
-        Employee::factory()->create(['nik' => '87654321', 'nama' => 'Budi Santoso']);
-        JobHistory::withTrashed()->where('employee_nik', '87654321')->forceDelete();
-        JobHistory::create(['employee_nik' => '87654321', 'jabatan' => 'Kepala Bagian', 'unit_kerja' => 'Bagian Tanaman', 'tmt_awal' => '2026-09-01', 'is_applied' => true, 'sumber' => JobHistory::SUMBER_MUTASI]);
+        $this->employeeWithoutHistory('87654321', 'Budi Santoso');
+        $this->placement('87654321', 'Bagian Tanaman', 'Kepala Bagian', '2026-09-01');
 
         $this->page()->assertSee('melebihi kuota')->set('view', 'unit')->assertSee('melebihi kuota');
         $this->assertStringNotContainsString('melebihi kuota', Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)->set('search', 'Tajati')->html());

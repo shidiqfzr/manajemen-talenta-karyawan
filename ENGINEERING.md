@@ -129,6 +129,7 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
 Prinsip DRY adalah fondasi utama arsitektur aplikasi ini. Dilarang keras melakukan penyalinan (copy-paste) kode secara masif baik di Backend maupun Frontend.
 - **Backend (Single Source of Truth):** Segala bentuk kalkulasi (Pensiun, MBT, RM Level) wajib dipusatkan di **Service Layer**. Tidak boleh ada kalkulasi duplikat di Controller, Command, atau Livewire.
 - **Frontend (UI Components):** Elemen visual yang digunakan lebih dari satu kali (seperti *Page Header*, *Card*, *Combobox*, *Modal*) **wajib** diabstraksi menjadi **Blade Components** (contoh: `<x-admin.page-header>`) di `resources/views/components/`. Hal ini menjamin keseragaman UI dan mempermudah perubahan tema secara terpusat sesuai `DESIGN.md`.
+- **Balok bangun bersama (dijaga `tests/Unit/SharedBuildingBlocksGuardTest.php`):** satu implementasi untuk setiap aturan lintas layar, tanpa salinan baru. Penyamaran NIK hanya lewat `App\Support\NikMasker` (UU PDP); tabel untuk data dalam memori (hasil service, bukan query) memakai concern `App\Livewire\Concerns\WithCollectionTable` (opsi baris per halaman dari `config/hris.pagination`, pengirisan koleksi dengan klem halaman) sebagai pasangan `WithDataTable` untuk tabel bersumber query; pengalih tampilan dalam satu halaman memakai `<x-admin.segmented>`. Menemukan logika yang sama di dua tempat berarti mengekstraknya, bukan menyalinnya ke tempat ketiga.
 
 ---
 

@@ -1,6 +1,9 @@
 // SUT: Sebaran Formasi (tab Master Formasi) dan Monitoring Formasi Kosong. Satu berkas uji per fitur (ENGINEERING.md §3.5).
-import { test, expect } from '@playwright/test';
+import { test, expect as baseExpect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+
+// Server uji PHP berutas tunggal: halaman dan aksi Livewire dapat memakan belasan detik di bawah beban, jadi batas tunggu 30 detik (bukan 10).
+const expect = baseExpect.configure({ timeout: 30_000 });
 
 // Pindai area konten halaman; kerangka layout bersama diuji pada spesifikasi lain.
 const scanMain = (page) => new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
@@ -14,14 +17,21 @@ async function openSebaran(page) {
     await expect(page.getByRole('heading', { name: 'Sebaran Formasi' }).first()).toBeVisible();
 }
 
-test('tab: empat bagian Master Data, Sebaran Formasi aktif, KPI tampil, tanpa istilah internal', async ({ page }) => {
+test('navigasi: tiga bagian utama, Formasi aktif dengan tampilan Sebaran Jabatan, KPI tampil, tanpa istilah internal', async ({ page }) => {
     await openSebaran(page);
 
     const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
-    for (const label of ['Formasi', 'Sebaran Formasi', 'Jabatan Penampungan', 'Riwayat Perubahan']) {
+    for (const label of ['Formasi', 'Surat Keputusan', 'Riwayat Perubahan']) {
         await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
-    await expect(nav.getByRole('link', { name: 'Sebaran Formasi' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
+
+    // Empat tampilan Formasi berada pada satu pengalih, bukan tab terpisah.
+    const views = page.getByRole('navigation', { name: 'Tampilan Formasi' });
+    for (const label of ['Unit Kerja', 'Sebaran Jabatan', 'Jabatan Penampungan', 'Versi Struktur']) {
+        await expect(views.getByRole('link', { name: label, exact: true })).toBeVisible();
+    }
+    await expect(views.getByRole('link', { name: 'Sebaran Jabatan', exact: true })).toHaveAttribute('aria-current', 'page');
 
     for (const kpi of ['Formasi Jabatan', 'Terisi', 'Formasi Kosong', 'Diisi Pj/Plt']) {
         await expect(page.getByText(kpi, { exact: true }).first()).toBeVisible();

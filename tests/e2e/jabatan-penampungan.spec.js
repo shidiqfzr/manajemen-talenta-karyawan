@@ -1,6 +1,9 @@
 // SUT: Jabatan Penampungan (tab Master Formasi: Advisor dan Diperbantukan). Satu berkas uji per fitur (ENGINEERING.md §3.5).
-import { test, expect } from '@playwright/test';
+import { test, expect as baseExpect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+
+// Server uji PHP berutas tunggal: halaman dan aksi Livewire dapat memakan belasan detik di bawah beban, jadi batas tunggu 30 detik (bukan 10).
+const expect = baseExpect.configure({ timeout: 30_000 });
 
 const scanMain = (page) => new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
 const scanDialog = (page) => new AxeBuilder({ page }).include('[role=dialog]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
@@ -31,9 +34,12 @@ async function showDialog(page, trigger, name) {
 test('tab menampilkan jabatan bawaan, KPI, dan keterangan bahwa bukan formasi', async ({ page }) => {
     await openTab(page);
 
-    await expect(page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Jabatan Penampungan' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Tampilan Formasi' }).getByRole('link', { name: 'Jabatan Penampungan' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Bagian Master Data' }).getByRole('link', { name: 'Formasi', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('Advisor RM-2', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Karyawan Diperbantukan RM-3', { exact: true }).first()).toBeVisible();
+    // Aturan berada pada popover info agar header tabel tidak penuh: buka dahulu, lalu aturannya terbaca.
+    await page.getByRole('button', { name: 'Aturan jabatan penampungan' }).click();
     await expect(page.getByText(/bukan bagian dari Master Formasi/)).toBeVisible();
 
     const text = (await page.locator('body').innerText()).toLowerCase();
