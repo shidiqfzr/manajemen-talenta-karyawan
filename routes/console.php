@@ -74,6 +74,8 @@ Artisan::command('hris:expire-mutasi-proposals', function (ChainProposalService 
 
 Schedule::command('hris:purge-import-files')->hourly();
 Schedule::command('hris:purge-import-governance')->daily();
+// SK struktur diterapkan lebih dulu agar mutasi terjadwal pada hari yang sama menuju struktur yang sudah baru.
+Schedule::command('hr:apply-structure-decrees')->dailyAt('00:00');
 Schedule::command('hr:apply-effective-mutations')->dailyAt('00:01');
 Schedule::command('hr:process-retirements')->dailyAt('00:05');
 Schedule::command('hris:mpp-capture-period')->monthlyOn(1, '01:00');

@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Position;
+use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Models\UnitAlias;
+use App\Services\Structure\StructureReader;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -158,5 +160,35 @@ class PositionUnitSeeder extends Seeder
                 ]
             );
         }
+
+        $this->recordBaselineDecree($jsonPath);
+    }
+
+    /**
+     * Mencatat SK yang menjadi dasar baseline sebagai SK Diterapkan, sehingga riwayat struktur pada instalasi baru
+     * dimulai dari versi yang diketahui (DOMAIN.md §3.7). Idempoten menurut nomor SK.
+     */
+    private function recordBaselineDecree(string $baselinePath): void
+    {
+        $meta = json_decode((string) @file_get_contents(database_path('data/structure_decree.json')), true);
+        if (! is_array($meta)) {
+            return;
+        }
+
+        StructureDecree::updateOrCreate(
+            ['sk_number' => StructureDecree::normalizeNumber($meta['sk_number'])],
+            [
+                'title' => $meta['title'],
+                'revokes' => $meta['revokes'] ?? null,
+                'note' => $meta['note'] ?? null,
+                'sk_date' => $meta['sk_date'],
+                'effective_date' => $meta['effective_date'],
+                'status' => StructureDecree::STATUS_APPLIED,
+                'source_path' => 'baseline:database/data/master_formasi.json',
+                'source_sha256' => (string) hash_file('sha256', $baselinePath),
+                'snapshot' => app(StructureReader::class)->current(),
+                'applied_at' => now(),
+            ]
+        );
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\Position;
+use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Models\UnitAlias;
 use Database\Seeders\PositionUnitSeeder;
@@ -148,6 +149,22 @@ class FormasiSeederTest extends TestCase
         $this->assertSame('Wilayah Kalimantan Timur', $tajati->wilayah);
         $this->assertNotSame(999, $tajati->urutan);
         $this->assertSame('RM-1', Position::where('nama', 'Manajer')->value('rm_level'));
+    }
+
+    public function test_seeding_records_the_baseline_sk_exactly_once(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->seed(PositionUnitSeeder::class);
+
+        $decree = StructureDecree::sole();
+
+        $this->assertSame('DPSB/SKPTS/352/IX/2026', $decree->sk_number);
+        $this->assertSame('Perubahan Struktur Organisasi Region Office PT Perkebunan Nusantara IV', $decree->title);
+        $this->assertSame(StructureDecree::STATUS_APPLIED, $decree->status);
+        $this->assertSame(['2026-09-01', '2026-09-01'], [$decree->sk_date->toDateString(), $decree->effective_date->toDateString()]);
+        $this->assertNotNull($decree->revokes);
+        $this->assertCount(47, $decree->snapshot['units']);
+        $this->assertSame(hash_file('sha256', database_path('data/master_formasi.json')), $decree->source_sha256);
     }
 
     public function test_pool_positions_exist_without_seats(): void
