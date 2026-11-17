@@ -217,12 +217,12 @@ test('versi struktur: memilih versi lampau, mencari pemangku, tampilan per unit,
     expect(await page.locator('main').innerText()).toMatch(/\*{5}001/);
 
     // Tampilan per unit: buka semua unit sekaligus.
-    await page.getByRole('button', { name: 'Per Unit' }).click();
+    await page.getByRole('radio', { name: 'Per Unit' }).click();
     await page.getByRole('button', { name: 'Buka semua unit' }).click();
     await expect(page.locator('tbody button[aria-expanded="true"]').first()).toBeVisible();
     await page.getByRole('button', { name: 'Tutup semua unit' }).click();
     await expect(page.locator('tbody button[aria-expanded="true"]')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Per Jabatan' }).click();
+    await page.getByRole('radio', { name: 'Per Jabatan' }).click();
 
     // Perbandingan antarversi: SK 352 menuju SK 401 menambahkan satu unit.
     await page.getByPlaceholder('Cari unit, wilayah, jabatan, atau nama pemangku...').fill('');

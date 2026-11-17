@@ -128,6 +128,28 @@ class AdminSharedComponentsTest extends TestCase
         $view->assertDontSee('aria-current="step"', false);
     }
 
+    public function test_segmented_renders_a_keyboard_operable_radiogroup_with_the_current_option_checked(): void
+    {
+        $view = $this->blade('<x-admin.segmented label="Tampilan sebaran" :options="[\'jabatan\' => \'Per Jabatan\', \'unit\' => \'Per Unit\']" current="unit" />');
+
+        $view->assertSee('role="radiogroup"', false);
+        $view->assertSee('aria-label="Tampilan sebaran"', false);
+        $view->assertSeeInOrder(['Per Jabatan', 'Per Unit']);
+        $view->assertSee('@keydown.arrow-right.prevent="move(1)"', false);
+        $view->assertSee('@keydown.arrow-left.prevent="move(-1)"', false);
+        $this->assertSame(1, substr_count($view->__toString(), 'aria-checked="true"'));
+        $this->assertSame(1, substr_count($view->__toString(), 'tabindex="0"'), 'tabindex berpindah (roving): hanya pilihan aktif yang dapat difokus dengan Tab');
+        $this->assertSame(1, substr_count($view->__toString(), 'tabindex="-1"'));
+        $view->assertSee('wire:click="setView(\'jabatan\')"', false);
+    }
+
+    public function test_segmented_action_name_is_configurable(): void
+    {
+        $this->blade('<x-admin.segmented label="Tampilan" :options="[\'a\' => \'A\', \'b\' => \'B\']" current="a" action="pilihTampilan" />')
+            ->assertSee('wire:click="pilihTampilan(\'b\')"', false)
+            ->assertDontSee('setView', false);
+    }
+
     public function test_file_verification_without_a_hash_shows_a_dash_and_no_copy_button(): void
     {
         $view = $this->blade('<x-admin.file-verification :hash="null" />');

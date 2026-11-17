@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Master;
 
 use App\Exceptions\FormasiRuleViolationException;
 use App\Exports\FormasiExport;
+use App\Livewire\Concerns\WithCollectionTable;
 use App\Models\Employee;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
@@ -32,6 +33,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class FormasiEditor extends Component
 {
+    use WithCollectionTable;
     use WithPagination;
 
     /** Pilihan jumlah baris per halaman pada kedua tabel. */
@@ -152,14 +154,6 @@ class FormasiEditor extends Component
         }
 
         return Excel::download($export, $filename);
-    }
-
-    public function updatedPerPage(): void
-    {
-        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = $this->defaultPerPage();
-        }
-        $this->resetPage();
     }
 
     /** Pencarian atau filter berubah: kembali ke halaman pertama agar hasil tidak berada di halaman kosong. */
@@ -585,7 +579,7 @@ class FormasiEditor extends Component
     #[Computed]
     public function pagedSeats(): LengthAwarePaginator
     {
-        return $this->paginate($this->filteredSeats);
+        return $this->paginateCollection($this->filteredSeats);
     }
 
     /**
@@ -594,7 +588,7 @@ class FormasiEditor extends Component
     #[Computed]
     public function pagedOverview(): LengthAwarePaginator
     {
-        return $this->paginate($this->filteredOverview);
+        return $this->paginateCollection($this->filteredOverview);
     }
 
     /**
@@ -848,20 +842,6 @@ class FormasiEditor extends Component
         $this->pendingParams = $params;
     }
 
-    /**
-     * Halaman diklem ke halaman terakhir yang ada, mis. setelah baris dihapus atau filter dipersempit.
-     */
-    private function paginate(Collection $rows): LengthAwarePaginator
-    {
-        $perPage = in_array($this->perPage, $this->perPageOptions(), true) ? $this->perPage : $this->defaultPerPage();
-        $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $perPage)));
-        if ($page !== $this->getPage()) {
-            $this->setPage($page);
-        }
-
-        return new LengthAwarePaginator($rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page);
-    }
-
     private function ownsSeat(int $seatId): bool
     {
         return $this->unitId !== null
@@ -878,16 +858,5 @@ class FormasiEditor extends Component
     private function authorizeAdmin(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
-    }
-
-    /** @return array<int, int> Opsi baris per halaman; satu standar untuk seluruh tabel (config hris.pagination). */
-    protected function perPageOptions(): array
-    {
-        return array_map('intval', config('hris.pagination.options'));
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return (int) config('hris.pagination.default');
     }
 }

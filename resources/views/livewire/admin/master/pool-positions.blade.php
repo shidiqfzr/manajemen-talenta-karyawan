@@ -49,15 +49,7 @@
                         </ul>
                     </div>
                 </div>
-                <div role="radiogroup" aria-label="Tampilan jabatan penampungan" x-data="{ move(step) { const radios = [...$el.querySelectorAll('[role=radio]')]; const index = radios.indexOf(document.activeElement); if (index < 0) { return; } const target = radios[(index + step + radios.length) % radios.length]; target.focus(); target.click(); } }"
-                    @keydown.arrow-right.prevent="move(1)" @keydown.arrow-down.prevent="move(1)"
-                    @keydown.arrow-left.prevent="move(-1)" @keydown.arrow-up.prevent="move(-1)"
-                    class="inline-flex rounded-lg border border-surface-300 bg-white p-0.5">
-                    @foreach (['jabatan' => 'Daftar Jabatan', 'unit' => 'Per Unit'] as $key => $label)
-                        <button type="button" role="radio" aria-checked="{{ $view === $key ? 'true' : 'false' }}" tabindex="{{ $view === $key ? '0' : '-1' }}" wire:click="setView('{{ $key }}')"
-                            class="px-3 py-1.5 rounded-md text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === $key ? 'bg-primary-600 text-white shadow-2xs' : 'text-surface-600 hover:bg-surface-100' }}">{{ $label }}</button>
-                    @endforeach
-                </div>
+                <x-admin.segmented label="Tampilan jabatan penampungan" :options="['jabatan' => 'Daftar Jabatan', 'unit' => 'Per Unit']" :current="$view" />
                 <x-admin.button size="sm" icon="fas fa-plus" wire:click="openCreate">Tambah Jabatan</x-admin.button>
             </x-slot:actions>
         </x-admin.table.header>

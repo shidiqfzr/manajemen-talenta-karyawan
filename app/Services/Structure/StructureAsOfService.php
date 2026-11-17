@@ -4,6 +4,7 @@ namespace App\Services\Structure;
 
 use App\Models\JobHistory;
 use App\Models\StructureDecree;
+use App\Support\NikMasker;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -185,16 +186,11 @@ class StructureAsOfService
         foreach ($rows as $row) {
             $grouped[$row->unit_kerja][$row->jabatan][] = [
                 'nama' => (string) $row->nama,
-                'nik_masked' => self::maskNik((string) $row->employee_nik),
+                'nik_masked' => NikMasker::mask((string) $row->employee_nik),
                 'status_penugasan' => $row->status_penugasan,
             ];
         }
 
         return $grouped;
-    }
-
-    private static function maskNik(string $nik): string
-    {
-        return str_repeat('*', max(strlen($nik) - 3, 0)).substr($nik, -3);
     }
 }

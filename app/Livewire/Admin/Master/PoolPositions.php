@@ -3,12 +3,12 @@
 namespace App\Livewire\Admin\Master;
 
 use App\Exceptions\FormasiRuleViolationException;
+use App\Livewire\Concerns\WithCollectionTable;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Services\Formasi\MasterFormasiService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -25,6 +25,7 @@ use Livewire\WithPagination;
  */
 class PoolPositions extends Component
 {
+    use WithCollectionTable;
     use WithPagination;
 
     public const VIEW_JABATAN = 'jabatan';
@@ -379,11 +380,7 @@ class PoolPositions extends Component
             ? $jabatan->filter(fn (object $r) => $matches($r, ['nama', 'jenis_label', 'rm_level']))->values()
             : $unitRows->filter(fn (object $r) => $matches($r, ['unit_nama', 'nama', 'jenis_label']))->values();
 
-        $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $this->perPage)));
-        if ($page !== $this->getPage()) {
-            $this->setPage($page);
-        }
-        $paginator = new LengthAwarePaginator($rows->forPage($page, $this->perPage)->values(), $rows->count(), $this->perPage, $page);
+        $paginator = $this->paginateCollection($rows);
 
         return view('livewire.admin.master.pool-positions', [
             'rows' => $paginator,
@@ -521,16 +518,5 @@ class PoolPositions extends Component
     private function authorizeAdmin(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
-    }
-
-    /** @return array<int, int> Opsi baris per halaman; satu standar untuk seluruh tabel (config hris.pagination). */
-    protected function perPageOptions(): array
-    {
-        return array_map('intval', config('hris.pagination.options'));
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return (int) config('hris.pagination.default');
     }
 }

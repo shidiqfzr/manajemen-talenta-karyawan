@@ -3,12 +3,12 @@
 namespace App\Livewire\Admin\Master;
 
 use App\Exports\FormasiExport;
+use App\Livewire\Concerns\WithCollectionTable;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Services\JobVacancyService;
 use App\Support\DataTable\Filter;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class FormasiDistribution extends Component
 {
+    use WithCollectionTable;
     use WithPagination;
 
     public const VIEW_JABATAN = 'jabatan';
@@ -198,12 +199,7 @@ class FormasiDistribution extends Component
 
         $rows = $this->sorted($this->view === self::VIEW_JABATAN ? $this->distribution($service) : $this->seats($service));
 
-        $page = max(1, min($this->getPage(), (int) ceil($rows->count() / $this->perPage)));
-        if ($page !== $this->getPage()) {
-            // Simpan halaman yang sebenarnya ditampilkan, agar "Sebelumnya" dan "Berikutnya" bergerak dari sana.
-            $this->setPage($page);
-        }
-        $paginator = new LengthAwarePaginator($rows->forPage($page, $this->perPage)->values(), $rows->count(), $this->perPage, $page);
+        $paginator = $this->paginateCollection($rows);
 
         $filterValues = $this->activeFilterValues($service);
 
@@ -313,9 +309,7 @@ class FormasiDistribution extends Component
             $this->view = self::VIEW_JABATAN;
         }
 
-        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = $this->defaultPerPage();
-        }
+        $this->perPage = $this->normalisedPerPage();
 
         if (! in_array($this->sortField, self::SORTABLE[$this->view], true)) {
             $this->sortField = '';
@@ -335,16 +329,5 @@ class FormasiDistribution extends Component
     private function authorizeAdmin(): void
     {
         abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
-    }
-
-    /** @return array<int, int> Opsi baris per halaman; satu standar untuk seluruh tabel (config hris.pagination). */
-    protected function perPageOptions(): array
-    {
-        return array_map('intval', config('hris.pagination.options'));
-    }
-
-    protected function defaultPerPage(): int
-    {
-        return (int) config('hris.pagination.default');
     }
 }

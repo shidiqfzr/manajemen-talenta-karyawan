@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Tables;
 
+use App\Livewire\Concerns\WithCollectionTable;
 use App\Services\JobVacancyService;
 use App\Support\DataTable\Filter;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -19,6 +19,7 @@ use Livewire\WithPagination;
  */
 class JobVacancyTable extends Component
 {
+    use WithCollectionTable;
     use WithPagination;
 
     private const SEARCH_MAX_LENGTH = 100;
@@ -62,7 +63,7 @@ class JobVacancyTable extends Component
         }
 
         $this->search = $this->normaliseSearch($this->search);
-        $this->normalisePerPage();
+        $this->perPage = $this->normalisedPerPage();
         $this->normaliseSort();
 
         foreach ($this->filters() as $filter) {
@@ -75,7 +76,7 @@ class JobVacancyTable extends Component
         if ($property === 'search') {
             $this->search = $this->normaliseSearch($this->search);
         } elseif ($property === 'perPage') {
-            $this->normalisePerPage();
+            $this->perPage = $this->normalisedPerPage();
         } elseif ($property === 'sortField' || $property === 'sortDirection') {
             $this->normaliseSort();
         } else {
@@ -127,12 +128,6 @@ class JobVacancyTable extends Component
         }
 
         $this->resetPage();
-    }
-
-    /** @return array<int, int> */
-    protected function perPageOptions(): array
-    {
-        return array_map('intval', config('hris.pagination.options'));
     }
 
     /** @return array<string, string> [filter property => value] for filters that are set and allowed. */
@@ -193,7 +188,7 @@ class JobVacancyTable extends Component
         foreach ($this->filters() as $filter) {
             $this->normaliseFilter($filter);
         }
-        $this->normalisePerPage();
+        $this->perPage = $this->normalisedPerPage();
         $this->normaliseSort();
 
         $baseVacancies = $service->filterVacancies(
@@ -215,17 +210,7 @@ class JobVacancyTable extends Component
             : $baseVacancies;
         $filteredVacancies = $this->sortVacancies($filteredVacancies);
 
-        // In-memory pagination
-        $currentPage = $this->getPage();
-        $items = $filteredVacancies->slice(($currentPage - 1) * $this->perPage, $this->perPage)->values();
-
-        $paginatedVacancies = new LengthAwarePaginator(
-            $items,
-            $filteredVacancies->count(),
-            $this->perPage,
-            $currentPage,
-            ['path' => request()->url(), 'query' => request()->query()]
-        );
+        $paginatedVacancies = $this->paginateCollection($filteredVacancies);
 
         return view('livewire.tables.job-vacancy-table', [
             'vacancies' => $paginatedVacancies,
@@ -259,13 +244,6 @@ class JobVacancyTable extends Component
     private function normaliseSearch(string $search): string
     {
         return mb_substr(trim($search), 0, self::SEARCH_MAX_LENGTH);
-    }
-
-    private function normalisePerPage(): void
-    {
-        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = (int) config('hris.pagination.default');
-        }
     }
 
     /** A tampered sort column or direction falls back to the default order. */

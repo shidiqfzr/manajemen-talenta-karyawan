@@ -121,12 +121,7 @@
                     search-placeholder="Cari unit, wilayah, jabatan, atau nama pemangku..." />
                 <x-admin.table.header :title="$view === 'unit' ? 'Struktur per Unit' : 'Daftar Jabatan'" :paginator="$rows" :noun="$view === 'unit' ? 'Unit' : 'Jabatan'" :export="true">
                     <x-slot:actions>
-                        <div class="inline-flex rounded-lg border border-surface-200 overflow-hidden" role="group" aria-label="Tampilan tabel">
-                            @foreach (['jabatan' => 'Per Jabatan', 'unit' => 'Per Unit'] as $key => $label)
-                                <button type="button" wire:key="view-{{ $key }}" wire:click="$set('view', '{{ $key }}')" aria-pressed="{{ $view === $key ? 'true' : 'false' }}"
-                                    class="px-3 py-1.5 text-xs font-semibold cursor-pointer transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset {{ $view === $key ? 'bg-primary-600 text-white' : 'bg-white text-surface-700 hover:bg-surface-50' }}">{{ $label }}</button>
-                            @endforeach
-                        </div>
+                        <x-admin.segmented label="Tampilan tabel" :options="['jabatan' => 'Per Jabatan', 'unit' => 'Per Unit']" :current="$view" />
                     </x-slot:actions>
                 </x-admin.table.header>
 

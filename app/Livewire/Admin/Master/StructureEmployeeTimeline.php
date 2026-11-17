@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Master;
 
 use App\Models\Employee;
 use App\Services\Structure\EmployeePositionTimelineService;
+use App\Support\NikMasker;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -67,7 +68,7 @@ class StructureEmployeeTimeline extends Component
 
         return $employee === null ? null : [
             'nama' => $employee->nama,
-            'nik_masked' => str_repeat('*', max(strlen($employee->nik) - 3, 0)).substr($employee->nik, -3),
+            'nik_masked' => NikMasker::mask($employee->nik),
             'jabatan' => $employee->jabatan,
             'unit_kerja' => $employee->unit_kerja,
         ];

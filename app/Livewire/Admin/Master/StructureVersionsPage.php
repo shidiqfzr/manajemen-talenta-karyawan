@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Master;
 
 use App\Exports\FormasiExport;
+use App\Livewire\Concerns\WithCollectionTable;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\StructureDecree;
@@ -30,6 +31,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class StructureVersionsPage extends Component
 {
+    use WithCollectionTable;
     use WithPagination;
 
     public const TABS = ['struktur', 'karyawan'];
@@ -122,6 +124,12 @@ class StructureVersionsPage extends Component
         $this->tab = in_array($this->tab, self::TABS, true) ? $this->tab : 'struktur';
     }
 
+    public function setView(string $view): void
+    {
+        $this->view = in_array($view, self::VIEWS, true) ? $view : $this->view;
+        $this->resetPage();
+    }
+
     public function updatedView(): void
     {
         $this->view = in_array($this->view, self::VIEWS, true) ? $this->view : 'jabatan';
@@ -155,15 +163,6 @@ class StructureVersionsPage extends Component
     public function updatedIsiFilter(): void
     {
         $this->normaliseFilters();
-        $this->resetPage();
-    }
-
-    public function updatedPerPage(): void
-    {
-        if (! in_array($this->perPage, $this->perPageOptions(), true)) {
-            $this->perPage = $this->defaultPerPage();
-        }
-
         $this->resetPage();
     }
 
@@ -299,7 +298,7 @@ class StructureVersionsPage extends Component
     #[Computed]
     public function pagedRows(): LengthAwarePaginator
     {
-        return $this->paginate($this->view === 'unit' ? $this->groupedUnits : $this->filteredRows);
+        return $this->paginateCollection($this->view === 'unit' ? $this->groupedUnits : $this->filteredRows);
     }
 
     public function hasActiveFilters(): bool
@@ -376,15 +375,6 @@ class StructureVersionsPage extends Component
         ]);
     }
 
-    /** @param Collection<int, mixed> $items */
-    private function paginate(Collection $items): LengthAwarePaginator
-    {
-        $perPage = in_array($this->perPage, $this->perPageOptions(), true) ? $this->perPage : $this->defaultPerPage();
-        $page = max(1, min($this->getPage(), (int) ceil($items->count() / $perPage)));
-
-        return new LengthAwarePaginator($items->forPage($page, $perPage)->values(), $items->count(), $perPage, $page);
-    }
-
     private function afterTimeChange(): void
     {
         $this->syncVersion();
@@ -434,16 +424,5 @@ class StructureVersionsPage extends Component
     private function normaliseSearch(): void
     {
         $this->search = mb_substr(trim($this->search), 0, self::SEARCH_MAX_LENGTH);
-    }
-
-    /** @return array<int, int> */
-    private function perPageOptions(): array
-    {
-        return array_map('intval', config('hris.pagination.options'));
-    }
-
-    private function defaultPerPage(): int
-    {
-        return (int) config('hris.pagination.default');
     }
 }

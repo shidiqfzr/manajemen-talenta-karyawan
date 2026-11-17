@@ -5,6 +5,7 @@ namespace App\Services\Structure;
 use App\Models\Employee;
 use App\Models\JobHistory;
 use App\Models\StructureDecree;
+use App\Support\NikMasker;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 
@@ -41,7 +42,7 @@ class EmployeePositionTimelineService
             ->map(fn (Employee $employee): array => [
                 'token' => Crypt::encryptString($employee->nik),
                 'nama' => $employee->nama,
-                'nik_masked' => self::maskNik($employee->nik),
+                'nik_masked' => NikMasker::mask($employee->nik),
                 'jabatan' => $employee->jabatan,
                 'unit_kerja' => $employee->unit_kerja,
             ])
@@ -105,10 +106,5 @@ class EmployeePositionTimelineService
                 ];
             })
             ->all();
-    }
-
-    private static function maskNik(string $nik): string
-    {
-        return str_repeat('*', max(strlen($nik) - 3, 0)).substr($nik, -3);
     }
 }
