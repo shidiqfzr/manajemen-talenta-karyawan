@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\StructureDecree;
 use App\Models\User;
 use App\Services\Structure\StructureDecreeService;
+use App\Services\Structure\StructureReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -297,6 +298,58 @@ class StructureDecreeScreensTest extends TestCase
             ->assertSee('Ganti nama jabatan');
 
         $this->assertSame(['Asisten Pemetaan' => 'Asisten Pemetaan & Survei'], $decree->fresh()->unit_mapping['positions']);
+    }
+
+    public function test_detail_follows_the_shared_layout_with_summary_timeline_and_file_verification(): void
+    {
+        $decree = $this->submitted($this->changedRows(), '2026-12-01');
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $decree])
+            ->assertSee('Ringkasan SK')
+            ->assertSee('Jumlah Perubahan')
+            ->assertSee('Total Kuota')
+            ->assertSee('Jejak Keputusan')
+            ->assertSeeInOrder(['Diajukan', 'Menunggu persetujuan'])
+            ->assertSee('Verifikasi Berkas')
+            ->assertSee('Kode Verifikasi Berkas')
+            ->assertSee('Unduh Lampiran SK')
+            ->assertSee('Keputusan');
+    }
+
+    public function test_the_timeline_records_a_rejection_with_its_reason_and_actor(): void
+    {
+        $decree = $this->submitted($this->changedRows(), '2026-12-01');
+        $checker = User::factory()->create(['role' => 'admin', 'name' => 'Penyetuju Dua']);
+        $this->service->reject($decree, $checker, 'Lampiran belum sesuai SK asli.');
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $decree->fresh()])
+            ->assertSeeInOrder(['Jejak Keputusan', 'Diajukan', 'Ditolak', 'Penyetuju Dua', 'Lampiran belum sesuai SK asli.'])
+            ->assertDontSee('Menunggu persetujuan');
+    }
+
+    public function test_the_baseline_summary_takes_its_totals_from_the_stored_snapshot(): void
+    {
+        $baseline = StructureDecree::create([
+            'sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'Baseline', 'sk_date' => '2026-09-01', 'effective_date' => '2026-09-01',
+            'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'baseline:database/data/master_formasi.json', 'source_sha256' => str_repeat('a', 64),
+            'snapshot' => app(StructureReader::class)->current(),
+        ]);
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $baseline])
+            ->assertSee('SK dasar instalasi')
+            ->assertSeeInOrder(['Unit', '2', 'Formasi Jabatan', '4', 'Total Kuota', '5']);
+    }
+
+    public function test_detail_follows_the_shared_layout_for_a_failed_decree_too(): void
+    {
+        $decree = $this->submitted($this->changedRows(), '2026-12-01');
+        $decree->update(['status' => StructureDecree::STATUS_FAILED, 'failure_message' => 'Nama unit sudah dipakai unit lain.']);
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeDetail::class, ['decree' => $decree->fresh()])
+            ->assertSee('Penerapan SK gagal')
+            ->assertSee('Nama unit sudah dipakai unit lain.')
+            ->assertSee('Terapkan Ulang')
+            ->assertSee('Batalkan SK');
     }
 
     public function test_detail_hides_approval_from_the_submitter_when_four_eyes_is_on(): void
