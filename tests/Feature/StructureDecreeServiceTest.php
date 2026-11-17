@@ -20,24 +20,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Concerns\CreatesStructureFixtures;
 use Tests\TestCase;
 
 class StructureDecreeServiceTest extends TestCase
 {
+    use CreatesStructureFixtures;
     use RefreshDatabase;
-
-    private const HEADERS = ['No', 'Unit/Bagian', 'Sub Bagian', 'Jabatan', 'Strata RM', 'Bidang', 'Kuota', 'Keterangan'];
-
-    private const RO = 'Regional Office (Kantor Direksi Pontianak)';
 
     private StructureDecreeService $service;
 
     private User $admin;
-
-    /** @var list<string> */
-    private array $tempFiles = [];
 
     protected function setUp(): void
     {
@@ -53,48 +46,14 @@ class StructureDecreeServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach ($this->tempFiles as $file) {
-            @unlink($file);
-        }
+        $this->cleanUpWorkbooks();
         parent::tearDown();
-    }
-
-    private function seat(Unit $unit, string $nama, string $rm, string $bidang, int $kuota): void
-    {
-        $position = Position::firstOrCreate(['nama' => $nama], ['level' => in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true) ? 'Karpim' : 'Karpel', 'rm_level' => $rm, 'is_active' => true]);
-        DB::table('position_unit')->insert(['unit_id' => $unit->id, 'position_id' => $position->id, 'kuota' => $kuota, 'bidang' => $bidang, 'created_at' => now(), 'updated_at' => now()]);
-    }
-
-    private function baseStructure(): void
-    {
-        $tanaman = Unit::create(['nama' => 'Bagian Tanaman', 'kode' => 'Bagian', 'wilayah' => self::RO, 'is_active' => true, 'urutan' => 1]);
-        $tajati = Unit::create(['nama' => 'Kebun Tajati', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => true, 'urutan' => 2]);
-        $this->seat($tanaman, 'Kepala Bagian', 'RM-1', 'TAN', 1);
-        $this->seat($tanaman, 'Asisten Pemetaan', 'RM-3', 'TAN', 2);
-        $this->seat($tajati, 'Kepala Bagian', 'RM-1', 'TAN', 1);
-        $this->seat($tajati, 'Manajer', 'RM-1', 'TAN', 1);
-    }
-
-    /** Workbook rows [unit, jabatan, rm, bidang, kuota] in the 8-column format. */
-    private function upload(array $rows, ?array $headers = null): UploadedFile
-    {
-        $sheet = new Spreadsheet;
-        $sheet->getActiveSheet()->fromArray(
-            [$headers ?? self::HEADERS, ...array_map(fn (array $r, int $i) => [$i + 1, $r[0], '-', $r[1], $r[2], $r[3], $r[4], null], $rows, array_keys($rows))],
-            null,
-            'A1'
-        );
-        $path = tempnam(sys_get_temp_dir(), 'sk').'.xlsx';
-        (new Xlsx($sheet))->save($path);
-        $this->tempFiles[] = $path;
-
-        return new UploadedFile($path, 'lampiran.xlsx', null, null, true);
     }
 
     /** Workbook equal to the base structure, with Asisten Pemetaan changed to a quota of 3. */
     private function changedWorkbook(): UploadedFile
     {
-        return $this->upload([
+        return $this->uploadWorkbook([
             ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
             ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 3],
         ]);
@@ -173,7 +132,7 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_wrong_headers_or_non_xlsx_are_rejected_with_a_message_and_store_nothing(): void
     {
-        $this->assertDecreeError(fn () => $this->service->createDraft($this->data(), $this->upload([['Bagian Tanaman', 'X', 'RM 1', 'TAN', 1]], ['A', 'B']), null, $this->admin), 'Judul kolom');
+        $this->assertDecreeError(fn () => $this->service->createDraft($this->data(), $this->uploadWorkbook([['Bagian Tanaman', 'X', 'RM 1', 'TAN', 1]], ['A', 'B']), null, $this->admin), 'Judul kolom');
         $this->assertDecreeError(fn () => $this->service->createDraft($this->data(), UploadedFile::fake()->create('lampiran.pdf', 10, 'application/pdf'), null, $this->admin), '.xlsx');
 
         $this->assertSame(0, StructureDecree::count());
@@ -189,7 +148,7 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_identical_workbook_blocks_submission_with_a_no_changes_message(): void
     {
-        $decree = $this->service->createDraft($this->data(), $this->upload([
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([
             ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
             ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 2],
         ]), null, $this->admin);
@@ -200,7 +159,7 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_update_review_applies_mapping_and_closing_to_the_diff(): void
     {
-        $decree = $this->service->createDraft($this->data(), $this->upload([
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([
             ['Kebun Tajati Baru', 'Kepala Bagian', 'RM 1', 'TAN', 1],
             ['Kebun Tajati Baru', 'Manajer', 'RM 1', 'TAN', 1],
         ]), null, $this->admin);
@@ -217,20 +176,20 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_new_units_need_kode_and_a_known_wilayah_before_submission(): void
     {
-        $decree = $this->service->createDraft($this->data(), $this->upload([['Kebun Baru', 'Manajer', 'RM 1', 'TAN', 1]]), null, $this->admin);
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([['Kebun Baru', 'Manajer', 'RM 1', 'TAN', 1]]), null, $this->admin);
 
         $this->assertStringContainsString('Kebun Baru', implode(' ', $this->service->blockers($decree)));
 
         $decree = $this->service->updateReview($decree, [], [], ['Kebun Baru' => ['kode' => 'Kebun', 'wilayah' => 'Mars', 'urutan' => 9]], [], $this->admin);
         $this->assertStringContainsString('wilayah', implode(' ', $this->service->blockers($decree)));
 
-        $decree = $this->service->updateReview($decree, [], [], ['Kebun Baru' => ['kode' => 'Kebun', 'wilayah' => self::RO, 'urutan' => 9]], [], $this->admin);
+        $decree = $this->service->updateReview($decree, [], [], ['Kebun Baru' => ['kode' => 'Kebun', 'wilayah' => self::REGIONAL_OFFICE, 'urutan' => 9]], [], $this->admin);
         $this->assertSame([], $this->service->blockers($decree));
     }
 
     public function test_position_rename_is_blocked_when_the_position_is_used_outside_the_workbook(): void
     {
-        $decree = $this->service->createDraft($this->data(), $this->upload([
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([
             ['Bagian Tanaman', 'Kepala Bagian Tanaman', 'RM 1', 'TAN', 1],
             ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 2],
         ]), null, $this->admin);
@@ -250,7 +209,7 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_submit_is_blocked_while_blockers_exist(): void
     {
-        $decree = $this->service->createDraft($this->data(), $this->upload([
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([
             ['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1],
             ['Bagian Tanaman', 'Asisten Pemetaan', 'RM 3', 'TAN', 2],
         ]), null, $this->admin);
@@ -354,7 +313,7 @@ class StructureDecreeServiceTest extends TestCase
      */
     private function approvedDecree(array $rows, array $choices = [], ?User $approver = null): StructureDecree
     {
-        $decree = $this->service->createDraft($this->data(['effective_date' => $choices['effective'] ?? '2026-09-01']), $this->upload($rows), null, $this->admin);
+        $decree = $this->service->createDraft($this->data(['effective_date' => $choices['effective'] ?? '2026-09-01']), $this->uploadWorkbook($rows), null, $this->admin);
         $decree = $this->service->updateReview($decree, $choices['mapping'] ?? [], $choices['closed'] ?? [], $choices['new_units'] ?? [], $choices['positions'] ?? [], $this->admin);
 
         return $this->service->approve($this->service->submit($decree, $this->admin), $approver ?? $this->admin);
@@ -362,8 +321,8 @@ class StructureDecreeServiceTest extends TestCase
 
     public function test_apply_reproduces_the_workbook_structure_and_leaves_uncovered_units_alone(): void
     {
-        $lain = Unit::create(['nama' => 'Bagian Lain', 'kode' => 'Bagian', 'wilayah' => self::RO, 'is_active' => true, 'urutan' => 3]);
-        $this->seat($lain, 'Kepala Lain', 'RM-1', 'UMU', 1);
+        $lain = Unit::create(['nama' => 'Bagian Lain', 'kode' => 'Bagian', 'wilayah' => self::REGIONAL_OFFICE, 'is_active' => true, 'urutan' => 3]);
+        $this->seatRow($lain, 'Kepala Lain', 'RM-1', 'UMU', 1);
         $before = app(StructureReader::class)->current()['units']['Bagian Lain'];
 
         $rows = [
@@ -377,7 +336,7 @@ class StructureDecreeServiceTest extends TestCase
         ];
         $decree = $this->approvedDecree($rows, [
             'mapping' => ['Kebun Tajati' => 'Kebun Tajati Baru'],
-            'new_units' => ['Kebun Kemitraan' => ['kode' => 'Kebun', 'wilayah' => self::RO, 'urutan' => 10]],
+            'new_units' => ['Kebun Kemitraan' => ['kode' => 'Kebun', 'wilayah' => self::REGIONAL_OFFICE, 'urutan' => 10]],
         ]);
 
         $this->assertSame(StructureDecree::STATUS_APPLIED, $decree->status);
@@ -459,7 +418,7 @@ class StructureDecreeServiceTest extends TestCase
     public function test_apply_reactivates_an_inactive_unit_listed_in_the_workbook(): void
     {
         $tidur = Unit::create(['nama' => 'Kebun Tidur', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => false, 'urutan' => 6]);
-        $this->seat($tidur, 'Manajer', 'RM-1', 'TAN', 1);
+        $this->seatRow($tidur, 'Manajer', 'RM-1', 'TAN', 1);
 
         $this->approvedDecree([['Kebun Tidur', 'Manajer', 'RM 1', 'TAN', 2]]);
 
@@ -615,7 +574,7 @@ class StructureDecreeServiceTest extends TestCase
         Employee::factory()->count(2)->create(['unit_kerja' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan']);
         $other = Employee::factory()->create(['unit_kerja' => 'Kebun Tajati', 'jabatan' => 'Manajer']);
         JobHistory::create(['employee_nik' => $other->nik, 'jabatan' => 'Asisten Pemetaan', 'unit_kerja' => 'Bagian Tanaman', 'tmt_awal' => '2026-12-01', 'is_applied' => false]);
-        $decree = $this->service->createDraft($this->data(), $this->upload([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]]), null, $this->admin);
+        $decree = $this->service->createDraft($this->data(), $this->uploadWorkbook([['Bagian Tanaman', 'Kepala Bagian', 'RM 1', 'TAN', 1]]), null, $this->admin);
 
         $impact = $this->service->impact($decree);
 

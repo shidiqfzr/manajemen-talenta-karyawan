@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController
 use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\JobVacancyController;
 use App\Http\Controllers\Admin\Master\PositionController;
+use App\Http\Controllers\Admin\Master\StructureDecreeDownloadController;
 use App\Http\Controllers\Admin\Master\UnitController;
 use App\Http\Controllers\Admin\MutasiController;
 use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\DataController;
 use App\Http\Controllers\User\EmployeeController as UserEmployeeController;
 use App\Http\Controllers\User\TrainingController as UserTrainingController;
 use App\Models\Employee;
+use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Services\ManPowerPlanningService;
 use Illuminate\Http\Request;
@@ -171,6 +173,13 @@ Route::prefix('admin')
 
             // Riwayat perubahan master (read-only)
             Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');
+
+            // Surat Keputusan (SK) struktur organisasi: daftar, buat, tinjau, detail, unduh berkas
+            Route::view('sk', 'admin.master.sk.index')->name('sk.index');
+            Route::view('sk/baru', 'admin.master.sk.create')->name('sk.create');
+            Route::get('sk/{decree}/tinjau', fn (StructureDecree $decree) => view('admin.master.sk.create', ['decree' => $decree]))->name('sk.review');
+            Route::get('sk/{decree}/unduh/{berkas}', StructureDecreeDownloadController::class)->name('sk.download');
+            Route::get('sk/{decree}', fn (StructureDecree $decree) => view('admin.master.sk.show', ['decree' => $decree]))->name('sk.show');
 
             // Formasi (formasi jabatan per unit)
             // Daftar unit; tautan lama ?unit= diteruskan ke halaman detail unit.

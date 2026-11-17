@@ -17,6 +17,12 @@ final class HrisPermission
     /** Approve or reject proposals, or issue the SK directly when approval is not required. */
     public const MUTASI_APPROVE = 'mutasi.approve';
 
+    /** Draft, review, submit and cancel organisation structure decrees (SK). */
+    public const STRUKTUR_PREPARE = 'struktur.prepare';
+
+    /** Approve or reject organisation structure decrees (SK). */
+    public const STRUKTUR_APPROVE = 'struktur.approve';
+
     /** Register every configured permission as a Gate ability. */
     public static function register(): void
     {

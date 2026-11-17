@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\EmployeeImportLog;
 use App\Models\MutasiChainProposal;
+use App\Models\StructureDecree;
 use App\Models\User;
 use App\Services\NotificationCenterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -54,6 +55,27 @@ class NotificationCenterServiceTest extends TestCase
 
         $this->assertContains('usulan', $this->keys($admin));
         $this->assertNotContains('usulan', $this->keys($staff));
+    }
+
+    public function test_submitted_decrees_are_shown_to_approvers_and_stale_or_failed_ones_need_attention(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $staff = User::factory()->create(['role' => 'user']);
+        $decree = fn (string $number, string $status) => StructureDecree::create(['sk_number' => $number, 'title' => 'SK', 'sk_date' => '2026-09-01', 'effective_date' => '2026-09-01', 'status' => $status, 'source_path' => 'x', 'source_sha256' => str_repeat('a', 64)]);
+
+        $this->assertNotContains('sk-struktur', $this->keys($admin));
+
+        $submitted = $decree('A/1', StructureDecree::STATUS_SUBMITTED);
+        $item = collect(app(NotificationCenterService::class)->itemsFor($admin))->firstWhere('key', 'sk-struktur');
+        $this->assertSame(1, $item['count']);
+        $this->assertSame(route('admin.master.sk.show', $submitted), $item['url']);
+        $this->assertNotContains('sk-struktur', $this->keys($staff));
+
+        $submitted->update(['status' => StructureDecree::STATUS_STALE]);
+        $this->assertContains('sk-struktur-tindakan', $this->keys($admin));
+        $submitted->update(['status' => StructureDecree::STATUS_FAILED]);
+        $this->assertContains('sk-struktur-tindakan', $this->keys($admin));
+        $this->assertNotContains('sk-struktur-tindakan', $this->keys($staff));
     }
 
     public function test_only_employees_entering_mbt_within_the_warning_window_are_counted(): void

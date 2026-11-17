@@ -8,6 +8,7 @@
         ['label' => 'Formasi', 'route' => 'admin.master.formasi.index', 'match' => 'admin.master.formasi.*', 'icon' => 'fa-table-list'],
         ['label' => 'Sebaran Formasi', 'route' => 'admin.master.sebaran.index', 'match' => 'admin.master.sebaran.*', 'icon' => 'fa-table-cells'],
         ['label' => 'Jabatan Penampungan', 'route' => 'admin.master.penampungan.index', 'match' => 'admin.master.penampungan.*', 'icon' => 'fa-user-tag'],
+        ['label' => 'Surat Keputusan', 'route' => 'admin.master.sk.index', 'match' => 'admin.master.sk.*', 'icon' => 'fa-file-signature'],
         ['label' => 'Riwayat Perubahan', 'route' => 'admin.master.riwayat.index', 'match' => 'admin.master.riwayat.*', 'icon' => 'fa-clock-rotate-left'],
     ];
 @endphp

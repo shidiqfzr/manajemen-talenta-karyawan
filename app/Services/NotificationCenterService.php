@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\EmployeeImportLog;
 use App\Models\MutasiChainProposal;
+use App\Models\StructureDecree;
 use App\Models\User;
 use App\Support\HrisPermission;
 use Illuminate\Support\Facades\Gate;
@@ -45,6 +46,34 @@ class NotificationCenterService
                     'count' => $pendingProposals,
                     'icon' => 'fas fa-diagram-project',
                     'url' => route('admin.mutasi.index', ['tab' => 'usulan']),
+                ];
+            }
+        }
+
+        if (Gate::forUser($user)->allows(HrisPermission::STRUKTUR_APPROVE)) {
+            $submitted = StructureDecree::query()->where('status', StructureDecree::STATUS_SUBMITTED)->orderBy('id')->get();
+            if ($submitted->isNotEmpty()) {
+                $items[] = [
+                    'key' => 'sk-struktur',
+                    'title' => 'SK Struktur Organisasi Menunggu Persetujuan',
+                    'detail' => $submitted->count().' SK struktur organisasi menunggu keputusan Anda.',
+                    'count' => $submitted->count(),
+                    'icon' => 'fas fa-file-signature',
+                    'url' => $submitted->count() === 1 ? route('admin.master.sk.show', $submitted->first()) : route('admin.master.sk.index'),
+                ];
+            }
+        }
+
+        if (Gate::forUser($user)->allows(HrisPermission::STRUKTUR_PREPARE)) {
+            $attention = StructureDecree::query()->whereIn('status', [StructureDecree::STATUS_STALE, StructureDecree::STATUS_FAILED])->orderBy('id')->get();
+            if ($attention->isNotEmpty()) {
+                $items[] = [
+                    'key' => 'sk-struktur-tindakan',
+                    'title' => 'SK Struktur Organisasi Perlu Tindakan',
+                    'detail' => $attention->count().' SK struktur organisasi perlu ditinjau ulang atau diterapkan ulang.',
+                    'count' => $attention->count(),
+                    'icon' => 'fas fa-triangle-exclamation',
+                    'url' => $attention->count() === 1 ? route('admin.master.sk.show', $attention->first()) : route('admin.master.sk.index'),
                 ];
             }
         }

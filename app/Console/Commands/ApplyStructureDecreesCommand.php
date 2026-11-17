@@ -21,7 +21,7 @@ class ApplyStructureDecreesCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Menerapkan SK struktur organisasi yang sudah disetujui dan tanggal berlakunya telah tiba (DOMAIN.md §3.7)';
+    protected $description = 'Menerapkan SK struktur organisasi yang sudah disetujui dan tanggal berlakunya telah tiba';
 
     public function handle(StructureDecreeService $decrees): int
     {
