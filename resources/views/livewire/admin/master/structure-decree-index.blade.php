@@ -6,7 +6,7 @@
                 <h2 class="text-sm font-bold text-surface-900">Surat Keputusan Struktur</h2>
                 <p class="text-xs text-surface-500">{{ $decrees->count() }} SK tercatat</p>
             </div>
-            <x-admin.button href="{{ route('admin.master.sk.create') }}" icon="fas fa-plus" wire:navigate>Buat SK Baru</x-admin.button>
+            <x-admin.button href="{{ route('admin.master.sk.create') }}" icon="fas fa-plus" wire:navigate>Catat SK dari Holding</x-admin.button>
         </div>
 
         <div class="overflow-x-auto">

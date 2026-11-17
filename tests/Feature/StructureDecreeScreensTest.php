@@ -82,7 +82,29 @@ class StructureDecreeScreensTest extends TestCase
             ->assertSee('DPSB/SKPTS/352/IX/2026')
             ->assertSee('Perubahan Struktur Organisasi Region Office')
             ->assertSee('Draf')
-            ->assertSee('Buat SK Baru');
+            ->assertSee('Catat SK dari Holding');
+    }
+
+    public function test_the_form_explains_the_holding_sk_and_offers_the_template(): void
+    {
+        $this->actingAs($this->admin)->get(route('admin.master.sk.create'))
+            ->assertOk()
+            ->assertSee('Catat &amp; Terapkan SK Struktur', false)
+            ->assertSee('diterbitkan Holding')
+            ->assertSee('Unduh Template Lampiran')
+            ->assertSee('Cara menyiapkan lampiran');
+
+        Livewire::actingAs($this->admin)->test(StructureDecreeWizard::class)
+            ->assertSee('Unduh Template Lampiran')
+            ->assertSee('Cara menyiapkan lampiran');
+    }
+
+    public function test_template_downloads_for_admins_only(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $this->actingAs($this->admin)->get(route('admin.master.sk.template'))->assertOk()->assertDownload('template-struktur-organisasi.xlsx');
+        $this->actingAs($user)->get(route('admin.master.sk.template'))->assertForbidden();
     }
 
     public function test_wizard_creates_a_draft_and_shows_the_review_with_the_diff(): void

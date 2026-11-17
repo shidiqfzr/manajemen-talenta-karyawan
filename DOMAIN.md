@@ -247,7 +247,7 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 
 ### 3.7 Tata Kelola Revisi Struktur Organisasi (Surat Keputusan)
 
-Struktur organisasi berubah melalui Surat Keputusan (SK) Direksi yang berlaku pada tanggal tertentu. Basis data adalah sumber kebenaran struktur; berkas Excel lampiran SK dan `master_formasi.json` hanya masukan (baseline instalasi baru), bukan cara menerapkan SK pada basis data yang dipertahankan.
+Struktur organisasi berubah melalui Surat Keputusan (SK) Direksi yang berlaku pada tanggal tertentu. **SK struktur diterbitkan oleh Holding; PTPN IV Regional V tidak menerbitkannya, melainkan mencatat SK yang sudah diterima dan menerapkan perubahannya** (layar "Catat SK dari Holding"). Lampiran SK disiapkan dari **template** yang diunduh dari layar yang sama: berkas Excel berisi struktur saat ini dalam format unggahan (`StructureTemplateBuilder`), yang disesuaikan dengan Lampiran SK dari Holding (ubah kuota atau bidang, tambah baris, hapus baris); template yang diunggah tanpa perubahan menghasilkan selisih kosong, dan template tidak memuat data pribadi karyawan. Basis data adalah sumber kebenaran struktur; berkas Excel lampiran SK dan `master_formasi.json` hanya masukan (baseline instalasi baru), bukan cara menerapkan SK pada basis data yang dipertahankan.
 
 **Aturan baku**
 1. Setiap perubahan struktur (unit, jabatan, Formasi Jabatan, kuota, bidang, RM Band) wajib merujuk satu SK: nomor, tanggal SK, dan tanggal berlaku. Nomor SK disimpan ternormalisasi tanpa spasi di sekitar garis miring (`DPSB/SKPTS/ 352 /IX/2026` menjadi `DPSB/SKPTS/352/IX/2026`) dan tidak boleh ganda di antara SK yang masih berlaku (nomor SK yang ditolak atau dibatalkan boleh dipakai lagi).

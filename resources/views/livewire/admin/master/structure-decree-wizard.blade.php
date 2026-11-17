@@ -18,6 +18,27 @@
     @enderror
 
     @if ($step === 1)
+        {{-- Panduan: SK struktur diterbitkan Holding; Regional V mencatat dan menerapkannya (DESIGN.md §8.5a). --}}
+        <section class="rounded-2xl border border-primary-200 bg-primary-50/60 p-5 sm:p-6 space-y-3" aria-labelledby="panduan-title">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 id="panduan-title" class="text-sm font-bold text-primary-900">SK struktur diterbitkan Holding</h2>
+                    <p class="text-sm text-primary-900/80 mt-0.5">Regional V mencatat SK yang sudah diterima dan menerapkan perubahannya pada struktur organisasi di aplikasi. Isi formulir ini sesuai SK dari Holding.</p>
+                </div>
+                <x-admin.button href="{{ route('admin.master.sk.template') }}" variant="soft" icon="fas fa-download">Unduh Template Lampiran</x-admin.button>
+            </div>
+            <details class="text-sm text-primary-900/90">
+                <summary class="cursor-pointer font-semibold">Cara menyiapkan lampiran</summary>
+                <ol class="mt-2 list-decimal pl-5 space-y-1">
+                    <li>Unduh template. Isinya struktur organisasi saat ini dalam format yang dibaca aplikasi.</li>
+                    <li>Sesuaikan barisnya dengan Lampiran SK dari Holding: ubah kuota, bidang, atau strata; tambah baris untuk formasi jabatan baru; hapus baris untuk formasi yang dihilangkan.</li>
+                    <li>Unit yang tidak diatur SK boleh dihapus dari berkas dan tidak akan diubah. Untuk unit yang tercantum, seluruh jabatannya harus ada.</li>
+                    <li>Simpan sebagai .xlsx lalu unggah di bawah. Aplikasi menampilkan perubahan terhadap struktur saat ini untuk Anda tinjau sebelum SK diajukan.</li>
+                </ol>
+                <p class="mt-2 text-xs text-primary-900/70">Template yang diunggah tanpa perubahan tidak menghasilkan perubahan apa pun. Penjelasan lengkap ada pada lembar "Petunjuk" di dalam template.</p>
+            </details>
+        </section>
+
         <form wire:submit="createDraft" class="space-y-5 bg-white border border-surface-200 rounded-2xl p-5 sm:p-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <x-admin.form.input name="skNumber" label="Nomor SK" wire:model="skNumber" required hint="Contoh: DPSB/SKPTS/352/IX/2026" />
@@ -36,7 +57,7 @@
                     <input id="workbook" type="file" wire:model="workbook" accept=".xlsx" @error('workbook') aria-invalid="true" aria-describedby="workbook-error" @enderror
                         class="block w-full text-sm text-surface-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary-700">
                     <p wire:loading wire:target="workbook" class="text-[11px] text-surface-500 mt-1"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Mengunggah berkas...</p>
-                    <p class="text-[10px] text-surface-500 mt-1">Kolom: No, Unit/Bagian, Sub Bagian, Jabatan, Strata RM, Bidang, Kuota, Keterangan. Maksimal 10 MB.</p>
+                    <p class="text-[10px] text-surface-500 mt-1">Gunakan template di atas dan sesuaikan dengan Lampiran SK dari Holding. Kolom: No, Unit/Bagian, Sub Bagian, Jabatan, Strata RM, Bidang, Kuota, Keterangan. Maksimal 10 MB.</p>
                     @error('workbook') <p id="workbook-error" class="text-danger-700 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
