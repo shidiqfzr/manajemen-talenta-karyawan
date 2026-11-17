@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Training;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -40,7 +41,7 @@ class TrainingsExport implements FromCollection, WithEvents, WithHeadings, WithM
         $this->filters = $filters;
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         if ($this->query !== null) {
             return (clone $this->query)->get();

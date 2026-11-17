@@ -79,7 +79,7 @@ class MutasiHistoryExport implements FromQuery, WithColumnFormatting, WithEvents
     /**
      * Membangun streaming query mutasi terfilter memanfaatkan MutasiService (DRY).
      */
-    public function query()
+    public function query(): Builder
     {
         // A prebuilt query (for example the shared table's filtered rows) takes precedence over $filters.
         if ($this->query !== null) {

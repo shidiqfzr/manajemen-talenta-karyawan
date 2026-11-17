@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -12,7 +13,7 @@ use Maatwebsite\Excel\Concerns\WithTitle;
  * lembar kedua memuat nama pengakses dan waktu unduh karena berkas berisi data pribadi (DESIGN.md §11).
  * Impor hanya membaca lembar pertama.
  */
-class FailedEmployeesWorkbook implements WithMultipleSheets
+class FailedEmployeesWorkbook implements Export, WithMultipleSheets
 {
     public function __construct(
         protected array $failedRows,

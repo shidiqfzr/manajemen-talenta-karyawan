@@ -5,9 +5,10 @@ namespace App\Exports;
 use App\Exports\Sheets\EmployeeTemplateDataSheet;
 use App\Exports\Sheets\EmployeeTemplateFormasiSheet;
 use App\Exports\Sheets\EmployeeTemplateReferenceSheet;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class EmployeeTemplateExport implements WithMultipleSheets
+class EmployeeTemplateExport implements Export, WithMultipleSheets
 {
     /**
      * Mengembalikan multi-sheet workbook:

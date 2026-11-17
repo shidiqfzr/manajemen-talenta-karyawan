@@ -3,7 +3,6 @@
 namespace App\Services\Structure;
 
 use App\Services\Formasi\FormasiExcelParser;
-use App\Support\PhpSpreadsheetGuard;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -23,22 +22,18 @@ class StructureTemplateBuilder
 
     public function build(): Spreadsheet
     {
-        return PhpSpreadsheetGuard::run(function (): Spreadsheet {
-            $book = new Spreadsheet;
-            $this->fillStructureSheet($book);
-            $this->fillInstructionSheet($book);
-            $book->setActiveSheetIndex(0);
+        $book = new Spreadsheet;
+        $this->fillStructureSheet($book);
+        $this->fillInstructionSheet($book);
+        $book->setActiveSheetIndex(0);
 
-            return $book;
-        });
+        return $book;
     }
 
     /** Menyusun dan menulis template ke $target (jalur berkas atau `php://output`). */
     public function writeTo(string $target): void
     {
-        $book = $this->build();
-
-        PhpSpreadsheetGuard::run(fn () => (new Xlsx($book))->save($target));
+        (new Xlsx($this->build()))->save($target);
     }
 
     private function fillStructureSheet(Spreadsheet $book): void

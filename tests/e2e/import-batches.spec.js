@@ -21,7 +21,7 @@ test('daftar menampilkan hasil berlabel, tanggal baku, dan tanpa istilah interna
     await expect(row).toContainText(/65\s*dilewati/);
     await expect(row.getByText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/)).toBeVisible();
     await expect(page.getByText('Persetujuan dua pihak (empat mata) belum diaktifkan.')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Perlu Tindakan/ })).toHaveAttribute('title', /belum diaktifkan/);
+    await expect(page.getByRole('button', { name: /Perlu Tindakan/ })).toHaveAttribute('title', /belum diaktifkan/);
     expect(await page.locator('body').innerText()).not.toMatch(FORBIDDEN_TERMS);
 });
 
@@ -104,20 +104,20 @@ const timelineOf = (page) => page.locator('#timeline-title').locator('xpath=ance
 
 test('tab status menyaring pengajuan dan impor yang sudah ditutup', async ({ page }) => {
     await page.goto('/admin/employees/import/batches', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('link', { name: /Perlu Tindakan\s*2/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Perlu Tindakan\s*2/ })).toBeVisible();
 
-    await page.getByRole('link', { name: /Perlu Tindakan/ }).click();
-    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await page.getByRole('button', { name: /Perlu Tindakan/ }).click();
+    // Hanya tbody data: tbody skeleton (aria-hidden) berisi baris tersembunyi.
+    await expect(page.locator('tbody:not([aria-hidden="true"]) tr')).toHaveCount(2);
     await expect(page.locator('tbody').getByText('Menunggu Persetujuan')).toHaveCount(2);
 
-    await page.getByRole('link', { name: /Ditutup/ }).click();
-    await expect(page.locator('tbody tr')).toHaveCount(3);
+    await page.getByRole('button', { name: /Ditutup/ }).click();
+    await expect(page.locator('tbody:not([aria-hidden="true"]) tr')).toHaveCount(3);
     for (const label of ['Ditolak', 'Kedaluwarsa', 'Dibatalkan']) {
         await expect(page.locator('tbody').getByText(label, { exact: true }).first()).toBeVisible();
     }
 
-    await page.getByRole('searchbox').fill('tidak-ada-berkas-ini');
-    await page.getByRole('button', { name: 'Cari' }).click();
+    await page.getByPlaceholder('Cari berkas atau pengaju...').fill('tidak-ada-berkas-ini');
     await expect(page.getByText(/Tidak ada impor yang cocok dengan filter ini/)).toBeVisible();
 });
 

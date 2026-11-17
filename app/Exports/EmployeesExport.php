@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -64,7 +65,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
      * Membangun query data karyawan dengan dukungan filter pencarian dinamis,
      * eager loading tugas rangkap (concurrentJobs), dan efisiensi memori (chunked query streaming).
      */
-    public function query()
+    public function query(): Builder
     {
         $query = Employee::with(['concurrentJobs']);
 
