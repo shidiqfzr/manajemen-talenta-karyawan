@@ -1,5 +1,5 @@
 {{--
-    Navigasi seksi modul Master Data: satu entri sidebar, dua bagian (masing-masing halaman dengan URL sendiri).
+    Navigasi seksi modul Master Data: satu entri sidebar, beberapa bagian (masing-masing halaman dengan URL sendiri).
     Tampilan mengikuti tab bergaris bawah modul Mutasi; karena setiap bagian adalah halaman terpisah, semantiknya
     <nav> + aria-current="page" (bukan role="tab", yang untuk panel dalam satu halaman).
 --}}
@@ -9,6 +9,7 @@
         ['label' => 'Sebaran Formasi', 'route' => 'admin.master.sebaran.index', 'match' => 'admin.master.sebaran.*', 'icon' => 'fa-table-cells'],
         ['label' => 'Jabatan Penampungan', 'route' => 'admin.master.penampungan.index', 'match' => 'admin.master.penampungan.*', 'icon' => 'fa-user-tag'],
         ['label' => 'Surat Keputusan', 'route' => 'admin.master.sk.index', 'match' => 'admin.master.sk.*', 'icon' => 'fa-file-signature'],
+        ['label' => 'Versi Struktur', 'route' => 'admin.master.versi.index', 'match' => 'admin.master.versi.*', 'icon' => 'fa-code-branch'],
         ['label' => 'Riwayat Perubahan', 'route' => 'admin.master.riwayat.index', 'match' => 'admin.master.riwayat.*', 'icon' => 'fa-clock-rotate-left'],
     ];
 @endphp

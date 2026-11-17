@@ -9,12 +9,13 @@ use App\Models\MasterAuditLog;
 use App\Models\StructureDecree;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Layar "Versi Struktur" (DOMAIN.md §3.7): baca-saja; daftar versi struktur per SK, lalu struktur dan pemangku jabatan
- * pada versi atau tanggal yang dipilih.
+ * Layar "Versi Struktur" (DOMAIN.md §3.7): baca-saja; satu kendali waktu (versi atau tanggal), tabel per jabatan atau per unit,
+ * perbandingan antarversi, dan riwayat jabatan karyawan.
  */
 class StructureVersionsPageTest extends TestCase
 {
@@ -34,7 +35,7 @@ class StructureVersionsPageTest extends TestCase
         $this->first = $this->decree('DPSB/SKPTS/352/IX/2026', '2026-09-01', ['units' => [
             'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Regional Office', 'urutan' => 1, 'is_active' => true, 'seats' => [
                 'Kepala Bagian' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
-                'Asisten Pemetaan' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 2],
+                'Asisten Pemetaan' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TEK', 'kuota' => 2],
             ]],
             'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'urutan' => 2, 'is_active' => true, 'seats' => [
                 'Manajer' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
@@ -71,102 +72,184 @@ class StructureVersionsPageTest extends TestCase
         ]]);
     }
 
+    private function page(): Testable
+    {
+        return Livewire::actingAs($this->admin)->test(StructureVersionsPage::class);
+    }
+
     public function test_page_is_for_admins_only_including_livewire_requests(): void
     {
         $user = User::factory()->create(['role' => 'user']);
 
-        $this->actingAs($user)->get(route('admin.master.sk.versions'))->assertForbidden();
+        $this->actingAs($user)->get(route('admin.master.versi.index'))->assertForbidden();
         Livewire::actingAs($user)->test(StructureVersionsPage::class)->assertForbidden();
-        $this->actingAs($this->admin)->get(route('admin.master.sk.versions'))->assertOk();
+        $this->actingAs($this->admin)->get(route('admin.master.versi.index'))->assertOk();
     }
 
-    public function test_route_does_not_collide_with_the_decree_detail_route(): void
+    public function test_page_is_its_own_master_data_tab_and_is_not_reached_through_a_buried_button(): void
     {
-        $this->actingAs($this->admin)->get('/admin/master/sk/versi')->assertOk()->assertSee('Versi Struktur');
+        $html = $this->actingAs($this->admin)->get(route('admin.master.versi.index'))->assertOk()->getContent();
+        preg_match('/<nav aria-label="Bagian Master Data".*?<\/nav>/s', $html, $nav);
+
+        $this->assertSame(1, substr_count($nav[0], 'aria-current="page"'));
+        $this->assertMatchesRegularExpression('/aria-current="page"[^>]*>.*?Versi Struktur/s', $nav[0]);
+
+        $sk = $this->actingAs($this->admin)->get(route('admin.master.sk.index'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('>Versi Struktur</x', $sk);
+        $this->assertSame(1, preg_match('/aria-current="page"[^>]*>.*?Surat Keputusan/s', $sk), 'tab Surat Keputusan tetap aktif di daftar SK');
     }
 
-    public function test_page_explains_its_purpose_up_front(): void
+    public function test_the_page_leads_with_data_not_with_explanations(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertSee('Setiap SK yang diterapkan menambah satu versi struktur')
-            ->assertSee('menelusuri struktur dan pemangku jabatan di masa lalu');
+        $html = $this->page()->html();
+
+        $this->assertStringNotContainsString('Setiap SK yang diterapkan menambah satu versi struktur', $html, 'banner penjelasan panjang dihapus; tujuan ada pada subjudul halaman');
+        $this->assertLessThan(strpos($html, 'Kepala Bagian'), strpos($html, 'Total Kuota'), 'ringkasan mendahului tabel');
     }
 
-    public function test_a_single_version_is_listed_as_current_with_a_hint_about_the_next_one(): void
+    public function test_one_time_control_lists_every_version_and_follows_the_date(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
+        $second = $this->secondVersion();
+
+        $this->page()
+            ->assertSet('version', (string) $second->id)
+            ->assertSee('DPSB/SKPTS/400/XI/2026')
             ->assertSee('DPSB/SKPTS/352/IX/2026')
-            ->assertSee('Berlaku sekarang')
+            ->assertSee('01 Nov 2026 – sekarang')
+            ->assertSee('01 Sep 2026 – 31 Okt 2026')
+            ->set('date', '2026-09-15')
+            ->assertSet('version', (string) $this->first->id)
+            ->set('date', '2026-08-31')
+            ->assertSet('version', '');
+    }
+
+    public function test_choosing_a_version_opens_its_first_day_and_the_current_version_opens_today(): void
+    {
+        $second = $this->secondVersion();
+
+        $this->page()
+            ->set('version', (string) $this->first->id)
+            ->assertSet('date', '2026-09-01')
+            ->assertSee('Bagian Tanaman')
+            ->assertDontSee('Bagian Baru')
+            ->set('version', (string) $second->id)
+            ->assertSet('date', '2026-11-17')
+            ->assertSee('Bagian Baru');
+    }
+
+    public function test_an_unknown_version_is_ignored(): void
+    {
+        $this->page()
+            ->set('version', '999999')
+            ->assertSet('date', '2026-11-17')
+            ->assertSet('version', (string) $this->first->id);
+    }
+
+    public function test_a_single_version_explains_where_the_next_one_comes_from_without_a_big_card(): void
+    {
+        $this->page()
             ->assertSee('Baru ada satu versi')
             ->assertSee('Catat SK dari Holding');
     }
 
-    public function test_versions_are_listed_newest_first_with_periods_and_totals(): void
+    public function test_context_line_names_the_decree_in_force_with_a_link_to_it(): void
     {
-        $this->secondVersion();
+        $html = $this->page()->html();
 
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertSeeInOrder(['DPSB/SKPTS/400/XI/2026', 'Berlaku sekarang', 'DPSB/SKPTS/352/IX/2026'])
-            ->assertSee('01 Sep 2026 – 31 Okt 2026')
-            ->assertSee('01 Nov 2026 – sekarang')
-            ->assertDontSee('Baru ada satu versi');
-    }
-
-    public function test_selecting_a_past_version_opens_its_first_day_and_its_structure(): void
-    {
-        $this->secondVersion();
-
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertSet('date', '2026-11-17')
-            ->assertSee('Bagian Baru')
-            ->assertDontSee('Bagian Tanaman')
-            ->call('selectVersion', $this->first->id)
-            ->assertSet('date', '2026-09-01')
-            ->assertSee('Bagian Tanaman')
-            ->assertDontSee('Bagian Baru');
-    }
-
-    public function test_selecting_the_current_version_opens_today_and_unknown_versions_are_not_found(): void
-    {
-        $second = $this->secondVersion();
-
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->set('date', '2026-09-01')
-            ->call('selectVersion', $second->id)
-            ->assertSet('date', '2026-11-17')
-            ->call('selectVersion', 999999)
-            ->assertNotFound();
+        $this->assertStringContainsString('mengacu pada', $html);
+        $this->assertStringContainsString(route('admin.master.sk.show', $this->first), $html);
     }
 
     public function test_summary_tiles_show_units_jabatan_total_quota_and_filled(): void
     {
-        $component = Livewire::actingAs($this->admin)->test(StructureVersionsPage::class);
+        $component = $this->page();
 
         $component->assertSeeInOrder(['Unit', '2', 'Jabatan', '3', 'Total Kuota', '4', 'Terisi', '1']);
         $this->assertSame(['units' => 2, 'seats' => 3, 'kuota' => 4, 'filled' => 1], $component->instance()->report['totals']);
     }
 
-    public function test_table_is_per_unit_with_seats_and_holders_inside_each_unit(): void
+    public function test_default_table_is_flat_per_jabatan_so_a_jabatan_can_be_found_without_opening_units(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
+        $this->page()
+            ->assertSet('view', 'jabatan')
+            ->assertSeeInOrder(['Kepala Bagian', 'Asisten Pemetaan', 'Manajer'])
+            ->assertSee('Dewi Lestari')
+            ->assertDontSee('Buka semua unit');
+    }
+
+    public function test_a_seat_with_more_holders_than_its_quota_is_flagged_in_both_views(): void
+    {
+        Employee::factory()->create(['nik' => '87654321', 'nama' => 'Budi Santoso']);
+        JobHistory::withTrashed()->where('employee_nik', '87654321')->forceDelete();
+        JobHistory::create(['employee_nik' => '87654321', 'jabatan' => 'Kepala Bagian', 'unit_kerja' => 'Bagian Tanaman', 'tmt_awal' => '2026-09-01', 'is_applied' => true, 'sumber' => JobHistory::SUMBER_MUTASI]);
+
+        $this->page()->assertSee('melebihi kuota')->set('view', 'unit')->assertSee('melebihi kuota');
+        $this->assertStringNotContainsString('melebihi kuota', Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)->set('search', 'Tajati')->html());
+    }
+
+    public function test_unit_view_groups_jabatan_inside_expandable_units_with_an_expand_all_control(): void
+    {
+        $this->page()
+            ->set('view', 'unit')
             ->assertSeeInOrder(['Bagian Tanaman', 'Kebun Tajati'])
-            ->assertSee('Kepala Bagian')
-            ->assertSee('Asisten Pemetaan')
+            ->assertSee('Buka semua unit')
+            ->assertSee('Tutup semua unit')
+            ->assertSee('Asisten Pemetaan');
+    }
+
+    public function test_unknown_view_falls_back_to_the_flat_view(): void
+    {
+        $this->page()->set('view', 'sembarang')->assertSet('view', 'jabatan');
+    }
+
+    public function test_search_matches_unit_wilayah_jabatan_or_holder_name_and_shows_only_matching_rows(): void
+    {
+        $this->page()
+            ->set('search', 'Tajati')
             ->assertSee('Manajer')
-            ->assertSee('Dewi Lestari');
+            ->assertDontSee('Asisten Pemetaan')
+            ->set('search', 'pemetaan')
+            ->assertSee('Asisten Pemetaan')
+            ->assertDontSee('Manajer')
+            ->set('search', 'Kalimantan Timur')
+            ->assertSee('Manajer')
+            ->assertDontSee('Kepala Bagian')
+            ->set('search', 'lestari')
+            ->assertSee('Kepala Bagian')
+            ->assertDontSee('Asisten Pemetaan');
+    }
+
+    public function test_filters_narrow_by_wilayah_rm_band_bidang_and_filled_state(): void
+    {
+        $this->page()
+            ->set('rmFilter', 'RM-3')->assertSee('Asisten Pemetaan')->assertDontSee('Manajer')->set('rmFilter', '')
+            ->set('bidangFilter', 'TEK')->assertSee('Asisten Pemetaan')->assertDontSee('Kepala Bagian')->set('bidangFilter', '')
+            ->set('wilayahFilter', 'Wilayah Kalimantan Timur')->assertSee('Manajer')->assertDontSee('Kepala Bagian')->set('wilayahFilter', '')
+            ->set('isiFilter', 'terisi')->assertSee('Kepala Bagian')->assertDontSee('Manajer')
+            ->set('isiFilter', 'kosong')->assertSee('Manajer')->assertDontSee('Kepala Bagian');
+    }
+
+    public function test_unknown_filter_values_are_ignored_and_reset_clears_everything(): void
+    {
+        $this->page()
+            ->set('rmFilter', 'RM-99')->assertSet('rmFilter', '')
+            ->set('isiFilter', 'aneh')->assertSet('isiFilter', '')
+            ->set('search', 'Tajati')->set('bidangFilter', 'TAN')
+            ->call('resetFilters')
+            ->assertSet('search', '')->assertSet('bidangFilter', '');
     }
 
     public function test_holder_nik_is_masked_everywhere_on_the_page(): void
     {
-        $html = Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)->html();
+        $html = $this->page()->html();
 
         $this->assertStringContainsString('*****678', $html);
         $this->assertStringNotContainsString('12345678', $html);
     }
 
-    public function test_a_date_before_the_first_decree_says_so_but_keeps_the_version_list(): void
+    public function test_a_date_before_the_first_decree_says_so_and_keeps_the_time_control(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
+        $this->page()
             ->set('date', '2026-08-31')
             ->assertSee('Struktur belum tersedia untuk tanggal ini')
             ->assertSee('DPSB/SKPTS/352/IX/2026')
@@ -177,14 +260,12 @@ class StructureVersionsPageTest extends TestCase
     {
         StructureDecree::query()->delete();
 
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertSee('Belum ada SK yang diterapkan')
-            ->assertDontSee('Berlaku sekarang');
+        $this->page()->assertSee('Belum ada SK yang diterapkan');
     }
 
     public function test_people_who_were_not_yet_in_office_are_hidden_on_earlier_dates(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
+        $this->page()
             ->set('date', '2026-09-01')
             ->assertSee('Dewi Lestari')
             ->set('date', '2026-08-31')
@@ -195,66 +276,91 @@ class StructureVersionsPageTest extends TestCase
     {
         JobHistory::query()->forceDelete();
 
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertSee('Belum ada riwayat jabatan karyawan pada tanggal ini');
+        $this->page()->assertSee('Belum ada riwayat jabatan karyawan pada tanggal ini');
     }
 
     public function test_invalid_dates_fall_back_to_today(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
+        $this->page()
             ->set('date', 'bukan-tanggal')
             ->assertSet('date', '2026-11-17')
             ->set('date', '2026-02-31')
             ->assertSet('date', '2026-11-17');
     }
 
-    public function test_search_matches_unit_wilayah_or_jabatan_and_keeps_whole_units(): void
-    {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->set('search', 'Tajati')
-            ->assertSee('Kebun Tajati')
-            ->assertDontSee('Bagian Tanaman')
-            ->set('search', 'pemetaan')
-            ->assertSee('Bagian Tanaman')
-            ->assertDontSee('Kebun Tajati')
-            ->set('search', 'Kalimantan Timur')
-            ->assertSee('Kebun Tajati')
-            ->assertDontSee('Bagian Tanaman');
-    }
-
     public function test_pagination_follows_the_shared_per_page_options(): void
     {
-        $component = Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)->set('perPage', 999);
+        $component = $this->page()->set('perPage', 999);
 
         $this->assertContains($component->get('perPage'), config('hris.pagination.options'));
     }
 
-    public function test_comparison_with_the_current_structure_is_summarised_on_demand(): void
+    public function test_comparison_offers_the_current_structure_and_every_other_version(): void
     {
-        // Struktur sekarang (basis data uji) kosong, sedangkan versi SK memiliki 3 jabatan.
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->assertDontSee('Selisih dengan struktur sekarang')
-            ->set('compare', true)
+        $second = $this->secondVersion();
+
+        $component = $this->page()
+            ->assertDontSee('Selisih dengan')
+            ->set('compare', 'current')
             ->assertSee('Selisih dengan struktur sekarang');
+
+        $options = $component->instance()->compareOptions;
+        $this->assertSame(['current', (string) $this->first->id], array_column($options, 'value'), 'versi yang sedang dilihat tidak ditawarkan sebagai pembanding');
+        $this->assertSame($second->id, $component->instance()->report['decree']->id);
+    }
+
+    public function test_comparing_two_versions_lists_what_changed_between_them(): void
+    {
+        $second = $this->secondVersion();
+
+        $this->page()
+            ->set('version', (string) $this->first->id)
+            ->set('compare', (string) $second->id)
+            ->assertSee('Selisih dengan DPSB/SKPTS/400/XI/2026')
+            ->assertSee('Bagian Baru');
+    }
+
+    public function test_an_invalid_comparison_choice_is_dropped(): void
+    {
+        $this->page()->set('compare', 'aneh')->assertSet('compare', '')->set('compare', (string) $this->first->id)->assertSet('compare', '', 'sebuah versi tidak dibandingkan dengan dirinya sendiri');
+    }
+
+    public function test_the_employee_tab_is_available_and_switches_without_losing_the_time_control(): void
+    {
+        $this->page()
+            ->assertSet('tab', 'struktur')
+            ->set('tab', 'karyawan')
+            ->assertSee('Cari karyawan')
+            ->set('tab', 'sembarang')
+            ->assertSet('tab', 'struktur');
     }
 
     public function test_export_downloads_a_workbook_and_is_audited_without_personal_data(): void
     {
-        Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)
-            ->call('export')
-            ->assertFileDownloaded();
+        $this->page()->call('export')->assertFileDownloaded();
 
         $log = MasterAuditLog::where('action', 'structure_as_of.export')->latest('id')->first();
         $this->assertNotNull($log);
-        $this->assertSame('DPSB/SKPTS/352/IX/2026', $log->new_values['sk_number']);
-        $this->assertSame('2026-11-17', $log->new_values['date']);
-        $this->assertSame(3, $log->new_values['rows']);
+        // Kunci memakai istilah bisnis yang sama dengan catatan audit lain, agar Riwayat Perubahan menampilkannya berlabel.
+        $this->assertSame('DPSB/SKPTS/352/IX/2026', $log->new_values['nomor_sk']);
+        $this->assertSame('2026-11-17', $log->new_values['posisi_per']);
+        $this->assertSame(3, $log->new_values['jumlah_baris']);
         $this->assertStringNotContainsString('12345678', json_encode($log->new_values));
+
+        $this->assertSame('Versi struktur diunduh', MasterAuditLog::actionLabel('structure_as_of.export'));
+        $this->assertSame('Versi Struktur', MasterAuditLog::ENTITY_LABELS['structure_as_of']);
+        foreach (array_keys($log->new_values) as $key) {
+            $this->assertArrayHasKey($key, MasterAuditLog::FIELD_LABELS, "kunci '{$key}' harus punya label bisnis");
+        }
+
+        $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))->assertOk()
+            ->assertSee('Versi struktur diunduh')
+            ->assertDontSee('structure_as_of.export');
     }
 
     public function test_page_never_exposes_internal_document_names(): void
     {
-        $html = Livewire::actingAs($this->admin)->test(StructureVersionsPage::class)->html();
+        $html = $this->page()->html();
 
         foreach (['AGENTS.md', 'DOMAIN.md', 'DESIGN.md', 'ENGINEERING.md', 'SECURITY.md', 'SSOT'] as $internal) {
             $this->assertStringNotContainsString($internal, $html);
@@ -266,6 +372,6 @@ class StructureVersionsPageTest extends TestCase
         $this->actingAs($this->admin)->get(route('admin.master.sk.show', $this->first))
             ->assertOk()
             ->assertSee('Lihat struktur setelah SK ini')
-            ->assertSee(route('admin.master.sk.versions', ['date' => '2026-09-01']), false);
+            ->assertSee(route('admin.master.versi.index', ['date' => '2026-09-01']), false);
     }
 }

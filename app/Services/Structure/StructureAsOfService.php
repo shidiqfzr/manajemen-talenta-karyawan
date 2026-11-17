@@ -155,6 +155,12 @@ class StructureAsOfService
         return $decree === null ? null : $this->calculator->calculate($this->reader->current(), $decree->snapshot);
     }
 
+    /** Selisih dari versi $from menuju versi $to (unit baru pada $to tercatat sebagai unit.add). */
+    public function compareVersions(StructureDecree $from, StructureDecree $to): StructureDiff
+    {
+        return $this->calculator->calculate($to->snapshot, $from->snapshot);
+    }
+
     /**
      * Pemangku yang menjabat pada tanggal itu, dikelompokkan per unit lalu jabatan. Baris terjadwal yang belum berlaku
      * (is_applied = false) dan baris terhapus lunak tidak dihitung. NIK tidak pernah keluar utuh (UU PDP).

@@ -248,6 +248,20 @@ class StructureAsOfServiceTest extends TestCase
         $this->assertNotEmpty($diff->ofType('seat.add'), 'arah selisih: dari versi pada tanggal itu menuju struktur sekarang');
     }
 
+    public function test_two_versions_can_be_compared_in_either_direction(): void
+    {
+        $first = $this->decree('SK/1', '2026-09-01', $this->seat('Bagian Lama', 'Kepala Lama', 3));
+        $second = $this->decree('SK/2', '2026-12-01', $this->seat('Bagian Baru', 'Kepala Baru', 1));
+
+        $forward = $this->service->compareVersions($first, $second);
+        $backward = $this->service->compareVersions($second, $first);
+
+        $this->assertFalse($forward->isEmpty());
+        $this->assertSame('Bagian Baru', $forward->ofType('unit.add')[0]['unit'], 'dari versi lama menuju versi baru: unit baru ditambahkan');
+        $this->assertSame('Bagian Lama', $backward->ofType('unit.add')[0]['unit']);
+        $this->assertTrue($this->service->compareVersions($first, $first)->isEmpty());
+    }
+
     public function test_compare_is_null_when_no_version_exists_and_empty_when_the_structure_is_unchanged(): void
     {
         $this->assertNull($this->service->compareWithCurrent(Carbon::parse('2026-10-01')));

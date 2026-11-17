@@ -165,53 +165,94 @@ test('detail SK baseline: diterapkan, tidak dapat dibatalkan, dan tanpa unduhan 
 });
 
 async function openVersions(page) {
-    await page.goto('/admin/master/sk/versi', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/master/versi', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Versi Struktur', exact: true }).first()).toBeVisible();
 }
 
-test('versi struktur: daftar versi per SK, struktur per unit, tanggal sebelum SK pertama tidak direkonstruksi, NIK tersamar', async ({ page }) => {
+// Basis data E2E memuat dua versi: SK 352 (1 Sep 2026) dan SK 401 (1 Okt 2026), serta dua karyawan uji (seed-structure-versions.php).
+const SECOND_NUMBER = 'DPSB/SKPTS/401/X/2026';
+
+test('versi struktur: tab tersendiri, satu kendali waktu, data langsung terlihat, dan tanpa NIK utuh', async ({ page }) => {
     await openIndex(page);
-    await page.getByRole('link', { name: 'Versi Struktur' }).click();
-    await page.waitForURL(/\/admin\/master\/sk\/versi$/, { timeout: 30_000 });
+    const nav = page.getByRole('navigation', { name: 'Bagian Master Data' });
+    await expect(nav.getByRole('link', { name: 'Versi Struktur', exact: true })).toBeVisible();
+    // Tab adalah satu-satunya jalan masuk: tidak ada tombol terpendam lagi pada daftar SK.
+    await expect(page.getByRole('link', { name: 'Versi Struktur' })).toHaveCount(1);
+
+    await nav.getByRole('link', { name: 'Versi Struktur', exact: true }).click();
+    await page.waitForURL(/\/admin\/master\/versi$/, { timeout: 30_000 });
+    await expect(nav.getByRole('link', { name: 'Versi Struktur', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name: 'Versi Struktur', exact: true }).first()).toBeVisible({ timeout: 30_000 });
 
-    // Tujuan halaman dijelaskan di awal, dan SK baseline adalah satu-satunya versi yang berlaku sekarang.
-    await expect(page.getByText('Setiap SK yang diterapkan menambah satu versi struktur')).toBeVisible();
-    await expect(page.getByText(BASELINE_NUMBER).first()).toBeVisible();
-    await expect(page.getByText('Berlaku sekarang')).toBeVisible();
-    await expect(page.getByText('Baru ada satu versi')).toBeVisible();
-
-    // Ringkasan dan tabel per unit memakai komponen bersama.
+    // Tanpa banner penjelasan panjang; ringkasan dan tabel jabatan langsung tampil.
+    await expect(page.getByText('Setiap SK yang diterapkan menambah satu versi struktur')).toHaveCount(0);
     for (const title of ['Unit', 'Jabatan', 'Total Kuota', 'Terisi']) {
         await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
     }
-    await expect(page.getByText(/\d+ baris per halaman|baris per halaman/)).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Pemangku Jabatan' })).toBeVisible();
+    await expect(page.getByText(/baris per halaman/)).toBeVisible();
 
-    // Jabatan dan pemangku dibuka per unit; NIK delapan digit tidak boleh tampil utuh.
-    const firstUnit = page.locator('tbody button[aria-expanded]').first();
-    await expect(firstUnit).toHaveAttribute('aria-expanded', 'false');
-    await firstUnit.click();
-    await expect(firstUnit).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('columnheader', { name: 'Pemangku Jabatan' }).first()).toBeVisible();
+    // Satu pemilih versi berisi kedua SK; versi terbaru terpilih dan konteksnya disebut.
+    const version = page.locator('#version');
+    await expect(version.locator('option')).toHaveCount(2);
+    await expect(version.locator('option:checked')).toContainText(SECOND_NUMBER);
+    await expect(page.getByText(/mengacu pada/)).toContainText(SECOND_NUMBER);
+
+    expect(await page.locator('main').innerText()).not.toMatch(/\b\d{8}\b/);
+    expect((await page.locator('body').innerText()).toLowerCase()).not.toMatch(FORBIDDEN_TERMS);
+});
+
+test('versi struktur: memilih versi lampau, mencari pemangku, tampilan per unit, dan perbandingan antarversi', async ({ page }) => {
+    await openVersions(page);
+
+    // Memilih SK 352 memindahkan tanggal ke hari pertama berlakunya; pemangku mengikuti riwayat jabatan pada tanggal itu.
+    await page.locator('#version').selectOption({ index: 1 }); // terbaru dahulu: indeks 1 adalah SK 352
+    await expect(page.getByLabel('atau Tanggal')).toHaveValue('2026-09-01');
+    await expect(page.getByText(/mengacu pada/)).toContainText('DPSB/SKPTS/352/IX/2026');
+
+    // Pencarian nama pemangku bekerja lintas unit pada tabel datar (tanpa membuka unit satu per satu).
+    await page.getByPlaceholder('Cari unit, wilayah, jabatan, atau nama pemangku...').fill('Uji Versi');
+    await expect(page.getByText('Budi Uji Versi')).toBeVisible();
+    await expect(page.getByText('Sari Uji Versi')).toBeVisible();
+    expect(await page.locator('main').innerText()).toMatch(/\*{5}001/);
+
+    // Tampilan per unit: buka semua unit sekaligus.
+    await page.getByRole('button', { name: 'Per Unit' }).click();
+    await page.getByRole('button', { name: 'Buka semua unit' }).click();
+    await expect(page.locator('tbody button[aria-expanded="true"]').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Tutup semua unit' }).click();
+    await expect(page.locator('tbody button[aria-expanded="true"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Per Jabatan' }).click();
+
+    // Perbandingan antarversi: SK 352 menuju SK 401 menambahkan satu unit.
+    await page.getByPlaceholder('Cari unit, wilayah, jabatan, atau nama pemangku...').fill('');
+    await page.locator('#compare').selectOption({ label: SECOND_NUMBER });
+    await expect(page.getByRole('heading', { name: `Selisih dengan ${SECOND_NUMBER}` })).toBeVisible();
+    await expect(page.getByText('Unit Uji Versi Baru').first()).toBeVisible();
+
+    // Satu hari sebelum SK pertama berlaku: tidak ada struktur karangan, pemilih waktu tetap ada.
+    await page.getByLabel('atau Tanggal').fill('2026-08-31');
+    await expect(page.getByText('Struktur belum tersedia untuk tanggal ini')).toBeVisible();
+    await expect(page.locator('#version')).toBeVisible();
+});
+
+test('versi struktur: riwayat jabatan karyawan terhadap versi struktur, tanpa NIK utuh', async ({ page }) => {
+    await openVersions(page);
+    await page.getByRole('button', { name: 'Riwayat Jabatan Karyawan' }).click();
+    await expect(page.getByText(/minimal 3 karakter/)).toBeVisible();
+
+    await page.getByPlaceholder(/Ketik nama atau NIK karyawan/).fill('Budi Uji');
+    await page.getByRole('button', { name: /Budi Uji Versi/ }).click();
+
+    await expect(page.getByRole('heading', { name: 'Budi Uji Versi' })).toBeVisible();
+    await expect(page.getByText('SK/MUTASI/UJI/1')).toBeVisible();
+    await expect(page.getByText('DPSB/SKPTS/401/X/2026').first()).toBeVisible();
+    await expect(page.getByText('DPSB/SKPTS/352/IX/2026').first()).toBeVisible();
+    await expect(page.getByText('sekarang').first()).toBeVisible();
     expect(await page.locator('main').innerText()).not.toMatch(/\b\d{8}\b/);
 
-    // Satu hari sebelum SK baseline berlaku: tidak ada struktur karangan, daftar versi tetap tampil.
-    await page.getByLabel('Tanggal', { exact: true }).fill('2026-08-31');
-    await expect(page.getByText('Struktur belum tersedia untuk tanggal ini')).toBeVisible();
-    await expect(page.getByText(BASELINE_NUMBER).first()).toBeVisible();
-
-    // Memilih versi membuka hari pertama berlakunya.
-    await page.getByRole('button', { name: new RegExp(BASELINE_NUMBER) }).click();
-    await expect(page.getByText('mengacu pada')).toBeVisible();
-    await expect(page.getByLabel('Tanggal', { exact: true })).not.toHaveValue('2026-08-31');
-
-    // Perbandingan dengan struktur sekarang: struktur baseline sama dengan struktur sekarang pada basis data uji.
-    await page.getByLabel('Bandingkan dengan struktur sekarang').check();
-    await expect(page.getByRole('heading', { name: 'Selisih dengan struktur sekarang' })).toBeVisible();
-    await expect(page.getByText('Tidak ada perbedaan')).toBeVisible();
-
-    const text = (await page.locator('body').innerText()).toLowerCase();
-    expect(text).not.toMatch(FORBIDDEN_TERMS);
+    await page.getByRole('button', { name: 'Ganti karyawan' }).click();
+    await expect(page.getByPlaceholder(/Ketik nama atau NIK karyawan/)).toBeVisible();
 });
 for (const [name, width] of [['ponsel 375px', 375], ['laptop 1366px', 1366], ['layar lebar 1920px', 1920]]) {
     test(`tanpa overflow horizontal pada ${name}`, async ({ page }) => {

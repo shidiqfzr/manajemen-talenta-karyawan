@@ -82,6 +82,7 @@ class MasterAuditLog extends Model
         'seat_access.view_occupants' => 'Pemegang jabatan formasi dibuka',
         'data_table.bulk' => 'Aksi massal pada tabel data',
         'data_table.export' => 'Tabel data diunduh',
+        'structure_as_of.export' => 'Versi struktur diunduh',
     ];
 
     public const ENTITY_LABELS = [
@@ -98,6 +99,7 @@ class MasterAuditLog extends Model
         'mpp_access' => 'Akses Data MPP',
         'seat_access' => 'Akses Data Formasi',
         'data_table' => 'Tabel Data',
+        'structure_as_of' => 'Versi Struktur',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
