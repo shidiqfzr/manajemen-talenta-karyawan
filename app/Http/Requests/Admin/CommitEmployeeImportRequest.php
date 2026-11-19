@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\HrisPermission;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CommitEmployeeImportRequest extends FormRequest
@@ -11,7 +12,7 @@ class CommitEmployeeImportRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can(HrisPermission::KARYAWAN_IMPORT) ?? false;
     }
 
     /**
@@ -20,7 +21,7 @@ class CommitEmployeeImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'token' => 'required|string',
+            'token' => 'required|uuid',
         ];
     }
 
@@ -31,7 +32,7 @@ class CommitEmployeeImportRequest extends FormRequest
     {
         return [
             'token.required' => 'Token sesi impor wajib disertakan.',
-            'token.string' => 'Format token sesi impor tidak valid.',
+            'token.uuid' => 'Format token sesi impor tidak valid.',
         ];
     }
 }

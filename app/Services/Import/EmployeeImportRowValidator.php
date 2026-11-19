@@ -18,7 +18,6 @@ class EmployeeImportRowValidator
         'jabatan' => 'required|string|max:255',
         'level' => 'required|string|in:Karpim,Karpel',
         'unit_kerja' => 'required|string|max:255',
-        'status_penugasan' => 'nullable|string|in:Definitif,Diperbantukan,Pejabat Sementara (Pjs),Tugas Belajar,Advisor',
         'status_karyawan' => 'required|string|max:50',
         'golongan' => ['nullable', 'string', 'regex:/^(I|II|III|IV)[A-D](\/[0-9]{2})?$/i'],
         'tanggal_dalam_jabatan' => 'nullable|date',
@@ -82,14 +81,25 @@ class EmployeeImportRowValidator
         $levelKnown = $this->deriveLevel($data, $existingEmployeesCache);
 
         // RM Band mengikuti daftar resmi pada model Position (satu sumber), bukan salinan di validator ini.
-        $rules = self::VALIDATION_RULES + ['rm_level' => ['nullable', 'string', Rule::in(array_keys(Position::RM_LEVEL_LIST))]];
+        $rules = self::VALIDATION_RULES + [
+            'rm_level' => ['nullable', 'string', Rule::in(array_keys(Position::RM_LEVEL_LIST))],
+            'status_penugasan' => ['nullable', 'string', Rule::in(Employee::ASSIGNMENT_STATUSES)],
+        ];
         if (! $levelKnown) {
             $rules['level'] = 'nullable|string|in:Karpim,Karpel';
         }
         $validator = Validator::make($data, $rules, self::CUSTOM_MESSAGES + ['rm_level.in' => 'RM Level tidak dikenal (RM-1 sampai RM-7).']);
 
         if ($validator->fails()) {
-            return $validator->errors()->all();
+            $errors = $validator->errors();
+            $messages = $errors->all();
+
+            // Advisor dan Diperbantukan adalah jabatan penampungan: kolom Jabatan tetap wajib, bukan diganti status.
+            if ($errors->has('jabatan') && in_array($data['status_penugasan'] ?? null, [Employee::STATUS_ADVISOR, Employee::STATUS_DIPERBANTUKAN], true)) {
+                $messages = [...array_diff($messages, $errors->get('jabatan')), $this->poolJabatanGuidance((string) $data['status_penugasan'], (string) ($data['unit_kerja'] ?? ''))];
+            }
+
+            return array_values($messages);
         }
 
         if (! $levelKnown) {
@@ -238,6 +248,34 @@ class EmployeeImportRowValidator
         $data['level'] = $levels[0];
 
         return true;
+    }
+
+    /**
+     * Petunjuk untuk karyawan berstatus Advisor/Diperbantukan yang kolom Jabatannya kosong: sebutkan jabatan penampungan
+     * yang sudah dibuka pada unit itu (tidak ditebak dari golongan atau RM Band).
+     */
+    private function poolJabatanGuidance(string $status, string $unitName): string
+    {
+        $base = "Karyawan berstatus {$status} tetap wajib memiliki Jabatan: isi dengan jabatan penampungannya (Advisor atau Diperbantukan) yang sudah dibuka pada unit.";
+
+        [$unitExists] = $this->getUnitPositionData($unitName, 'Karpim');
+        if (! $unitExists) {
+            return $base." Unit Kerja '{$unitName}' tidak terdaftar di Master Unit Organisasi.";
+        }
+
+        $opened = [];
+        foreach ($this->unitPositionsCache[$unitName]['positions'] ?? [] as $positions) {
+            foreach ($positions as $nama => $seat) {
+                if ($seat['pool']) {
+                    $opened[] = $nama;
+                }
+            }
+        }
+        sort($opened);
+
+        return $opened === []
+            ? $base." Belum ada jabatan penampungan yang dibuka pada unit '{$unitName}'; buka lebih dulu pada tab Jabatan Penampungan di Master Data."
+            : $base." Jabatan penampungan yang dibuka pada unit '{$unitName}': ".implode('; ', $opened).'.';
     }
 
     /**

@@ -452,7 +452,7 @@
                     <!-- Status Penugasan -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label for="statusPenugasanInput" class="block text-xs font-bold text-surface-700">Status Penugasan <span class="text-danger">*</span></label>
+                            <label for="statusPenugasanInput" class="block text-xs font-bold text-surface-700">Status Jabatan Utama <span class="text-danger">*</span></label>
                         </div>
                         <div class="relative">
                             <span class="absolute left-3.5 inset-y-0 flex items-center text-xs text-surface-500">

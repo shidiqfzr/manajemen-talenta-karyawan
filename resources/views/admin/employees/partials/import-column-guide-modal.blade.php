@@ -48,22 +48,12 @@
                                         <span class="text-danger font-bold">*</span>
                                         <span>= Kolom wajib</span>
                                     </div>
-                                    <button type="button" @click="showDictionaryDrawer = false" class="p-2 rounded-xl text-surface-500 hover:text-surface-600 hover:bg-surface-100 transition cursor-pointer" title="Tutup Kamus (Esc)">
-                                        <i class="fas fa-xmark text-lg" aria-hidden="true"></i>
-                                    </button>
+                                    <x-admin.button variant="ghost" size="sm" icon="fas fa-xmark" aria-label="Tutup kamus format" title="Tutup Kamus (Esc)" @click="showDictionaryDrawer = false"></x-admin.button>
                                 </div>
                             </div>
 
                             <!-- Search Input Kolom -->
-                            <div class="relative">
-                                <i class="fas fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs" aria-hidden="true"></i>
-                                <input type="text" x-model="searchColumn" x-ref="searchColInput"
-                                    placeholder="Cari nama kolom, tipe dropdown, atau aturan bisnis (lintas {{ $guideTotal }} kolom)..."
-                                    class="w-full pl-9 pr-8 py-2 bg-white border border-surface-200 rounded-xl text-xs text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition shadow-2xs">
-                                <button aria-label="Hapus pencarian kolom" type="button" x-show="searchColumn" @click="searchColumn = ''; $refs.searchColInput?.focus()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-600 text-xs cursor-pointer">
-                                    <i class="fas fa-times-circle" aria-hidden="true"></i>
-                                </button>
-                            </div>
+                            <x-admin.search-input id="column_guide_search" x-model="searchColumn" :shortcut="null" label="Cari kolom pada kamus format" placeholder="Cari nama kolom, tipe dropdown, atau aturan bisnis (lintas {{ $guideTotal }} kolom)..." />
 
                             <!-- Search Active Indicator -->
                             <template x-if="searchColumn.trim() !== ''">
@@ -72,9 +62,7 @@
                                         <i class="fas fa-filter text-primary-600" aria-hidden="true"></i>
                                         <span>Menampilkan hasil pencarian di seluruh {{ $guideTotal }} kolom</span>
                                     </span>
-                                    <button type="button" @click="searchColumn = ''" class="font-bold underline hover:text-primary-950 cursor-pointer">
-                                        Reset Pencarian
-                                    </button>
+                                    <x-admin.button variant="soft" size="sm" @click="searchColumn = ''">Reset Pencarian</x-admin.button>
                                 </div>
                             </template>
                         </div>
@@ -147,7 +135,7 @@
                                                         Kata kunci <span class="font-mono font-bold text-primary-800" x-text="'&ldquo;' + searchColumn + '&rdquo;'"></span> tidak sesuai dengan {{ $guideTotal }} kolom kamus resmi.
                                                     </p>
                                                 </div>
-                                                <x-admin.button variant="soft" size="sm" icon="fas fa-rotate-left" @click="searchColumn = ''; $refs.searchColInput?.focus()">Reset Pencarian</x-admin.button>
+                                                <x-admin.button variant="soft" size="sm" icon="fas fa-rotate-left" @click="searchColumn = ''; document.getElementById('column_guide_search')?.focus()">Reset Pencarian</x-admin.button>
                                             </div>
                                         </td>
                                     </tr>
@@ -166,9 +154,7 @@
                                     <i class="fas fa-file-arrow-down text-primary-600" aria-hidden="true"></i>
                                     <span>Unduh Template (.xlsx)</span>
                                 </a>
-                                <button type="button" @click="showDictionaryDrawer = false" class="px-3.5 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-900 text-white font-bold transition cursor-pointer shadow-xs whitespace-nowrap">
-                                    Tutup
-                                </button>
+                                <x-admin.button variant="secondary" size="sm" @click="showDictionaryDrawer = false">Tutup</x-admin.button>
                             </div>
                         </div>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Employee;
 use App\Models\Position;
 use App\Services\KepegawaianPolicy;
 use Illuminate\Contracts\Validation\Validator;
@@ -30,7 +31,7 @@ class StoreEmployeeRequest extends FormRequest
             'level' => ['required', 'string', Rule::in(['Karpim', 'Karpel'])],
             'rm_level' => ['nullable', 'string', Rule::in(array_keys(Position::RM_LEVEL_LIST))],
             'unit_kerja' => ['required', 'string', 'max:255'],
-            'status_penugasan' => ['nullable', 'string', Rule::in(['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'])],
+            'status_penugasan' => ['nullable', 'string', Rule::in(Employee::ASSIGNMENT_STATUSES)],
             'status_karyawan' => ['required', 'string', 'max:50'],
             'tanggal_berakhir_kontrak' => ['nullable', 'date'],
             'golongan' => ['nullable', 'string', 'max:50'],

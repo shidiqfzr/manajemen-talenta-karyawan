@@ -6,11 +6,13 @@ use App\Exceptions\ImportAbortedException;
 use App\Imports\EmployeesImport;
 use App\Jobs\ProcessEmployeeImportCommitJob;
 use App\Jobs\ProcessEmployeeImportPreviewJob;
+use App\Models\Employee;
 use App\Models\EmployeeImportLog;
+use App\Models\JobHistory;
 use App\Models\User;
+use App\Services\Import\ImportAuditRecorder;
+use App\Services\Import\ImportSessionStore;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +26,10 @@ class EmployeeImportService
 {
     private const DISK = 'local'; // Maps to storage/app/private per filesystems.php & SECURITY.md 4.4
 
-    private const CACHE_TTL_MINUTES = 60;
+    public function __construct(
+        private readonly ImportSessionStore $sessions,
+        private readonly ImportAuditRecorder $audit,
+    ) {}
 
     /**
      * Ambang batas jumlah baris data untuk beralih otomatis ke Background Queue Job (Hybrid Execution).
@@ -63,14 +68,14 @@ class EmployeeImportService
         $token = (string) Str::uuid();
         $storedPath = $file->storeAs('imports', "import_{$token}.xlsx", self::DISK);
         $fullPath = Storage::disk(self::DISK)->path($storedPath);
-        Cache::put("import_owner_{$token}", $user?->id ?? 0, now()->addHours(2));
+        $this->sessions->claim($token, $user);
 
         // 3. Deteksi volume data
         $dataRows = $this->getSpreadsheetRowCount($fullPath);
 
         // 4. Hybrid Execution Routing
         if ($dataRows > self::ASYNC_THRESHOLD) {
-            Cache::put("import_job_{$token}", [
+            $this->sessions->putJob($token, [
                 'status' => 'processing',
                 'progress' => 15,
                 'message' => 'Menganalisis '.number_format($dataRows).' baris data karyawan di antrean latar belakang...',
@@ -79,7 +84,7 @@ class EmployeeImportService
                 'total_rows' => $dataRows,
                 'token' => $token,
                 'type' => 'preview',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             ProcessEmployeeImportPreviewJob::dispatch(
                 $token,
@@ -119,17 +124,6 @@ class EmployeeImportService
     }
 
     /**
-     * Sesi impor hanya boleh diakses admin yang mengunggah berkasnya. Token tanpa pemilik
-     * (kedaluwarsa) dianggap boleh diteruskan agar pesan "sesi berakhir" tetap tampil.
-     */
-    public function isTokenOwnedBy(string $token, ?User $user): bool
-    {
-        $owner = Cache::get("import_owner_{$token}");
-
-        return $owner === null || $owner === ($user?->id ?? 0);
-    }
-
-    /**
      * Eksekusi inti Dry-Run analisis pratinjau.
      */
     public function executeDryRun(string $fullPath, string $storedPath, string $originalName, int $fileSize, string $token): array
@@ -140,20 +134,20 @@ class EmployeeImportService
         $summary = $import->getImportSummary();
 
         // Cache metadata pratinjau untuk proses komit atau unduh baris gagal
-        Cache::put("import_preview_{$token}", [
+        $this->sessions->putPreview($token, [
             'file_hash' => hash_file('sha256', $fullPath),
             'file_path' => $storedPath,
             'original_name' => $originalName,
             'file_size' => $fileSize,
             'summary' => $summary,
-            'failed_rows' => $this->sealRows($import->failedRows),
-        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            'failed_rows' => $this->sessions->sealRows($import->failedRows),
+        ]);
 
         // Simpan baris gagal di cache terpisah dengan retensi 2 jam untuk unduhan berkas koreksi
-        Cache::put("import_failed_rows_{$token}", $this->sealRows($import->failedRows), now()->addHours(2));
+        $this->sessions->putFailedRows($token, $import->failedRows);
 
         // Update status job ke completed untuk sinkronisasi hybrid
-        Cache::put("import_job_{$token}", [
+        $this->sessions->putJob($token, [
             'status' => 'completed',
             'progress' => 100,
             'summary' => $summary,
@@ -161,7 +155,7 @@ class EmployeeImportService
             'file_name' => $originalName,
             'file_size' => $fileSize,
             'type' => 'preview',
-        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+        ]);
 
         return $summary;
     }
@@ -174,7 +168,7 @@ class EmployeeImportService
         try {
             $fullPath = Storage::disk(self::DISK)->path($storedPath);
 
-            Cache::put("import_job_{$token}", [
+            $this->sessions->putJob($token, [
                 'status' => 'processing',
                 'progress' => 40,
                 'message' => 'Memvalidasi aturan bisnis kepegawaian...',
@@ -182,18 +176,18 @@ class EmployeeImportService
                 'file_size' => $fileSize,
                 'token' => $token,
                 'type' => 'preview',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             return $this->executeDryRun($fullPath, $storedPath, $originalName, $fileSize, $token);
         } catch (\Throwable $e) {
             Log::error("Gagal menjalankan preview import background job [Token: {$token}]: ".$e->getMessage());
 
-            Cache::put("import_job_{$token}", [
+            $this->sessions->putJob($token, [
                 'status' => 'failed',
                 'error' => 'Gagal memproses pratinjau: '.$e->getMessage(),
                 'token' => $token,
                 'type' => 'preview',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             throw $e;
         }
@@ -208,28 +202,23 @@ class EmployeeImportService
         ?string $ip = null,
         ?string $userAgent = null
     ): array {
-        $cached = Cache::get("import_preview_{$token}");
+        $cached = $this->sessions->preview($token);
         if (! $cached || ! Storage::disk(self::DISK)->exists($cached['file_path'])) {
             throw new \RuntimeException('Sesi pratinjau impor telah kedaluwarsa atau berkas tidak ditemukan. Silakan unggah ulang berkas.');
         }
 
         // Satu token hanya boleh dikomit sekali: klik ganda atau permintaan paralel tidak boleh menulis dua kali.
-        if (! Cache::add($this->commitGuardKey($token), true, now()->addMinutes(self::CACHE_TTL_MINUTES))) {
+        if (! $this->sessions->beginCommit($token)) {
             throw new \RuntimeException('Komit untuk berkas ini sudah dijalankan atau sedang diproses.');
         }
 
         try {
             return $this->dispatchOrRunCommit($cached, $token, $user, $ip, $userAgent);
         } catch (\Throwable $e) {
-            Cache::forget($this->commitGuardKey($token));
+            $this->sessions->releaseCommit($token);
 
             throw $e;
         }
-    }
-
-    private function commitGuardKey(string $token): string
-    {
-        return "import_commit_started_{$token}";
     }
 
     /**
@@ -237,19 +226,19 @@ class EmployeeImportService
      */
     public function commitApproved(string $token, User $checker, ?string $ip = null, ?string $userAgent = null): array
     {
-        $cached = Cache::get("import_preview_{$token}");
+        $cached = $this->sessions->preview($token);
         if (! $cached || ! Storage::disk(self::DISK)->exists($cached['file_path'])) {
             throw new ImportAbortedException('Berkas pengajuan tidak ditemukan atau sesi peninjauan berakhir. Tinjau ulang pengajuan.');
         }
 
-        if (! Cache::add($this->commitGuardKey($token), true, now()->addMinutes(self::CACHE_TTL_MINUTES))) {
+        if (! $this->sessions->beginCommit($token)) {
             throw new ImportAbortedException('Penyimpanan pengajuan ini sudah dijalankan atau sedang diproses.');
         }
 
         try {
             return $this->dispatchOrRunCommit($cached, $token, $checker, $ip, $userAgent, true);
         } catch (\Throwable $e) {
-            Cache::forget($this->commitGuardKey($token));
+            $this->sessions->releaseCommit($token);
 
             throw $e;
         }
@@ -264,7 +253,7 @@ class EmployeeImportService
             }
 
             $result = app(EmployeeImportGovernanceService::class)->submit($cached, $token, $user, $ip, $userAgent);
-            Cache::forget($this->commitGuardKey($token));
+            $this->sessions->releaseCommit($token);
 
             return $result;
         }
@@ -273,13 +262,13 @@ class EmployeeImportService
 
         // Hybrid Execution untuk Commit volume besar
         if ($totalProcessed > self::ASYNC_THRESHOLD) {
-            Cache::put("import_commit_job_{$token}", [
+            $this->sessions->putCommitJob($token, [
                 'status' => 'processing',
                 'progress' => 15,
                 'message' => 'Menyimpan '.number_format($totalProcessed).' data karyawan ke database di antrean latar belakang...',
                 'token' => $token,
                 'type' => 'commit',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             ProcessEmployeeImportCommitJob::dispatch(
                 $token,
@@ -345,19 +334,19 @@ class EmployeeImportService
             'timestamp' => now()->toIso8601String(),
         ]);
 
-        $failedRows = ! empty($import->failedRows) ? $import->failedRows : $this->openRows($cached['failed_rows'] ?? []);
+        $failedRows = ! empty($import->failedRows) ? $import->failedRows : $this->sessions->openRows($cached['failed_rows'] ?? []);
 
         // Pertahankan baris gagal di cache terpisah untuk unduhan Tahap 3 (retensi 2 jam)
         if (! empty($failedRows)) {
-            Cache::put("import_failed_rows_{$token}", $this->sealRows($failedRows), now()->addHours(2));
+            $this->sessions->putFailedRows($token, $failedRows);
         }
 
         // Bersihkan berkas sementara & cache pratinjau
         Storage::disk(self::DISK)->delete($cached['file_path']);
-        Cache::forget("import_preview_{$token}");
+        $this->sessions->forgetPreview($token);
 
         // Simpan data rekap hasil komit untuk unduhan laporan impor (.xlsx)
-        Cache::put("import_report_{$token}", [
+        $this->sessions->putReport($token, [
             'user_name' => $user?->name ?? 'Administrator HR',
             'user_email' => $user?->email ?? '-',
             'ip_address' => $ip ?? '-',
@@ -365,18 +354,18 @@ class EmployeeImportService
             'file_name' => $cached['original_name'],
             'file_size' => $cached['file_size'],
             'summary' => $summary,
-            'rows' => $this->sealRows($import->validRows),
-            'failed_rows' => $this->sealRows($failedRows),
-        ], now()->addHours(2));
+            'rows' => $this->sessions->sealRows($import->validRows),
+            'failed_rows' => $this->sessions->sealRows($failedRows),
+        ]);
 
         // Update commit job status ke completed
-        Cache::put("import_commit_job_{$token}", [
+        $this->sessions->putCommitJob($token, [
             'status' => 'completed',
             'progress' => 100,
             'summary' => $summary,
             'token' => $token,
             'type' => 'commit',
-        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+        ]);
 
         return $summary;
     }
@@ -410,8 +399,12 @@ class EmployeeImportService
                     throw new ImportAbortedException("Komit dibatalkan: {$import->processingFailures} baris gagal diproses akibat kendala sistem. Tidak ada data yang tersimpan, silakan coba lagi atau hubungi administrator sistem.");
                 }
 
+                // Karyawan yang tanggal pensiunnya sudah tiba langsung diberhentikan, dalam transaksi yang sama.
+                $retired = $this->retireDueImportedEmployees($import, $user);
+
                 $summary = $import->getImportSummary();
-                $log = $this->recordAuditLog($summary, $user, $ip, $userAgent, $fileName, $fileSize, $token, $fileHash, $approvedLog);
+                $summary['retired'] = $retired;
+                $log = $this->audit->record($summary, $user, $ip, $userAgent, $fileName, $fileSize, $token, $fileHash, $approvedLog);
 
                 // Rekaman perubahan per karyawan disimpan dalam transaksi yang sama agar impor dapat dibatalkan.
                 foreach ($import->changes as $change) {
@@ -429,6 +422,68 @@ class EmployeeImportService
         }
     }
 
+    /** Satu kalimat hasil impor (disimpan, atau komit selesai) untuk pesan keberhasilan pada layar daftar karyawan. */
+    public static function resultMessage(array $summary): string
+    {
+        return "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.".self::retiredNote($summary);
+    }
+
+    /**
+     * Kalimat tambahan untuk pesan hasil komit bila ada karyawan yang langsung diberhentikan karena pensiun.
+     */
+    public static function retiredNote(array $summary): string
+    {
+        $retired = (int) ($summary['retired'] ?? 0);
+
+        return $retired > 0
+            ? " {$retired} karyawan telah mencapai Batas Usia Pensiun dan otomatis dipindahkan ke arsip Pensiun."
+            : '';
+    }
+
+    /**
+     * Memberhentikan karyawan hasil impor yang tanggal pensiun efektifnya sudah tiba (DOMAIN.md §5.1), tanpa menunggu
+     * pekerjaan harian `hr:process-retirements`, agar daftar aktif, arsip pensiun, dan kursi formasi langsung konsisten.
+     * Hanya karyawan yang diubah impor ini yang diproses; sisanya tetap urusan pekerjaan harian. Berjalan di dalam
+     * transaksi komit: sidik jari pembatalan diperbarui dan riwayat jabatan yang ditutup direkam, sehingga pembatalan
+     * impor tetap dapat mengembalikan karyawan beserta jabatannya.
+     *
+     * @return int jumlah karyawan yang diberhentikan
+     */
+    private function retireDueImportedEmployees(EmployeesImport $import, ?User $user): int
+    {
+        $niks = array_values(array_unique(array_column($import->changes, 'nik')));
+        if ($niks === []) {
+            return 0;
+        }
+
+        $openBefore = JobHistory::query()->active()->whereIn('employee_nik', $niks)->get()
+            ->groupBy('employee_nik')
+            ->map(fn ($histories) => $histories->map(fn (JobHistory $h) => [
+                'id' => $h->id,
+                'created' => false,
+                'before' => ['tmt_akhir' => null, 'catatan' => $h->catatan],
+            ])->values()->all());
+
+        $result = app(PensiunService::class)->processDue(
+            null, false, $niks, $user, 'Diproses otomatis setelah impor Excel (tanggal pensiun sudah tiba)'
+        );
+        $retired = array_column($result['items'], 'nik');
+        if ($retired === []) {
+            return 0;
+        }
+
+        foreach ($import->changes as $i => $change) {
+            if (! in_array($change['nik'], $retired, true)) {
+                continue;
+            }
+
+            $import->changes[$i]['jobs'] = array_merge($change['jobs'], $openBefore->get($change['nik'], []));
+            $import->changes[$i]['after_hash'] = Employee::stateHash(Employee::findOrFail($change['nik']));
+        }
+
+        return count($retired);
+    }
+
     /**
      * Membaca spreadsheet; berkas yang tidak dapat dibaca menjadi galat yang aman ditampilkan, bukan galat 500.
      */
@@ -444,65 +499,6 @@ class EmployeeImportService
     }
 
     /**
-     * Audit Trail Pencatatan Impor Massal Karyawan (UU PDP No. 27/2022 & Tata Kelola Keamanan BUMN).
-     * Dipanggil di dalam transaksi komit; kegagalan mencatat membatalkan komit.
-     */
-    private function recordAuditLog(array $summary, ?User $user, ?string $ip, ?string $userAgent, string $fileName, int $fileSize, ?string $token, string $fileHash, ?EmployeeImportLog $approvedLog = null): EmployeeImportLog
-    {
-        $result = [
-            'file_name' => $fileName,
-            'file_size' => $fileSize,
-            'file_sha256' => $fileHash,
-            'stored_path' => null,
-            'total_rows' => $summary['total_processed'] ?? 0,
-            'created_count' => $summary['created'] ?? 0,
-            'updated_count' => $summary['updated'] ?? 0,
-            'unchanged_count' => $summary['unchanged'] ?? 0,
-            'skipped_count' => $summary['skipped'] ?? 0,
-            'has_errors' => $summary['has_errors'] ?? false,
-            'status' => EmployeeImportLog::STATUS_COMPLETED,
-            'committed_at' => now(),
-            'token' => $token,
-            'metadata' => [
-                'file_sha256' => $fileHash,
-                'summary' => $this->redactSummary($summary),
-            ],
-        ];
-
-        // Impor yang disetujui memperbarui catatan pengajuan (pengaju tetap tercatat sebagai pengaju).
-        if ($approvedLog) {
-            $approvedLog->update($result);
-
-            return $approvedLog;
-        }
-
-        return EmployeeImportLog::create($result + [
-            'user_id' => $user?->id,
-            'user_name' => $user?->name ?? 'System Administrator',
-            'user_email' => $user?->email,
-            'ip_address' => $ip,
-            'user_agent' => $userAgent,
-        ]);
-    }
-
-    /**
-     * Ringkasan untuk jejak audit persisten tanpa data pribadi (NIK, nama, baris contoh): hanya
-     * hitungan dan pesan galat per nomor baris (UU PDP No. 27/2022).
-     */
-    private function redactSummary(array $summary): array
-    {
-        unset($summary['sample_rows']);
-        // Pesan galat dapat memuat NIK (mis. duplikat): disamarkan sebelum disimpan permanen.
-        $mask = fn (string $text): string => preg_replace_callback('/\b[0-9]{8}\b/', fn (array $m) => substr($m[0], 0, 2).'****'.substr($m[0], -2), $text) ?? $text;
-        $summary['errors'] = array_map(
-            fn (array $error) => ['row' => $error['row'] ?? null, 'errors' => array_map(fn ($message) => $mask((string) $message), $error['errors'] ?? [])],
-            $summary['errors'] ?? []
-        );
-
-        return $summary;
-    }
-
-    /**
      * Dijalankan oleh ProcessEmployeeImportCommitJob pada worker antrean latar belakang.
      */
     public function processCommitJob(
@@ -512,31 +508,31 @@ class EmployeeImportService
         ?string $userAgent = null
     ): array {
         try {
-            $cached = Cache::get("import_preview_{$token}");
+            $cached = $this->sessions->preview($token);
             if (! $cached || ! Storage::disk(self::DISK)->exists($cached['file_path'])) {
                 throw new \RuntimeException('Sesi pratinjau impor telah kedaluwarsa atau berkas tidak ditemukan.');
             }
 
-            Cache::put("import_commit_job_{$token}", [
+            $this->sessions->putCommitJob($token, [
                 'status' => 'processing',
                 'progress' => 50,
                 'message' => 'Sedang menulis data ke tabel master kepegawaian...',
                 'token' => $token,
                 'type' => 'commit',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             return $this->executeCommit($cached, $token, $user, $ip, $userAgent);
         } catch (\Throwable $e) {
             Log::error("Gagal menjalankan commit import background job [Token: {$token}]: ".$e->getMessage());
-            Cache::forget($this->commitGuardKey($token));
+            $this->sessions->releaseCommit($token);
             app(EmployeeImportGovernanceService::class)->releaseApproval($token);
 
-            Cache::put("import_commit_job_{$token}", [
+            $this->sessions->putCommitJob($token, [
                 'status' => 'failed',
                 'error' => 'Gagal mengeksekusi komit data: '.$e->getMessage(),
                 'token' => $token,
                 'type' => 'commit',
-            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            ]);
 
             throw $e;
         }
@@ -580,77 +576,6 @@ class EmployeeImportService
     }
 
     /**
-     * Memeriksa status antrean kerja impor (pratinjau atau komit).
-     */
-    public function getJobStatus(string $token): ?array
-    {
-        return Cache::get("import_commit_job_{$token}")
-            ?? Cache::get("import_job_{$token}");
-    }
-
-    /**
-     * Mengambil daftar baris data yang gagal divalidasi dari sesi pratinjau maupun pasca-komit.
-     */
-    public function getFailedRows(string $token): ?array
-    {
-        $sealed = Cache::get("import_failed_rows_{$token}")
-            ?? Cache::get("import_report_{$token}")['failed_rows']
-            ?? Cache::get("import_preview_{$token}")['failed_rows']
-            ?? null;
-
-        return $sealed === null ? null : $this->openRows($sealed);
-    }
-
-    /**
-     * Mengambil data rekapitulasi komit impor karyawan untuk diunduh sebagai laporan Excel.
-     */
-    public function getImportReport(string $token): ?array
-    {
-        $report = Cache::get("import_report_{$token}");
-
-        if ($report === null) {
-            return null;
-        }
-
-        $report['rows'] = $this->openRows($report['rows'] ?? []);
-        $report['failed_rows'] = $this->openRows($report['failed_rows'] ?? []);
-
-        return $report;
-    }
-
-    /**
-     * Jejak audit unduhan berkas yang memuat data pribadi (laporan impor / baris gagal), tanpa NIK atau nama.
-     */
-    public function recordDownloadAudit(string $kind, string $token, ?User $user, ?string $ip, int $recordCount): void
-    {
-        Log::info('HRIS Unduh Berkas Impor Karyawan', [
-            'kind' => $kind,
-            'token' => $token,
-            'user_id' => $user?->id,
-            'user_name' => $user?->name ?? 'System',
-            'ip_address' => $ip,
-            'record_count' => $recordCount,
-            'timestamp' => now()->toIso8601String(),
-        ]);
-    }
-
-    /**
-     * Baris impor memuat data pribadi: di cache disimpan terenkripsi (UU PDP No. 27/2022).
-     */
-    private function sealRows(array $rows): string
-    {
-        return Crypt::encrypt($rows);
-    }
-
-    /**
-     * Membuka baris dari cache; nilai larik polos (cache lama) diteruskan apa adanya.
-     */
-    private function openRows(mixed $rows): array
-    {
-        return is_string($rows) ? Crypt::decrypt($rows) : (array) $rows;
-    }
-
-    /**
      * Membersihkan berkas spreadsheet sementara yang ditinggalkan tanpa komit.
      */
     public function purgeExpiredFiles(int $hours = 2): int
@@ -680,8 +605,8 @@ class EmployeeImportService
         ?string $userAgent = null
     ): array {
         // 1. Cek jika token berada dalam sesi antrean commit
-        if (Cache::has("import_commit_job_{$token}")) {
-            $cached = Cache::get("import_preview_{$token}");
+        if ($this->sessions->hasCommitJob($token)) {
+            $cached = $this->sessions->preview($token);
             if (! $cached || ! Storage::disk(self::DISK)->exists($cached['file_path'])) {
                 throw new \RuntimeException('Sesi komit impor telah kedaluwarsa atau berkas tidak ditemukan.');
             }
@@ -696,8 +621,8 @@ class EmployeeImportService
         }
 
         // 2. Cek jika token berada dalam sesi antrean preview
-        if (Cache::has("import_job_{$token}")) {
-            $jobData = Cache::get("import_job_{$token}");
+        if ($this->sessions->hasJob($token)) {
+            $jobData = $this->sessions->job($token);
             $storedPath = "imports/import_{$token}.xlsx";
 
             if (! Storage::disk(self::DISK)->exists($storedPath)) {

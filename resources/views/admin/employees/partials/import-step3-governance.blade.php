@@ -75,11 +75,7 @@
         <form action="{{ route('admin.employees.import.downloadReport') }}" method="POST" target="_blank" class="w-full">
             @csrf
             <input type="hidden" name="token" :value="importToken">
-            <button type="submit"
-                class="w-full py-2.5 px-4 rounded-xl border border-surface-200 bg-white hover:bg-surface-50 text-surface-700 text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer">
-                <i class="fas fa-file-excel text-primary-600 text-sm" aria-hidden="true"></i>
-                <span>Unduh Laporan Rekapitulasi (.xlsx)</span>
-            </button>
+            <x-admin.button type="submit" variant="secondary" icon="fas fa-file-excel" class="w-full">Unduh Laporan Rekapitulasi (.xlsx)</x-admin.button>
         </form>
     </div>
 </div>

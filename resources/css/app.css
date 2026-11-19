@@ -98,3 +98,19 @@
   background-position: right 4px center;
   background-repeat: no-repeat;
 }
+
+/* Scrollbar tipis bernada netral/bahaya dan latar titik diagram alur: dari token tema, supaya Blade tidak memakai style="" berwarna manual. */
+.scrollbar-soft {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-300) transparent;
+}
+
+.scrollbar-soft-danger {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-danger-200) transparent;
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(var(--color-surface-300) 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
+}

@@ -1048,6 +1048,8 @@ class MutasiProcessTest extends TestCase
             'jabatan' => 'Kasubag Madya', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-2',
             'golongan' => 'IIID',
             'tanggal_dalam_jabatan' => now()->subMonths(19)->toDateString(),
+            // Tetap: tanggal acak dari pabrik kadang persis sama dengan masa kerja pejabat petahana yang dihitung pada uji.
+            'tmt_unit_kerja' => now()->subYears(10)->toDateString(),
         ]);
         Employee::factory()->create(['jabatan' => 'Kabag Penuh', 'unit_kerja' => 'Bagian SDM', 'rm_level' => 'RM-1'] + $incumbent);
         Position::factory()->create(['nama' => 'Kabag Penuh', 'rm_level' => 'RM-1']);

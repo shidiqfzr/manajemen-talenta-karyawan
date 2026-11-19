@@ -6,10 +6,13 @@ use App\Exceptions\ImportAbortedException;
 use App\Http\Controllers\Controller;
 use App\Models\EmployeeImportLog;
 use App\Services\EmployeeImportGovernanceService;
+use App\Services\EmployeeImportService;
+use App\Services\Import\ImportSessionStore;
+use App\Support\HrisPermission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 /**
@@ -22,6 +25,8 @@ class EmployeeImportBatchController extends Controller
 
     public function index(Request $request): View|RedirectResponse
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         // Old links used `q`; the shared table reads `search`.
         if ($request->query->has('q')) {
             $query = $request->query();
@@ -43,6 +48,8 @@ class EmployeeImportBatchController extends Controller
 
     public function show(Request $request, EmployeeImportLog $log): View
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         $review = null;
         $reviewRows = null;
         $reviewError = null;
@@ -75,12 +82,14 @@ class EmployeeImportBatchController extends Controller
             'skippedGroups' => EmployeeImportGovernanceService::groupSkippedRows($skipped),
             'skippedRows' => $skipped,
             'correctionExpiresAt' => ($log->committed_at ?? $log->created_at)->copy()->addHours(2),
-            'canDownloadFailed' => $log->token && Cache::has("import_failed_rows_{$log->token}"),
+            'canDownloadFailed' => $log->token && app(ImportSessionStore::class)->hasFailedRows($log->token),
         ]);
     }
 
     public function approve(Request $request, EmployeeImportLog $log): RedirectResponse
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         $data = $request->validate(['reviewed_digest' => ['required', 'string', 'size:64']]);
 
         try {
@@ -91,13 +100,15 @@ class EmployeeImportBatchController extends Controller
 
         $message = ($result['is_async'] ?? false)
             ? 'Persetujuan diterima. Data karyawan sedang disimpan di antrean latar belakang.'
-            : "Impor disetujui dan disimpan: {$result['created']} data baru, {$result['updated']} data diperbarui, ".($result['unchanged'] ?? 0).' data tetap.';
+            : "Impor disetujui dan disimpan: {$result['created']} data baru, {$result['updated']} data diperbarui, ".($result['unchanged'] ?? 0).' data tetap.'.EmployeeImportService::retiredNote($result);
 
         return redirect()->route('admin.employees.import.batches.show', $log)->with('success', $message);
     }
 
     public function reject(Request $request, EmployeeImportLog $log): RedirectResponse
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:500']], [
             'reason.required' => 'Alasan wajib diisi.',
             'reason.min' => 'Alasan minimal 10 karakter agar tercatat jelas pada jejak audit.',
@@ -114,6 +125,8 @@ class EmployeeImportBatchController extends Controller
 
     public function rollback(Request $request, EmployeeImportLog $log): RedirectResponse
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:10', 'max:500'],
             'confirmation' => ['nullable', 'string', 'max:20'],

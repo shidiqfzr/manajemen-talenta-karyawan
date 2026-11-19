@@ -31,7 +31,7 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
             'STRATA KARYAWAN',
             'RM LEVEL',
             'STATUS KARYAWAN',
-            'STATUS PENUGASAN',
+            'STATUS JABATAN UTAMA',
             'JALUR MASUK',
             'AGAMA RESMI',
             'SUSUNAN KELUARGA (PTKP)',
@@ -51,7 +51,7 @@ class EmployeeTemplateReferenceSheet implements FromArray, WithEvents, WithHeadi
         $levels = array_keys(Employee::LEVELS);
         $rmLevels = array_keys(Position::RM_LEVEL_LIST);
         $employmentStatuses = ['Tetap (PKWTT)', 'Kontrak (PKWT)', 'Calon Pegawai'];
-        $assignmentStatuses = ['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'];
+        $assignmentStatuses = Employee::ASSIGNMENT_STATUSES_TEMPLATE;
         $entryChannels = array_keys(Employee::ENTRY_CHANNELS);
         $religions = Employee::RELIGIONS;
         $familyStatuses = array_keys(Employee::FAMILY_STATUSES);

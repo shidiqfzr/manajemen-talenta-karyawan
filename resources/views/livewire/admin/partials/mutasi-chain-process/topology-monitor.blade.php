@@ -140,8 +140,7 @@
                     </div>
 
                     <!-- Horizontal Flow Diagram for this Cluster -->
-                    <div class="p-4 sm:p-5 bg-surface-50/70 overflow-x-auto shadow-inner relative"
-                         style="background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px); background-size: 20px 20px;">
+                    <div class="p-4 sm:p-5 bg-surface-50/70 bg-dot-grid overflow-x-auto shadow-inner relative">
                         
                         <div class="flex items-center min-w-max py-2 px-1">
                             

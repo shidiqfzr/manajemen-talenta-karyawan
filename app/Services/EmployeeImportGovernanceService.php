@@ -8,6 +8,7 @@ use App\Models\EmployeeImportChange;
 use App\Models\EmployeeImportLog;
 use App\Models\JobHistory;
 use App\Models\User;
+use App\Services\Import\ImportSessionStore;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -99,7 +100,7 @@ class EmployeeImportGovernanceService
 
         // Berkas sementara pratinjau diganti berkas pengajuan; sesi pratinjau selesai.
         $disk->delete($source);
-        Cache::forget("import_preview_{$token}");
+        app(ImportSessionStore::class)->forgetPreview($token);
 
         Log::info('HRIS Impor Data Karyawan diajukan untuk persetujuan', [
             'batch_id' => $log->id, 'maker_id' => $maker->id, 'ip_address' => $ip, 'file_sha256' => $hash,

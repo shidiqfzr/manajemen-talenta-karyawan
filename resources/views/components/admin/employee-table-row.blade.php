@@ -55,13 +55,6 @@
                             <span aria-hidden="true">MBT</span>
                             <span class="sr-only">Masa Bebas Tugas (MBT)</span>
                         </span>
-                    @elseif($employee->isApproachingMbt())
-                        <span class="inline-flex shrink-0 items-center gap-1 rounded border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[10px] font-medium text-warning-800"
-                            title="Karyawan menjelang MBT pada {{ $employee->effective_tanggal_mbt?->format('d M Y') }} (sisa {{ $employee->mbt_countdown }})">
-                            <i class="fas fa-hourglass-start text-[10px]" aria-hidden="true"></i>
-                            <span aria-hidden="true">MBT · {{ $employee->mbt_countdown }}</span>
-                            <span class="sr-only">Menjelang MBT ({{ $employee->mbt_countdown }})</span>
-                        </span>
                     @endif
                 </div>
                 {{-- Sanksi jarang dan perlu tindakan: tetap sebagai lencana terbaca di baris sendiri di bawah NIK. --}}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\HrisPermission;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportEmployeeFileRequest extends FormRequest
@@ -11,7 +12,7 @@ class ImportEmployeeFileRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can(HrisPermission::KARYAWAN_IMPORT) ?? false;
     }
 
     /**
