@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 8765;
 
 /**
- * Evaluasi UI/UX otomatis di browser nyata (ENGINEERING.md §3.8).
+ * Evaluasi UI/UX otomatis di browser nyata (ENGINEERING.md §3.6).
  * Server uji memakai basis data SQLite sementara yang di-seed ulang setiap proses,
  * sehingga data pengembangan tidak tersentuh.
  */
