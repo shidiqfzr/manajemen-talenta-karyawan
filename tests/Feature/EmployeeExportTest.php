@@ -143,7 +143,7 @@ class EmployeeExportTest extends TestCase
         $this->assertSame('UNIT KERJA', $headings[10]);
         $this->assertSame('GOLONGAN', $headings[11]);
         $this->assertSame('RM LEVEL', $headings[12]);
-        $this->assertSame('STATUS PENUGASAN', $headings[13]);
+        $this->assertSame('STATUS JABATAN UTAMA', $headings[13]);
         $this->assertSame('TUGAS RANGKAP / PENUGASAN SEMENTARA', $headings[14], 'Kolom 15 (O) harus memuat Tugas Rangkap');
         $this->assertSame('TMT BEKERJA', $headings[15]);
         $this->assertSame('TANGGAL DIANGKAT STAF', $headings[16]);
@@ -230,6 +230,8 @@ class EmployeeExportTest extends TestCase
         $rowSingle = $export->map($empSingleLoaded);
         $rowPlt = $export->map($empPltLoaded);
         $rowMulti = $export->map($empMultiLoaded);
+
+        $this->assertSame('Laki-laki', $rowSingle[2], 'Jenis kelamin diekspor sebagai kata lengkap, sama dengan pilihan dropdown template.');
 
         // Validasi Karyawan 1: Kolom O (index 14) harus kosong
         $this->assertSame('', $rowSingle[14], 'Karyawan tanpa tugas rangkap harus memiliki sel kosong di kolom tugas rangkap');

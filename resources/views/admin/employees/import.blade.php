@@ -5,7 +5,7 @@
     // Jumlah kolom mengikuti kamus kolom (satu sumber), bukan angka tetap pada teks.
     $guideTotal = collect($dictionaryCategories)->flatMap(fn ($category) => $category['columns'])->count();
 @endphp
-<div x-data="employeeImportWizard()" class="space-y-6 max-w-7xl mx-auto pb-12">
+<div x-data="employeeImportWizard(@js($wizard))" @open-import-diff.window="openDiffModal($event.detail)" class="space-y-6 max-w-7xl mx-auto pb-12">
     {{-- MODAL PROSES LATAR BELAKANG & INSPEKSI PERUBAHAN --}}
     @include('admin.employees.partials.import-async-modal')
     @include('admin.employees.partials.import-diff-modal')
@@ -60,8 +60,5 @@
     @include('admin.employees.partials.import-step3')
 
 </div>
-
-{{-- LOGIKA KOMPONEN ALPINE.JS & EVENT LISTENERS --}}
-@include('admin.employees.partials.import-wizard-script')
 
 @endsection

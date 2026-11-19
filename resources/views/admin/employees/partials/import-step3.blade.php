@@ -116,12 +116,7 @@
                     <form action="{{ route('admin.employees.import.downloadFailed') }}" method="POST" target="_blank" class="shrink-0 w-full sm:w-auto">
                         @csrf
                         <input type="hidden" name="token" :value="importToken">
-                        <button type="submit"
-                            style="background-color: #B91C1C !important; color: #FFFFFF !important;"
-                            class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-danger-700 hover:bg-danger-800 active:scale-[0.99] text-white text-xs font-bold transition shadow-2xs cursor-pointer border border-danger-800 hover:shadow-xs">
-                            <i class="fas fa-file-arrow-down text-xs" aria-hidden="true"></i>
-                            <span>Unduh Berkas Koreksi</span>
-                        </button>
+                        <x-admin.button type="submit" variant="secondary" size="sm" icon="fas fa-file-arrow-down" class="w-full sm:w-auto">Unduh Berkas Koreksi</x-admin.button>
                     </form>
                 </div>
             </template>

@@ -80,7 +80,7 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - `App\Services\JobVacancyService`: Deteksi formasi kosong manajerial aktif.
   - `App\Services\TrainingExportService`: Ekspor laporan dan surat tugas.
   - `App\Services\EmployeeExportService`: Orkestrasi ekspor data kepegawaian berstandar UU PDP No. 27/2022, sanitasi parameter filter, penyematan metadata/print footer rahasia, dan pencatatan audit trail.
-  - `App\Services\EmployeeImportService`: Validasi pra-impor, preview dry-run, dan jejak audit impor tanpa data pribadi.
+  - `App\Services\EmployeeImportService`: Orkestrasi alur impor (pratinjau dry-run, komit atomik, eksekusi hibrida sinkron/antrean). Tanggung jawab lain dipisah: `Import\ImportSessionStore` (satu-satunya pemilik kunci, masa berlaku, kepemilikan, dan enkripsi sesi di cache), `Import\ImportAuditRecorder` (catatan komit `employee_import_logs` dan log unduhan tanpa data pribadi), `Import\EmployeeImportDiffer` (rincian perubahan dan pemeriksaan baris identik), `Import\ImportDateParser` (normalisasi tanggal), `Import\EmployeeImportWizardConfig` (konfigurasi untuk wizard), dan `Import\EmployeeImportColumns` (satu-satunya definisi kolom). Controller dan komponen Livewire memakai `ImportSessionStore`, bukan `Cache::*` langsung.
   - `App\Services\EmployeeImportGovernanceService`: Persetujuan empat mata (maker-checker), pembatalan (undo) impor, dan pembersihan pengajuan/rekaman kedaluwarsa; kebijakan diatur pada `config/hris.php`.
   - `App\Services\Structure\StructureDecreeService`: Siklus SK struktur organisasi (draf, tinjau, ajukan, setujui, terapkan). Penerapan berjalan dalam satu `DB::transaction()` dan memanggil operasi `MasterFormasiService`, bukan menulis tabel master langsung; `StructureDiffCalculator` murni (tanpa akses basis data). Perintah `hr:apply-structure-decrees` dijadwalkan harian 00:00 (UTC), sebelum `hr:apply-effective-mutations`; izin `struktur.prepare` dan `struktur.approve` pada `config/hris.php`. Lihat DOMAIN.md §3.7.
   - `App\Services\KepegawaianPolicy`: Satu-satunya sumber Batas Usia Pensiun (56), MBT (T-1), dan rentang grade per strata Karpim/Karpel. Dilarang menulis ulang angka-angka ini di model, validator, atau layar.
@@ -122,7 +122,7 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - URL query string: `search`, `sort`, `direction`, `per_page` dikelola trait; properti filter modul memakai `#[Url(as: '...', except: '')]`. Tabel sematan (beberapa tabel dalam satu halaman) menonaktifkan sinkronisasi URL (`syncsUrl()` false) dan memakai `paginationName()` yang unik.
   - Aksi massal dan ekspor: izin Gate diperiksa pada setiap panggilan sebelum ada query, aksi massal dijalankan dalam `DB::transaction()` bersama catatan audit, dan keduanya tercatat lewat `MasterAuditLog` tanpa kata kunci pencarian. Ekspor hanya Excel dengan batas 10.000 baris; sel berawalan `=`, `+`, `-`, `@`, tab, atau CR dinetralkan oleh satu penjaga `App\Support\SpreadsheetCell::neutralise()`; semua exporter wajib memakainya dan dilarang menulis ulang aturannya (diuji di `SpreadsheetCellTest`).
   - Properti publik Livewire dapat diubah klien: ID induk tabel (mis. `employeeId`) **wajib** `#[Locked]`, dan metode yang mengembalikan Builder atau penangan aksi massal (`bulk<Nama>`) **wajib** `protected`.
-  - Komponen tabel yang memakai trait: `Tables\JobHistoryTable`, `Tables\EvaluationTable`, `Tables\TrainingTable`, `Admin\Master\AuditHistory`, `Admin\MutasiHistory`, ditambah `Admin\EvaluationIndexTable`, `Admin\TrainingIndexTable`, `Admin\TrainingParticipantTable`, `Admin\Employees\ImportBatchTable`, dan `Admin\Employees\EmployeeTable`. Daftar berbasis koleksi (`Tables\JobVacancyTable`, daftar Formasi) tidak dapat memakai trait yang khusus Eloquent, sehingga hanya memakai komponen tampilan `x-admin.table.*`.
+  - Komponen tabel yang memakai trait: `Tables\JobHistoryTable`, `Tables\EvaluationTable`, `Tables\TrainingTable`, `Admin\Master\AuditHistory`, `Admin\MutasiHistory`, ditambah `Admin\EvaluationIndexTable`, `Admin\TrainingIndexTable`, `Admin\TrainingParticipantTable`, `Admin\Employees\ImportBatchTable`, dan `Admin\Employees\EmployeeTable`. Daftar berbasis koleksi (`Tables\JobVacancyTable`, daftar Formasi) tidak dapat memakai trait yang khusus Eloquent, sehingga hanya memakai komponen tampilan `x-admin.table.*`. Daftar berbasis koleksi yang bersumber dari cache sesi, seperti tabel pratinjau Impor Data Karyawan (`Admin\Employees\ImportPreviewTable`), memakai concern `WithCollectionTable`: pembacaan, pencarian, dan paginasi dilakukan di server (peramban tidak menerima seluruh baris), kepemilikan sesi diperiksa pada setiap permintaan, dan token sesi `#[Locked]` hanya dapat diganti oleh peristiwa yang divalidasi ulang di server.
   - Pengujian: perilaku trait di `WithDataTableTest`, komponen di `TableComponentsTest`, dan satu kelas uji per tabel modul.
 
 ### 2.4 Prinsip DRY (Don't Repeat Yourself) & Reusability
@@ -186,6 +186,9 @@ php artisan test --filter=ManPowerPlanningTest
 
 # Menjalankan pengujian dengan rincian stop-on-failure
 php artisan test --stop-on-failure
+
+# Menjalankan pengujian logika JavaScript (modul Alpine tanpa peramban, runner bawaan Node)
+npm run test:js
 ```
 
 ### 3.4 Standar Kerapihan Kode (Code Quality Gate)
@@ -211,6 +214,8 @@ npm run e2e           # menjalankan seluruh pengujian E2E
 - **Basis data terisolasi**: `tests/e2e/support/serve.mjs` membuat SQLite sementara (`tests/e2e/.tmp/`), menjalankan `migrate:fresh --seed`, lalu menyalakan server pada port 8765. Basis data pengembangan tidak tersentuh.
 - **Sesi**: `tests/e2e/auth.setup.js` login satu kali; seluruh pengujian memakai sesi tersebut.
 - **Cakupan minimum per fitur** (mengacu DESIGN.md §16): kosakata dan nilai baku dari SSOT, penjajaran/hierarki, nilai turunan dari Master Formasi, state error, tidak ada scroll horizontal pada 375px, 1366px, dan 1920px, serta pindai aksesibilitas WCAG 2.1 A/AA (axe-core) tanpa pelanggaran `serious`/`critical`.
+- **Wizard Impor Data Karyawan** (`tests/e2e/import-wizard.spec.js`): berkas uji dibuat `tests/e2e/support/make-import-fixtures.php` dari kursi formasi nyata pada basis data sementara (NIK sintetis pada rentang tersendiri agar tidak bertabrakan dengan seed lain). Spesifikasi menjalankan unggah, pratinjau, tab, pencarian, paginasi, dan bar konfirmasi; tahap komit sengaja tidak dijalankan di E2E agar data bersama spesifikasi lain tidak berubah (komit diuji di `EmployeeImportTest`). Karena server uji berutas tunggal, pratinjau diberi batas waktu panjang (`test.slow()`).
+- **Logika wizard** ada di modul `resources/js/admin/employee-import-wizard.js` (bukan skrip Blade) dan diuji dengan `tests/js/employee-import-wizard.test.js` (`npm run test:js`).
 - **Prinsip SUT (§3.5)** berlaku: satu berkas `*.spec.js` per layar/fitur, misalnya `employee-create.spec.js`.
 - **Jangan** memakai `waitForLoadState('networkidle')`; tunggu elemen atau kondisi yang relevan.
 - Server pengembangan PHP bersifat satu-utas sehingga suite berjalan beberapa menit; hasil, tangkapan layar, dan trace kegagalan ada di `test-results/` dan `playwright-report/` (tidak di-commit).

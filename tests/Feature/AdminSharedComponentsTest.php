@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
@@ -156,5 +157,40 @@ class AdminSharedComponentsTest extends TestCase
 
         $view->assertDontSee('Salin kode verifikasi berkas');
         $view->assertSee('-');
+    }
+
+    public function test_approval_policy_notice_switches_title_icon_and_tone_with_the_policy(): void
+    {
+        $markup = <<<'BLADE'
+        <x-admin.approval-policy-notice :active="$active">
+            <x-slot:enabled>Teks aktif.</x-slot:enabled>
+            <x-slot:disabled>Teks nonaktif.</x-slot:disabled>
+            Kalimat penutup.
+        </x-admin.approval-policy-notice>
+        BLADE;
+
+        $off = $this->blade($markup, ['active' => false]);
+        $off->assertSee('Persetujuan dua pihak (empat mata) belum diaktifkan.');
+        $off->assertSeeInOrder(['Teks nonaktif.', 'Kalimat penutup.']);
+        $off->assertDontSee('Teks aktif.');
+        $off->assertSee('fa-circle-info', false);
+        $off->assertSee('role="status"', false);
+
+        $on = $this->blade($markup, ['active' => true]);
+        $on->assertSee('Persetujuan dua pihak (empat mata) aktif.');
+        $on->assertSeeInOrder(['Teks aktif.', 'Kalimat penutup.']);
+        $on->assertDontSee('Teks nonaktif.');
+        $on->assertSee('fa-user-shield', false);
+    }
+
+    public function test_the_approval_policy_title_is_written_only_in_the_shared_component(): void
+    {
+        $offenders = collect(File::allFiles(resource_path('views')))
+            ->filter(fn ($file) => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(fn ($file) => $file->getFilename() !== 'approval-policy-notice.blade.php')
+            ->filter(fn ($file) => str_contains(file_get_contents($file->getPathname()), 'Persetujuan dua pihak (empat mata)'))
+            ->map(fn ($file) => $file->getRelativePathname())->values()->all();
+
+        $this->assertSame([], $offenders, 'Pemberitahuan kebijakan empat mata wajib memakai <x-admin.approval-policy-notice>.');
     }
 }

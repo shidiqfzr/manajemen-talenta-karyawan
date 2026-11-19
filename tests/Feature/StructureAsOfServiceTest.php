@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\JobHistory;
+use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Services\Structure\StructureAsOfService;
 use App\Services\Structure\StructureReader;
@@ -137,6 +138,68 @@ class StructureAsOfServiceTest extends TestCase
 
         $this->assertSame([], $report['rows'][0]['holders']);
         $this->assertSame(2, $report['outside_structure']);
+    }
+
+    public function test_outside_structure_holders_are_listed_with_masked_nik_so_the_count_is_traceable(): void
+    {
+        $this->appliedDecree('SK/1', '2026-09-01', $this->seatSnapshot('Bagian Tanaman', 'Kepala Bagian'));
+        $this->holder('12345678', 'Penampung', 'Bagian Tanaman', 'Jabatan Penampungan', '2026-09-01');
+        $this->holder('10000002', 'Terdaftar', 'Bagian Tanaman', 'Kepala Bagian', '2026-09-01');
+
+        $report = $this->service->report(Carbon::parse('2026-10-01'));
+
+        $this->assertCount($report['outside_structure'], $report['outside_holders']);
+        $this->assertSame('Penampung', $report['outside_holders'][0]['nama']);
+        $this->assertSame('Bagian Tanaman', $report['outside_holders'][0]['unit']);
+        $this->assertSame('Jabatan Penampungan', $report['outside_holders'][0]['jabatan']);
+        $this->assertSame('*****678', $report['outside_holders'][0]['nik_masked']);
+        $this->assertStringNotContainsString('12345678', json_encode($report['outside_holders']));
+    }
+
+    public function test_concurrent_assignments_outside_the_structure_are_reported_apart_and_not_as_mismatches(): void
+    {
+        $this->appliedDecree('SK/1', '2026-09-01', $this->seatSnapshot('Bagian Tanaman', 'Kepala Bagian'));
+        $this->holder('10000001', 'Rangkap', 'Bagian Tanaman', 'Asisten Lain', '2026-09-01', null, ['status_penugasan' => 'Plt']);
+        $this->holder('10000002', 'Pj', 'Unit Lain', 'Manajer Lain', '2026-09-01', null, ['status_penugasan' => 'Pj']);
+        $this->holder('10000003', 'Definitif Salah', 'Bagian Tanaman', 'Asisten Lain', '2026-09-01', null, ['status_penugasan' => 'Definitif']);
+
+        $report = $this->service->report(Carbon::parse('2026-10-01'));
+
+        $this->assertSame(1, $report['outside_structure']);
+        $this->assertSame(['Definitif Salah'], array_column($report['outside_holders'], 'nama'));
+        $this->assertSame(2, $report['concurrent_outside']);
+        $this->assertEqualsCanonicalizing(['Rangkap', 'Pj'], array_column($report['concurrent_holders'], 'nama'));
+        $this->assertStringNotContainsString('10000001', json_encode($report['concurrent_holders']));
+    }
+
+    public function test_outside_holders_are_diagnosed_so_admins_know_what_to_correct(): void
+    {
+        Position::create(['nama' => 'Advisor Tanaman', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true, 'is_overflow' => true]);
+        $this->appliedDecree('SK/1', '2026-09-01', ['units' => [
+            'Bagian Tanaman' => ['kode' => 'Bagian', 'wilayah' => 'Wilayah X', 'urutan' => 1, 'is_active' => true, 'seats' => [
+                'Kepala Bagian Tanaman' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+                'Kepala Sub Bagian A' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+                'Kepala Sub Bagian B' => ['rm_level' => 'RM-3', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+            ]],
+            'Kebun Tajati' => ['kode' => 'Kebun', 'wilayah' => 'Wilayah X', 'urutan' => 2, 'is_active' => true, 'seats' => [
+                'Manajer' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+            ]],
+        ]]);
+        $this->holder('10000001', 'Pool', 'Bagian Tanaman', 'Advisor Tanaman', '2026-09-01');
+        $this->holder('10000002', 'Unit Lama', 'Unit Yang Dulu Ada', 'Manajer', '2026-09-01');
+        $this->holder('10000003', 'Salah Unit', 'Bagian Tanaman', 'Manajer', '2026-09-01');
+        $this->holder('10000004', 'Terpotong', 'Bagian Tanaman', 'Kepala Bagian', '2026-09-01');
+        $this->holder('10000005', 'Ambigu', 'Bagian Tanaman', 'Kepala Sub', '2026-09-01');
+        $this->holder('10000006', 'Asing', 'Bagian Tanaman', 'Pengawas Wilayah', '2026-09-01');
+
+        $byName = collect($this->service->report(Carbon::parse('2026-10-01'))['outside_holders'])->keyBy('nama');
+
+        $this->assertSame(['penampungan', null], [$byName['Pool']['reason'], $byName['Pool']['hint']]);
+        $this->assertSame('unit_tidak_ada', $byName['Unit Lama']['reason']);
+        $this->assertSame(['jabatan_di_unit_lain', 'Kebun Tajati'], [$byName['Salah Unit']['reason'], $byName['Salah Unit']['hint']]);
+        $this->assertSame(['nama_jabatan_berbeda', 'Kepala Bagian Tanaman'], [$byName['Terpotong']['reason'], $byName['Terpotong']['hint']]);
+        $this->assertSame(['jabatan_tidak_ada', null], [$byName['Ambigu']['reason'], $byName['Ambigu']['hint']], 'a hint is given only when exactly one seat matches');
+        $this->assertSame('jabatan_tidak_ada', $byName['Asing']['reason']);
     }
 
     public function test_versions_list_each_applied_decree_with_its_period_and_totals_newest_first(): void

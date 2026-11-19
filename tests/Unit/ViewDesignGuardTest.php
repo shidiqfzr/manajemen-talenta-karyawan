@@ -173,6 +173,22 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_no_literal_color_is_set_through_an_inline_style_attribute(): void
+    {
+        $this->assertNoViolations(
+            $this->occurrences('/(?<![\w:-])style="[^"]*(?:#[0-9a-fA-F]{3,8}\b|rgba?\()[^"]*"/'),
+            'Dilarang style="…" dengan warna hex/rgb manual. Pakai token dari @theme atau komponen x-admin.button (DESIGN.md §3.1).'
+        );
+    }
+
+    public function test_screens_never_use_the_large_button_size(): void
+    {
+        $this->assertNoViolations(
+            $this->occurrences('/<x-admin\.button[^>]*\ssize="lg"/'),
+            'Ukuran tombol layar: md (bawaan) untuk aksi utama, sm untuk aksi sekunder dalam kartu atau baris. Ukuran lg tidak dipakai (DESIGN.md §6.1).'
+        );
+    }
+
     public function test_no_dark_mode_classes_are_used(): void
     {
         $this->assertNoViolations(
@@ -402,11 +418,15 @@ class ViewDesignGuardTest extends TestCase
 
     public function test_file_uploads_use_the_shared_upload_component(): void
     {
-        // Utang desain tercatat (DESIGN.md §17 D20): form lama yang belum dimigrasi ke x-admin.file-upload. Tidak boleh bertambah.
-        $debt = [
+        // Komponen bersama pemilik <input type="file">: isian Livewire (file-upload) dan area tarik-dan-lepas Alpine (file-dropzone).
+        $shared = [
             'components/admin/file-upload.blade.php',
+            'components/admin/file-dropzone.blade.php',
+        ];
+        // Utang desain tercatat (DESIGN.md §17 D20): form lama yang belum dimigrasi ke komponen bersama. Tidak boleh bertambah.
+        $debt = [
+            ...$shared,
             'components/admin/employee-form.blade.php',
-            'admin/employees/partials/import-step1.blade.php',
             'admin/trainings/add-participant.blade.php',
             'admin/trainings/edit-participant.blade.php',
         ];

@@ -144,7 +144,7 @@
                         </button>
 
                         <div x-show="showList" x-collapse x-cloak class="mt-3 bg-white/60 border border-danger-200 rounded-lg p-3 backdrop-blur-sm shadow-inner">
-                            <div class="max-h-56 overflow-y-auto space-y-2 pr-2" style="scrollbar-width: thin; scrollbar-color: #fca5a5 transparent;">
+                            <div class="max-h-56 overflow-y-auto space-y-2 pr-2 scrollbar-soft-danger">
                                 @foreach($expiredSanksiEmployees as $emp)
                                     <div class="flex items-center justify-between gap-4 py-2 border-b border-danger-100 last:border-0 hover:bg-danger-50/50 transition-colors px-2 rounded-md">
                                         <div>

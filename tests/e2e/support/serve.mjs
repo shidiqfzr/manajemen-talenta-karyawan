@@ -17,7 +17,8 @@ const env = {
     ...process.env,
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: database,
-    CACHE_STORE: 'array',
+    // Basis data (bukan array): pratinjau impor disimpan di cache pada satu permintaan dan dibaca tabel Livewire pada permintaan berikutnya.
+    CACHE_STORE: 'database',
     SESSION_DRIVER: 'file',
     QUEUE_CONNECTION: 'sync',
 };
@@ -27,7 +28,7 @@ if (migrate.status !== 0) {
     process.exit(migrate.status ?? 1);
 }
 
-for (const script of ['seed-import-batch.php', 'seed-import-states.php', 'seed-structure-versions.php']) {
+for (const script of ['seed-import-batch.php', 'seed-import-states.php', 'seed-structure-versions.php', 'make-import-fixtures.php']) {
     const seed = spawnSync('php', ['artisan', 'tinker', `--execute=include 'tests/e2e/support/${script}';`], { cwd: root, env, stdio: 'inherit' });
     if (seed.status !== 0) {
         process.exit(seed.status ?? 1);

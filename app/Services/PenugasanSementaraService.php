@@ -16,8 +16,8 @@ class PenugasanSementaraService
     public function tambahPenugasan(Employee $employee, array $data): JobHistory
     {
         // Validasi status penugasan agar hanya menerima Plt/Pjs atau sejenisnya
-        $statusPenugasan = $data['status_penugasan'] ?? 'Pejabat Sementara (Pjs)';
-        if (! in_array($statusPenugasan, ['Pejabat Sementara (Pjs)', 'Plt', 'Diperbantukan'])) {
+        $statusPenugasan = $data['status_penugasan'] ?? Employee::STATUS_PJS;
+        if (! in_array($statusPenugasan, [Employee::STATUS_PJS, Employee::STATUS_PLT, Employee::STATUS_DIPERBANTUKAN])) {
             throw new InvalidArgumentException('Status penugasan sementara tidak valid.');
         }
 

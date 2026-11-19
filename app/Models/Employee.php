@@ -140,6 +140,31 @@ class Employee extends Model
     /**
      * Strata Karyawan (DOMAIN.md Bab 3).
      */
+    /**
+     * Status penugasan yang diterima impor dan formulir: status jabatan utama karyawan (kolom Jabatan), bukan status tugas
+     * rangkap. Advisor dan Diperbantukan dipertahankan agar berkas dan data lama tetap sah (keputusan SDM masih menunggu,
+     * DOMAIN.md §5.4 butir 7).
+     */
+    public const STATUS_DEFINITIF = 'Definitif';
+
+    public const STATUS_DIPERBANTUKAN = 'Diperbantukan';
+
+    public const STATUS_PJS = 'Pejabat Sementara (Pjs)';
+
+    public const STATUS_TUGAS_BELAJAR = 'Tugas Belajar';
+
+    public const STATUS_ADVISOR = 'Advisor';
+
+    /** Status pada tugas rangkap (job_histories), bukan status jabatan utama karyawan. */
+    public const STATUS_PLT = 'Plt';
+
+    public const STATUS_PJ = 'Pj';
+
+    public const ASSIGNMENT_STATUSES = [self::STATUS_DEFINITIF, self::STATUS_DIPERBANTUKAN, self::STATUS_PJS, self::STATUS_TUGAS_BELAJAR, self::STATUS_ADVISOR];
+
+    /** Pilihan pada dropdown template impor: Advisor/Diperbantukan adalah jabatan penampungan, dipilih pada kolom Jabatan. */
+    public const ASSIGNMENT_STATUSES_TEMPLATE = [self::STATUS_DEFINITIF, self::STATUS_PJS, self::STATUS_TUGAS_BELAJAR];
+
     public const LEVELS = [
         self::LEVEL_KARPIM => 'Karyawan Pimpinan (Karpim)',
         self::LEVEL_KARPEL => 'Karyawan Pelaksana (Karpel)',
@@ -280,6 +305,25 @@ class Employee extends Model
             ->whereNotNull($this->qualifyColumn('tanggal_mbt'))
             ->whereDate($this->qualifyColumn('tanggal_mbt'), '>', today())
             ->whereDate($this->qualifyColumn('tanggal_mbt'), '<=', today()->addMonthsNoOverflow(KepegawaianPolicy::MBT_PERINGATAN_BULAN));
+    }
+
+    /** Pilihan filter Status Kepegawaian pada daftar karyawan dan ekspornya; bawaan (tanpa pilihan) = karyawan aktif. */
+    public const STATUS_KEPEGAWAIAN_FILTERS = [
+        'mbt' => 'MBT',
+        'pensiun' => 'Pensiun',
+    ];
+
+    /** Satu-satunya pintu filter Status Kepegawaian (tabel dan ekspor); nilai tak dikenal = karyawan aktif. */
+    public function scopeStatusKepegawaian($query, ?string $status)
+    {
+        return match ($status) {
+            'pensiun' => $query->berhenti(),
+            // MBT = sedang menjalani MBT: tanggal MBT sudah tiba dan tanggal pensiun belum. Menjelang MBT dan yang sudah lewat BUP bukan MBT (DOMAIN.md §5.1).
+            'mbt' => $query->mbt()->where(fn ($q) => $q
+                ->whereNull($this->qualifyColumn('tanggal_pensiun'))
+                ->orWhereDate($this->qualifyColumn('tanggal_pensiun'), '>', today())),
+            default => $query->aktif(),
+        };
     }
 
     /** Sudah diberhentikan dari jabatan (pensiun diproses); beda dengan isPensionReached() yang hanya menilai tanggal. */

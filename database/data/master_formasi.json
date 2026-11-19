@@ -1700,14 +1700,14 @@
                 "kuota": 3
             },
             {
-                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas dan Perizinan",
+                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas & Perizinan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Bidang Teknik dan Pengolahan",
+                "nama": "Asisten Bidang Teknik & Pengolahan",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1740,7 +1740,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas dan Perizinan",
+                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas & Perizinan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1754,7 +1754,7 @@
                 "kuota": 3
             },
             {
-                "nama": "Asisten Bidang Teknik dan Pengolahan",
+                "nama": "Asisten Bidang Teknik & Pengolahan",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1787,14 +1787,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Bidang Tanaman dan Plasma",
+                "nama": "Asisten Bidang Tanaman & Plasma",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 3
             },
             {
-                "nama": "Asisten Bidang Teknik dan Pengolahan",
+                "nama": "Asisten Bidang Teknik & Pengolahan",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1808,7 +1808,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas dan Perizinan",
+                "nama": "Asisten Bidang Keuangan, Pengadaan, Umum, Humas & Perizinan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1838,7 +1838,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1873,7 +1873,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1903,7 +1903,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1945,7 +1945,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Afdeling I dan II",
+                "nama": "Asisten Afdeling I & II",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -1987,14 +1987,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2066,21 +2066,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Afdeling VII dan VIII",
+                "nama": "Asisten Afdeling VII & VIII",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2173,21 +2173,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2252,14 +2252,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2338,21 +2338,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2424,7 +2424,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2438,7 +2438,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2503,14 +2503,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2575,21 +2575,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2647,14 +2647,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2726,21 +2726,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2798,14 +2798,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2842,14 +2842,14 @@
                 "kuota": 4
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2921,14 +2921,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -2958,14 +2958,14 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3058,14 +3058,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3102,7 +3102,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3130,7 +3130,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Afdeling VI dan VII",
+                "nama": "Asisten Afdeling VI & VII",
                 "bidang": "TAN",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3151,14 +3151,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3237,21 +3237,21 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Sipil, Traksi dan Alat Berat",
+                "nama": "Asisten Sipil, Traksi & Alat Berat",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Personalia dan Teknik Kebun",
+                "nama": "Asisten Personalia & Teknik Kebun",
                 "bidang": "UMU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3281,21 +3281,21 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Penerimaan Bokar dan Laboratorium",
+                "nama": "Asisten Penerimaan Bokar & Laboratorium",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3332,7 +3332,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3346,7 +3346,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3376,7 +3376,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3390,7 +3390,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3434,7 +3434,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3448,14 +3448,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Teknik dan Pengolahan Instalasi Tangki Timbun Tanah Merah (T3M)",
+                "nama": "Asisten Teknik & Pengolahan Instalasi Tangki Timbun Tanah Merah (T3M)",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3492,7 +3492,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3506,7 +3506,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3543,7 +3543,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3557,7 +3557,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3594,7 +3594,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3608,14 +3608,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Instalasi Pembinaan dan Pengapalan",
+                "nama": "Asisten Instalasi Pembinaan & Pengapalan",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3659,14 +3659,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 1
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3703,7 +3703,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3717,7 +3717,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3754,7 +3754,7 @@
                 "kuota": 2
             },
             {
-                "nama": "Asisten Teknik Reparasi dan Bengkel Umum",
+                "nama": "Asisten Teknik Reparasi & Bengkel Umum",
                 "bidang": "TEK",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3768,7 +3768,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Asisten Tata Usaha dan Keuangan",
+                "nama": "Asisten Tata Usaha & Keuangan",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3798,7 +3798,7 @@
                 "kuota": 1
             },
             {
-                "nama": "Staf Bidang Administrasi, Keuangan, dan Umum",
+                "nama": "Staf Bidang Administrasi, Keuangan & Umum",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
@@ -3842,14 +3842,14 @@
                 "kuota": 1
             },
             {
-                "nama": "Key User Modul FM,PS,BKM,SPB, dan D-Farm",
+                "nama": "Key User Modul FM,PS,BKM,SPB & D-Farm",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",
                 "kuota": 2
             },
             {
-                "nama": "Key User Modul PP, QM, dan Jembatan Timbang",
+                "nama": "Key User Modul PP, QM & Jembatan Timbang",
                 "bidang": "KEU",
                 "level": "Karpim",
                 "rm_level": "RM-3",

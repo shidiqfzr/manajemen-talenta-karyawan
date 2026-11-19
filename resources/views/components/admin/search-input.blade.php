@@ -8,6 +8,8 @@
     'clearUrl' => null,
     'debounce' => '300ms',
     'maxlength' => null,
+    'xModel' => null, // ekspresi Alpine milik komponen induk (penyaringan di peramban tanpa server); menggantikan model Livewire dan formulir
+    'label' => null, // nama aksesibel bila tidak ada label terlihat
     'containerClass' => 'relative flex-1',
 ])
 
@@ -22,6 +24,10 @@
         @keydown.window="if ($event.key === '{{ $shortcut }}' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) { $event.preventDefault(); $refs.searchInput.focus(); }"
     @endif
     x-data="{
+        @if($xModel)
+        get hasValue() { return !!({{ $xModel }}); },
+        clear() { {{ $xModel }} = ''; $refs.searchInput.focus(); },
+        @else
         hasValue: {{ $model ? 'false' : ($resolvedValue ? 'true' : 'false') }},
         init() {
             @if($model)
@@ -44,7 +50,8 @@
                     $refs.searchInput.form?.submit();
                 @endif
             @endif
-        }
+        },
+        @endif
     }">
 
     <!-- Search Icon -->
@@ -56,7 +63,9 @@
     <input type="text"
         x-ref="searchInput"
         id="{{ $resolvedId }}"
-        @if($model)
+        @if($xModel)
+            x-model="{{ $xModel }}"
+        @elseif($model)
             wire:model.live.debounce.{{ $debounce }}="{{ $model }}"
         @else
             name="{{ $name }}"
@@ -64,6 +73,7 @@
             @input="hasValue = !!$event.target.value"
         @endif
         placeholder="{{ $placeholder }}"
+        @if($label) aria-label="{{ $label }}" @endif
         @if($maxlength) maxlength="{{ $maxlength }}" @endif
         class="w-full pl-10 pr-16 py-2.5 bg-white border border-surface-300 rounded-xl text-xs sm:text-sm text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 transition shadow-2xs">
 
@@ -75,6 +85,7 @@
             x-cloak
             @click="clear()"
             class="text-surface-500 hover:text-danger transition p-1 cursor-pointer"
+            aria-label="Hapus pencarian"
             title="Hapus pencarian">
             <i class="fas fa-times-circle text-sm" aria-hidden="true"></i>
         </button>

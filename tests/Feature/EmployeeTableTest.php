@@ -78,21 +78,24 @@ class EmployeeTableTest extends TestCase
             ->assertSee('PGW-A05')->assertDontSee('PGW-A06');
     }
 
-    public function test_status_kepegawaian_filter_separates_mbt_and_menjelang_mbt(): void
+    public function test_status_kepegawaian_filter_follows_the_retirement_lifecycle(): void
     {
-        Employee::factory()->create(['nama' => 'KARYAWAN BIASA', 'tanggal_mbt' => null]);
-        Employee::factory()->create(['nama' => 'KARYAWAN MBT', 'tanggal_mbt' => today()->subMonth()]);
-        Employee::factory()->create(['nama' => 'KARYAWAN MENJELANG', 'tanggal_mbt' => today()->addMonths(2)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN BIASA', 'tanggal_mbt' => today()->addYears(5), 'tanggal_pensiun' => today()->addYears(5)->addMonths(6)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN JAUH', 'tanggal_mbt' => today()->addMonths(7), 'tanggal_pensiun' => today()->addMonths(13)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN MENJELANG', 'tanggal_mbt' => today()->addMonths(5), 'tanggal_pensiun' => today()->addMonths(11)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN SEDANG MBT', 'tanggal_mbt' => today()->subMonths(2), 'tanggal_pensiun' => today()->addMonths(4)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN LEWAT BUP', 'tanggal_mbt' => today()->subMonths(8), 'tanggal_pensiun' => today()->subMonths(2)]);
+        Employee::factory()->create(['nama' => 'KARYAWAN PENSIUN', 'tanggal_mbt' => today()->subYear(), 'tanggal_pensiun' => today()->subMonths(6), 'tanggal_berhenti' => today()->subMonths(5)]);
 
         Livewire::test(EmployeeTable::class)
+            // Bawaan: semua karyawan aktif (MBT tetap bagian dari aktif), tanpa arsip pensiun.
+            ->assertSee('KARYAWAN BIASA')->assertSee('KARYAWAN SEDANG MBT')->assertDontSee('KARYAWAN PENSIUN')
+            // MBT: hanya yang sedang MBT; Menjelang MBT dan lewat BUP bukan MBT.
             ->set('statusKepegawaian', 'mbt')
-            ->assertSee('KARYAWAN MBT')
-            ->assertDontSee('KARYAWAN MENJELANG')
-            ->assertDontSee('KARYAWAN BIASA')
-            ->set('statusKepegawaian', 'menjelang_mbt')
-            ->assertSee('KARYAWAN MENJELANG')
-            ->assertDontSee('KARYAWAN MBT')
-            ->assertDontSee('KARYAWAN BIASA');
+            ->assertSee('KARYAWAN SEDANG MBT')->assertDontSee('KARYAWAN MENJELANG')->assertDontSee('KARYAWAN LEWAT BUP')
+            ->assertDontSee('KARYAWAN JAUH')->assertDontSee('KARYAWAN BIASA')->assertDontSee('KARYAWAN PENSIUN')
+            ->set('statusKepegawaian', 'pensiun')
+            ->assertSee('KARYAWAN PENSIUN')->assertDontSee('KARYAWAN SEDANG MBT')->assertDontSee('KARYAWAN BIASA');
     }
 
     public function test_unknown_filter_values_are_ignored(): void
@@ -203,8 +206,9 @@ class EmployeeTableTest extends TestCase
             ->assertSeeHtml('<span class="sr-only">Masa Pensiun (BUP)</span>')
             ->assertSeeHtml('<span class="sr-only">Masa Bebas Tugas (MBT)</span>')
             ->assertSeeHtml('title="Karyawan telah mencapai Batas Usia Pensiun')
-            ->assertSee('Menjelang MBT (')
-            ->assertSeeHtml('<span aria-hidden="true">MBT · ')
+            // The "Menjelang MBT" countdown chip is gone: only MBT and BUP/Pensiun markers remain on a row.
+            ->assertDontSee('Menjelang MBT (')
+            ->assertDontSeeHtml('<span aria-hidden="true">MBT · ')
             ->assertSee('PGW-BIASA');
     }
 

@@ -17,13 +17,19 @@ use App\Models\Employee;
 use App\Models\EmployeeImportChange;
 use App\Models\EmployeeImportLog;
 use App\Models\JobHistory;
+use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\UnitAlias;
 use App\Models\User;
+use App\Services\EmployeeImportGovernanceService;
 use App\Services\EmployeeImportService;
 use App\Services\Formasi\MasterFormasiService;
+use App\Services\Import\ConcurrentJobTextParser;
 use App\Services\Import\EmployeeImportDictionary;
+use App\Services\Import\ImportSessionStore;
+use App\Services\PensiunService;
+use App\Support\JabatanLabel;
 use Carbon\Carbon;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,6 +39,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Events\AfterSheet;
@@ -102,7 +109,7 @@ class EmployeeImportTest extends TestCase
             $headers = [
                 'NIK*', 'NAMA*', 'JENIS KELAMIN', 'TEMPAT LAHIR', 'TANGGAL LAHIR',
                 'AGAMA', 'SUSUNAN KELUARGA', 'STATUS KARYAWAN*', 'JABATAN*', 'LEVEL*',
-                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS PENUGASAN',
+                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS JABATAN UTAMA',
                 'TUGAS RANGKAP / PENUGASAN SEMENTARA',
                 'TMT BEKERJA', 'TANGGAL DIANGKAT STAF', 'TANGGAL DALAM JABATAN',
                 'TMT UNIT KERJA', 'JALUR MASUK', 'JOB GRADE', 'PERSON GRADE',
@@ -112,7 +119,7 @@ class EmployeeImportTest extends TestCase
             $headers = [
                 'NIK*', 'NAMA*', 'JENIS KELAMIN', 'TEMPAT LAHIR', 'TANGGAL LAHIR',
                 'AGAMA', 'SUSUNAN KELUARGA', 'STATUS KARYAWAN*', 'JABATAN*', 'LEVEL*',
-                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS PENUGASAN',
+                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS JABATAN UTAMA',
                 'TMT BEKERJA', 'TANGGAL DIANGKAT STAF', 'TANGGAL DALAM JABATAN',
                 'TMT UNIT KERJA', 'JALUR MASUK', 'JOB GRADE', 'PERSON GRADE',
                 'PENDIDIKAN TERAKHIR', 'SEKOLAH', 'TANGGAL MBT', 'TANGGAL PENSIUN',
@@ -818,7 +825,7 @@ class EmployeeImportTest extends TestCase
         $second[6] = 'K/3';
         $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$second])]);
 
-        $diff = collect($response->json('summary.sample_rows.0.diff'))->firstWhere('field', 'susunan_keluarga');
+        $diff = collect($this->previewSummary($response)['sample_rows'][0]['diff'])->firstWhere('field', 'susunan_keluarga');
         $this->assertNotNull($diff, 'Perubahan data keluarga tetap harus ditandai.');
         $this->assertStringNotContainsString('K/', $diff['old'].$diff['new']);
     }
@@ -953,16 +960,21 @@ class EmployeeImportTest extends TestCase
                     'skipped',
                     'total_processed',
                     'has_errors',
-                    'sample_rows',
                     'failed_count',
                     'is_dry_run',
                 ],
-            ]);
+            ])
+            // Peramban hanya menerima angka: baris karyawan dan baris terkendala (NIK, nama) tetap di server (UU PDP).
+            ->assertJsonMissingPath('summary.sample_rows')
+            ->assertJsonMissingPath('summary.valid_rows')
+            ->assertJsonMissingPath('summary.errors');
 
         $summary = $response->json('summary');
         $this->assertEquals(1, $summary['created']);
         $this->assertEquals(1, $summary['skipped']);
         $this->assertTrue($summary['is_dry_run']);
+        $this->assertStringNotContainsString('13009988', $response->getContent());
+        $this->assertSame(1, count($this->previewSummary($response)['sample_rows']), 'Barisnya tetap tersedia di server.');
 
         // Data TIDAK boleh tersimpan di database selama dry-run preview!
         $this->assertDatabaseMissing('employees', ['nik' => '13009988']);
@@ -1024,7 +1036,7 @@ class EmployeeImportTest extends TestCase
     public function test_commit_import_rejects_expired_or_invalid_token(): void
     {
         $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), [
-            'token' => 'non-existent-token-uuid-1234',
+            'token' => '0b1c2d3e-0000-4000-8000-000000000001',
         ]);
 
         $response->assertStatus(422)
@@ -1117,7 +1129,7 @@ class EmployeeImportTest extends TestCase
             [
                 'NIK*', 'NAMA*', 'JENIS KELAMIN', 'TEMPAT LAHIR', 'TANGGAL LAHIR',
                 'AGAMA', 'SUSUNAN KELUARGA', 'STATUS KARYAWAN*', 'JABATAN*', 'LEVEL*',
-                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS PENUGASAN', 'TUGAS RANGKAP',
+                'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS JABATAN UTAMA', 'TUGAS RANGKAP',
                 'TMT BEKERJA', 'TANGGAL DIANGKAT STAF', 'TANGGAL DALAM JABATAN', 'TMT UNIT KERJA',
                 'JALUR MASUK', 'JOB GRADE', 'PERSON GRADE', 'PENDIDIKAN TERAKHIR', 'SEKOLAH',
                 'TANGGAL MBT', 'TANGGAL PENSIUN',
@@ -1269,7 +1281,7 @@ class EmployeeImportTest extends TestCase
 
         $this->assertEquals(
             'Plt. Manajer PKS PKS Gunung Meliau TMT 15 Juli 2026',
-            $previewResponse->json('summary.sample_rows.0.tugas_rangkap')
+            $this->previewSummary($previewResponse)['sample_rows'][0]['tugas_rangkap']
         );
 
         $token = $previewResponse->json('token');
@@ -1298,6 +1310,448 @@ class EmployeeImportTest extends TestCase
         $this->assertNull($concurrentJob->tmt_akhir);
         $this->assertEquals('PENUGASAN', $concurrentJob->jenis_mutasi);
         $this->assertStringContainsString('Plt. Manajer PKS', $concurrentJob->catatan);
+    }
+
+    /** Baris impor dengan teks Tugas Rangkap (Kolom O) untuk pengujian validasi tugas rangkap. */
+    private function rangkapImportRow(string $nik, string $rangkap): array
+    {
+        return [
+            $nik, 'BUDI SANTOSO', 'L', 'Pontianak', '1988-05-10',
+            'Islam', 'K/2', 'Tetap (PKWTT)', 'Asisten Afdeling', 'Karpim',
+            'Kebun Inti Gunung Meliau', 'IIIA/00', 'RM-3', 'Definitif',
+            $rangkap,
+            '2015-01-01', '2017-01-01', '2020-01-01', '2020-01-01',
+            'Reguler', 11, 11, 'S1', 'Universitas Tanjungpura',
+            '2043-05-01', '2044-05-01',
+        ];
+    }
+
+    /**
+     * Ringkasan pratinjau lengkap (baris karyawan dan baris terkendala). Respons JSON hanya memuat angka; barisnya tersimpan
+     * terenkripsi di server dan dibaca tabel pratinjau halaman demi halaman.
+     *
+     * @return array<string, mixed>
+     */
+    private function previewSummary(TestResponse $response): array
+    {
+        return app(ImportSessionStore::class)->preview($response->json('token'))['summary'];
+    }
+
+    private function previewRangkap(string $nik, string $rangkap)
+    {
+        return $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$this->rangkapImportRow($nik, $rangkap)]),
+        ]);
+    }
+
+    private function rangkapMasterPosition(): void
+    {
+        $pks = Unit::firstOrCreate(['nama' => 'PKS Gunung Meliau'], ['kode' => 'PKGM', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $manajer = Position::firstOrCreate(['nama' => 'Manajer PKS', 'level' => 'Karpim'], ['is_active' => true]);
+        $pks->positions()->syncWithoutDetaching([$manajer->id => ['kuota' => 1]]);
+    }
+
+    public function test_concurrent_job_whose_official_position_name_contains_the_unit_name_is_recognised(): void
+    {
+        $sekretariat = Unit::firstOrCreate(['nama' => 'Bagian Sekretariat & Hukum'], ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true]);
+        $kepala = Position::firstOrCreate(['nama' => 'Kepala Bagian Sekretariat & Hukum', 'level' => 'Karpim'], ['is_active' => true]);
+        $sekretariat->positions()->syncWithoutDetaching([$kepala->id => ['kuota' => 1]]);
+        $akuntansi = Unit::firstOrCreate(['nama' => 'Bagian Akuntansi & Keuangan'], ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true]);
+        $kabag = Position::firstOrCreate(['nama' => 'Kepala Bagian Akuntansi & Keuangan', 'level' => 'Karpim'], ['is_active' => true]);
+        $akuntansi->positions()->syncWithoutDetaching([$kabag->id => ['kuota' => 1]]);
+
+        $parser = new ConcurrentJobTextParser;
+
+        $sek = $parser->parse('Plt. Kepala Bagian Sekretariat & Hukum TMT 29 Juli 2026', 'Bagian Lain');
+        $this->assertTrue($sek['jabatan_dikenal']);
+        $this->assertSame('Kepala Bagian Sekretariat & Hukum', $sek['jabatan']);
+        $this->assertSame('Bagian Sekretariat & Hukum', $sek['unit_kerja']);
+        $this->assertSame('2026-07-29', $sek['tmt_awal']);
+
+        $dan = $parser->parse('Plt. Kepala Bagian Akuntansi dan Keuangan TMT 1 September 2026', 'Bagian Akuntansi & Keuangan');
+        $this->assertTrue($dan['jabatan_dikenal']);
+        $this->assertSame('Kepala Bagian Akuntansi & Keuangan', $dan['jabatan']);
+
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Kepala Bagian Sekretariat & Hukum TMT 29 Juli 2026', 'Bagian Lain'));
+
+        $stale = $parser->inspect('Plt. Kepala Bagian Sekretariat & Hukum Unit Lama TMT 29 Juli 2026', 'Bagian Lain');
+        $this->assertStringContainsString("Jabatan resmi yang mirip: 'Kepala Bagian Sekretariat & Hukum'; sisa teks 'Unit Lama'", $stale['errors'][0]);
+    }
+
+    public function test_template_validation_texts_stay_within_excel_limits_so_the_file_opens_without_repair(): void
+    {
+        $path = Storage::disk('local')->path('limit_check.xlsx');
+        Excel::store(new EmployeeTemplateExport, 'limit_check.xlsx', 'local');
+        $workbook = IOFactory::load($path);
+        Storage::disk('local')->delete('limit_check.xlsx');
+
+        $checked = 0;
+        foreach ($workbook->getWorksheetIterator() as $sheet) {
+            foreach ($sheet->getDataValidationCollection() as $cell => $validation) {
+                $label = "{$sheet->getTitle()}!{$cell}";
+                // Excel truncates nothing: titles over 32 and messages over 255 characters make it report a corrupt file.
+                $this->assertLessThanOrEqual(32, mb_strlen((string) $validation->getPromptTitle()), "Judul panduan {$label}");
+                $this->assertLessThanOrEqual(255, mb_strlen((string) $validation->getPrompt()), "Isi panduan {$label}");
+                $this->assertLessThanOrEqual(32, mb_strlen((string) $validation->getErrorTitle()), "Judul galat {$label}");
+                $this->assertLessThanOrEqual(255, mb_strlen((string) $validation->getError()), "Isi galat {$label}");
+                $checked++;
+            }
+        }
+        $this->assertGreaterThan(10, $checked);
+    }
+
+    public function test_the_status_column_is_read_from_both_the_new_and_the_legacy_header(): void
+    {
+        $headers = [
+            'NIK*', 'NAMA*', 'JENIS KELAMIN', 'TEMPAT LAHIR', 'TANGGAL LAHIR',
+            'AGAMA', 'SUSUNAN KELUARGA', 'STATUS KARYAWAN*', 'JABATAN*', 'LEVEL*',
+            'UNIT KERJA*', 'GOLONGAN', 'RM LEVEL', 'STATUS PENUGASAN',
+            'TUGAS RANGKAP / PENUGASAN SEMENTARA',
+            'TMT BEKERJA', 'TANGGAL DIANGKAT STAF', 'TANGGAL DALAM JABATAN',
+            'TMT UNIT KERJA', 'JALUR MASUK', 'JOB GRADE', 'PERSON GRADE',
+            'PENDIDIKAN TERAKHIR', 'SEKOLAH', 'TANGGAL MBT', 'TANGGAL PENSIUN',
+        ];
+        $legacy = $this->rangkapImportRow('13009921', '');
+        $legacy[13] = 'Pejabat Sementara (Pjs)';
+        $current = $this->rangkapImportRow('13009922', '');
+        $current[13] = 'Tugas Belajar';
+
+        foreach ([[$legacy, $headers, '13009921', 'Pejabat Sementara (Pjs)'], [$current, str_replace('STATUS PENUGASAN', 'STATUS JABATAN UTAMA', $headers), '13009922', 'Tugas Belajar']] as [$row, $heads, $nik, $expected]) {
+            $token = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+                'import_file' => $this->createExcelUploadFile([$row], 'status.xlsx', $heads),
+            ])->assertOk()->assertJsonPath('summary.failed_count', 0)->json('token');
+
+            $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+            $this->assertSame($expected, Employee::findOrFail($nik)->status_penugasan);
+        }
+    }
+
+    public function test_import_requires_the_import_permission_not_just_the_admin_role(): void
+    {
+        config(['hris.permissions' => ['mutasi.prepare' => ['admin']]]);
+
+        $this->actingAs($this->admin)->get(route('admin.employees.import.page'))->assertForbidden();
+        $this->actingAs($this->admin)->get(route('admin.employees.downloadTemplate'))->assertForbidden();
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$this->rangkapImportRow('13009931', '')]),
+        ])->assertForbidden();
+        $this->actingAs($this->admin)->get(route('admin.employees.import.batches.index'))->assertForbidden();
+    }
+
+    public function test_import_tokens_must_be_uuids_so_they_never_reach_cache_keys_unchecked(): void
+    {
+        foreach (['commit', 'downloadFailed', 'downloadReport'] as $name) {
+            $this->actingAs($this->admin)->postJson(route("admin.employees.import.{$name}"), ['token' => '../../etc/passwd'])
+                ->assertStatus(422)->assertJsonValidationErrors('token');
+        }
+        $this->actingAs($this->admin)->getJson('/admin/employees/import/status/not-a-uuid')->assertNotFound();
+    }
+
+    public function test_sync_fallback_failure_does_not_leak_internal_error_details_to_the_browser(): void
+    {
+        $token = (string) Str::uuid();
+        $this->mock(EmployeeImportService::class, function ($mock) {
+            $mock->shouldReceive('fallbackToSync')->andThrow(new \RuntimeException('SQLSTATE secret connection detail'));
+        });
+
+        $response = $this->actingAs($this->admin)->getJson(route('admin.employees.import.status', ['token' => $token, 'fallback_sync' => 1]))
+            ->assertStatus(422);
+
+        $this->assertStringNotContainsString('SQLSTATE', $response->getContent());
+        $this->assertStringContainsString('Gagal mengalihkan ke mode sinkron', $response->json('message'));
+    }
+
+    public function test_concurrent_job_naming_the_employees_own_unit_is_split_into_position_and_unit(): void
+    {
+        $meliau = Unit::firstOrCreate(['nama' => 'PKS Gunung Meliau'], ['kode' => 'PKGM', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $manajer = Position::firstOrCreate(['nama' => 'Manajer', 'level' => 'Karpim'], ['is_active' => true]);
+        $meliau->positions()->syncWithoutDetaching([$manajer->id => ['kuota' => 1]]);
+        $sintang = Unit::firstOrCreate(['nama' => 'Kebun Sintang'], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $asisten = Position::firstOrCreate(['nama' => 'Asisten Tata Usaha & Keuangan', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $sintang->positions()->syncWithoutDetaching([$asisten->id => ['kuota' => 1]]);
+
+        $parser = new ConcurrentJobTextParser;
+
+        // Teks berisi nama unit yang sama dengan unit karyawan: "Manajer" di unit "PKS Gunung Meliau".
+        $own = $parser->parse('Plt. Manajer PKS Gunung Meliau', 'PKS Gunung Meliau');
+        $this->assertTrue($own['jabatan_dikenal']);
+        $this->assertSame(['Manajer', 'PKS Gunung Meliau'], [$own['jabatan'], $own['unit_kerja']]);
+
+        $sin = $parser->parse('Plt. Asisten Tata Usaha dan Keuangan Kebun Sintang TMT 1 Agustus 2026', 'Kebun Sintang');
+        $this->assertTrue($sin['jabatan_dikenal']);
+        $this->assertSame(['Asisten Tata Usaha & Keuangan', 'Kebun Sintang', '2026-08-01'], [$sin['jabatan'], $sin['unit_kerja'], $sin['tmt_awal']]);
+
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Manajer PKS Gunung Meliau', 'PKS Gunung Meliau'));
+    }
+
+    /** Master untuk uji tugas rangkap berformat ganda: Manajer di PKS Gunung Meliau, Asisten Tata Usaha & Keuangan di Kebun Sintang. */
+    private function multiRangkapMaster(): void
+    {
+        $meliau = Unit::firstOrCreate(['nama' => 'PKS Gunung Meliau'], ['kode' => 'PKGM', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $manajer = Position::firstOrCreate(['nama' => 'Manajer', 'level' => 'Karpim'], ['is_active' => true]);
+        $meliau->positions()->syncWithoutDetaching([$manajer->id => ['kuota' => 1]]);
+        $sintang = Unit::firstOrCreate(['nama' => 'Kebun Sintang'], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $asisten = Position::firstOrCreate(['nama' => 'Asisten Tata Usaha & Keuangan', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $sintang->positions()->syncWithoutDetaching([$asisten->id => ['kuota' => 1]]);
+    }
+
+    public function test_concurrent_job_cell_accepts_the_readable_and_the_export_format_with_several_tasks(): void
+    {
+        $this->multiRangkapMaster();
+        $parser = new ConcurrentJobTextParser;
+        $dash = mb_chr(0x2014);
+
+        // Format ekspor: status pada kurung siku, jabatan — unit, SK dan TMT opsional pada kurung.
+        $export = $parser->parse("[Plt] Manajer {$dash} PKS Gunung Meliau (SK: 123/IX/2026, TMT: 2026-07-15)", 'Kebun Sintang');
+        $this->assertSame(['Plt', 'Manajer', 'PKS Gunung Meliau', '2026-07-15'], [$export['status_penugasan'], $export['jabatan'], $export['unit_kerja'], $export['tmt_awal']]);
+
+        $long = $parser->parse("[Pejabat Sementara (Pjs)] Asisten Tata Usaha & Keuangan {$dash} Kebun Sintang", 'X');
+        $this->assertSame('Pejabat Sementara (Pjs)', $long['status_penugasan']);
+        $this->assertFalse($long['tmt_eksplisit']);
+
+        $this->assertSame('Pj', $parser->parse('Pj. Manajer PKS Gunung Meliau', 'PKS Gunung Meliau')['status_penugasan']);
+
+        // Beberapa tugas dalam satu sel: baris baru atau titik koma, format boleh campuran.
+        $cell = "[Plt] Manajer {$dash} PKS Gunung Meliau (TMT: 2026-07-15)\nPlt. Asisten Tata Usaha dan Keuangan Kebun Sintang TMT 1 Agustus 2026";
+        $this->assertCount(2, $parser->segments($cell));
+        $this->assertCount(2, $parser->segments('Plt. Manajer PKS Gunung Meliau; Plt. Asisten Tata Usaha & Keuangan Kebun Sintang'));
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect($cell, 'PKS Gunung Meliau'));
+
+        // Kesalahan ditolak dengan alasan yang jelas, tanpa tebakan.
+        $this->assertStringContainsString("unit kerja 'PKS Tidak Ada' tidak ada pada master unit", $parser->inspect("[Plt] Manajer {$dash} PKS Tidak Ada", 'X')['errors'][0]);
+        $this->assertStringContainsString("status 'Foo' tidak dikenali", $parser->inspect("[Foo] Manajer {$dash} PKS Gunung Meliau", 'X')['errors'][0]);
+        $duplicate = $parser->inspect("Plt. Manajer PKS Gunung Meliau\n[Plt] Manajer {$dash} PKS Gunung Meliau", 'PKS Gunung Meliau');
+        $this->assertStringContainsString('Tugas Rangkap ke-2', $duplicate['errors'][0]);
+        $this->assertStringContainsString('tertulis lebih dari sekali', $duplicate['errors'][0]);
+        $tooMany = implode("\n", array_fill(0, ConcurrentJobTextParser::MAX_SEGMENTS + 1, 'Plt. Manajer PKS Gunung Meliau'));
+        $this->assertStringContainsString('maksimal', $parser->inspect($tooMany, 'PKS Gunung Meliau')['errors'][0]);
+    }
+
+    public function test_import_registers_every_concurrent_job_in_the_cell_and_never_stores_an_sk_number(): void
+    {
+        $this->multiRangkapMaster();
+        $dash = mb_chr(0x2014);
+        $cell = "[Plt] Manajer {$dash} PKS Gunung Meliau (SK: 123/IX/2026, TMT: 2026-07-15)\nPjs. Asisten Tata Usaha dan Keuangan Kebun Sintang TMT 1 Agustus 2026";
+
+        $token = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$this->rangkapImportRow('13009941', $cell)]),
+        ])->assertOk()->assertJsonPath('summary.failed_count', 0)->json('token');
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+        $jobs = JobHistory::where('employee_nik', '13009941')->whereNull('tmt_akhir')->where('status_penugasan', '!=', 'Definitif')->orderBy('tmt_awal')->get();
+        $this->assertCount(2, $jobs);
+        $this->assertSame(['Manajer', 'PKS Gunung Meliau', 'Plt', '2026-07-15'], [$jobs[0]->jabatan, $jobs[0]->unit_kerja, $jobs[0]->status_penugasan, $jobs[0]->tmt_awal->toDateString()]);
+        $this->assertSame(['Asisten Tata Usaha & Keuangan', 'Kebun Sintang', 'Pejabat Sementara (Pjs)', '2026-08-01'], [$jobs[1]->jabatan, $jobs[1]->unit_kerja, $jobs[1]->status_penugasan, $jobs[1]->tmt_awal->toDateString()]);
+        foreach ($jobs as $job) {
+            $this->assertSame(JobHistory::SUMBER_IMPOR, $job->sumber);
+            $this->assertNull($job->nomor_sk, 'Baris impor tidak boleh memuat nomor SK buatan.');
+            $this->assertNull($job->tanggal_sk);
+        }
+        $this->assertStringContainsString('SK: 123/IX/2026', (string) $jobs[0]->catatan, 'Teks asli tetap tersimpan pada catatan.');
+    }
+
+    public function test_the_export_text_of_concurrent_jobs_reads_back_unchanged_and_a_missing_tmt_keeps_the_start_date(): void
+    {
+        $this->multiRangkapMaster();
+        $employee = Employee::factory()->create(['nik' => '13009942', 'unit_kerja' => 'Kebun Sintang']);
+        JobHistory::create(['employee_nik' => '13009942', 'jabatan' => 'Manajer', 'unit_kerja' => 'PKS Gunung Meliau', 'status_penugasan' => 'Plt', 'tmt_awal' => '2026-07-15', 'tmt_akhir' => null]);
+        JobHistory::create(['employee_nik' => '13009942', 'jabatan' => 'Asisten Tata Usaha & Keuangan', 'unit_kerja' => 'Kebun Sintang', 'status_penugasan' => 'Pj', 'tmt_awal' => '2026-08-01', 'tmt_akhir' => null]);
+
+        // Teks yang ditulis ekspor dibaca kembali identik: impor ulang tidak mengubah apa pun.
+        $export = new EmployeesExport;
+        $text = $export->map($export->query()->where('nik', '13009942')->first())[14];
+        $parser = new ConcurrentJobTextParser;
+        $this->assertCount(2, $parser->segments($text));
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect($text, 'Kebun Sintang'));
+        $this->assertTrue($parser->matchesExisting('13009942', $text, 'Kebun Sintang'));
+
+        $rowsBefore = JobHistory::where('employee_nik', '13009942')->count();
+        $parser->registerAllFromText($employee, $text);
+        $this->assertSame($rowsBefore, JobHistory::where('employee_nik', '13009942')->count(), 'Tidak ada baris ganda.');
+
+        // TMT yang tidak tertulis tidak menimpa tanggal mulai yang sudah tercatat.
+        $parser->registerAllFromText($employee, 'Plt. Manajer PKS Gunung Meliau');
+        $this->assertSame('2026-07-15', JobHistory::where('employee_nik', '13009942')->where('jabatan', 'Manajer')->first()->tmt_awal->toDateString());
+        $this->assertTrue($parser->matchesExisting('13009942', 'Plt. Manajer PKS Gunung Meliau', 'Kebun Sintang'));
+    }
+
+    public function test_concurrent_job_without_a_unit_is_rejected_when_the_jabatan_belongs_to_another_unit(): void
+    {
+        $sdm = Unit::firstOrCreate(['nama' => 'Bagian Sumber Daya Manusia'], ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true]);
+        Unit::firstOrCreate(['nama' => 'Bagian Akuntansi & Keuangan'], ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true]);
+        $asisten = Position::firstOrCreate(['nama' => 'Asisten Pengembangan SDM & Budaya', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $sdm->positions()->syncWithoutDetaching([$asisten->id => ['kuota' => 1]]);
+        Position::firstOrCreate(['nama' => 'Asisten Tanpa Formasi', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $parser = new ConcurrentJobTextParser;
+
+        // Unit tidak tertulis: dianggap unit karyawan, padahal jabatan ada di unit lain pada SK -> ditolak dengan petunjuk, tanpa tebakan.
+        $omitted = $parser->inspect('Plt. Asisten Pengembangan SDM & Budaya TMT 7 Juli 2026', 'Bagian Akuntansi & Keuangan');
+        $this->assertCount(1, $omitted['errors']);
+        $this->assertStringContainsString("dianggap unit karyawan 'Bagian Akuntansi & Keuangan'", $omitted['errors'][0]);
+        $this->assertStringContainsString('Jabatan ini ada pada unit: Bagian Sumber Daya Manusia', $omitted['errors'][0]);
+        $this->assertSame([], $omitted['warnings']);
+
+        // Unit tertulis eksplisit (rangkap lintas unit yang sah): diterima.
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Asisten Pengembangan SDM & Budaya Bagian Sumber Daya Manusia TMT 7 Juli 2026', 'Bagian Akuntansi & Keuangan'));
+        // Unit karyawan sendiri memang memiliki jabatan itu: diterima tanpa menulis unit.
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Asisten Pengembangan SDM & Budaya', 'Bagian Sumber Daya Manusia'));
+        // Jabatan master yang tidak punya formasi di unit mana pun: tetap hanya peringatan.
+        $orphan = $parser->inspect('Plt. Asisten Tanpa Formasi', 'Bagian Akuntansi & Keuangan');
+        $this->assertSame([], $orphan['errors']);
+        $this->assertCount(1, $orphan['warnings']);
+    }
+
+    public function test_import_rejects_a_concurrent_job_with_an_omitted_unit_and_accepts_it_once_the_unit_is_written(): void
+    {
+        $sdm = Unit::firstOrCreate(['nama' => 'Bagian Sumber Daya Manusia'], ['kode' => 'Bagian', 'wilayah' => 'Regional Office (Kantor Direksi Pontianak)', 'is_active' => true]);
+        $asisten = Position::firstOrCreate(['nama' => 'Asisten Pengembangan SDM & Budaya', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $sdm->positions()->syncWithoutDetaching([$asisten->id => ['kuota' => 1]]);
+
+        $rejected = $this->previewRangkap('13009951', 'Plt. Asisten Pengembangan SDM & Budaya TMT 7 Juli 2026')->assertOk();
+        $this->assertSame(1, $rejected->json('summary.failed_count'));
+        $this->assertStringContainsString('Jabatan ini ada pada unit: Bagian Sumber Daya Manusia', $this->previewSummary($rejected)['errors'][0]['errors'][0]);
+
+        $accepted = $this->previewRangkap('13009951', 'Plt. Asisten Pengembangan SDM & Budaya Bagian Sumber Daya Manusia TMT 7 Juli 2026')->assertOk();
+        $this->assertSame(0, $accepted->json('summary.failed_count'));
+        $this->assertSame(1, $accepted->json('summary.created'));
+    }
+
+    public function test_cached_import_sessions_never_hold_personal_data_in_plaintext(): void
+    {
+        $this->rangkapMasterPosition();
+        $good = $this->rangkapImportRow('13009961', '');
+        $bad = $this->rangkapImportRow('13009962', 'Plt. Kepala TMT 15 Juli 2026');
+        $bad[1] = 'SITI AMINAH';
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$good, $bad]),
+        ])->assertOk();
+        $token = $response->json('token');
+        $this->assertSame(1, $response->json('summary.failed_count'));
+
+        // Pratinjau: ringkasan memuat NIK dan nama (kunci job dan preview), tetapi di cache terenkripsi.
+        foreach (["import_job_{$token}", "import_preview_{$token}", "import_failed_rows_{$token}"] as $key) {
+            $raw = Cache::get($key);
+            $this->assertIsString($raw, "{$key} harus berupa muatan terenkripsi");
+            foreach (['13009961', '13009962', 'BUDI SANTOSO', 'SITI AMINAH'] as $secret) {
+                $this->assertStringNotContainsString($secret, $raw, "{$key} memuat data pribadi polos");
+            }
+        }
+
+        // Layanan tetap dapat membacanya kembali untuk pemilik sesi.
+        $this->assertSame(1, app(ImportSessionStore::class)->preview($token)['summary']['failed_count']);
+
+        // Setelah komit: laporan (memuat nama dan email pengguna) dan status komit juga terenkripsi.
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+        foreach (["import_report_{$token}", "import_commit_job_{$token}"] as $key) {
+            $raw = Cache::get($key);
+            if ($raw === null) {
+                continue;
+            }
+            $this->assertIsString($raw, "{$key} harus berupa muatan terenkripsi");
+            foreach (['13009961', 'BUDI SANTOSO', $this->admin->email] as $secret) {
+                $this->assertStringNotContainsString($secret, $raw, "{$key} memuat data pribadi polos");
+            }
+        }
+        $this->assertNotNull(app(ImportSessionStore::class)->report($token), 'Laporan tetap dapat diunduh pengunggahnya.');
+
+        // Entri lama berupa larik polos (sebelum enkripsi) tetap terbaca; isi rusak diperlakukan sebagai sesi berakhir.
+        Cache::put("import_preview_{$token}", 'bukan-muatan-terenkripsi', now()->addMinutes(5));
+        $this->assertNull(app(ImportSessionStore::class)->preview($token));
+    }
+
+    public function test_concurrent_job_with_an_omitted_unit_warns_when_the_jabatan_also_exists_in_other_units(): void
+    {
+        $a = Unit::firstOrCreate(['nama' => 'Kebun Ganda A'], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $b = Unit::firstOrCreate(['nama' => 'Kebun Ganda B'], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $c = Unit::firstOrCreate(['nama' => 'Kebun Tunggal'], ['kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+        $shared = Position::firstOrCreate(['nama' => 'Asisten Ganda', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $single = Position::firstOrCreate(['nama' => 'Asisten Tunggal', 'level' => 'Karpel'], ['rm_level' => 'RM-5', 'is_active' => true]);
+        $a->positions()->syncWithoutDetaching([$shared->id => ['kuota' => 1]]);
+        $b->positions()->syncWithoutDetaching([$shared->id => ['kuota' => 1]]);
+        $c->positions()->syncWithoutDetaching([$single->id => ['kuota' => 1]]);
+        $parser = new ConcurrentJobTextParser;
+
+        // Ada di unit karyawan dan di unit lain: tetap diterima (bawaan unit karyawan) tetapi diberi peringatan.
+        $ambiguous = $parser->inspect('Plt. Asisten Ganda', 'Kebun Ganda A');
+        $this->assertSame([], $ambiguous['errors']);
+        $this->assertCount(1, $ambiguous['warnings']);
+        $this->assertStringContainsString("dianggap unit karyawan 'Kebun Ganda A'", $ambiguous['warnings'][0]);
+        $this->assertStringContainsString('juga ada pada unit lain (Kebun Ganda B)', $ambiguous['warnings'][0]);
+
+        // Hanya ada di unit karyawan, atau unit ditulis eksplisit: tanpa peringatan.
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Asisten Tunggal', 'Kebun Tunggal'));
+        $this->assertSame(['errors' => [], 'warnings' => []], $parser->inspect('Plt. Asisten Ganda Kebun Ganda B', 'Kebun Ganda A'));
+    }
+
+    public function test_preview_rows_use_the_same_status_vocabulary_as_the_committed_report(): void
+    {
+        $this->rangkapMasterPosition();
+
+        // Karyawan baru: status BARU (bukan CREATE) agar lencana "Status Aksi" tampil dan filter tab "Karyawan Baru" cocok.
+        $response = $this->previewRangkap('13009971', '')->assertOk();
+        $this->assertSame('CREATE', $this->previewSummary($response)['sample_rows'][0]['action']);
+        $this->assertSame('BARU', $this->previewSummary($response)['sample_rows'][0]['status']);
+
+        // Setelah komit, impor ulang berkas yang sama: karyawan sudah ada dan identik -> TETAP.
+        $token = $response->json('token');
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+        $again = $this->previewRangkap('13009971', '')->assertOk();
+        $this->assertSame('UNCHANGED', $this->previewSummary($again)['sample_rows'][0]['action']);
+        $this->assertSame('TETAP', $this->previewSummary($again)['sample_rows'][0]['status']);
+
+        // Tabel pratinjau memakai kunci baku `action` untuk lencana, dan kartu KPI tidak memuat tautan "Periksa" berlebih.
+        $this->assertStringContainsString("\$row['action'] === 'CREATE'", file_get_contents(resource_path('views/livewire/admin/employees/import-preview-table.blade.php')));
+        $this->assertStringNotContainsString('Periksa &rarr;', file_get_contents(resource_path('views/admin/employees/partials/import-step2.blade.php')));
+    }
+
+    public function test_wizard_step_two_confirms_through_the_shared_sticky_form_footer(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.employees.import.page'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('sticky bottom-4', $html, 'Bar konfirmasi memakai x-admin.form.footer (menempel di bawah).');
+        $this->assertStringContainsString('@click="resetToStep1()"', $html);
+        $this->assertStringContainsString('@click="executeCommitImport()"', $html);
+        $this->assertStringContainsString('Semua data ditolak', $html);
+        $this->assertStringNotContainsString('Footer Action Bar', $html, 'Bar aksi buatan sendiri sudah diganti komponen bersama.');
+    }
+
+    public function test_concurrent_job_with_an_unknown_position_is_rejected_instead_of_stored_as_free_text(): void
+    {
+        $this->rangkapMasterPosition();
+
+        $response = $this->previewRangkap('13009911', 'Plt. Kepala TMT 15 Juli 2026')->assertOk();
+
+        $this->assertSame(1, $response->json('summary.failed_count'));
+        $this->assertSame(0, $response->json('summary.created'));
+        $this->assertStringContainsString("jabatan 'Kepala' tidak dikenali pada master jabatan", $this->previewSummary($response)['errors'][0]['errors'][0]);
+        $this->assertDatabaseMissing('job_histories', ['employee_nik' => '13009911', 'jabatan' => 'Kepala']);
+    }
+
+    public function test_concurrent_job_with_an_unreadable_or_impossible_tmt_is_rejected_not_defaulted_to_today(): void
+    {
+        $this->rangkapMasterPosition();
+
+        foreach (['Plt. Manajer PKS PKS Gunung Meliau TMT 31 Februari 2026', 'Plt. Manajer PKS PKS Gunung Meliau TMT segera'] as $text) {
+            $response = $this->previewRangkap('13009912', $text)->assertOk();
+
+            $this->assertSame(1, $response->json('summary.failed_count'), $text);
+            $this->assertStringContainsString('tanggal TMT tidak terbaca', $this->previewSummary($response)['errors'][0]['errors'][0]);
+        }
+    }
+
+    public function test_concurrent_job_in_a_unit_where_the_position_is_not_a_formation_is_accepted_with_a_warning(): void
+    {
+        $this->rangkapMasterPosition();
+        Unit::firstOrCreate(['nama' => 'PKS Lain'], ['kode' => 'PKL', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true]);
+
+        $response = $this->previewRangkap('13009913', 'Plt. Manajer PKS PKS Lain TMT 15 Juli 2026')->assertOk();
+
+        $this->assertSame(0, $response->json('summary.failed_count'));
+        $this->assertSame(1, $response->json('summary.created'));
+        $response->assertJsonPath('summary.warning_count', 1);
+        $this->assertStringContainsString("jabatan 'Manajer PKS' tidak tercantum pada formasi Unit Kerja 'PKS Lain'", $this->previewSummary($response)['sample_rows'][0]['warnings'][0]);
     }
 
     /**
@@ -1358,6 +1812,37 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('employees', ['nik' => '88004002', 'jabatan' => 'Advisor Impor RM-1']);
         $this->assertDatabaseMissing('employees', ['nik' => '88004003']);
         $this->assertStringContainsString('tidak valid untuk Unit Kerja', session('import_summary')['errors'][0]['errors'][0]);
+    }
+
+    public function test_blank_jabatan_for_an_advisor_or_diperbantukan_names_the_pool_jabatan_opened_on_the_unit(): void
+    {
+        $opened = $this->formasiUnit('Kebun Pool Petunjuk', 'Manajer Pool Petunjuk', 'RM-1', 1);
+        $this->formasiUnit('Kebun Tanpa Pool', 'Manajer Tanpa Pool', 'RM-1', 1);
+        $service = new MasterFormasiService;
+        $advisor = $service->createPoolPosition(['nama' => 'Advisor Petunjuk RM-1', 'jenis' => 'advisor', 'rm_level' => 'RM-1'], $this->admin);
+        $service->openPoolPosition($opened, $advisor, $this->admin);
+
+        $withPool = $this->karpimImportRow('88012001', '', 'Kebun Pool Petunjuk');
+        $withPool[13] = 'Advisor';
+        $withoutPool = $this->karpimImportRow('88012002', '', 'Kebun Tanpa Pool');
+        $withoutPool[13] = 'Diperbantukan';
+        $plain = $this->karpimImportRow('88012003', '', 'Kebun Pool Petunjuk');
+
+        $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$withPool, $withoutPool, $plain]),
+        ])->assertOk();
+
+        $errors = collect($this->previewSummary($response)['errors'])->keyBy('nik');
+        $first = implode(' ', $errors['88012001']['errors'] ?? []);
+        $this->assertStringContainsString('Karyawan berstatus Advisor tetap wajib memiliki Jabatan', $first);
+        $this->assertStringContainsString("Jabatan penampungan yang dibuka pada unit 'Kebun Pool Petunjuk': Advisor Petunjuk RM-1", $first);
+        $this->assertStringNotContainsString('Jabatan karyawan wajib diisi', $first);
+
+        $second = implode(' ', $errors['88012002']['errors'] ?? []);
+        $this->assertStringContainsString('Belum ada jabatan penampungan yang dibuka pada unit', $second);
+
+        // Tanpa status Advisor/Diperbantukan, pesan biasa tetap dipakai.
+        $this->assertStringContainsString('Jabatan karyawan wajib diisi', implode(' ', $errors['88012003']['errors'] ?? []));
     }
 
     public function test_import_rejects_a_level_for_which_the_unit_has_no_formasi(): void
@@ -1602,8 +2087,8 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('summary.created', 0)
             ->assertJsonPath('summary.updated', 0)
             ->assertJsonPath('summary.unchanged', 1)
-            ->assertJsonPath('summary.failed_count', 0)
-            ->assertJsonPath('summary.sample_rows.0.action', 'UNCHANGED');
+            ->assertJsonPath('summary.failed_count', 0);
+        $this->assertSame('UNCHANGED', $this->previewSummary($previewResponse)['sample_rows'][0]['action']);
 
         $token = $previewResponse->json('token');
 
@@ -1812,7 +2297,7 @@ class EmployeeImportTest extends TestCase
      */
     public function test_import_status_endpoint_returns_job_progress(): void
     {
-        $token = 'test-token-'.uniqid();
+        $token = (string) Str::uuid();
 
         // 404 jika token belum terdaftar
         $notFoundResponse = $this->actingAs($this->admin)->getJson(route('admin.employees.import.status', ['token' => $token]));
@@ -1970,7 +2455,7 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('summary.updated', 1)
             ->assertJsonPath('summary.created', 0);
 
-        $sampleRows = $response->json('summary.sample_rows');
+        $sampleRows = $this->previewSummary($response)['sample_rows'];
         $this->assertNotEmpty($sampleRows);
         $this->assertEquals('UPDATE', $sampleRows[0]['action']);
         $this->assertNotEmpty($sampleRows[0]['diff']);
@@ -2046,7 +2531,7 @@ class EmployeeImportTest extends TestCase
 
         // 4. Unduh dengan token tidak valid harus ditolak
         $invalidRes = $this->actingAs($this->admin)->post(route('admin.employees.import.downloadReport'), [
-            'token' => 'invalid-token-xyz',
+            'token' => '0b1c2d3e-0000-4000-8000-000000000002',
         ]);
         $invalidRes->assertRedirect();
         $invalidRes->assertSessionHas('error');
@@ -2188,7 +2673,7 @@ class EmployeeImportTest extends TestCase
         $token = $this->previewToken([$this->karpimImportRow('88007201', 'Manajer Hash', 'Kebun Hash')]);
 
         $swapped = $this->createExcelUploadFile([$this->karpimImportRow('88007299', 'Manajer Hash', 'Kebun Hash')]);
-        Storage::disk('local')->put(Cache::get("import_preview_{$token}")['file_path'], file_get_contents($swapped->getRealPath()));
+        Storage::disk('local')->put(app(ImportSessionStore::class)->preview($token)['file_path'], file_get_contents($swapped->getRealPath()));
 
         $response = $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token]);
 
@@ -2227,12 +2712,36 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseMissing('employees', ['nik' => '88007401']);
     }
 
+    public function test_the_preview_query_count_stays_flat_as_the_number_of_rows_grows(): void
+    {
+        $this->formasiUnit('Kebun Anggaran Kueri', 'Manajer Anggaran Kueri', 'RM-1', 60);
+        $rowsOf = fn (int $count, int $base): array => array_map(
+            fn (int $i) => $this->karpimImportRow((string) ($base + $i), 'Manajer Anggaran Kueri', 'Kebun Anggaran Kueri'),
+            range(1, $count)
+        );
+        $queriesFor = function (array $rows): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->previewToken($rows);
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $small = $queriesFor($rowsOf(4, 88500000));
+        $large = $queriesFor($rowsOf(40, 88600000));
+
+        // Sepuluh kali lebih banyak baris tidak boleh menghasilkan sepuluh kali lebih banyak kueri (tanpa N+1 per baris).
+        $this->assertLessThan($small * 4, $large, "Kueri pratinjau 40 baris ({$large}) melonjak dibanding 4 baris ({$small}).");
+    }
+
     public function test_a_failed_commit_releases_the_token_so_the_admin_can_retry(): void
     {
         $this->formasiUnit('Kebun Ulang', 'Manajer Ulang', 'RM-1', 5);
         $token = $this->previewToken([$this->karpimImportRow('88007501', 'Manajer Ulang', 'Kebun Ulang')]);
 
-        $path = Cache::get("import_preview_{$token}")['file_path'];
+        $path = app(ImportSessionStore::class)->preview($token)['file_path'];
         $original = Storage::disk('local')->get($path);
         Storage::disk('local')->put($path, 'rusak');
 
@@ -2321,7 +2830,7 @@ class EmployeeImportTest extends TestCase
         $response = $this->actingAs($this->admin)->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$row])]);
 
         $response->assertOk()->assertJsonPath('summary.skipped', 0)->assertJsonPath('summary.warning_count', 1);
-        $this->assertStringContainsString('tidak lagi tercantum', $response->json('summary.sample_rows.0.warnings.0'));
+        $this->assertStringContainsString('tidak lagi tercantum', $this->previewSummary($response)['sample_rows'][0]['warnings'][0]);
 
         $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $response->json('token')])->assertOk();
         $this->assertSame('NAMA DIPERBARUI', Employee::find('88008301')->nama);
@@ -2344,7 +2853,7 @@ class EmployeeImportTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('summary.warning_count', 1);
-        $this->assertStringContainsString('melebihi kuota', $response->json('summary.sample_rows.0.warnings.0'));
+        $this->assertStringContainsString('melebihi kuota', $this->previewSummary($response)['sample_rows'][0]['warnings'][0]);
     }
 
     public function test_existing_karpel_in_a_unit_without_karpel_formasi_is_not_warned(): void
@@ -2429,7 +2938,7 @@ class EmployeeImportTest extends TestCase
         $this->assertSame([], $workbook->getDefinedNames(), 'Tanpa rentang bernama atau kolom bantu: hanya katalog.');
         // Nol harus tertulis sebagai 0 di berkas (bukan sel kosong): Terisi 0 dan Sisa 0 sama-sama bermakna.
         $this->assertSame(0, $formasi->getCell('G2')->getValue(), 'Kolom Terisi tanpa pemangku harus bernilai 0.');
-        $this->assertSame('', (string) $formasi->getCell('I1')->getValue());
+        $this->assertSame('H', $formasi->getHighestColumn(), 'Katalog hanya berisi kolom data (tanpa kolom catatan).');
 
         // Rumus validasi: Jabatan (J) bergantung pada Unit (I) di baris yang sama, dan menolak pilihan di luar daftar.
         $validation = $data->getCell('J7')->getDataValidation();
@@ -2455,7 +2964,7 @@ class EmployeeImportTest extends TestCase
                 ->join('positions', 'positions.id', '=', 'position_unit.position_id')
                 ->where('units.nama', $unit)
                 ->orderByRaw("case positions.level when 'Karpim' then 0 else 1 end")->orderBy('positions.rm_level')->orderBy('positions.nama')
-                ->pluck('positions.nama')->all();
+                ->pluck('positions.nama')->map(fn ($nama) => JabatanLabel::display($nama))->all();
 
             $this->assertSame(count($expected), (int) $scratch->getCell('Y2')->getCalculatedValue(), "Jumlah Jabatan untuk {$unit}");
             $this->assertSame($expected[0], $scratch->getCell('Y3')->getCalculatedValue(), "Jabatan pertama untuk {$unit}");
@@ -2463,6 +2972,28 @@ class EmployeeImportTest extends TestCase
             $checked++;
         }
         $this->assertSame(Unit::count(), $checked);
+    }
+
+    public function test_template_lists_jabatan_with_an_ampersand_and_the_import_still_stores_the_master_name(): void
+    {
+        $this->formasiUnit('Kebun Ampersand', 'Asisten Tata Usaha dan Keuangan', 'RM-1', 1);
+
+        // Template: katalog dan dropdown menampilkan "&"; nama master tidak ikut berubah.
+        $path = tempnam(sys_get_temp_dir(), 'tpl_').'.xlsx';
+        file_put_contents($path, Excel::raw(new EmployeeTemplateExport, ExcelWriter::XLSX));
+        $listed = array_column(IOFactory::load($path)->getSheetByName('Formasi per Unit')->toArray(), 1);
+        unlink($path);
+        $this->assertContains('Asisten Tata Usaha & Keuangan', $listed);
+        $this->assertNotContains('Asisten Tata Usaha dan Keuangan', $listed);
+        $this->assertSame('Asisten Tata Usaha dan Keuangan', Position::where('nama', 'like', 'Asisten Tata Usaha%')->value('nama'));
+
+        // Impor: nama yang dipilih dari template (dengan "&") dipetakan ke nama master.
+        $token = $this->actingAs($this->admin)->postJson(route('admin.employees.import.preview'), [
+            'import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88011001', 'Asisten Tata Usaha & Keuangan', 'Kebun Ampersand')]),
+        ])->assertOk()->assertJsonPath('summary.failed_count', 0)->json('token');
+        $this->actingAs($this->admin)->postJson(route('admin.employees.import.commit'), ['token' => $token])->assertOk();
+
+        $this->assertSame('Asisten Tata Usaha dan Keuangan', Employee::findOrFail('88011001')->jabatan);
     }
 
     public function test_import_derives_strata_when_the_level_column_is_blank(): void
@@ -2597,12 +3128,12 @@ class EmployeeImportTest extends TestCase
             return array_values(array_filter($values, fn ($value) => $value !== null && $value !== ''));
         };
         $expected = [
-            'JENIS KELAMIN' => ['L', 'P'],
+            'JENIS KELAMIN' => ['Laki-laki', 'Perempuan'],
             'AGAMA' => Employee::RELIGIONS,
             'SUSUNAN KELUARGA' => array_keys(Employee::FAMILY_STATUSES),
             'STATUS KARYAWAN*' => ['Tetap (PKWTT)', 'Kontrak (PKWT)', 'Calon Pegawai'],
             'UNIT KERJA*' => Unit::orderBy('urutan')->orderBy('nama')->pluck('nama')->all(),
-            'STATUS PENUGASAN' => ['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'],
+            'STATUS JABATAN UTAMA' => ['Definitif', 'Pejabat Sementara (Pjs)', 'Tugas Belajar'],
             'JALUR MASUK' => array_keys(Employee::ENTRY_CHANNELS),
             'PENDIDIKAN TERAKHIR' => Employee::EDUCATION_LEVELS,
         ];
@@ -2614,7 +3145,7 @@ class EmployeeImportTest extends TestCase
 
         // Panduan input pada header: judulnya membahas kolom yang benar.
         $titles = [
-            'UNIT KERJA*' => 'Unit Kerja', 'JABATAN*' => 'Jabatan', 'GOLONGAN' => 'Golongan', 'STATUS PENUGASAN' => 'Status Penugasan',
+            'UNIT KERJA*' => 'Unit Kerja', 'JABATAN*' => 'Jabatan', 'GOLONGAN' => 'Golongan', 'STATUS JABATAN UTAMA' => 'Status Jabatan Utama',
             'TUGAS RANGKAP / PENUGASAN SEMENTARA' => 'Tugas Rangkap', 'TMT BEKERJA' => 'TMT Bekerja', 'TANGGAL DIANGKAT STAF' => 'Tgl Diangkat Staf',
             'JOB GRADE' => 'Job Grade', 'PERSON GRADE' => 'Person Grade', 'TANGGAL MBT' => 'Tanggal MBT', 'TANGGAL PENSIUN' => 'Tanggal Pensiun',
         ];
@@ -2701,7 +3232,7 @@ class EmployeeImportTest extends TestCase
         $log = EmployeeImportLog::create([
             'user_id' => $this->admin->id, 'user_name' => $this->admin->name, 'file_name' => 'koreksi.xlsx', 'file_size' => 2048,
             'file_sha256' => hash('sha256', 'koreksi'), 'total_rows' => 3, 'created_count' => 1, 'skipped_count' => 2, 'has_errors' => true,
-            'status' => EmployeeImportLog::STATUS_COMPLETED, 'committed_at' => now(), 'token' => 'token-koreksi',
+            'status' => EmployeeImportLog::STATUS_COMPLETED, 'committed_at' => now(), 'token' => '0b1c2d3e-0000-4000-8000-000000000003',
             'metadata' => ['summary' => ['errors' => [
                 ['row' => 7, 'errors' => ["Kuota formasi jabatan 'Asisten Kepala' pada Unit Kerja 'Kebun Tajati' sudah terpenuhi (3 formasi)."]],
                 ['row' => 9, 'errors' => ["Kuota formasi jabatan 'Mandor' pada Unit Kerja 'Kebun Lain' sudah terpenuhi (2 formasi)."]],
@@ -2712,7 +3243,7 @@ class EmployeeImportTest extends TestCase
 
         $page()->assertDontSee('Unduh Berkas Koreksi')->assertSee('Berkas koreksi sudah tidak tersedia karena memuat data pribadi', false);
 
-        Cache::put('import_failed_rows_token-koreksi', 'sealed', now()->addHours(2));
+        Cache::put('import_failed_rows_0b1c2d3e-0000-4000-8000-000000000003', 'sealed', now()->addHours(2));
         $page()->assertSee('Unduh Berkas Koreksi')
             ->assertSee('tersedia sampai', false)
             ->assertSee($log->committed_at->copy()->addHours(2)->format('d/m/Y H:i'))
@@ -2739,7 +3270,7 @@ class EmployeeImportTest extends TestCase
         $this->assertFalse(config('hris.import.require_approval'));
 
         $this->enableApproval();
-        $this->actingAs($this->admin)->get(route('admin.employees.import.page'))->assertOk()->assertSee('requiresApproval: true', false);
+        $this->actingAs($this->admin)->get(route('admin.employees.import.page'))->assertOk()->assertViewHas('wizard', fn (array $wizard) => $wizard['requiresApproval'] === true);
     }
 
     public function test_commit_only_submits_for_approval_when_the_policy_is_active(): void
@@ -2878,7 +3409,7 @@ class EmployeeImportTest extends TestCase
             ->post(route('admin.employees.import.preview'), ['import_file' => $this->createExcelUploadFile([$this->karpimImportRow('88020001', 'Manajer Tata Kelola', 'Kebun Tata Kelola')])])
             ->json('token');
         try {
-            app(EmployeeImportService::class)->executeCommit(Cache::get("import_preview_{$token}"), $token, $this->admin);
+            app(EmployeeImportService::class)->executeCommit(app(ImportSessionStore::class)->preview($token), $token, $this->admin);
             $this->fail('Penyimpanan tanpa persetujuan seharusnya ditolak.');
         } catch (ImportAbortedException $e) {
             $this->assertStringContainsString('persetujuan admin lain', $e->getMessage());
@@ -3213,5 +3744,97 @@ class EmployeeImportTest extends TestCase
             $page->assertSee($text);
         }
         $page->assertDontSee('Menunggu persetujuan admin lain')->assertDontSee('Tindakan Berisiko');
+    }
+
+    /** Baris impor karyawan yang tanggal lahirnya membuat Batas Usia Pensiun sudah lewat (lahir 1960 => pensiun 2016). */
+    private function pastRetirementRow(string $nik, string $jabatan, string $unit): array
+    {
+        $row = $this->karpimImportRow($nik, $jabatan, $unit);
+        $row[4] = '1960-03-10';
+
+        return $row;
+    }
+
+    public function test_import_retires_employees_whose_retirement_date_has_arrived_without_the_daily_command(): void
+    {
+        $this->formasiUnit('Kebun Pensiun Impor', 'Manajer Pensiun Impor', 'RM-1', 5);
+
+        $response = $this->commitRows([
+            $this->pastRetirementRow('88030001', 'Manajer Pensiun Impor', 'Kebun Pensiun Impor'),
+            $this->karpimImportRow('88030002', 'Manajer Pensiun Impor', 'Kebun Pensiun Impor'),
+        ])->assertOk();
+
+        $response->assertJsonPath('summary.retired', 1);
+
+        $retired = Employee::find('88030001');
+        $this->assertTrue($retired->isSeparated());
+        $this->assertSame(Employee::ALASAN_PENSIUN, $retired->alasan_berhenti);
+        $this->assertSame('2016-03-01', $retired->tanggal_berhenti->toDateString());
+        $this->assertFalse(Employee::find('88030002')->isSeparated(), 'Karyawan yang belum pensiun tetap aktif.');
+
+        // Filter Pensiun dan daftar aktif langsung konsisten; kursi formasi kosong.
+        $this->assertTrue(Employee::statusKepegawaian('pensiun')->where('nik', '88030001')->exists());
+        $this->assertFalse(Employee::statusKepegawaian(null)->where('nik', '88030001')->exists());
+        $this->assertSame(0, JobHistory::query()->active()->where('employee_nik', '88030001')->count());
+        $this->assertSame(1, JobHistory::query()->active()->where('employee_nik', '88030002')->count());
+
+        // Pekerjaan harian tidak menemukan sisa pekerjaan (idempotent).
+        $this->assertSame(0, app(PensiunService::class)->processDue()['count']);
+
+        $audit = MasterAuditLog::where('action', 'employee.separated')->sole();
+        $this->assertSame('Diproses otomatis setelah impor Excel (tanggal pensiun sudah tiba)', $audit->reason);
+        $this->assertSame($this->admin->name, $audit->user_name, 'Pelaku adalah admin yang mengimpor, bukan anonim.');
+    }
+
+    public function test_import_message_reports_how_many_employees_were_retired(): void
+    {
+        $this->formasiUnit('Kebun Pesan Pensiun', 'Manajer Pesan Pensiun', 'RM-1', 5);
+        $file = $this->createExcelUploadFile([$this->pastRetirementRow('88030003', 'Manajer Pesan Pensiun', 'Kebun Pesan Pensiun')]);
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import'), ['import_file' => $file])
+            ->assertSessionHas('success', fn (string $message) => str_contains($message, '1 karyawan telah mencapai Batas Usia Pensiun'));
+
+        $this->assertSame('', EmployeeImportService::retiredNote(['retired' => 0]));
+    }
+
+    public function test_rollback_still_works_for_an_imported_employee_that_was_retired_by_the_import(): void
+    {
+        $this->seedGovernanceUnit('Kebun Undo Pensiun', 'Manajer Undo Pensiun');
+        $hashBefore = Employee::stateHash(Employee::findOrFail('88021001'));
+        $openBefore = JobHistory::query()->active()->where('employee_nik', '88021001')->count();
+        $this->assertGreaterThan(0, $openBefore);
+
+        $this->commitRows([
+            $this->pastRetirementRow('88021001', 'Manajer Undo Pensiun', 'Kebun Undo Pensiun'),
+            $this->pastRetirementRow('88021002', 'Manajer Undo Pensiun', 'Kebun Undo Pensiun'),
+        ])->assertOk()->assertJsonPath('summary.retired', 2);
+
+        $log = EmployeeImportLog::latest('id')->firstOrFail();
+        $this->assertTrue(Employee::find('88021001')->isSeparated());
+        $this->assertTrue(app(EmployeeImportGovernanceService::class)->rollbackReadiness($log)['ready'], 'Pemberhentian oleh impor tidak boleh dianggap perubahan setelah impor.');
+
+        $this->actingAs($this->admin)->post(route('admin.employees.import.batches.rollback', $log), ['reason' => 'Berkas periode salah diunggah'])
+            ->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('employees', ['nik' => '88021002']);
+        $restored = Employee::find('88021001');
+        $this->assertSame($hashBefore, Employee::stateHash($restored), 'Karyawan eksisting kembali ke kondisi sebelum impor, termasuk status aktif.');
+        $this->assertFalse($restored->isSeparated());
+        $this->assertSame($openBefore, JobHistory::query()->active()->where('employee_nik', '88021001')->count(), 'Riwayat jabatan yang ditutup pensiun dibuka kembali.');
+    }
+
+    public function test_the_daily_command_still_retires_employees_the_import_did_not_touch(): void
+    {
+        $this->formasiUnit('Kebun Harian Pensiun', 'Manajer Harian Pensiun', 'RM-1', 5);
+        Employee::factory()->create([
+            'nik' => '88030009', 'jabatan' => 'Manajer Harian Pensiun', 'unit_kerja' => 'Kebun Harian Pensiun',
+            'level' => 'Karpim', 'rm_level' => 'RM-1', 'tanggal_lahir' => '1960-03-10', 'tanggal_pensiun' => '2016-03-01',
+        ]);
+
+        $this->commitRows([$this->karpimImportRow('88030010', 'Manajer Harian Pensiun', 'Kebun Harian Pensiun')])->assertOk()->assertJsonPath('summary.retired', 0);
+
+        $this->assertFalse(Employee::find('88030009')->isSeparated(), 'Impor hanya memproses karyawan yang diubahnya.');
+        $this->artisan('hr:process-retirements')->assertSuccessful();
+        $this->assertTrue(Employee::find('88030009')->isSeparated());
     }
 }

@@ -27,15 +27,18 @@ class PensiunService
     public const ALASAN_PEMBATALAN = 'Karyawan diberhentikan dari jabatan';
 
     /**
-     * Karyawan aktif yang tanggal pensiunnya sudah tiba pada tanggal acuan.
+     * Karyawan aktif yang tanggal pensiunnya sudah tiba pada tanggal acuan. `$niks` membatasi pada sekumpulan NIK
+     * (mis. karyawan yang baru diimpor); tanpa itu, seluruh karyawan aktif dinilai.
      *
+     * @param  list<string>|null  $niks
      * @return Collection<int, Employee>
      */
-    public function dueEmployees(?Carbon $asOf = null): Collection
+    public function dueEmployees(?Carbon $asOf = null, ?array $niks = null): Collection
     {
         $asOf = ($asOf ?? Carbon::today())->copy()->startOfDay();
 
         return Employee::aktif()
+            ->when($niks !== null, fn ($query) => $query->whereIn('nik', $niks))
             ->orderBy('nik')
             ->get()
             ->filter(fn (Employee $emp): bool => $emp->effective_tanggal_pensiun !== null
@@ -45,15 +48,17 @@ class PensiunService
 
     /**
      * Memberhentikan semua karyawan yang jatuh tempo pensiun (pekerjaan terjadwal; tanpa pelaku, tercatat sebagai Sistem).
-     * Idempotent. `$dryRun` hanya melaporkan siapa yang akan diproses tanpa mengubah data.
+     * Idempotent. `$dryRun` hanya melaporkan siapa yang akan diproses tanpa mengubah data. `$niks` membatasi proses pada
+     * karyawan tertentu (impor Excel); `$actor` dan `$sumber` mencatat siapa dan dari proses mana pemberhentian berasal.
      *
+     * @param  list<string>|null  $niks
      * @return array{count: int, dry_run: bool, items: list<array{nik: string, nama: string, jabatan: ?string, unit_kerja: ?string, tanggal_berhenti: string}>}
      */
-    public function processDue(?Carbon $asOf = null, bool $dryRun = false): array
+    public function processDue(?Carbon $asOf = null, bool $dryRun = false, ?array $niks = null, ?User $actor = null, ?string $sumber = null): array
     {
         $items = [];
 
-        foreach ($this->dueEmployees($asOf) as $employee) {
+        foreach ($this->dueEmployees($asOf, $niks) as $employee) {
             $items[] = [
                 'nik' => (string) $employee->nik,
                 'nama' => (string) $employee->nama,
@@ -63,7 +68,7 @@ class PensiunService
             ];
 
             if (! $dryRun) {
-                $this->separate($employee);
+                $this->separate($employee, actor: $actor, sumber: $sumber);
             }
         }
 
@@ -83,6 +88,7 @@ class PensiunService
         ?string $nomorSk = null,
         ?Carbon $tanggalSk = null,
         ?User $actor = null,
+        ?string $sumber = null,
     ): bool {
         if (! in_array($alasan, Employee::ALASAN_BERHENTI, true)) {
             throw new InvalidArgumentException("Alasan pemberhentian '{$alasan}' tidak dikenal.");
@@ -98,7 +104,7 @@ class PensiunService
             throw new InvalidArgumentException('Tanggal pemberhentian tidak boleh melewati hari ini.');
         }
 
-        return DB::transaction(function () use ($employee, $alasan, $tanggal, $nomorSk, $tanggalSk, $actor): bool {
+        return DB::transaction(function () use ($employee, $alasan, $tanggal, $nomorSk, $tanggalSk, $actor, $sumber): bool {
             $locked = Employee::where('nik', $employee->nik)->lockForUpdate()->first();
             $tanggal ??= $locked?->effective_tanggal_pensiun;
 
@@ -150,7 +156,7 @@ class PensiunService
                     'tanggal_sk' => $tanggalSk?->toDateString(),
                     'jumlah' => $closed->count() + $cancelled->count(),
                 ], fn ($value) => $value !== null && $value !== ''),
-                $actor === null ? 'Diproses otomatis oleh sistem pada tanggal berhenti' : null,
+                $sumber ?? ($actor === null ? 'Diproses otomatis oleh sistem pada tanggal berhenti' : null),
             );
 
             return true;

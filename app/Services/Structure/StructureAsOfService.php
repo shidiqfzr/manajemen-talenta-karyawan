@@ -3,6 +3,7 @@
 namespace App\Services\Structure;
 
 use App\Models\JobHistory;
+use App\Models\Position;
 use App\Models\StructureDecree;
 use App\Support\NikMasker;
 use Carbon\CarbonImmutable;
@@ -18,6 +19,17 @@ use Illuminate\Support\Facades\DB;
  */
 class StructureAsOfService
 {
+    /** Why a holder is not matched to a formasi of the decree (drives the corrective hint shown to HR admins). */
+    public const REASON_POOL = 'penampungan';
+
+    public const REASON_UNIT_MISSING = 'unit_tidak_ada';
+
+    public const REASON_OTHER_UNIT = 'jabatan_di_unit_lain';
+
+    public const REASON_NAME_MISMATCH = 'nama_jabatan_berbeda';
+
+    public const REASON_JABATAN_MISSING = 'jabatan_tidak_ada';
+
     public function __construct(private StructureReader $reader, private StructureDiffCalculator $calculator) {}
 
     public function decreeFor(CarbonInterface $date): ?StructureDecree
@@ -82,7 +94,7 @@ class StructureAsOfService
     }
 
     /**
-     * @return array{decree: StructureDecree, rows: list<array<string, mixed>>, units: list<array<string, mixed>>, totals: array{units: int, seats: int, kuota: int, filled: int}, holder_total: int, outside_structure: int}|null
+     * @return array{decree: StructureDecree, rows: list<array<string, mixed>>, units: list<array<string, mixed>>, totals: array{units: int, seats: int, kuota: int, filled: int}, holder_total: int, outside_structure: int, concurrent_outside: int, concurrent_holders: list<array{unit: string, jabatan: string, nama: string, nik_masked: string, status_penugasan: ?string}>, outside_holders: list<array{unit: string, jabatan: string, nama: string, nik_masked: string, status_penugasan: ?string, reason: string, hint: ?string}>}|null
      */
     public function report(CarbonInterface $date): ?array
     {
@@ -92,6 +104,7 @@ class StructureAsOfService
         }
 
         $holders = $this->holders($date);
+        $snapshotUnits = $decree->snapshot['units'] ?? [];
         $holderTotal = array_sum(array_map(fn (array $byJabatan): int => array_sum(array_map('count', $byJabatan)), $holders));
         $rows = [];
         $units = [];
@@ -131,6 +144,24 @@ class StructureAsOfService
         $units = array_values($units);
         $active = array_filter($units, fn (array $unit): bool => $unit['is_active']);
 
+        // Whatever is left in $holders was not matched to a formasi (e.g. Jabatan Penampungan or a unit no longer in the SK).
+        // A concurrent assignment (Plt/Pj, e.g. from the import's Tugas Rangkap column) is a valid extra duty, not a formasi seat:
+        // it is reported on its own and never as a mismatch to fix.
+        $outsideHolders = [];
+        $concurrentHolders = [];
+        foreach ($holders as $unit => $byJabatan) {
+            foreach ($byJabatan as $jabatan => $placed) {
+                foreach ($placed as $holder) {
+                    if ($holder['status_penugasan'] !== null && $holder['status_penugasan'] !== 'Definitif') {
+                        $concurrentHolders[] = ['unit' => (string) $unit, 'jabatan' => (string) $jabatan] + $holder;
+
+                        continue;
+                    }
+                    $outsideHolders[] = ['unit' => (string) $unit, 'jabatan' => (string) $jabatan] + $holder + $this->classifyOutside((string) $unit, (string) $jabatan, $snapshotUnits);
+                }
+            }
+        }
+
         return [
             'decree' => $decree,
             'rows' => $rows,
@@ -142,8 +173,60 @@ class StructureAsOfService
                 'filled' => array_sum(array_column($active, 'filled')),
             ],
             'holder_total' => $holderTotal,
-            'outside_structure' => $holderTotal - array_sum(array_column($rows, 'holder_count')),
+            'outside_structure' => count($outsideHolders),
+            'concurrent_outside' => count($concurrentHolders),
+            'concurrent_holders' => $concurrentHolders,
+            'outside_holders' => $outsideHolders,
         ];
+    }
+
+    /**
+     * Diagnoses a holder that matched no formasi, so the admin knows what to correct (through Mutasi) instead of guessing.
+     * Matching is exact on unit + jabatan, hence most cases are a truncated/renamed jabatan or a wrong unit, not a real
+     * position outside the structure. A name hint is given only when exactly one seat of the unit is a plausible match.
+     *
+     * @param  array<string, array<string, mixed>>  $snapshotUnits
+     * @return array{reason: string, hint: ?string}
+     */
+    private function classifyOutside(string $unit, string $jabatan, array $snapshotUnits): array
+    {
+        $position = Position::getAllCached()->get($jabatan);
+        if ($position && ($position->is_overflow || $position->is_diperban)) {
+            return ['reason' => self::REASON_POOL, 'hint' => null];
+        }
+
+        if (! isset($snapshotUnits[$unit])) {
+            return ['reason' => self::REASON_UNIT_MISSING, 'hint' => null];
+        }
+
+        $otherUnits = [];
+        foreach ($snapshotUnits as $name => $data) {
+            if ($name !== $unit && isset(($data['seats'] ?? [])[$jabatan])) {
+                $otherUnits[] = (string) $name;
+            }
+        }
+        if ($otherUnits !== []) {
+            return ['reason' => self::REASON_OTHER_UNIT, 'hint' => implode('; ', array_slice($otherUnits, 0, 3))];
+        }
+
+        $needle = $this->normalize($jabatan);
+        $candidates = array_values(array_filter(
+            array_map('strval', array_keys($snapshotUnits[$unit]['seats'] ?? [])),
+            function (string $seat) use ($needle): bool {
+                $seat = $this->normalize($seat);
+
+                return $needle !== '' && $seat !== '' && (str_contains($seat, $needle) || str_contains($needle, $seat));
+            }
+        ));
+
+        return count($candidates) === 1
+            ? ['reason' => self::REASON_NAME_MISMATCH, 'hint' => $candidates[0]]
+            : ['reason' => self::REASON_JABATAN_MISSING, 'hint' => null];
+    }
+
+    private function normalize(string $text): string
+    {
+        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', strtolower($text)));
     }
 
     /**

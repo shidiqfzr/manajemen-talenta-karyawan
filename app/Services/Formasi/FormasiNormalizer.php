@@ -2,6 +2,8 @@
 
 namespace App\Services\Formasi;
 
+use App\Support\JabatanLabel;
+
 /**
  * Menyeragamkan penulisan nama unit dan jabatan dari berkas formasi (ALL CAPS)
  * ke gaya penulisan master data yang sudah berlaku.
@@ -41,7 +43,8 @@ class FormasiNormalizer
 
     public static function jabatan(string $raw): string
     {
-        return self::format($raw);
+        // Nama jabatan juga memakai '&' (bukan 'dan'): satu aturan bersama dengan tampilan (JabatanLabel).
+        return JabatanLabel::display(self::format($raw));
     }
 
     private static function format(string $raw): string

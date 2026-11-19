@@ -3,6 +3,8 @@
 namespace App\Exports\Sheets;
 
 use App\Models\Employee;
+use App\Services\Import\EmployeeImportColumns;
+use App\Support\JabatanLabel;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -27,8 +29,6 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
 {
     public const TITLE = 'Formasi per Unit';
 
-    private const NOTE = 'Salinan Master Formasi saat template diunduh. Unduh ulang template bila Master Formasi berubah.';
-
     /** @var list<array<string, mixed>>|null */
     private ?array $seats = null;
 
@@ -39,18 +39,16 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
 
     public function headings(): array
     {
-        return ['UNIT KERJA', 'JABATAN', 'STRATA', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'SISA KUOTA', '', 'CATATAN'];
+        return ['UNIT KERJA', 'JABATAN', 'STRATA', 'RM BAND', 'BIDANG', 'KUOTA', 'TERISI', 'SISA KUOTA'];
     }
 
     public function array(): array
     {
         $rows = [];
-        foreach ($this->seats() as $index => $seat) {
+        foreach ($this->seats() as $seat) {
             $rows[] = [
                 $seat['unit'], $seat['jabatan'], $seat['level'], $seat['rm_level'],
                 $seat['bidang'], $seat['kuota'], $seat['terisi'], $seat['sisa'],
-                '',
-                $index === 0 ? self::NOTE : '',
             ];
         }
 
@@ -71,8 +69,9 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
     public function positionListFormula(int $row): string
     {
         $unitColumn = "'".self::TITLE."'!\$A\$2:\$A\${$this->lastSeatRow()}";
+        $unitCell = '$'.EmployeeImportColumns::letter('unit_kerja').$row;
 
-        return "OFFSET('".self::TITLE."'!\$B\$1,MATCH(\$I{$row},{$unitColumn},0),0,COUNTIF({$unitColumn},\$I{$row}),1)";
+        return "OFFSET('".self::TITLE."'!\$B\$1,MATCH({$unitCell},{$unitColumn},0),0,COUNTIF({$unitColumn},{$unitCell}),1)";
     }
 
     public function registerEvents(): array
@@ -86,15 +85,13 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
                 $sheet->setAutoFilter("A1:H{$lastRow}");
                 $sheet->getRowDimension(1)->setRowHeight(26);
 
-                foreach (['A1:H1', 'J1'] as $header) {
-                    $sheet->getStyle($header)->applyFromArray([
-                        'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10],
-                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1B5330']],
-                        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-                    ]);
-                }
+                $sheet->getStyle('A1:H1')->applyFromArray([
+                    'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10],
+                    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1B5330']],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+                ]);
 
-                foreach (['A' => 38, 'B' => 52, 'C' => 10, 'D' => 10, 'E' => 10, 'F' => 9, 'G' => 9, 'H' => 12, 'I' => 3, 'J' => 30] as $col => $width) {
+                foreach (['A' => 38, 'B' => 52, 'C' => 10, 'D' => 10, 'E' => 10, 'F' => 9, 'G' => 9, 'H' => 12] as $col => $width) {
                     $sheet->getColumnDimension($col)->setWidth($width);
                 }
                 $sheet->getStyle("C2:H{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -146,7 +143,7 @@ class EmployeeTemplateFormasiSheet implements FromArray, WithEvents, WithHeading
 
             return [
                 'unit' => $record->unit,
-                'jabatan' => $record->jabatan,
+                'jabatan' => JabatanLabel::display($record->jabatan),
                 'level' => $record->level,
                 'rm_level' => $record->rm_level ?? '',
                 'bidang' => $record->bidang ?? '',

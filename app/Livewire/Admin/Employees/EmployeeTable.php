@@ -230,14 +230,7 @@ class EmployeeTable extends Component
     protected function baseQuery(): Builder
     {
         // Daftar bawaan hanya karyawan aktif: yang sudah pensiun tidak lagi menempati jabatan (DOMAIN.md §5.1).
-        $query = Employee::query()->with('concurrentJobs');
-
-        return match ($this->statusKepegawaian) {
-            'pensiun' => $query->berhenti(),
-            'mbt' => $query->mbt(),
-            'menjelang_mbt' => $query->menjelangMbt(),
-            default => $query->aktif(),
-        };
+        return Employee::query()->with('concurrentJobs')->statusKepegawaian($this->statusKepegawaian);
     }
 
     protected function rowKey(): string
@@ -295,11 +288,7 @@ class EmployeeTable extends Component
                 ->withoutControl()
                 ->apply(fn (Builder $query, string $value) => $query->whereMonth('tmt_bekerja', $value)),
             // Status Kepegawaian: bawaan Aktif; "Pensiun" membuka arsip; MBT / Menjelang MBT menyaring masa bebas tugas. Kondisinya dipasang di baseQuery().
-            Filter::select('statusKepegawaian', 'Status Kepegawaian', [
-                'menjelang_mbt' => 'Menjelang MBT',
-                'mbt' => 'MBT',
-                'pensiun' => 'Pensiun',
-            ])
+            Filter::select('statusKepegawaian', 'Status Kepegawaian', Employee::STATUS_KEPEGAWAIAN_FILTERS)
                 ->icon('fas fa-user-clock')
                 ->allLabel('Karyawan Aktif')
                 ->apply(fn (Builder $query, string $value) => $query),
