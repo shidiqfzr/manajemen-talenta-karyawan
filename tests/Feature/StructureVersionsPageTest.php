@@ -263,6 +263,59 @@ class StructureVersionsPageTest extends TestCase
         $this->page()->assertSee('Belum ada riwayat jabatan karyawan pada tanggal ini');
     }
 
+    public function test_employees_outside_the_structure_are_listed_with_masked_nik_and_never_hidden(): void
+    {
+        $this->employeeWithoutHistory('87654321', 'Budi Penampung');
+        $this->placement('87654321', 'Bagian Tanaman', 'Jabatan Penampungan', '2026-09-01');
+
+        $html = $this->page()
+            ->assertSee('tidak dihitung pada kolom Terisi')
+            ->assertSee('Lihat daftar')
+            ->assertSee('Budi Penampung')
+            ->assertSee('Jabatan Penampungan')
+            ->assertSee('modul Mutasi')
+            ->html();
+
+        $this->assertStringContainsString('*****321', $html);
+        $this->assertStringNotContainsString('87654321', $html);
+    }
+
+    public function test_concurrent_assignments_are_informational_not_a_mismatch_warning(): void
+    {
+        $this->employeeWithoutHistory('87654323', 'Dedi Rangkap');
+        $this->placement('87654323', 'Bagian Tanaman', 'Asisten Lain', '2026-09-01', null, ['status_penugasan' => 'Plt']);
+
+        $html = $this->page()
+            ->assertSee('1 penugasan rangkap (Plt/Pj)')
+            ->assertSee('bukan kesalahan data')
+            ->assertSee('Dedi Rangkap')
+            ->assertDontSee('tidak cocok dengan struktur SK')
+            ->html();
+
+        $this->assertStringNotContainsString('87654323', $html);
+    }
+
+    public function test_outside_holders_show_a_cause_and_a_correction_hint(): void
+    {
+        $this->employeeWithoutHistory('87654322', 'Citra Terpotong');
+        $this->placement('87654322', 'Bagian Tanaman', 'Kepala', '2026-09-01');
+
+        $this->page()
+            ->assertSee('Penyebab')
+            ->assertSee('Nama jabatan berbeda dari SK')
+            ->assertSee('Kepala Bagian');
+    }
+
+    public function test_the_comparison_control_is_disabled_while_only_one_version_exists(): void
+    {
+        $html = $this->page()->html();
+        $this->assertMatchesRegularExpression('/<select[^>]*id="compare"[^>]*disabled/', $html);
+
+        $this->secondVersion();
+        $html = $this->page()->html();
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*id="compare"[^>]*disabled/', $html);
+    }
+
     public function test_invalid_dates_fall_back_to_today(): void
     {
         $this->page()

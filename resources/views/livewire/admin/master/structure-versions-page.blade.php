@@ -42,7 +42,7 @@
                 </div>
                 <div class="md:col-span-3">
                     <label for="compare" class="block text-xs font-bold text-surface-700 mb-1.5">Bandingkan dengan</label>
-                    <select id="compare" wire:model.live="compare" class="{{ $selectClass }}" @disabled($report === null)>
+                    <select id="compare" wire:model.live="compare" class="{{ $selectClass }}" @disabled($report === null || count($versions) < 2)>
                         <option value="">Tanpa pembanding</option>
                         @foreach ($this->compareOptions as $option)
                             <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -86,10 +86,97 @@
                     <p>Belum ada riwayat jabatan karyawan pada tanggal ini, sehingga seluruh jabatan tampil kosong.</p>
                 </div>
             @elseif ($report['outside_structure'] > 0)
-                <div class="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900" role="status">
-                    <i class="fas fa-triangle-exclamation mt-1" aria-hidden="true"></i>
-                    <p>{{ $format($report['outside_structure']) }} karyawan pada tanggal ini menjabat di unit atau jabatan yang tidak tercantum pada struktur SK (misalnya jabatan penampungan). Mereka tidak ditampilkan pada tabel di bawah.</p>
-                </div>
+                {{-- Karyawan di luar struktur SK tidak boleh hilang dari tampilan: daftar dapat dibuka (details/summary, tanpa JS) dan cocok dengan selisih jumlah Terisi. --}}
+                <details class="group rounded-xl border border-warning-200 bg-warning-50 text-sm text-warning-900" role="status">
+                    <summary class="flex items-start gap-3 px-4 py-3 cursor-pointer list-none rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        <i class="fas fa-triangle-exclamation mt-1" aria-hidden="true"></i>
+                        <span class="flex-1">{{ $format($report['outside_structure']) }} karyawan pada tanggal ini menjabat di unit atau jabatan yang tidak cocok dengan struktur SK (jabatan penampungan, atau nama jabatan/unit pada riwayat yang berbeda dari SK). Mereka tidak dihitung pada kolom Terisi.</span>
+                        <span class="shrink-0 font-semibold underline group-open:hidden">Lihat daftar</span>
+                        <span class="shrink-0 font-semibold underline hidden group-open:inline">Tutup daftar</span>
+                    </summary>
+                    <div class="overflow-x-auto border-t border-warning-200 bg-white rounded-b-xl">
+                        <table class="w-full text-left border-collapse text-xs text-surface-800">
+                            <caption class="sr-only">Karyawan di luar struktur SK pada tanggal ini</caption>
+                            <thead>
+                                <tr class="bg-surface-50 border-b border-surface-200">
+                                    <x-admin.table.th class="py-2.5 px-5">Karyawan</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Unit Kerja</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Jabatan</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Penyebab &amp; saran</x-admin.table.th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-surface-100">
+                                @foreach ($report['outside_holders'] as $holder)
+                                    <tr wire:key="outside-{{ $loop->index }}">
+                                        <td class="px-5 py-2.5">
+                                            <span class="font-medium text-surface-900">{{ $holder['nama'] }}</span>
+                                            <span class="font-mono text-surface-500">{{ $holder['nik_masked'] }}</span>
+                                        </td>
+                                        <td class="px-5 py-2.5">{{ $holder['unit'] }}</td>
+                                        <td class="px-5 py-2.5">{{ $holder['jabatan'] }}</td>
+                                        <td class="px-5 py-2.5">
+                                            @switch ($holder['reason'])
+                                                @case('penampungan')
+                                                    Jabatan penampungan, bukan formasi SK. Tidak perlu diperbaiki.
+                                                    @break
+                                                @case('unit_tidak_ada')
+                                                    Unit kerja tidak tercantum pada SK ini.
+                                                    @break
+                                                @case('jabatan_di_unit_lain')
+                                                    Jabatan ini pada SK berada di unit: <span class="font-medium">{{ $holder['hint'] }}</span>. Periksa unit penempatan.
+                                                    @break
+                                                @case('nama_jabatan_berbeda')
+                                                    Nama jabatan berbeda dari SK. Kemungkinan: <span class="font-medium">{{ $holder['hint'] }}</span>.
+                                                    @break
+                                                @default
+                                                    Jabatan tidak ditemukan pada unit ini di SK. Periksa nama jabatan.
+                                            @endswitch
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                        <p class="px-5 py-2.5 text-surface-600 border-t border-surface-100">Perbaikan penempatan karyawan hanya dilakukan melalui modul Mutasi; halaman ini hanya menampilkan.</p>
+                    </div>
+                </details>
+            @endif
+
+            @if ($report['concurrent_outside'] > 0)
+                {{-- Tugas rangkap (Plt/Pj, termasuk hasil impor) adalah penugasan tambahan yang sah, bukan formasi SK: informasi, bukan peringatan. --}}
+                <details class="group rounded-xl border border-surface-200 bg-surface-50 text-sm text-surface-800" role="status">
+                    <summary class="flex items-start gap-3 px-4 py-3 cursor-pointer list-none rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        <i class="fas fa-circle-info mt-1 text-surface-500" aria-hidden="true"></i>
+                        <span class="flex-1">{{ $format($report['concurrent_outside']) }} penugasan rangkap (Plt/Pj) pada tanggal ini berada di luar formasi SK. Penugasan rangkap tidak menempati kuota formasi sehingga tidak dihitung pada kolom Terisi, dan bukan kesalahan data.</span>
+                        <span class="shrink-0 font-semibold underline group-open:hidden">Lihat daftar</span>
+                        <span class="shrink-0 font-semibold underline hidden group-open:inline">Tutup daftar</span>
+                    </summary>
+                    <div class="overflow-x-auto border-t border-surface-200 bg-white rounded-b-xl">
+                        <table class="w-full text-left border-collapse text-xs text-surface-800">
+                            <caption class="sr-only">Penugasan rangkap di luar formasi SK pada tanggal ini</caption>
+                            <thead>
+                                <tr class="bg-surface-50 border-b border-surface-200">
+                                    <x-admin.table.th class="py-2.5 px-5">Karyawan</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Unit Kerja</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Jabatan</x-admin.table.th>
+                                    <x-admin.table.th class="py-2.5 px-5">Status</x-admin.table.th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-surface-100">
+                                @foreach ($report['concurrent_holders'] as $holder)
+                                    <tr wire:key="concurrent-{{ $loop->index }}">
+                                        <td class="px-5 py-2.5">
+                                            <span class="font-medium text-surface-900">{{ $holder['nama'] }}</span>
+                                            <span class="font-mono text-surface-500">{{ $holder['nik_masked'] }}</span>
+                                        </td>
+                                        <td class="px-5 py-2.5">{{ $holder['unit'] }}</td>
+                                        <td class="px-5 py-2.5">{{ $holder['jabatan'] }}</td>
+                                        <td class="px-5 py-2.5">{{ $holder['status_penugasan'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
             @endif
 
             @if ($compare !== '')

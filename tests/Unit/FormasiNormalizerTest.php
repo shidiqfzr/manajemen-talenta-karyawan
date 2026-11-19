@@ -21,9 +21,9 @@ class FormasiNormalizerTest extends TestCase
     public function test_normalizer_formats_jabatan(): void
     {
         $this->assertSame('Asisten Humas & Protokoler', FormasiNormalizer::jabatan('ASISTEN HUMAS & PROTOKOLER'));
-        $this->assertSame('Asisten Afdeling VII dan VIII', FormasiNormalizer::jabatan('ASISTEN AFDELING VII DAN VIII'));
+        $this->assertSame('Asisten Afdeling VII & VIII', FormasiNormalizer::jabatan('ASISTEN AFDELING VII DAN VIII'));
         $this->assertSame('Asisten TJSL', FormasiNormalizer::jabatan('ASISTEN TJSL'));
-        $this->assertSame('Asisten Asesmen dan Rekrutmen', FormasiNormalizer::jabatan('ASISTEN ASESMEN DAN REKRUITMEN'));
+        $this->assertSame('Asisten Asesmen & Rekrutmen', FormasiNormalizer::jabatan('ASISTEN ASESMEN DAN REKRUITMEN'));
         $this->assertSame('Asisten Tajati', FormasiNormalizer::jabatan('Asisten Tajati'));
         $this->assertSame('Asisten Afdeling IIA', FormasiNormalizer::jabatan('ASISTEN AFDELING IIA'));
     }
@@ -33,12 +33,12 @@ class FormasiNormalizerTest extends TestCase
         $this->assertSame('Asisten Afdeling XIII', FormasiNormalizer::jabatan('ASISTEN AFDELING XIII'));
         $this->assertSame('Asisten QC Pengolahan Kelapa Sawit', FormasiNormalizer::jabatan('ASISTEN QC PENGOLAHAN KELAPA SAWIT'));
         $this->assertSame('Kepala Sub Bagian QC & Administrasi Tanaman', FormasiNormalizer::jabatan('KEPALA SUB BAGIAN QC & ADMINISTRASI TANAMAN'));
-        $this->assertSame('Asisten ESG dan Sustainability', FormasiNormalizer::jabatan('ASISTEN ESG DAN SUSTAINABILITY'));
-        $this->assertSame('Kepala Sub Bagian Kesejahteraan dan HI', FormasiNormalizer::jabatan('KEPALA SUB BAGIAN KESEJAHTERAAN DAN HI'));
+        $this->assertSame('Asisten ESG & Sustainability', FormasiNormalizer::jabatan('ASISTEN ESG DAN SUSTAINABILITY'));
+        $this->assertSame('Kepala Sub Bagian Kesejahteraan & HI', FormasiNormalizer::jabatan('KEPALA SUB BAGIAN KESEJAHTERAAN DAN HI'));
         $this->assertSame('Head of PMO Investasi Tanaman Wilayah Kalbar', FormasiNormalizer::jabatan('HEAD OF PMO INVESTASI TANAMAN WILAYAH KALBAR'));
         $this->assertSame('Key User Modul FI / CO / HCM / MM / PM / SD', FormasiNormalizer::jabatan('KEY USER MODUL FI / CO / HCM / MM / PM / SD'));
-        $this->assertSame('Key User Modul PP, QM, dan Jembatan Timbang', FormasiNormalizer::jabatan('KEY USER MODUL PP, QM, DAN JEMBATAN TIMBANG'));
-        $this->assertSame('Key User Modul FM,PS,BKM,SPB, dan D-Farm', FormasiNormalizer::jabatan('KEY USER MODUL FM,PS,BKM,SPB, DAN D-FARM'));
+        $this->assertSame('Key User Modul PP, QM & Jembatan Timbang', FormasiNormalizer::jabatan('KEY USER MODUL PP, QM, DAN JEMBATAN TIMBANG'));
+        $this->assertSame('Key User Modul FM,PS,BKM,SPB & D-Farm', FormasiNormalizer::jabatan('KEY USER MODUL FM,PS,BKM,SPB, DAN D-FARM'));
     }
 
     public function test_normalizer_keeps_tax_and_certification_acronyms_and_roman_suffixes_c_and_d(): void

@@ -48,7 +48,6 @@
                         <tr wire:key="row-{{ $decree->id }}" class="hover:bg-surface-50/75 transition">
                             <td class="px-4 py-3 max-w-[260px]">
                                 <a href="{{ route('admin.master.sk.show', $decree) }}" class="block font-semibold text-surface-900 truncate hover:text-primary-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded" title="{{ $decree->sk_number }}">{{ $decree->sk_number }}</a>
-                                <span class="block text-xs text-surface-500">SK #{{ $decree->id }}</span>
                             </td>
                             <td class="px-4 py-3 text-surface-700 max-w-[320px]">
                                 <span class="block truncate" title="{{ $decree->title }}">{{ $decree->title }}</span>
