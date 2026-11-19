@@ -10,16 +10,34 @@ class EmployeeImportDictionary
      */
     public static function getCategories(): array
     {
+        return array_map(function (array $category): array {
+            $letters = [];
+            $category['columns'] = array_map(function (array $column) use (&$letters): array {
+                // Huruf dan kunci kolom dari daftar kolom bersama: tidak ada salinan yang dapat tidak sinkron dengan template.
+                $column['letter'] = EmployeeImportColumns::letter($column['field']);
+                $column['key'] = EmployeeImportColumns::headingKey($column['field']);
+                $letters[] = $column['letter'];
+
+                return $column;
+            }, $category['columns']);
+            $category['title'] = str_replace('{range}', $letters[0].' – '.end($letters), $category['title']);
+            $category['count_label'] = count($category['columns']).' Kolom';
+
+            return $category;
+        }, self::definitions());
+    }
+
+    /** Definisi kategori dan kolom (tanpa huruf, kunci, dan jumlah: ketiganya diturunkan dari EmployeeImportColumns). */
+    private static function definitions(): array
+    {
         return [
             [
                 'id' => 'cat1',
-                'title' => 'Kategori I • Identitas Karyawan & Pribadi (Kolom A – G)',
+                'title' => 'Kategori I • Identitas Karyawan & Pribadi (Kolom {range})',
                 'icon' => 'fas fa-id-card',
-                'count_label' => '7 Kolom',
                 'columns' => [
                     [
-                        'letter' => 'A',
-                        'key' => 'nik',
+                        'field' => 'nik',
                         'short_title' => null,
                         'is_mandatory' => true,
                         'type_label' => 'Teks (8 Digit)',
@@ -30,8 +48,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'nomor induk unik 8 digit',
                     ],
                     [
-                        'letter' => 'B',
-                        'key' => 'nama',
+                        'field' => 'nama',
                         'short_title' => null,
                         'is_mandatory' => true,
                         'type_label' => 'Teks Bebas',
@@ -42,20 +59,18 @@ class EmployeeImportDictionary
                         'search_tags' => 'nama lengkap karyawan uppercase ktp',
                     ],
                     [
-                        'letter' => 'C',
-                        'key' => 'jenis_kelamin',
+                        'field' => 'jenis_kelamin',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
-                        'type_sub' => 'L / P',
+                        'type_sub' => 'Laki-laki / Perempuan',
                         'is_dropdown' => true,
-                        'description' => 'Pilih dari dropdown: L (Laki-laki) atau P (Perempuan).',
-                        'example' => 'L',
-                        'search_tags' => 'gender laki perempuan dropdown l p',
+                        'description' => 'Pilih dari dropdown: Laki-laki atau Perempuan.',
+                        'example' => 'Laki-laki',
+                        'search_tags' => 'gender jenis kelamin laki-laki perempuan dropdown',
                     ],
                     [
-                        'letter' => 'D',
-                        'key' => 'tempat_lahir',
+                        'field' => 'tempat_lahir',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Teks Bebas',
@@ -66,8 +81,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'kota kabupaten tempat lahir ktp',
                     ],
                     [
-                        'letter' => 'E',
-                        'key' => 'tanggal_lahir',
+                        'field' => 'tanggal_lahir',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal (Date)',
@@ -78,8 +92,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tanggal lahir pensiun mbt date',
                     ],
                     [
-                        'letter' => 'F',
-                        'key' => 'agama',
+                        'field' => 'agama',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
@@ -90,8 +103,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'agama islam kristen protestan katolik hindu buddha konghucu dropdown',
                     ],
                     [
-                        'letter' => 'G',
-                        'key' => 'susunan_keluarga',
+                        'field' => 'susunan_keluarga',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
@@ -105,13 +117,11 @@ class EmployeeImportDictionary
             ],
             [
                 'id' => 'cat2',
-                'title' => 'Kategori II • Jabatan & Formasi Organisasi (Kolom H – M)',
+                'title' => 'Kategori II • Jabatan & Formasi Organisasi (Kolom {range})',
                 'icon' => 'fas fa-briefcase',
-                'count_label' => '6 Kolom',
                 'columns' => [
                     [
-                        'letter' => 'H',
-                        'key' => 'status_karyawan',
+                        'field' => 'status_karyawan',
                         'short_title' => null,
                         'is_mandatory' => true,
                         'type_label' => 'Dropdown',
@@ -122,8 +132,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'status karyawan pkwtt pkwt tetap kontrak calon dropdown',
                     ],
                     [
-                        'letter' => 'I',
-                        'key' => 'unit_kerja',
+                        'field' => 'unit_kerja',
                         'short_title' => null,
                         'is_mandatory' => true,
                         'type_label' => 'Dropdown',
@@ -134,20 +143,18 @@ class EmployeeImportDictionary
                         'search_tags' => 'unit kebun pabrik pmo distrik regional dropdown',
                     ],
                     [
-                        'letter' => 'J',
-                        'key' => 'jabatan',
+                        'field' => 'jabatan',
                         'short_title' => null,
                         'is_mandatory' => true,
                         'type_label' => 'Dropdown',
                         'type_sub' => 'Mengikuti Unit Kerja',
                         'is_dropdown' => true,
-                        'description' => "Pilih setelah Unit Kerja. Dropdown hanya memuat Formasi Jabatan pada unit tersebut. Sheet 'Formasi per Unit' menampilkan strata, RM Band, bidang, kuota, dan sisa kuota setiap Formasi Jabatan. Strata (Karpim atau Karpel) dan RM Band diturunkan otomatis dari Formasi Jabatan, sehingga template tidak memiliki kolomnya.",
+                        'description' => "Pilih setelah Unit Kerja. Dropdown hanya memuat Formasi Jabatan pada unit tersebut. Sheet 'Formasi per Unit' menampilkan strata, RM Band, bidang, kuota, dan sisa kuota setiap Formasi Jabatan. Strata (Karpim atau Karpel) dan RM Band diturunkan otomatis dari Formasi Jabatan, sehingga template tidak memiliki kolomnya. Karyawan Advisor atau Diperbantukan tetap wajib memiliki jabatan: pilih jabatan penampungannya (mis. Advisor RM-3) yang sudah dibuka pada unit.",
                         'example' => 'Asisten Afdeling',
                         'search_tags' => 'posisi nomenklatur formasi unit aktif dropdown jabatan sisa kuota',
                     ],
                     [
-                        'letter' => 'K',
-                        'key' => 'golongan',
+                        'field' => 'golongan',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Format Baku',
@@ -158,26 +165,24 @@ class EmployeeImportDictionary
                         'search_tags' => 'golongan berkala ia iid iiia ivd pangkat format baku',
                     ],
                     [
-                        'letter' => 'L',
-                        'key' => 'status_penugasan',
+                        'field' => 'status_penugasan',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
-                        'type_sub' => 'Status Jabatan',
+                        'type_sub' => 'Status Jabatan Utama',
                         'is_dropdown' => true,
-                        'description' => 'Default: Definitif. Pilihan lain: Diperbantukan, Pejabat Sementara (Pjs), Tugas Belajar, Advisor.',
+                        'description' => 'Status untuk jabatan pada kolom Jabatan, bukan untuk Tugas Rangkap. Default: Definitif. Pilihan lain: Pejabat Sementara (Pjs), Tugas Belajar. Advisor dan Diperbantukan adalah jabatan penampungan: pilih pada kolom Jabatan.',
                         'example' => 'Definitif',
-                        'search_tags' => 'status penugasan definitif pjs diperbantukan tugas belajar advisor dropdown',
+                        'search_tags' => 'status jabatan utama penugasan definitif pjs diperbantukan tugas belajar advisor dropdown',
                     ],
                     [
-                        'letter' => 'M',
-                        'key' => 'tugas_rangkap_penugasan_sementara',
+                        'field' => 'tugas_rangkap_penugasan_sementara',
                         'short_title' => 'tugas_rangkap',
                         'is_mandatory' => false,
                         'type_label' => 'Teks Bebas',
                         'type_sub' => 'Auto-Register History',
                         'is_dropdown' => false,
-                        'description' => 'Tugas rangkap (Plt/Pjs). Otomatis didaftarkan ke riwayat penugasan (job_histories).',
+                        'description' => 'Tugas rangkap (Plt/Pj/Pjs/Diperbantukan); statusnya dibaca dari teks ini, bukan dari kolom Status Jabatan Utama. Tulis satu tugas per baris (Alt+Enter) atau pisahkan dengan titik koma, dengan format: Plt. Manajer PKS Gunung Meliau TMT 15 Juli 2026, atau seperti hasil ekspor: [Plt] Jabatan — Unit (SK: nomor, TMT: 2026-07-15). Nama jabatan dan unit wajib sesuai master; bila tidak, baris ditolak. Bila unit tidak ditulis, dianggap unit karyawan sendiri, dan baris ditolak jika jabatan itu ada di unit lain pada struktur SK: tulis nama unitnya. Nomor SK pada teks hanya menjadi catatan, bukan nomor SK resmi. Tugas yang dihapus dari sel tidak diakhiri otomatis.',
                         'example' => 'Plt. Manajer PKS Gunung Meliau TMT 15 Juli 2026',
                         'search_tags' => 'tugas rangkap plt pjs riwayat job history',
                     ],
@@ -185,13 +190,11 @@ class EmployeeImportDictionary
             ],
             [
                 'id' => 'cat3',
-                'title' => 'Kategori III • Masa Kerja & Rekam Karir (Kolom N – T)',
+                'title' => 'Kategori III • Masa Kerja & Rekam Karir (Kolom {range})',
                 'icon' => 'fas fa-chart-line',
-                'count_label' => '7 Kolom',
                 'columns' => [
                     [
-                        'letter' => 'N',
-                        'key' => 'tmt_bekerja',
+                        'field' => 'tmt_bekerja',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal (Date)',
@@ -202,8 +205,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tmt bekerja perdana tanggal mulai dinas date',
                     ],
                     [
-                        'letter' => 'O',
-                        'key' => 'tanggal_diangkat_staf',
+                        'field' => 'tanggal_diangkat_staf',
                         'short_title' => 'tgl_angkat_staf',
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal (Date)',
@@ -214,8 +216,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tanggal diangkat staf karpim pengangkatan date',
                     ],
                     [
-                        'letter' => 'P',
-                        'key' => 'tanggal_dalam_jabatan',
+                        'field' => 'tanggal_dalam_jabatan',
                         'short_title' => 'tgl_dlm_jabatan',
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal (Date)',
@@ -226,8 +227,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tanggal dalam jabatan tmt posisi saat ini date',
                     ],
                     [
-                        'letter' => 'Q',
-                        'key' => 'tmt_unit_kerja',
+                        'field' => 'tmt_unit_kerja',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal (Date)',
@@ -238,8 +238,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tmt unit kerja penempatan mutasi dinas date',
                     ],
                     [
-                        'letter' => 'R',
-                        'key' => 'jalur_masuk',
+                        'field' => 'jalur_masuk',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
@@ -250,8 +249,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'jalur masuk reguler ckp talent scouting rbb rekrutmen dropdown',
                     ],
                     [
-                        'letter' => 'S',
-                        'key' => 'job_grade',
+                        'field' => 'job_grade',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Angka (1 s.d. 16)',
@@ -262,8 +260,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'job grade bobot posisi 1 10 11 16 karpel karpim',
                     ],
                     [
-                        'letter' => 'T',
-                        'key' => 'person_grade',
+                        'field' => 'person_grade',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Angka (1 s.d. 16)',
@@ -277,13 +274,11 @@ class EmployeeImportDictionary
             ],
             [
                 'id' => 'cat4',
-                'title' => 'Kategori IV • Pendidikan & Pensiun (Kolom U – X)',
+                'title' => 'Kategori IV • Pendidikan & Pensiun (Kolom {range})',
                 'icon' => 'fas fa-graduation-cap',
-                'count_label' => '4 Kolom',
                 'columns' => [
                     [
-                        'letter' => 'U',
-                        'key' => 'pendidikan_terakhir',
+                        'field' => 'pendidikan_terakhir',
                         'short_title' => 'pendidikan',
                         'is_mandatory' => false,
                         'type_label' => 'Dropdown',
@@ -294,8 +289,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'pendidikan terakhir sd smp sma smk d3 d4 s1 s2 s3 ijazah dropdown',
                     ],
                     [
-                        'letter' => 'V',
-                        'key' => 'sekolah',
+                        'field' => 'sekolah',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Teks Bebas',
@@ -306,8 +300,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'sekolah universitas perguruan tinggi institut almamater',
                     ],
                     [
-                        'letter' => 'W',
-                        'key' => 'tanggal_mbt',
+                        'field' => 'tanggal_mbt',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal / Otomatis',
@@ -318,8 +311,7 @@ class EmployeeImportDictionary
                         'search_tags' => 'tanggal mbt masa bebas tugas 6 bulan sebelum pensiun date',
                     ],
                     [
-                        'letter' => 'X',
-                        'key' => 'tanggal_pensiun',
+                        'field' => 'tanggal_pensiun',
                         'short_title' => null,
                         'is_mandatory' => false,
                         'type_label' => 'Tanggal / Otomatis',

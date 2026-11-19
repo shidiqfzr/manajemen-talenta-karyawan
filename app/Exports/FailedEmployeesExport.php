@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Services\Import\EmployeeImportColumns;
 use App\Support\SpreadsheetCell;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -27,32 +28,7 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
         return [
             'NO. BARIS EXCEL',
             'ALASAN PENOLAKAN / KESALAHAN SISTEM',
-            'NIK*',
-            'NAMA*',
-            'JENIS KELAMIN',
-            'TEMPAT LAHIR',
-            'TANGGAL LAHIR',
-            'AGAMA',
-            'SUSUNAN KELUARGA',
-            'STATUS KARYAWAN*',
-            'JABATAN*',
-            'LEVEL*',
-            'UNIT KERJA*',
-            'GOLONGAN',
-            'RM LEVEL',
-            'STATUS PENUGASAN',
-            'TUGAS RANGKAP / PENUGASAN SEMENTARA',
-            'TMT BEKERJA',
-            'TANGGAL DIANGKAT STAF',
-            'TANGGAL DALAM JABATAN',
-            'TMT UNIT KERJA',
-            'JALUR MASUK',
-            'JOB GRADE',
-            'PERSON GRADE',
-            'PENDIDIKAN TERAKHIR',
-            'SEKOLAH',
-            'TANGGAL MBT',
-            'TANGGAL PENSIUN',
+            ...EmployeeImportColumns::headings(EmployeeImportColumns::LAYOUT_TABULAR, true),
         ];
     }
 
@@ -61,39 +37,17 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
         $exportData = [];
 
         foreach ($this->failedRows as $item) {
-            $rowNum = $item['row'] ?? '';
             $reasons = is_array($item['errors']) ? implode('; ', $item['errors']) : ($item['errors'] ?? '');
             $raw = $item['raw_data'] ?? [];
 
+            // Nilai asli setiap kolom dicari pada baris mentah menurut nama bidang dan nama alternatifnya (daftar kolom bersama).
             $exportData[] = [
-                $rowNum,
+                $item['row'] ?? '',
                 self::sanitizeCellValue($reasons),
-                $this->findRawValue($raw, ['nik']),
-                $this->findRawValue($raw, ['nama']),
-                $this->findRawValue($raw, ['jenis_kelamin', 'jk']),
-                $this->findRawValue($raw, ['tempat_lahir']),
-                $this->findRawValue($raw, ['tanggal_lahir', 'tgl_lahir']),
-                $this->findRawValue($raw, ['agama']),
-                $this->findRawValue($raw, ['susunan_keluarga', 'ptkp']),
-                $this->findRawValue($raw, ['status_karyawan']),
-                $this->findRawValue($raw, ['jabatan']),
-                $this->findRawValue($raw, ['level', 'strata']),
-                $this->findRawValue($raw, ['unit_kerja', 'unit']),
-                $this->findRawValue($raw, ['golongan', 'gol']),
-                $this->findRawValue($raw, ['rm_level', 'rm']),
-                $this->findRawValue($raw, ['status_penugasan']),
-                $this->findRawValue($raw, ['tugas_rangkap_penugasan_sementara', 'tugas_rangkap']),
-                $this->findRawValue($raw, ['tmt_bekerja']),
-                $this->findRawValue($raw, ['tanggal_diangkat_staf', 'tgl_staf']),
-                $this->findRawValue($raw, ['tanggal_dalam_jabatan', 'tgl_jabatan']),
-                $this->findRawValue($raw, ['tmt_unit_kerja', 'tmt_unit']),
-                $this->findRawValue($raw, ['jalur_masuk']),
-                $this->findRawValue($raw, ['job_grade']),
-                $this->findRawValue($raw, ['person_grade']),
-                $this->findRawValue($raw, ['pendidikan_terakhir', 'pendidikan']),
-                $this->findRawValue($raw, ['sekolah', 'universitas']),
-                $this->findRawValue($raw, ['tanggal_mbt', 'mbt']),
-                $this->findRawValue($raw, ['tanggal_pensiun', 'pensiun']),
+                ...array_map(
+                    fn (string $field): string => $this->findRawValue($raw, EmployeeImportColumns::rawKeys($field)),
+                    EmployeeImportColumns::fields(EmployeeImportColumns::LAYOUT_TABULAR)
+                ),
             ];
         }
 
@@ -112,7 +66,7 @@ class FailedEmployeesExport implements FromArray, ShouldAutoSize, WithEvents, Wi
     protected function findRawValue(array $raw, array $possibleKeys): string
     {
         foreach ($raw as $k => $v) {
-            $cleanKey = strtolower(trim(preg_replace('/[^a-zA-Z0-9]+/', '_', trim(str_replace('*', '', (string) $k))), '_'));
+            $cleanKey = EmployeeImportColumns::normaliseHeading((string) $k);
             foreach ($possibleKeys as $pk) {
                 $cleanPk = strtolower(trim(str_replace('*', '', $pk)));
                 if ($cleanKey === $cleanPk || str_contains($cleanKey, $cleanPk)) {

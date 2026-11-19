@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Employee;
 use App\Services\KepegawaianPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ class UpdateEmployeeRequest extends FormRequest
     {
         return [
             'nama' => ['required', 'string', 'max:255'],
-            'status_penugasan' => ['nullable', 'string', Rule::in(['Definitif', 'Diperbantukan', 'Pejabat Sementara (Pjs)', 'Tugas Belajar', 'Advisor'])],
+            'status_penugasan' => ['nullable', 'string', Rule::in(Employee::ASSIGNMENT_STATUSES)],
             'status_karyawan' => ['required', 'string', 'max:50'],
             'tanggal_berakhir_kontrak' => ['nullable', 'date'],
             'golongan' => ['nullable', 'string', 'max:50'],

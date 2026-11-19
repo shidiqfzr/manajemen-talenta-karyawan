@@ -52,12 +52,14 @@ return [
     |
     | mutasi.prepare : menyusun, menyimpan draf, dan mengajukan usulan mutasi berantai.
     | mutasi.approve : menyetujui/menolak usulan, atau langsung menerbitkan SK bila persetujuan nonaktif.
+    | karyawan.import: seluruh alur impor data karyawan (unggah, pratinjau, simpan, unduh laporan, serta persetujuan, penolakan, dan pembatalan batch).
     |
     */
 
     'permissions' => [
         'mutasi.prepare' => ['admin'],
         'mutasi.approve' => ['admin'],
+        'karyawan.import' => ['admin'],
         'struktur.prepare' => ['admin'],
         'struktur.approve' => ['admin'],
     ],
@@ -70,11 +72,13 @@ return [
     | require_approval : kebijakan empat mata (maker-checker). Bila aktif, admin yang mengajukan SK tidak
     |                    dapat menyetujuinya sendiri; admin LAIN yang menyetujui atau menolak.
     |                    Bila nonaktif, pengaju yang berhak dapat langsung menyetujui.
+    |                    Bawaan AKTIF: DOMAIN.md §3.7 mewajibkan persetujuan empat mata untuk SK struktur.
+    |                    Nonaktifkan (false) hanya pada lingkungan pengembangan dengan satu admin.
     |
     */
 
     'structure' => [
-        'require_approval' => (bool) env('HRIS_STRUCTURE_REQUIRE_APPROVAL', false),
+        'require_approval' => (bool) env('HRIS_STRUCTURE_REQUIRE_APPROVAL', true),
     ],
 
     /*

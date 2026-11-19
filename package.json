@@ -5,6 +5,7 @@
         "build": "vite build",
         "dev": "vite",
         "e2e": "playwright test",
+        "test:js": "node --test \"tests/js/**/*.test.js\"",
         "e2e:install": "playwright install chromium"
     },
     "devDependencies": {

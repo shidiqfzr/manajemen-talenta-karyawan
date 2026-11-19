@@ -63,6 +63,38 @@ class AdminFormComponentsTest extends TestCase
         $this->assertStringNotContainsString('fa-shield-halved', $html);
     }
 
+    public function test_footer_can_run_cancel_as_an_alpine_action_and_replace_status_and_primary(): void
+    {
+        $html = Blade::render(<<<'BLADE'
+            <x-admin.form.footer cancel-click="resetToStep1()" cancel-label="Ganti">
+                <x-slot:status><span x-text="'Siap ' + count"></span></x-slot:status>
+                <x-slot:primary><x-admin.button type="button" variant="primary" @click="commit()" x-bind:disabled="count === 0">Impor</x-admin.button></x-slot:primary>
+            </x-admin.form.footer>
+            BLADE);
+
+        // Tetap bar bersama: menempel di bawah, keterangan diumumkan, Batal di kiri.
+        $this->assertStringContainsString('sticky bottom-4', $html);
+        $this->assertStringContainsString('aria-live="polite"', $html);
+        $this->assertStringContainsString('@click="resetToStep1()"', $html);
+        $this->assertStringContainsString('Ganti', $html);
+        $this->assertStringNotContainsString('href=', $html, 'Batal berupa tombol aksi, bukan tautan.');
+        // Slot status dan primary menggantikan bawaan: tidak ada tombol simpan bawaan maupun catatan statis.
+        $this->assertStringContainsString("x-text=\"'Siap ' + count\"", $html);
+        $this->assertStringContainsString('@click="commit()"', $html);
+        $this->assertStringContainsString('x-bind:disabled="count === 0"', $html);
+        $this->assertSame(0, substr_count($html, 'type="submit"'));
+        $this->assertStringNotContainsString('fa-shield-halved', $html);
+    }
+
+    public function test_footer_keeps_its_link_cancel_and_submit_when_no_alpine_options_are_given(): void
+    {
+        $html = Blade::render('<x-admin.form.footer cancel-url="/batal" submit-label="Simpan" />');
+
+        $this->assertStringContainsString('href="/batal"', $html);
+        $this->assertSame(1, substr_count($html, 'type="submit"'));
+        $this->assertStringNotContainsString('@click=', $html);
+    }
+
     public function test_error_summary_is_hidden_without_errors(): void
     {
         $this->assertStringNotContainsString('errorSummary', Blade::render('<x-admin.form.error-summary />'));

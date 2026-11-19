@@ -2,7 +2,9 @@
 
 namespace App\Exports\Sheets;
 
+use App\Models\Employee;
 use App\Models\Unit;
+use App\Services\Import\EmployeeImportColumns;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -24,42 +26,13 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
         return 'Data Karyawan';
     }
 
+    /**
+     * Judul kolom dari satu daftar kolom bersama (EmployeeImportColumns). Strata (Karpim/Karpel) dan RM Band tidak diminta:
+     * keduanya diturunkan dari Formasi Jabatan pada Master Formasi.
+     */
     public function headings(): array
     {
-        return [
-            // Identitas Utama (Kolom A - G)
-            'NIK*',
-            'NAMA*',
-            'JENIS KELAMIN',
-            'TEMPAT LAHIR',
-            'TANGGAL LAHIR',
-            'AGAMA',
-            'SUSUNAN KELUARGA',
-
-            // Info Jabatan & Formasi (Kolom H - M). Strata (Karpim/Karpel) dan RM Band tidak diminta:
-            // keduanya diturunkan dari Formasi Jabatan pada Master Formasi.
-            'STATUS KARYAWAN*',
-            'UNIT KERJA*',
-            'JABATAN*',
-            'GOLONGAN',
-            'STATUS PENUGASAN',
-            'TUGAS RANGKAP / PENUGASAN SEMENTARA',
-
-            // Masa Kerja & Karir (Kolom N - T)
-            'TMT BEKERJA',
-            'TANGGAL DIANGKAT STAF',
-            'TANGGAL DALAM JABATAN',
-            'TMT UNIT KERJA',
-            'JALUR MASUK',
-            'JOB GRADE',
-            'PERSON GRADE',
-
-            // Lain-lain / Pendidikan & Pensiun (Kolom U - X)
-            'PENDIDIKAN TERAKHIR',
-            'SEKOLAH',
-            'TANGGAL MBT',
-            'TANGGAL PENSIUN',
-        ];
+        return EmployeeImportColumns::headings(EmployeeImportColumns::LAYOUT_TEMPLATE, true);
     }
 
     public function array(): array
@@ -69,7 +42,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 // Identitas Utama (Kolom A - G)
                 '13009988',
                 'BUDI SANTOSO',
-                'L',
+                'Laki-laki',
                 'Pontianak',
                 '1990-05-15',
                 'Islam',
@@ -103,16 +76,13 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
 
     public function columnFormats(): array
     {
-        return [
-            'A' => NumberFormat::FORMAT_TEXT,         // NIK strictly text
-            'E' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Lahir
-            'N' => NumberFormat::FORMAT_DATE_YYYYMMDD, // TMT Bekerja
-            'O' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Diangkat Staf
-            'P' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Dalam Jabatan
-            'Q' => NumberFormat::FORMAT_DATE_YYYYMMDD, // TMT Unit Kerja
-            'W' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal MBT
-            'X' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Pensiun
-        ];
+        // NIK harus teks (nol di depan tidak boleh hilang); kolom tanggal berformat ISO. Hurufnya dari daftar kolom bersama.
+        $formats = [EmployeeImportColumns::letter('nik') => NumberFormat::FORMAT_TEXT];
+        foreach (EmployeeImportColumns::fieldsOfType(EmployeeImportColumns::TYPE_DATE) as $field) {
+            $formats[EmployeeImportColumns::letter($field)] = NumberFormat::FORMAT_DATE_YYYYMMDD;
+        }
+
+        return $formats;
     }
 
     public function registerEvents(): array
@@ -120,6 +90,8 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
+                $letter = EmployeeImportColumns::letter(...);
+                $lastColumn = EmployeeImportColumns::lastLetter();
 
                 // 1. Freeze baris pertama agar header selalu terlihat saat scrolling
                 $sheet->freezePane('A2');
@@ -128,7 +100,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 $sheet->getRowDimension(1)->setRowHeight(28);
 
                 // 3. Styling Header Seragam: Hijau Korporat PTPN IV (Primary 800 - #1B5330) untuk seluruh 24 Kolom
-                $sheet->getStyle('A1:X1')->applyFromArray([
+                $sheet->getStyle("A1:{$lastColumn}1")->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],
@@ -152,7 +124,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 ]);
 
                 // 4. Beri warna merah (#EF4444) khusus untuk karakter tanda bintang (*) pada kolom wajib
-                $mandatoryCells = ['A1', 'B1', 'H1', 'I1', 'J1'];
+                $mandatoryCells = array_map(fn (string $field): string => $letter($field).'1', EmployeeImportColumns::requiredFields());
                 foreach ($mandatoryCells as $cellId) {
                     $cell = $sheet->getCell($cellId);
                     $val = (string) $cell->getValue();
@@ -171,81 +143,82 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
 
                 // 5. Panduan Input Message pada Header (Bersih, Melayang saat Sel Diklik, 100% Bebas Garis Tembus)
                 $inputGuides = [
-                    'A1' => [
+                    'nik' => [
                         'title' => 'Panduan NIK (Wajib)',
                         'prompt' => 'Format 8 digit angka (contoh: 13009988). Sel diformat teks agar nol di depan tidak hilang.',
                     ],
-                    'B1' => [
+                    'nama' => [
                         'title' => 'Panduan Nama Karyawan (Wajib)',
                         'prompt' => 'Nama lengkap karyawan (akan otomatis distandarkan menjadi HURUF BESAR oleh sistem).',
                     ],
-                    'C1' => [
+                    'jenis_kelamin' => [
                         'title' => 'Panduan Jenis Kelamin',
-                        'prompt' => 'Pilihan: L (Laki-laki) atau P (Perempuan). Tersedia dropdown pilihan.',
+                        'prompt' => 'Pilih Laki-laki atau Perempuan dari dropdown.',
                     ],
-                    'E1' => [
+                    'tanggal_lahir' => [
                         'title' => 'Panduan Tanggal Lahir',
                         'prompt' => 'Format tanggal: YYYY-MM-DD atau DD/MM/YYYY. Dasar perhitungan Pensiun & MBT.',
                     ],
-                    'F1' => [
+                    'agama' => [
                         'title' => 'Panduan Agama',
                         'prompt' => 'Pilih salah satu dari 6 agama resmi pada dropdown.',
                     ],
-                    'G1' => [
+                    'susunan_keluarga' => [
                         'title' => 'Panduan Susunan Keluarga',
                         'prompt' => 'Pilih status PTKP pada dropdown (L, TK, K/0, K/1, K/2, K/3).',
                     ],
-                    'H1' => [
+                    'status_karyawan' => [
                         'title' => 'Panduan Status Karyawan (Wajib)',
                         'prompt' => 'Pilih: Tetap (PKWTT), Kontrak (PKWT), atau Calon Pegawai.',
                     ],
-                    'I1' => [
+                    'unit_kerja' => [
                         'title' => 'Panduan Unit Kerja (Wajib)',
                         'prompt' => 'Pilih Unit Kerja resmi lebih dulu. Daftar Jabatan di kolom sebelah menyesuaikan unit yang dipilih.',
                     ],
-                    'J1' => [
+                    'jabatan' => [
                         'title' => 'Panduan Jabatan (Wajib)',
-                        'prompt' => 'Pilih setelah Unit Kerja. Hanya Formasi Jabatan pada unit tersebut yang tersedia; lihat sheet Formasi per Unit untuk RM Band, bidang, dan sisa kuota.',
+                        'prompt' => 'Pilih setelah Unit Kerja; hanya Formasi Jabatan pada unit itu yang tersedia (RM Band, bidang, kuota: sheet Formasi per Unit). Advisor/Diperbantukan: pilih jabatan penampungannya, mis. Advisor RM-3, bila sudah dibuka pada unit.',
                     ],
-                    'K1' => [
+                    'golongan' => [
                         'title' => 'Panduan Golongan',
                         'prompt' => 'Format baku: [Gol]/[Berkala]. Contoh: IIIA/00, IIIB/02, IVA/05.',
                     ],
-                    'L1' => [
-                        'title' => 'Panduan Status Penugasan',
-                        'prompt' => 'Pilih status penugasan: Definitif, Diperbantukan, Pejabat Sementara (Pjs), Tugas Belajar, atau Advisor.',
+                    'status_penugasan' => [
+                        'title' => 'Panduan Status Jabatan Utama',
+                        'prompt' => 'Status untuk jabatan pada kolom Jabatan (bukan untuk Tugas Rangkap). Pilih Definitif, Pejabat Sementara (Pjs), atau Tugas Belajar; kosong dianggap Definitif. Plt/Pjs tugas rangkap ditulis pada kolom Tugas Rangkap.',
                     ],
-                    'M1' => [
+                    'tugas_rangkap_penugasan_sementara' => [
                         'title' => 'Panduan Tugas Rangkap',
-                        'prompt' => 'Opsional. Catatan penugasan sementara atau jabatan rangkap (jika ada). Pengelolaan dinas resmi melalui modul Mutasi.',
+                        'prompt' => 'Opsional. Satu tugas per baris (Alt+Enter): Plt. Manajer PKS Gunung Meliau TMT 15 Juli 2026, atau [Plt] Jabatan — Unit (TMT: 2026-07-15). Tulis unit bila jabatan ada di unit lain. Jabatan dan unit harus sesuai master, bila tidak baris ditolak.',
                     ],
-                    'N1' => [
+                    'tmt_bekerja' => [
                         'title' => 'Panduan TMT Bekerja',
                         'prompt' => 'Wajib ada jika Karpim. Minimal 18 tahun setelah Tanggal Lahir.',
                     ],
-                    'O1' => [
+                    'tanggal_diangkat_staf' => [
                         'title' => 'Panduan Tgl Diangkat Staf',
                         'prompt' => 'Kosongkan jika Karpel. Untuk Karpim minimal sama dengan TMT Bekerja.',
                     ],
-                    'S1' => [
+                    'job_grade' => [
                         'title' => 'Panduan Job Grade',
                         'prompt' => 'Rentang bobot jabatan: Karpel (1-10), Karpim (11-16).',
                     ],
-                    'T1' => [
+                    'person_grade' => [
                         'title' => 'Panduan Person Grade',
                         'prompt' => 'Rentang person grade: Karpel (1-10), Karpim (11-16).',
                     ],
-                    'W1' => [
+                    'tanggal_mbt' => [
                         'title' => 'Panduan Tanggal MBT',
                         'prompt' => 'Boleh dikosongkan! Sistem akan otomatis menghitung Masa Bebas Tugas (6 bulan sebelum pensiun).',
                     ],
-                    'X1' => [
+                    'tanggal_pensiun' => [
                         'title' => 'Panduan Tanggal Pensiun',
                         'prompt' => 'Boleh dikosongkan! Sistem akan otomatis menghitung Batas Usia Pensiun (56 tahun).',
                     ],
                 ];
 
-                foreach ($inputGuides as $cell => $guide) {
+                foreach ($inputGuides as $field => $guide) {
+                    $cell = $letter($field).'1';
                     $validation = new DataValidation;
                     $validation->setType(DataValidation::TYPE_NONE);
                     $validation->setShowInputMessage(true);
@@ -256,15 +229,15 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 }
 
                 // 6. Auto-sizing untuk seluruh kolom A s.d. X
-                foreach (range('A', 'X') as $col) {
+                foreach (EmployeeImportColumns::letters() as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 
                 // 7. Aktifkan fitur AutoFilter bawaan Excel pada baris header (A1:X1)
-                $sheet->setAutoFilter('A1:X1');
+                $sheet->setAutoFilter("A1:{$lastColumn}1");
 
                 // 8. Wrap text aktif untuk kolom M (Tugas Rangkap)
-                $sheet->getStyle('M')->getAlignment()->setWrapText(true);
+                $sheet->getStyle($letter('tugas_rangkap_penugasan_sementara'))->getAlignment()->setWrapText(true);
 
                 // 9. Pasang In-Cell Data Validation (Dropdowns) untuk baris 2 sampai 250
                 $createValidation = function (string $formula) {
@@ -283,7 +256,7 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 };
 
                 // Dropdown literal sederhana
-                $genderVal = $createValidation('"L, P"');
+                $genderVal = $createValidation('"'.implode(', ', array_values(Employee::GENDERS)).'"');
                 $channelVal = $createValidation('"CKP, Talent Scouting, RBB, Reguler"');
 
                 // Dropdown formula merujuk ke Sheet 'Referensi Master Data'
@@ -311,15 +284,15 @@ class EmployeeTemplateDataSheet implements FromArray, WithColumnFormatting, With
                 $educationVal = $createValidation('\'Referensi Master Data\'!$I$2:$I$9');
 
                 for ($r = 2; $r <= 250; $r++) {
-                    $sheet->getCell("C{$r}")->setDataValidation(clone $genderVal);
-                    $sheet->getCell("F{$r}")->setDataValidation(clone $religionVal);
-                    $sheet->getCell("G{$r}")->setDataValidation(clone $familyVal);
-                    $sheet->getCell("H{$r}")->setDataValidation(clone $employmentVal);
-                    $sheet->getCell("I{$r}")->setDataValidation(clone $unitVal);
-                    $sheet->getCell("J{$r}")->setDataValidation($positionValidation($r));
-                    $sheet->getCell("L{$r}")->setDataValidation(clone $assignmentVal);
-                    $sheet->getCell("R{$r}")->setDataValidation(clone $channelVal);
-                    $sheet->getCell("U{$r}")->setDataValidation(clone $educationVal);
+                    $sheet->getCell($letter('jenis_kelamin').$r)->setDataValidation(clone $genderVal);
+                    $sheet->getCell($letter('agama').$r)->setDataValidation(clone $religionVal);
+                    $sheet->getCell($letter('susunan_keluarga').$r)->setDataValidation(clone $familyVal);
+                    $sheet->getCell($letter('status_karyawan').$r)->setDataValidation(clone $employmentVal);
+                    $sheet->getCell($letter('unit_kerja').$r)->setDataValidation(clone $unitVal);
+                    $sheet->getCell($letter('jabatan').$r)->setDataValidation($positionValidation($r));
+                    $sheet->getCell($letter('status_penugasan').$r)->setDataValidation(clone $assignmentVal);
+                    $sheet->getCell($letter('jalur_masuk').$r)->setDataValidation(clone $channelVal);
+                    $sheet->getCell($letter('pendidikan_terakhir').$r)->setDataValidation(clone $educationVal);
                 }
             },
         ];

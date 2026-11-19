@@ -142,8 +142,13 @@
             <span class="absolute bottom-0 left-0 right-0 h-1 {{ $themeConfig['activeBar'] }} rounded-b-2xl"></span>
         @endif
 @elseif ($isTab)
+    {{-- Kartu tab dapat dioperasikan keyboard (Enter atau Spasi), terbaca sebagai tombol berstatus tekan, dan fokusnya terlihat. --}}
     <div @click="setFilterTab('{{ $tabKey }}')"
-        class="{{ $containerBase }}"
+        @keydown.enter.prevent="setFilterTab('{{ $tabKey }}')"
+        @keydown.space.prevent="setFilterTab('{{ $tabKey }}')"
+        role="button" tabindex="0"
+        :aria-pressed="({{ $activeTabVar }} === '{{ $tabKey }}').toString()"
+        class="{{ $containerBase }} focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         :class="{{ $activeTabVar }} === '{{ $tabKey }}' ? '{{ $themeConfig['activeCard'] }} hover:shadow-sm hover:-translate-y-0.5' : 'border-surface-200/80 {{ $themeConfig['hoverInteractive'] }}'"
         {{ $attributes->except('class') }}>
         <span class="absolute bottom-0 left-0 right-0 h-1 {{ $themeConfig['activeBar'] }} rounded-b-2xl transition-opacity duration-150"

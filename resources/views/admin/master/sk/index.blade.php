@@ -13,17 +13,11 @@
 
     <x-admin.flash />
 
-    <div class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed {{ $requiresApproval ? 'border-primary-200 bg-primary-50 text-primary-900' : 'border-surface-200 bg-surface-50 text-surface-700' }}" role="status">
-        <i class="fas {{ $requiresApproval ? 'fa-user-shield' : 'fa-circle-info' }} mt-1" aria-hidden="true"></i>
-        <p>
-            @if ($requiresApproval)
-                <span class="font-semibold">Persetujuan dua pihak (empat mata) aktif.</span> SK harus diajukan lalu disetujui admin lain sebelum struktur organisasi berubah.
-            @else
-                <span class="font-semibold">Persetujuan dua pihak (empat mata) belum diaktifkan.</span> SK yang diajukan dapat langsung disetujui oleh pengajunya.
-            @endif
-            SK yang sudah disetujui diterapkan pada tanggal berlakunya, dan SK yang sudah diterapkan tidak dapat dibatalkan; koreksi dilakukan dengan SK baru.
-        </p>
-    </div>
+    <x-admin.approval-policy-notice :active="$requiresApproval">
+        <x-slot:enabled>SK harus diajukan lalu disetujui admin lain sebelum struktur organisasi berubah.</x-slot:enabled>
+        <x-slot:disabled>SK yang diajukan dapat langsung disetujui oleh pengajunya.</x-slot:disabled>
+        SK yang sudah disetujui diterapkan pada tanggal berlakunya, dan SK yang sudah diterapkan tidak dapat dibatalkan; koreksi dilakukan dengan SK baru.
+    </x-admin.approval-policy-notice>
 
     <livewire:admin.master.structure-decree-index />
 </div>

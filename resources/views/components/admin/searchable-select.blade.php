@@ -223,8 +223,7 @@
 
         <!-- Scrollable Options List -->
         <ul x-ref="optionsList"
-            class="overflow-y-auto py-1 divide-y divide-surface-50 {{ $maxHeight }}"
-            style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">
+            class="overflow-y-auto py-1 divide-y divide-surface-50 scrollbar-soft {{ $maxHeight }}">
 
             @if($hasAllOption)
                 <li @click="selectOption('')"

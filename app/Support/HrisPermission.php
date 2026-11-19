@@ -17,6 +17,9 @@ final class HrisPermission
     /** Approve or reject proposals, or issue the SK directly when approval is not required. */
     public const MUTASI_APPROVE = 'mutasi.approve';
 
+    /** Whole employee import flow: upload, preview, commit, reports, and batch approval, rejection and rollback. */
+    public const KARYAWAN_IMPORT = 'karyawan.import';
+
     /** Draft, review, submit and cancel organisation structure decrees (SK). */
     public const STRUKTUR_PREPARE = 'struktur.prepare';
 

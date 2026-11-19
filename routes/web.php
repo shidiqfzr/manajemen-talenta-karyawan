@@ -65,9 +65,9 @@ Route::prefix('admin')
             Route::post('/import', [AdminEmployeeController::class, 'import'])->name('import')->middleware('throttle:10,1');
             Route::post('/import/preview', [AdminEmployeeController::class, 'previewImport'])->name('import.preview')->middleware('throttle:10,1');
             Route::post('/import/commit', [AdminEmployeeController::class, 'commitImport'])->name('import.commit')->middleware('throttle:10,1');
-            Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
-            Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
-            Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
+            Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status')->whereUuid('token');
+            Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed')->middleware('throttle:20,1');
+            Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport')->middleware('throttle:20,1');
             Route::get('/import/batches', [EmployeeImportBatchController::class, 'index'])->name('import.batches.index');
             Route::get('/import/batches/{log}', [EmployeeImportBatchController::class, 'show'])->name('import.batches.show');
             Route::post('/import/batches/{log}/approve', [EmployeeImportBatchController::class, 'approve'])->name('import.batches.approve')->middleware('throttle:10,1');

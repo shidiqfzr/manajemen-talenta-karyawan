@@ -16,18 +16,11 @@
 
     <x-admin.flash />
 
-    <div class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed {{ $requiresApproval ? 'border-primary-200 bg-primary-50 text-primary-900' : 'border-surface-200 bg-surface-50 text-surface-700' }}" role="status">
-        <i class="fas {{ $requiresApproval ? 'fa-user-shield' : 'fa-circle-info' }} mt-1" aria-hidden="true"></i>
-        <p>
-            @if ($requiresApproval)
-                <span class="font-semibold">Persetujuan dua pihak (empat mata) aktif.</span> Impor harus diajukan lalu disetujui admin lain sebelum data karyawan berubah.
-                Pengajuan yang tidak diputuskan dalam {{ $approvalTtlDays }} hari kedaluwarsa otomatis.
-            @else
-                <span class="font-semibold">Persetujuan dua pihak (empat mata) belum diaktifkan.</span> Impor langsung disimpan setelah pratinjau dikonfirmasi.
-            @endif
-            Impor yang sudah tersimpan dapat dibatalkan dalam {{ $undoWindowDays }} hari, selama karyawan terkait belum berubah.
-        </p>
-    </div>
+    <x-admin.approval-policy-notice :active="$requiresApproval">
+        <x-slot:enabled>Impor harus diajukan lalu disetujui admin lain sebelum data karyawan berubah. Pengajuan yang tidak diputuskan dalam {{ $approvalTtlDays }} hari kedaluwarsa otomatis.</x-slot:enabled>
+        <x-slot:disabled>Impor langsung disimpan setelah pratinjau dikonfirmasi.</x-slot:disabled>
+        Impor yang sudah tersimpan dapat dibatalkan dalam {{ $undoWindowDays }} hari, selama karyawan terkait belum berubah.
+    </x-admin.approval-policy-notice>
 
     <livewire:admin.employees.import-batch-table />
 </div>

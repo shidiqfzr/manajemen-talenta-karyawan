@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Import\EmployeeImportColumns;
 use App\Services\ManPowerPlanningService;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
@@ -90,12 +91,8 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->where('level', $this->filters['level']);
         }
 
-        // Ekspor bawaan hanya karyawan aktif; arsip pensiun diekspor lewat status_kepegawaian=pensiun.
-        if (($this->filters['status_kepegawaian'] ?? '') === 'pensiun') {
-            $query->berhenti();
-        } else {
-            $query->aktif();
-        }
+        // Ekspor bawaan hanya karyawan aktif; status_kepegawaian (pensiun, MBT, menjelang MBT, lewat BUP) mengikuti filter daftar.
+        $query->statusKepegawaian((string) ($this->filters['status_kepegawaian'] ?? ''));
 
         if (! empty($this->filters['rm_level'])) {
             $query->where('rm_level', $this->filters['rm_level']);
@@ -159,41 +156,8 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
      */
     public function headings(): array
     {
-        return [
-            // Identitas Utama (Kolom A - G)
-            'NIK',
-            'NAMA',
-            'JENIS KELAMIN',
-            'TEMPAT LAHIR',
-            'TANGGAL LAHIR',
-            'AGAMA',
-            'SUSUNAN KELUARGA',
-
-            // Info Jabatan & Formasi (Kolom H - O)
-            'STATUS KARYAWAN',
-            'JABATAN',
-            'LEVEL',
-            'UNIT KERJA',
-            'GOLONGAN',
-            'RM LEVEL',
-            'STATUS PENUGASAN',
-            'TUGAS RANGKAP / PENUGASAN SEMENTARA',
-
-            // Masa Kerja & Karir (Kolom P - V)
-            'TMT BEKERJA',
-            'TANGGAL DIANGKAT STAF',
-            'TANGGAL DALAM JABATAN',
-            'TMT UNIT KERJA',
-            'JALUR MASUK',
-            'JOB GRADE',
-            'PERSON GRADE',
-
-            // Lain-lain / Pendidikan & Pensiun (Kolom W - Z)
-            'PENDIDIKAN TERAKHIR',
-            'SEKOLAH',
-            'TANGGAL MBT',
-            'TANGGAL PENSIUN',
-        ];
+        // Urutan kolom dari daftar kolom bersama; map() di bawah wajib menulis nilai dengan urutan yang sama.
+        return EmployeeImportColumns::headings(EmployeeImportColumns::LAYOUT_TABULAR);
     }
 
     /**
@@ -213,7 +177,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
         $tugasRangkapList = [];
         if ($employee->relationLoaded('concurrentJobs') && $employee->concurrentJobs->isNotEmpty()) {
             foreach ($employee->concurrentJobs as $cj) {
-                $status = $cj->status_penugasan ?: 'Plt';
+                $status = $cj->status_penugasan ?: Employee::STATUS_PLT;
                 $details = [];
                 if (! empty($cj->nomor_sk)) {
                     $details[] = 'SK: '.$cj->nomor_sk;
@@ -239,7 +203,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
         return [
             $clean($employee->nik),
             $clean($employee->nama),
-            $clean($employee->jenis_kelamin),
+            $clean(Employee::GENDERS[$employee->jenis_kelamin] ?? $employee->jenis_kelamin),
             $clean($employee->tempat_lahir),
             $formatDate($employee->tanggal_lahir),
             $clean($employee->agama),
@@ -275,16 +239,13 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
      */
     public function columnFormats(): array
     {
-        return [
-            'A' => NumberFormat::FORMAT_TEXT,         // NIK strictly text
-            'E' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Lahir
-            'P' => NumberFormat::FORMAT_DATE_YYYYMMDD, // TMT Bekerja
-            'Q' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Diangkat Staf
-            'R' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Dalam Jabatan
-            'S' => NumberFormat::FORMAT_DATE_YYYYMMDD, // TMT Unit Kerja
-            'Y' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal MBT
-            'Z' => NumberFormat::FORMAT_DATE_YYYYMMDD, // Tanggal Pensiun
-        ];
+        $layout = EmployeeImportColumns::LAYOUT_TABULAR;
+        $formats = [EmployeeImportColumns::letter('nik', $layout) => NumberFormat::FORMAT_TEXT];
+        foreach (EmployeeImportColumns::fieldsOfType(EmployeeImportColumns::TYPE_DATE, $layout) as $field) {
+            $formats[EmployeeImportColumns::letter($field, $layout)] = NumberFormat::FORMAT_DATE_YYYYMMDD;
+        }
+
+        return $formats;
     }
 
     /**
@@ -303,7 +264,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
                 $sheet->getRowDimension(1)->setRowHeight(28);
 
                 // 3. Styling Header Seragam: Hijau Korporat PTPN IV (Primary 800 - #1B5330) untuk seluruh 26 Kolom
-                $sheet->getStyle('A1:Z1')->applyFromArray([
+                $sheet->getStyle('A1:'.EmployeeImportColumns::lastLetter(EmployeeImportColumns::LAYOUT_TABULAR).'1')->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => 'FFFFFF'],
@@ -327,15 +288,15 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
                 ]);
 
                 // 4. Auto-sizing untuk seluruh kolom A s.d. Z
-                foreach (range('A', 'Z') as $col) {
+                foreach (EmployeeImportColumns::letters(EmployeeImportColumns::LAYOUT_TABULAR) as $col) {
                     $sheet->getColumnDimension($col)->setAutoSize(true);
                 }
 
                 // 5. Aktifkan fitur AutoFilter bawaan Excel pada baris header (A1:Z1)
-                $sheet->setAutoFilter('A1:Z1');
+                $sheet->setAutoFilter('A1:'.EmployeeImportColumns::lastLetter(EmployeeImportColumns::LAYOUT_TABULAR).'1');
 
                 // 6. Wrap text aktif untuk kolom O (Tugas Rangkap) agar multi-tugas tampil bertingkat rapi
-                $sheet->getStyle('O')->getAlignment()->setWrapText(true);
+                $sheet->getStyle(EmployeeImportColumns::letter('tugas_rangkap_penugasan_sementara', EmployeeImportColumns::LAYOUT_TABULAR))->getAlignment()->setWrapText(true);
 
                 // 7. Pengaturan Halaman Cetak & Print Footer Keamanan (UU PDP No. 27/2022)
                 $userName = $this->user?->name ?? 'Admin SDM';

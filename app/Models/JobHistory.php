@@ -24,9 +24,9 @@ class JobHistory extends Model
     ];
 
     public const STATUS_JABATAN = [
-        'Definitif',
-        'Pj',
-        'Plt',
+        Employee::STATUS_DEFINITIF,
+        Employee::STATUS_PJ,
+        Employee::STATUS_PLT,
     ];
 
     /** Asal baris riwayat (DOMAIN.md §2.2): hanya `mutasi` yang berdasar SK mutasi resmi. */

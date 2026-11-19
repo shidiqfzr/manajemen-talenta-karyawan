@@ -21,17 +21,27 @@ use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
 use App\Services\FormasiSeatGuard;
 use App\Services\Import\EmployeeImportDictionary;
+use App\Services\Import\EmployeeImportWizardConfig;
+use App\Services\Import\ImportAuditRecorder;
+use App\Services\Import\ImportSessionStore;
 use App\Services\PensiunService;
+use App\Support\HrisPermission;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
+    public function __construct(
+        private readonly ImportSessionStore $importSessions,
+        private readonly ImportAuditRecorder $importAudit,
+    ) {}
+
     // Display all employees: page-level KPI metrics and the expired-sanction notice. The directory list itself
     // (search, filters, sort, pagination) and the KPI cards that drive it are the Livewire component
     // App\Livewire\Admin\Employees\EmployeeTable, which receives these metrics as `kpi`.
@@ -195,10 +205,14 @@ class EmployeeController extends Controller
      */
     public function importPage()
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         $dictionaryCategories = EmployeeImportDictionary::getCategories();
         $pendingApprovalCount = EmployeeImportLog::where('status', EmployeeImportLog::STATUS_PENDING)->count();
 
-        return view('admin.employees.import', compact('dictionaryCategories', 'pendingApprovalCount'));
+        $wizard = EmployeeImportWizardConfig::make();
+
+        return view('admin.employees.import', compact('dictionaryCategories', 'pendingApprovalCount', 'wizard'));
     }
 
     public function import(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
@@ -217,7 +231,7 @@ class EmployeeController extends Controller
         return redirect()
             ->route('admin.employees.index')
             ->with([
-                'success' => "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.",
+                'success' => EmployeeImportService::resultMessage($summary),
                 'import_summary' => $summary,
             ]);
     }
@@ -232,13 +246,13 @@ class EmployeeController extends Controller
 
         return response()->json([
             'success' => true,
-            ...$previewData,
+            ...$this->forBrowser($previewData),
         ]);
     }
 
     public function commitImport(CommitEmployeeImportRequest $request, EmployeeImportService $importService)
     {
-        $this->authorizeImportToken($request->token, $importService);
+        $this->authorizeImportToken($request->token);
 
         try {
             $summary = $importService->commit(
@@ -263,18 +277,18 @@ class EmployeeController extends Controller
                     'is_async' => false,
                     'pending_approval' => true,
                     'batch_url' => route('admin.employees.import.batches.show', $summary['batch_id']),
-                    'summary' => $summary['summary'],
+                    'summary' => $this->importSessions->browserSummary($summary['summary']),
                 ]);
             }
 
-            session()->flash('success', "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.");
+            session()->flash('success', EmployeeImportService::resultMessage($summary));
             session()->flash('import_summary', $summary);
 
             return response()->json([
                 'success' => true,
                 'is_async' => false,
                 'redirect_url' => route('admin.employees.index'),
-                'summary' => $summary,
+                'summary' => $this->importSessions->browserSummary($summary),
             ]);
         } catch (ImportAbortedException|\DomainException|\RuntimeException $e) {
             return response()->json([
@@ -287,14 +301,24 @@ class EmployeeController extends Controller
     /**
      * Sesi impor (pratinjau, status, laporan, baris gagal) hanya dapat diakses pengunggahnya.
      */
-    private function authorizeImportToken(string $token, EmployeeImportService $importService): void
+    private function authorizeImportToken(string $token): void
     {
-        abort_unless($importService->isTokenOwnedBy($token, auth()->user()), 403, 'Sesi impor ini dimulai oleh administrator lain.');
+        abort_unless($this->importSessions->isOwnedBy($token, auth()->user()), 403, 'Sesi impor ini dimulai oleh administrator lain.');
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function forBrowser(array $payload): array
+    {
+        if (isset($payload['summary']) && is_array($payload['summary'])) {
+            $payload['summary'] = $this->importSessions->browserSummary($payload['summary']);
+        }
+
+        return $payload;
     }
 
     public function importStatus(Request $request, string $token, EmployeeImportService $importService)
     {
-        $this->authorizeImportToken($token, $importService);
+        $this->authorizeImportToken($token);
 
         // Fail-Safe SLA: Auto-fallback ke eksekusi sinkron jika worker antrean tidak merespons dalam 5 detik
         if ($request->boolean('fallback_sync')) {
@@ -312,17 +336,20 @@ class EmployeeController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    ...$result,
+                    ...$this->forBrowser($result),
                 ]);
             } catch (\Throwable $e) {
+                // Galat internal dicatat, tidak diteruskan ke peramban (SECURITY.md §4.4).
+                Log::error('Pengalihan impor ke mode sinkron gagal', ['exception' => $e::class, 'message' => $e->getMessage()]);
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal mengalihkan ke mode sinkron: '.$e->getMessage(),
+                    'message' => 'Gagal mengalihkan ke mode sinkron. Silakan coba lagi atau hubungi administrator sistem.',
                 ], 422);
             }
         }
 
-        $status = $importService->getJobStatus($token);
+        $status = $this->importSessions->jobStatus($token);
 
         if (! $status) {
             return response()->json([
@@ -334,45 +361,45 @@ class EmployeeController extends Controller
         // Jika job commit selesai, persiapkan flash session untuk tampilan index
         if (($status['status'] ?? '') === 'completed' && ($status['type'] ?? '') === 'commit' && isset($status['summary'])) {
             $summary = $status['summary'];
-            session()->flash('success', "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.");
+            session()->flash('success', EmployeeImportService::resultMessage($summary));
             session()->flash('import_summary', $summary);
             $status['redirect_url'] = route('admin.employees.index');
         }
 
         return response()->json([
             'success' => true,
-            ...$status,
+            ...$this->forBrowser($status),
         ]);
     }
 
-    public function downloadFailedRows(ImportTokenRequest $request, EmployeeImportService $importService)
+    public function downloadFailedRows(ImportTokenRequest $request)
     {
-        $this->authorizeImportToken($request->token, $importService);
+        $this->authorizeImportToken($request->token);
 
-        $failedRows = $importService->getFailedRows($request->token);
+        $failedRows = $this->importSessions->failedRows($request->token);
         if (empty($failedRows)) {
             return redirect()->back()->with('error', 'Tidak ada data baris gagal yang dapat diunduh atau sesi telah berakhir.');
         }
 
         $filename = 'baris_gagal_impor_karyawan_'.now()->format('Ymd_His').'.xlsx';
 
-        $importService->recordDownloadAudit('baris_gagal', $request->token, auth()->user(), $request->ip(), count($failedRows));
+        $this->importAudit->downloaded('baris_gagal', $request->token, auth()->user(), $request->ip(), count($failedRows));
 
         return Excel::download(new FailedEmployeesWorkbook($failedRows, auth()->user()?->name ?? 'Administrator', now()->translatedFormat('d F Y H:i:s')), $filename);
     }
 
-    public function downloadImportReport(ImportTokenRequest $request, EmployeeImportService $importService)
+    public function downloadImportReport(ImportTokenRequest $request)
     {
-        $this->authorizeImportToken($request->token, $importService);
+        $this->authorizeImportToken($request->token);
 
-        $reportData = $importService->getImportReport($request->token);
+        $reportData = $this->importSessions->report($request->token);
         if (empty($reportData)) {
             return redirect()->back()->with('error', 'Data rekapitulasi impor tidak ditemukan atau sesi telah berakhir.');
         }
 
         $filename = 'rekap_laporan_impor_karyawan_'.now()->format('Ymd_His').'.xlsx';
 
-        $importService->recordDownloadAudit('rekap_impor', $request->token, auth()->user(), $request->ip(), count($reportData['rows'] ?? []) + count($reportData['failed_rows'] ?? []));
+        $this->importAudit->downloaded('rekap_impor', $request->token, auth()->user(), $request->ip(), count($reportData['rows'] ?? []) + count($reportData['failed_rows'] ?? []));
 
         return Excel::download(new ImportSummaryExport($reportData), $filename);
     }
@@ -384,6 +411,8 @@ class EmployeeController extends Controller
 
     public function downloadTemplate()
     {
+        Gate::authorize(HrisPermission::KARYAWAN_IMPORT);
+
         return Excel::download(new EmployeeTemplateExport, 'karyawan_import_template.xlsx');
     }
 
