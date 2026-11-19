@@ -220,6 +220,14 @@ npm run e2e           # menjalankan seluruh pengujian E2E
 - **Jangan** memakai `waitForLoadState('networkidle')`; tunggu elemen atau kondisi yang relevan.
 - Server pengembangan PHP bersifat satu-utas sehingga suite berjalan beberapa menit; hasil, tangkapan layar, dan trace kegagalan ada di `test-results/` dan `playwright-report/` (tidak di-commit).
 
+### 3.7 Gerbang CI (GitHub Actions)
+Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap push ke `main`; hasilnya menjadi syarat penggabungan ke `main`.
+- **Backend**: Pint (`--test`), `composer audit`, dan seluruh suite PHPUnit pada PHP 8.4 dengan SQLite dalam memori. Aset dibangun lebih dulu karena tampilan memakai `@vite()`.
+- **Frontend**: `npm audit --audit-level=high` (celah tingkat tinggi dan kritis menggagalkan build) dan `npm run test:js`.
+- **E2E Playwright** tidak ikut gerbang karena berjalan lama pada server satu-utas; jalankan lokal sebelum merilis perubahan layar (§3.6).
+- **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala; setiap pembaruan melalui gerbang yang sama.
+- Perubahan ke `main` hanya melalui pull request; push langsung, push paksa, dan penghapusan cabang `main` dinonaktifkan.
+
 ---
 
 ## 4. Checklist Rilis & Deployment (Release Verification)
@@ -228,6 +236,10 @@ Sebelum merilis perubahan ke lingkungan produksi:
 - [ ] Semua migrasi database baru berjalan lancar (`php artisan migrate --dry-run`).
 - [ ] Semua test suite lolos (`php artisan test` 100% green).
 - [ ] Format kode lolos linter (`./vendor/bin/pint --test`).
+- [ ] Gerbang CI hijau pada pull request dan tidak ada celah tingkat tinggi pada `composer audit` maupun `npm audit`.
+- [ ] `.env` produksi: `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE=Asia/Jakarta`, `APP_LOCALE=id`, `SESSION_SECURE_COOKIE=true`, basis data dengan pengguna berhak akses minimal (bukan root).
+- [ ] Akun awal dibuat dengan `php artisan db:seed --class=UserSeeder --force` (satu administrator dari `HRIS_ADMIN_*`, tanpa akun demo; SECURITY.md §3), lalu `HRIS_ADMIN_PASSWORD` dihapus dari `.env` dan administrator kedua dibuat agar persetujuan empat mata berjalan. Jangan menjalankan `db:seed` penuh atau `migrate:fresh` pada basis data produksi.
+- [ ] Cadangan basis data dan berkas diambil sebelum migrasi, disimpan di luar server, terenkripsi, dan pemulihannya sudah pernah diuji.
 - [ ] Tidak ada hardcoded credentials atau debug helper (`dd()`, `dump()`, `ray()`).
 - [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`).
 - [ ] File log audit mencatat aktivitas dengan benar tanpa error exception.
