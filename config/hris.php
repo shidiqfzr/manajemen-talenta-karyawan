@@ -83,6 +83,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Administrator Awal (Produksi)
+    |--------------------------------------------------------------------------
+    |
+    | Dibaca hanya oleh UserSeeder pada APP_ENV=production (SECURITY.md §3). Lingkungan pengembangan,
+    | pengujian, dan E2E memakai akun demo tetap; produksi TIDAK membuat akun demo sama sekali.
+    | Kata sandi tidak pernah ditulis di kode: isi HRIS_ADMIN_PASSWORD saat instalasi pertama,
+    | jalankan seeder, lalu hapus nilainya dari .env.
+    |
+    */
+
+    'bootstrap_admin' => [
+        'name' => env('HRIS_ADMIN_NAME'),
+        'username' => env('HRIS_ADMIN_USERNAME'),
+        'email' => env('HRIS_ADMIN_EMAIL'),
+        'password' => env('HRIS_ADMIN_PASSWORD'),
+        'min_password_length' => 12,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Paginasi Tabel Data
     |--------------------------------------------------------------------------
     |

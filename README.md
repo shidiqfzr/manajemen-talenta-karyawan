@@ -61,6 +61,7 @@ Proyek ini dipandu oleh empat pilar dokumentasi arsitektur utama:
    php artisan key:generate
    php artisan migrate --seed
    ```
+   > Seeder ini membuat akun demo (`admin` / `user`) dan hanya untuk pengembangan. **Produksi**: isi `HRIS_ADMIN_*` pada `.env`, jalankan `php artisan db:seed --class=UserSeeder --force` (membuat satu administrator tanpa akun demo), lalu hapus `HRIS_ADMIN_PASSWORD` dari `.env`.
 4. Jalankan server pengembangan:
    ```bash
    npm run dev
