@@ -35,6 +35,12 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    /** Human-readable role name for the user menu, from config('hris.role_labels'). */
+    public function roleLabel(): string
+    {
+        return (string) config('hris.role_labels.'.$this->role, $this->role);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

@@ -50,6 +50,26 @@ class ViewDesignGuardTest extends TestCase
         );
     }
 
+    public function test_modals_are_built_on_the_shared_modal_shell(): void
+    {
+        // Modal tengah hanya lewat x-admin.modal (DESIGN.md §7.6). Drawer samping punya pola tersendiri dan dikecualikan.
+        $shell = 'components/admin/modal.blade.php';
+        $drawers = [
+            'components/admin/personnel-drawer.blade.php',
+            'components/admin/mutasi/talent-drawer.blade.php',
+            'livewire/admin/mpp-supply-plan-editor.blade.php',
+            'admin/employees/partials/import-column-guide-modal.blade.php',
+        ];
+
+        $this->assertNoViolations(
+            array_values(array_filter(
+                $this->tags('div', fn (string $tag) => str_contains($tag, 'role="dialog"')),
+                fn (string $location) => ! in_array(explode(':', $location)[0], [$shell, ...$drawers], true)
+            )),
+            'Modal wajib memakai <x-admin.modal> agar overlay, kepala, footer, fokus, dan transisi seragam (DESIGN.md §7.6); jangan menulis role="dialog" sendiri.'
+        );
+    }
+
     public function test_tab_widgets_follow_the_aria_tabs_pattern(): void
     {
         $div = '/<div(?=[\s>])'.self::TAG_BODY.'>/';
@@ -71,6 +91,29 @@ class ViewDesignGuardTest extends TestCase
         $this->assertNoViolations(
             $this->tags('th', fn (string $tag) => ! str_contains($tag, 'scope=')),
             '<th> wajib punya scope="col" atau scope="row" (DESIGN.md §10).'
+        );
+    }
+
+    public function test_column_headers_use_the_shared_header_cell(): void
+    {
+        // Pengecualian: sel pembuat komponen, kolom centang, matriks MPP (header berkelompok), dan <th scope="row">.
+        $allowed = ['components/admin/table/', 'man-power-planning.blade.php', 'mpp-supply-plan-editor.blade.php'];
+        $violations = array_values(array_filter(
+            $this->tags('th', fn (string $tag) => ! str_contains($tag, 'scope="row"')),
+            fn (string $location) => collect($allowed)->every(fn (string $path) => ! str_contains(str_replace('\\', '/', $location), $path)),
+        ));
+
+        $this->assertNoViolations(
+            $violations,
+            'Header kolom tabel wajib memakai <x-admin.table.th> agar tipografi seragam di semua modul (DESIGN.md §7.5); jangan menulis <th> sendiri.'
+        );
+    }
+
+    public function test_table_header_typography_is_never_set_outside_the_shared_cell(): void
+    {
+        $this->assertNoViolations(
+            $this->scan('/<(?:thead|tr)(?=[\s>])(?:"[^"]*"|\'[^\']*\'|->|=>|[^>"\'])*\buppercase\b(?:"[^"]*"|\'[^\']*\'|->|=>|[^>"\'])*>/', fn () => true),
+            'Huruf kapital dan ukuran teks header diatur di x-admin.table.th, bukan pada <thead>/<tr> (DESIGN.md §7.5).'
         );
     }
 
@@ -167,6 +210,27 @@ class ViewDesignGuardTest extends TestCase
         $this->assertNoViolations($violations, 'Pesan validasi/notifikasi tidak boleh menyebut nama dokumen internal (AGENTS.md aturan 6).');
     }
 
+    public function test_unescaped_blade_output_is_limited_to_the_highlight_component(): void
+    {
+        $violations = array_filter(
+            $this->occurrences('/\{!!/'),
+            fn (string $location) => ! str_starts_with($location, 'components/highlight.blade.php')
+        );
+
+        $this->assertNoViolations(
+            array_values($violations),
+            'Keluaran Blade wajib di-escape ({{ }}); {!! !!} hanya untuk komponen highlight yang sudah menyaring teksnya (SECURITY.md, mitigasi XSS).'
+        );
+    }
+
+    public function test_retirement_rules_are_never_hardcoded_in_views(): void
+    {
+        $this->assertNoViolations(
+            $this->occurrences('/(?:parseInt\([^)]*\)|\byear|\bmonth)\s*[-+]\s*(?:56|6)\b/'),
+            'Batas Usia Pensiun & MBT wajib bersumber dari KepegawaianPolicy, bukan angka literal di view (DOMAIN.md Bab 5.1).'
+        );
+    }
+
     public function test_no_raw_tailwind_palette_classes_are_used_in_views(): void
     {
         $this->assertNoViolations(
@@ -223,6 +287,159 @@ class ViewDesignGuardTest extends TestCase
         $this->assertNoViolations(
             $this->occurrences('/(?<![\w:-])animate-pulse(?![\w-])/'),
             'Gunakan motion-safe:animate-pulse agar hormat pada prefers-reduced-motion (DESIGN.md §3.7).'
+        );
+    }
+
+    public function test_shared_header_and_form_components_carry_no_decorative_gradient(): void
+    {
+        // DESIGN.md §1 dan §5.2: gradien dekoratif dilarang. Kepala halaman dan komponen formulir dipakai
+        // di setiap halaman admin, sehingga pelanggaran di sini menyebar ke seluruh aplikasi.
+        $violations = [];
+
+        foreach (self::views() as $path => $source) {
+            $shared = $path === 'components/admin/page-header.blade.php' || str_starts_with($path, 'components/admin/form/');
+
+            if ($shared && str_contains($source, 'gradient')) {
+                $violations[] = $path;
+            }
+        }
+
+        $this->assertSame([], $violations, 'Komponen bersama tidak boleh memakai gradien dekoratif (DESIGN.md §1, §5.2).');
+    }
+
+    public function test_module_index_pages_use_the_shared_header_and_flash(): void
+    {
+        // Halaman indeks modul Pelatihan dan Penilaian disejajarkan dengan modul Karyawan (DESIGN.md §6.1, §8.5).
+        $violations = [];
+        foreach (['admin/trainings/index.blade.php', 'admin/evaluations/index.blade.php'] as $path) {
+            $source = self::views()[$path] ?? '';
+
+            foreach ([
+                '<x-admin.module-header' => 'wajib memakai x-admin.module-header',
+                '<x-admin.flash' => 'wajib memakai x-admin.flash',
+            ] as $needle => $message) {
+                if (! str_contains($source, $needle)) {
+                    $violations[] = "{$path}: {$message}";
+                }
+            }
+
+            foreach (['<h1' => 'dilarang menulis <h1> sendiri', 'shadow-lg' => 'dilarang membungkus halaman dalam kartu putih', 'bg-info ' => 'tombol utama wajib x-admin.button variant primary'] as $needle => $message) {
+                if (str_contains($source, $needle)) {
+                    $violations[] = "{$path}: {$message}";
+                }
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Indeks Pelatihan dan Penilaian wajib memakai x-admin.module-header, x-admin.flash, dan tombol primer standar (DESIGN.md §6.1, §8.5).'
+        );
+    }
+
+    public function test_multi_step_flows_use_the_shared_stepper_and_never_hand_roll_one(): void
+    {
+        // DESIGN.md §6.1: satu penanda tahap untuk semua alur bertahap (Impor Karyawan, Catat SK Struktur, dan berikutnya).
+        $root = dirname(__DIR__, 2).'/resources/views';
+        $handRolled = [];
+
+        foreach (self::files($root, 'php') as $file) {
+            $relative = str_replace('\\', '/', substr($file, strlen($root) + 1));
+            if (! str_ends_with($file, '.blade.php') || $relative === 'components/admin/stepper.blade.php') {
+                continue;
+            }
+
+            // Ciri kartu tahap tulisan tangan: kicker huruf kapital berisi "Tahap N".
+            if (preg_match('/tracking-wider[^>]*>\s*Tahap\s+\d/', (string) file_get_contents($file)) === 1) {
+                $handRolled[] = $relative;
+            }
+        }
+
+        $this->assertSame([], $handRolled, "Penanda tahap tulisan tangan; pakai <x-admin.stepper>:\n".implode("\n", $handRolled));
+
+        foreach (['admin/employees/import.blade.php', 'livewire/admin/master/structure-decree-wizard.blade.php'] as $wizard) {
+            $this->assertStringContainsString('<x-admin.stepper', (string) file_get_contents($root.'/'.$wizard), "{$wizard} harus memakai x-admin.stepper");
+        }
+    }
+
+    public function test_blade_comments_are_never_nested_so_documentation_never_leaks_onto_the_page(): void
+    {
+        // Komentar {{-- --}} berakhir pada `--}}` pertama: komentar bersarang memotong komentar luar dan sisa teksnya tampil di halaman.
+        $root = dirname(__DIR__, 2).'/resources/views';
+        $violations = [];
+
+        foreach (self::files($root, 'php') as $file) {
+            if (! str_ends_with($file, '.blade.php')) {
+                continue;
+            }
+
+            $source = (string) file_get_contents($file);
+            preg_match_all('/\{\{--|--\}\}/', $source, $tokens, PREG_OFFSET_CAPTURE);
+
+            $open = false;
+            foreach ($tokens[0] as [$token, $offset]) {
+                $line = substr_count($source, "\n", 0, $offset) + 1;
+                $location = str_replace('\\', '/', substr($file, strlen($root) + 1)).':'.$line;
+
+                if ($token === '{{--' && $open) {
+                    $violations[] = $location.' (komentar bersarang)';
+                } elseif ($token === '--}}' && ! $open) {
+                    $violations[] = $location.' (penutup tanpa pembuka)';
+                }
+
+                $open = $token === '{{--';
+            }
+
+            if ($open) {
+                $violations[] = str_replace('\\', '/', substr($file, strlen($root) + 1)).' (komentar tidak ditutup)';
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Komentar Blade tidak boleh bersarang atau menggantung; jangan menulis {{-- di dalam komentar (DESIGN.md §6, docblock komponen).'
+        );
+    }
+
+    public function test_file_uploads_use_the_shared_upload_component(): void
+    {
+        // Utang desain tercatat (DESIGN.md §17 D20): form lama yang belum dimigrasi ke x-admin.file-upload. Tidak boleh bertambah.
+        $debt = [
+            'components/admin/file-upload.blade.php',
+            'components/admin/employee-form.blade.php',
+            'admin/employees/partials/import-step1.blade.php',
+            'admin/trainings/add-participant.blade.php',
+            'admin/trainings/edit-participant.blade.php',
+        ];
+
+        $violations = array_values(array_filter(
+            $this->tags('input', fn (string $tag) => preg_match('/type=["\']file["\']/', $tag) === 1),
+            fn (string $location) => ! in_array(explode(':', $location)[0], $debt, true),
+        ));
+
+        $this->assertNoViolations(
+            $violations,
+            'Unggah berkas wajib memakai <x-admin.file-upload> (progres dan nama berkas terlihat, accept spesifik); jangan menulis <input type="file"> sendiri (DESIGN.md §6.1).'
+        );
+    }
+
+    public function test_table_cards_always_carry_the_shared_table_header(): void
+    {
+        // Pengecualian: cangkang komponen itu sendiri dan tabel sematan profil pengguna non-admin (utang D21).
+        $allowed = ['components/admin/table/card.blade.php', 'user/trainings/show.blade.php'];
+
+        $violations = [];
+        foreach (self::views() as $path => $source) {
+            if (in_array($path, $allowed, true)) {
+                continue;
+            }
+            if (str_contains($source, '<x-admin.table.card') && ! str_contains($source, '<x-admin.table.header')) {
+                $violations[] = $path;
+            }
+        }
+
+        $this->assertNoViolations(
+            $violations,
+            'Kartu tabel (x-admin.table.card) wajib memuat bilah judul bersama x-admin.table.header; dilarang membuat header tabel sendiri (DESIGN.md §7.5).'
         );
     }
 

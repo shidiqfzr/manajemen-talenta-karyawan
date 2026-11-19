@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DeletionReasonRequest;
+use App\Http\Requests\Admin\EvaluationRequest;
 use App\Models\Employee;
 use App\Models\Evaluation;
 use App\Services\EvaluationService;
-use Illuminate\Http\Request;
 
 class EvaluationController extends Controller
 {
@@ -18,13 +19,11 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Display a paginated listing of evaluations.
+     * Display the evaluations list (queried by the EvaluationIndexTable Livewire component).
      */
     public function index()
     {
-        $evaluations = Evaluation::with('employee')->latest()->paginate(20);
-
-        return view('admin.evaluations.index', compact('evaluations'));
+        return view('admin.evaluations.index');
     }
 
     /**
@@ -39,7 +38,7 @@ class EvaluationController extends Controller
             return view('admin.evaluations.add-evaluation', compact('employee'));
         }
 
-        $employees = Employee::all();
+        $employees = Employee::aktif()->orderBy('nama')->get(['nik', 'nama']);
 
         return view('admin.evaluations.add-evaluation', compact('employees'));
     }
@@ -47,28 +46,9 @@ class EvaluationController extends Controller
     /**
      * Store a newly created evaluation in storage.
      */
-    public function store(Request $request)
+    public function store(EvaluationRequest $request)
     {
-        $data = $request->validate([
-            'employee_nik' => ['required', 'exists:employees,nik'],
-            'nilai_kepemimpinan' => 'nullable|numeric',
-            'nilai_perilaku_budaya' => 'nullable|numeric',
-            'nilai_pengalaman_teknis' => 'nullable|numeric',
-            'nilai_kematangan_pribadi' => 'nullable|numeric',
-            'skor_smkbk_9box' => 'nullable|numeric',
-            'skor_cli_9box' => 'nullable|numeric',
-            'kategori_9box' => 'nullable|string',
-            'bidang_tugas' => 'nullable|string',
-            'lembaga_asesmen' => 'nullable|string',
-            'tanggal_pelaksanaan_asesmen' => 'nullable|date',
-            'hasil_skor_asesmen' => 'nullable|numeric',
-            'kategori_asesmen' => 'nullable|string',
-            'keterangan_asesmen' => 'nullable|string',
-            'expired_asesmen' => 'nullable|date',
-            'keterangan' => 'nullable|string',
-        ]);
-
-        $this->evaluationService->processStore($data);
+        $this->evaluationService->processStore($request->validated());
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil disimpan.');
     }
@@ -97,30 +77,9 @@ class EvaluationController extends Controller
     /**
      * Update the specified evaluation in storage.
      */
-    public function update(Request $request, Evaluation $evaluation)
+    public function update(EvaluationRequest $request, Evaluation $evaluation)
     {
-        $data = $request->validate([
-            'nilai_kepemimpinan' => 'nullable|numeric',
-            'nilai_perilaku_budaya' => 'nullable|numeric',
-            'nilai_pengalaman_teknis' => 'nullable|numeric',
-            'nilai_kematangan_pribadi' => 'nullable|numeric',
-            'skor_smkbk_9box' => 'nullable|numeric',
-            'skor_cli_9box' => 'nullable|numeric',
-            'kategori_9box' => 'nullable|string',
-            'bidang_tugas' => 'nullable|string',
-            'tanggal_diangkat_staf' => 'nullable|date',
-            'masa_kerja_tahun' => 'nullable|integer',
-            'masa_kerja_bulan' => 'nullable|integer',
-            'lembaga_asesmen' => 'nullable|string',
-            'tanggal_pelaksanaan_asesmen' => 'nullable|date',
-            'hasil_skor_asesmen' => 'nullable|numeric',
-            'kategori_asesmen' => 'nullable|string',
-            'keterangan_asesmen' => 'nullable|string',
-            'expired_asesmen' => 'nullable|date',
-            'keterangan' => 'nullable|string',
-        ]);
-
-        $this->evaluationService->processUpdate($evaluation, $data);
+        $this->evaluationService->processUpdate($evaluation, $request->validated());
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil diperbarui.');
     }
@@ -128,9 +87,9 @@ class EvaluationController extends Controller
     /**
      * Remove the specified evaluation from storage.
      */
-    public function destroy(Evaluation $evaluation)
+    public function destroy(DeletionReasonRequest $request, Evaluation $evaluation)
     {
-        $evaluation->delete();
+        $this->evaluationService->processDestroy($evaluation, $request->validated('alasan'));
 
         return redirect()->route('admin.evaluations.index')->with('success', 'Penilaian berhasil dihapus.');
     }

@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\Position;
+use App\Models\StructureDecree;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -24,9 +26,9 @@ class FormasiSeederTest extends TestCase
     {
         $this->seed(PositionUnitSeeder::class);
 
-        $this->assertSame(45, Unit::count());
-        $this->assertSame(392, DB::table('position_unit')->count());
-        $this->assertSame(444, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(47, Unit::count());
+        $this->assertSame(492, DB::table('position_unit')->count());
+        $this->assertSame(619, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_manajer_coexists_in_three_bidang(): void
@@ -59,8 +61,51 @@ class FormasiSeederTest extends TestCase
             ->sortKeys()
             ->all();
 
-        $this->assertSame(['RM-1' => 45, 'RM-2' => 71, 'RM-3' => 328], $perRm);
-        $this->assertSame(['KEU' => 70, 'TAN' => 211, 'TEK' => 84, 'UMU' => 79], $perBidang);
+        $this->assertSame(['RM-1' => 45, 'RM-2' => 75, 'RM-3' => 338, 'RM-5' => 161], $perRm);
+        $this->assertSame(['KEU' => 92, 'TAN' => 248, 'TEK' => 98, 'UMU' => 181], $perBidang);
+    }
+
+    public function test_karpel_seats_keep_their_rm_5_band(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $this->assertSame(0, Position::whereNotIn('rm_level', Position::KARPIM_RM_LEVELS)->where('level', 'Karpim')->where('is_overflow', false)->count());
+        $this->assertSame(['RM-5'], Position::where('level', 'Karpel')->distinct()->pluck('rm_level')->all());
+        $this->assertSame(90, DB::table('position_unit')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('positions.level', 'Karpel')
+            ->count());
+    }
+
+    public function test_seat_keeps_its_explicit_kuota_and_bidang(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $seat = DB::table('position_unit')
+            ->where('unit_id', Unit::where('nama', 'Bagian Teknik & Pengolahan')->value('id'))
+            ->where('position_id', Position::where('nama', 'Asisten Sistem Manajemen & Sertifikasi')->value('id'))
+            ->first();
+
+        $this->assertSame(2, (int) $seat->kuota);
+        $this->assertSame('UMU', $seat->bidang);
+    }
+
+    public function test_kemitraan_seats_belong_to_their_own_units_and_not_to_distrik_petani_mitra(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        $tataUsaha = Position::where('nama', 'Asisten Tata Usaha')->value('id');
+        $kuotaByUnit = DB::table('position_unit')
+            ->join('units', 'units.id', '=', 'position_unit.unit_id')
+            ->where('position_unit.position_id', $tataUsaha)
+            ->whereIn('units.nama', ['Distrik Petani Mitra', 'Kebun Kemitraan Area Kalbar', 'Kebun Kemitraan Area Kaltim-Sel'])
+            ->pluck('position_unit.kuota', 'units.nama')
+            ->map(fn ($kuota) => (int) $kuota)
+            ->all();
+
+        $this->assertSame(['Kebun Kemitraan Area Kalbar' => 1, 'Kebun Kemitraan Area Kaltim-Sel' => 1], $kuotaByUnit);
+        $this->assertSame('Regional Office (Kantor Direksi Pontianak)', Unit::where('nama', 'Kebun Kemitraan Area Kalbar')->value('wilayah'));
+        $this->assertSame('Kebun', Unit::where('nama', 'Kebun Kemitraan Area Kaltim-Sel')->value('kode'));
     }
 
     public function test_seeding_twice_does_not_change_totals(): void
@@ -68,9 +113,9 @@ class FormasiSeederTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
         $this->seed(PositionUnitSeeder::class);
 
-        $this->assertSame(45, Unit::count());
-        $this->assertSame(392, DB::table('position_unit')->count());
-        $this->assertSame(444, (int) DB::table('position_unit')->sum('kuota'));
+        $this->assertSame(47, Unit::count());
+        $this->assertSame(492, DB::table('position_unit')->count());
+        $this->assertSame(619, (int) DB::table('position_unit')->sum('kuota'));
     }
 
     public function test_seeded_units_use_the_known_wilayah_labels(): void
@@ -106,6 +151,22 @@ class FormasiSeederTest extends TestCase
         $this->assertSame('RM-1', Position::where('nama', 'Manajer')->value('rm_level'));
     }
 
+    public function test_seeding_records_the_baseline_sk_exactly_once(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->seed(PositionUnitSeeder::class);
+
+        $decree = StructureDecree::sole();
+
+        $this->assertSame('DPSB/SKPTS/352/IX/2026', $decree->sk_number);
+        $this->assertSame('Perubahan Struktur Organisasi Region Office PT Perkebunan Nusantara IV', $decree->title);
+        $this->assertSame(StructureDecree::STATUS_APPLIED, $decree->status);
+        $this->assertSame(['2026-09-01', '2026-09-01'], [$decree->sk_date->toDateString(), $decree->effective_date->toDateString()]);
+        $this->assertNotNull($decree->revokes);
+        $this->assertCount(47, $decree->snapshot['units']);
+        $this->assertSame(hash_file('sha256', database_path('data/master_formasi.json')), $decree->source_sha256);
+    }
+
     public function test_pool_positions_exist_without_seats(): void
     {
         $this->seed(PositionUnitSeeder::class);
@@ -116,5 +177,25 @@ class FormasiSeederTest extends TestCase
             $this->assertNotNull($position, "{$nama} seharusnya tersedia sebagai jabatan pool.");
             $this->assertSame(0, DB::table('position_unit')->where('position_id', $position->id)->count());
         }
+    }
+
+    public function test_seeding_registers_the_legacy_unit_aliases_from_the_baseline(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->seed(PositionUnitSeeder::class);
+
+        $this->assertSame(7, UnitAlias::count());
+        $this->assertSame(
+            Unit::where('nama', 'PMO Batu Bara & Bisnis Lainnya')->value('id'),
+            UnitAlias::where('alias_key', UnitAlias::keyFor('PROJECT MANAGEMENT OFFICE (PMO) BATU BARA DAN BISNIS LAINNYA'))->value('unit_id')
+        );
+        $this->assertSame(
+            Unit::where('nama', 'Unit Group Kalimantan Barat')->value('id'),
+            UnitAlias::where('alias_key', UnitAlias::keyFor('Group Manager Kalbar'))->value('unit_id')
+        );
+        $this->assertSame(
+            Unit::where('nama', 'Bagian Sumber Daya Manusia')->value('id'),
+            UnitAlias::where('alias_key', UnitAlias::keyFor('Bagian Sumber Daya Manusia & Sistem Manajemen'))->value('unit_id')
+        );
     }
 }

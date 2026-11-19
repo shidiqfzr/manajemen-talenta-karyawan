@@ -4,6 +4,8 @@ namespace App\Exports;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\ManPowerPlanningService;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -19,6 +21,9 @@ use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
 class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithProperties, WithTitle
 {
+    /** Columns the optional `sort` filter may order by (the directory's sortable columns). */
+    private const SORTABLE = ['nama', 'jabatan', 'level', 'rm_level', 'golongan'];
+
     protected array $filters;
 
     protected ?User $user;
@@ -47,7 +52,7 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             'creator' => "{$userName} ({$userNik})",
             'lastModifiedBy' => 'PTPN IV Regional V HRIS System',
             'title' => 'Master Data Karyawan PTPN IV Regional V',
-            'description' => 'Dokumen Rahasia Data Pegawai diekspor sesuai UU PDP No. 27/2022',
+            'description' => 'Dokumen Rahasia Data Karyawan diekspor sesuai UU PDP No. 27/2022',
             'subject' => 'Data Karyawan & Formasi',
             'keywords' => 'ptpn4, hris, karyawan, formasi, confidential',
             'category' => 'HR Confidential Document',
@@ -57,10 +62,10 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
     }
 
     /**
-     * Membangun query data pegawai dengan dukungan filter pencarian dinamis,
+     * Membangun query data karyawan dengan dukungan filter pencarian dinamis,
      * eager loading tugas rangkap (concurrentJobs), dan efisiensi memori (chunked query streaming).
      */
-    public function query()
+    public function query(): Builder
     {
         $query = Employee::with(['concurrentJobs']);
 
@@ -77,8 +82,19 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->where('jabatan', $this->filters['jabatan']);
         }
 
+        if (! empty($this->filters['bidang'])) {
+            $query->whereIn('nik', app(ManPowerPlanningService::class)->employeeNiksByBidang((string) $this->filters['bidang']));
+        }
+
         if (! empty($this->filters['level'])) {
             $query->where('level', $this->filters['level']);
+        }
+
+        // Ekspor bawaan hanya karyawan aktif; arsip pensiun diekspor lewat status_kepegawaian=pensiun.
+        if (($this->filters['status_kepegawaian'] ?? '') === 'pensiun') {
+            $query->berhenti();
+        } else {
+            $query->aktif();
         }
 
         if (! empty($this->filters['rm_level'])) {
@@ -125,7 +141,17 @@ class EmployeesExport implements FromQuery, WithColumnFormatting, WithEvents, Wi
             $query->whereMonth('tmt_bekerja', $this->filters['bulan_masuk']);
         }
 
-        return $query->orderBy('nama', 'asc');
+        // Optional table sort (Daftar Karyawan export); whitelisted, defaults to nama ascending.
+        $sort = in_array($this->filters['sort'] ?? null, self::SORTABLE, true) ? $this->filters['sort'] : 'nama';
+        $direction = ($this->filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+
+        $query->orderBy($sort, $direction);
+
+        if ($sort !== 'nama') {
+            $query->orderBy('nama', 'asc');
+        }
+
+        return $query;
     }
 
     /**

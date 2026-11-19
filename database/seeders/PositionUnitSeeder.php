@@ -3,7 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Position;
+use App\Models\StructureDecree;
 use App\Models\Unit;
+use App\Models\UnitAlias;
+use App\Services\Structure\StructureReader;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +59,10 @@ class PositionUnitSeeder extends Seeder
             // Seed ulang menyelaraskan atribut master; status aktif yang diatur admin tidak diubah.
             $unit->fill(Arr::only($unitData, ['kode', 'wilayah', 'urutan']))->save();
 
+            foreach ($unitData['aliases'] ?? [] as $alias) {
+                UnitAlias::remember($unit, $alias, 'baseline');
+            }
+
             if (! empty($unitData['positions'])) {
                 foreach ($unitData['positions'] as $posData) {
                     $isOverflow = str_contains($posData['nama'], 'Advisor') || str_contains($posData['nama'], 'Diperbantukan');
@@ -107,7 +114,7 @@ class PositionUnitSeeder extends Seeder
 
         // Explicitly seed Generic Pool Positions (Advisor & Diperbantukan) since they are missing from master JSON
         $this->command->info('Memastikan jabatan Pool (Advisor & Diperbantukan) tersedia...');
-        $rms = ['RM-1', 'RM-2', 'RM-3', 'RM-4'];
+        $rms = ['RM-1', 'RM-2', 'RM-3'];
         foreach ($rms as $rm) {
             Position::firstOrCreate(
                 ['nama' => "Advisor {$rm}"],
@@ -153,5 +160,35 @@ class PositionUnitSeeder extends Seeder
                 ]
             );
         }
+
+        $this->recordBaselineDecree($jsonPath);
+    }
+
+    /**
+     * Mencatat SK yang menjadi dasar baseline sebagai SK Diterapkan, sehingga riwayat struktur pada instalasi baru
+     * dimulai dari versi yang diketahui (DOMAIN.md §3.7). Idempoten menurut nomor SK.
+     */
+    private function recordBaselineDecree(string $baselinePath): void
+    {
+        $meta = json_decode((string) @file_get_contents(database_path('data/structure_decree.json')), true);
+        if (! is_array($meta)) {
+            return;
+        }
+
+        StructureDecree::updateOrCreate(
+            ['sk_number' => StructureDecree::normalizeNumber($meta['sk_number'])],
+            [
+                'title' => $meta['title'],
+                'revokes' => $meta['revokes'] ?? null,
+                'note' => $meta['note'] ?? null,
+                'sk_date' => $meta['sk_date'],
+                'effective_date' => $meta['effective_date'],
+                'status' => StructureDecree::STATUS_APPLIED,
+                'source_path' => 'baseline:database/data/master_formasi.json',
+                'source_sha256' => (string) hash_file('sha256', $baselinePath),
+                'snapshot' => app(StructureReader::class)->current(),
+                'applied_at' => now(),
+            ]
+        );
     }
 }

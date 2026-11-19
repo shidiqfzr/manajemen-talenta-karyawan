@@ -5,16 +5,30 @@ namespace App\Services\Formasi;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Membaca berkas Excel formasi (satu baris = satu formasi jabatan) menjadi daftar formasi jabatan
- * per (unit, jabatan). Kelas ini tidak mengakses database.
+ * Membaca berkas Excel formasi menjadi daftar formasi jabatan per (unit, jabatan). Kelas ini tidak
+ * mengakses database.
+ *
+ * Dua format berkas dikenali dari baris judulnya:
+ * - Format struktur organisasi (8 kolom, kuota eksplisit, strata ditulis `RM 5`).
+ * - Format lama (4 kolom, satu baris = satu formasi jabatan, `RM-3`).
  */
 class FormasiExcelParser
 {
+    /** Judul kolom format lama. */
     public const HEADERS = ['Bagian/Unit Kerja', 'Nama Jabatan', 'Level RM', 'Bidang'];
 
-    public const RM_LEVELS = ['RM-1', 'RM-2', 'RM-3'];
+    /** Judul kolom format struktur organisasi. */
+    public const HEADERS_STRUKTUR = ['No', 'Unit/Bagian', 'Sub Bagian', 'Jabatan', 'Strata RM', 'Bidang', 'Kuota', 'Keterangan'];
+
+    public const RM_LEVELS = ['RM-1', 'RM-2', 'RM-3', 'RM-5'];
 
     public const BIDANG = ['KEU', 'TAN', 'TEK', 'UMU'];
+
+    /** RM-1 s.d. RM-3 adalah Karyawan Pimpinan (Karpim); strata RM di bawahnya Karyawan Pelaksana (Karpel). */
+    public static function levelForRm(string $rm): string
+    {
+        return in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true) ? 'Karpim' : 'Karpel';
+    }
 
     /**
      * @return array{
@@ -26,11 +40,11 @@ class FormasiExcelParser
     {
         $rows = IOFactory::load($path)->getSheet(0)->toArray(null, true, false, false);
 
-        $header = array_map(fn ($cell) => trim((string) $cell), array_slice($rows[0] ?? [], 0, 4));
-        if ($header !== self::HEADERS) {
+        $format = $this->detectFormat($rows[0] ?? []);
+        if ($format === null) {
             return [
                 'seats' => [],
-                'errors' => [['row' => 1, 'message' => 'Judul kolom harus: '.implode(', ', self::HEADERS).'.']],
+                'errors' => [['row' => 1, 'message' => 'Judul kolom harus: '.implode(', ', self::HEADERS_STRUKTUR).' (atau format lama: '.implode(', ', self::HEADERS).').']],
             ];
         }
 
@@ -42,27 +56,35 @@ class FormasiExcelParser
 
         foreach (array_slice($rows, 1, null, true) as $index => $row) {
             $excelRow = $index + 1;
-            [$unitRaw, $jabatanRaw, $rm, $bidang] = array_map(fn ($cell) => trim((string) $cell), array_slice(array_pad($row, 4, ''), 0, 4));
+            [$unitRaw, $jabatanRaw, $rm, $bidang, $kuotaRaw] = $this->extractCells($row, $format);
 
             if ($unitRaw === '' && $jabatanRaw === '' && $rm === '' && $bidang === '') {
                 continue;
             }
+
+            $rm = (string) preg_replace('/^RM\s*(\d)$/i', 'RM-$1', $rm);
 
             $problems = [];
             if ($unitRaw === '' || $jabatanRaw === '') {
                 $problems[] = 'Unit kerja dan nama jabatan wajib diisi.';
             }
             if (! in_array($rm, self::RM_LEVELS, true)) {
-                $problems[] = "Level RM '{$rm}' tidak valid (RM-1 sampai RM-3).";
+                $problems[] = "Level RM '{$rm}' tidak valid (".implode(', ', self::RM_LEVELS).').';
             }
             if (! in_array($bidang, self::BIDANG, true)) {
                 $problems[] = "Bidang '{$bidang}' tidak valid (KEU, TAN, TEK, UMU).";
+            }
+            // Kuota kosong = formasi berbasis norma tanpa jumlah tetap (disimpan 0, tidak ada kursi).
+            if ($kuotaRaw !== null && $kuotaRaw !== '' && ! ctype_digit($kuotaRaw)) {
+                $problems[] = "Kuota '{$kuotaRaw}' tidak valid (bilangan bulat, kosong berarti 0).";
             }
             if ($problems !== []) {
                 $errors[] = ['row' => $excelRow, 'message' => implode(' ', $problems)];
 
                 continue;
             }
+
+            $kuota = $kuotaRaw === null ? 1 : (int) $kuotaRaw;
 
             $unit = FormasiNormalizer::unit($unitRaw);
             $jabatan = FormasiNormalizer::jabatan($jabatanRaw);
@@ -76,7 +98,7 @@ class FormasiExcelParser
             }
 
             if (isset($seats[$key])) {
-                $seats[$key]['kuota']++;
+                $seats[$key]['kuota'] += $kuota;
 
                 continue;
             }
@@ -89,12 +111,42 @@ class FormasiExcelParser
             }
             $rmByJabatan[$jabatan] ??= ['rm' => $rm, 'row' => $excelRow];
 
-            $seats[$key] = ['unit' => $unit, 'jabatan' => $jabatan, 'rm_level' => $rm, 'bidang' => $bidang, 'kuota' => 1];
+            $seats[$key] = ['unit' => $unit, 'jabatan' => $jabatan, 'rm_level' => $rm, 'bidang' => $bidang, 'kuota' => $kuota];
         }
 
         return [
             'seats' => array_values(array_diff_key($seats, $conflicted)),
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * @param  array<int, mixed>  $headerRow
+     * @return 'struktur'|'legacy'|null
+     */
+    private function detectFormat(array $headerRow): ?string
+    {
+        $header = fn (int $length) => array_map(fn ($cell) => trim((string) $cell), array_slice(array_pad($headerRow, $length, ''), 0, $length));
+
+        return match (true) {
+            $header(count(self::HEADERS_STRUKTUR)) === self::HEADERS_STRUKTUR => 'struktur',
+            $header(count(self::HEADERS)) === self::HEADERS => 'legacy',
+            default => null,
+        };
+    }
+
+    /**
+     * @param  array<int, mixed>  $row
+     * @return array{0: string, 1: string, 2: string, 3: string, 4: ?string} unit, jabatan, RM, bidang, kuota (null = satu baris satu kursi)
+     */
+    private function extractCells(array $row, string $format): array
+    {
+        $cell = fn (int $column) => trim((string) ($row[$column] ?? ''));
+
+        if ($format === 'struktur') {
+            return [$cell(1), $cell(3), $cell(4), $cell(5), $cell(6)];
+        }
+
+        return [$cell(0), $cell(1), $cell(2), $cell(3), null];
     }
 }

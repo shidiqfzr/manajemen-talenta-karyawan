@@ -2,30 +2,96 @@
 
 namespace Tests\Feature;
 
+use App\Exports\MppMatrixExport;
+use App\Exports\MppPersonnelExport;
 use App\Livewire\Admin\ManPowerPlanning;
 use App\Models\Employee;
+use App\Models\JobHistory;
+use App\Models\MasterAuditLog;
+use App\Models\MppPeriod;
 use App\Models\Position;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\ManPowerPlanningService;
+use App\Services\Mpp\MppPeriodService;
+use App\Services\Mpp\MppSupplyPlanService;
 use Carbon\Carbon;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use Tests\Concerns\CreatesMppEmployees;
 use Tests\TestCase;
 
 class ManPowerPlanningTest extends TestCase
 {
+    use CreatesMppEmployees;
     use RefreshDatabase;
+
+    /** Tanggal acuan tetap agar default "Posisi per" (bulan berjalan) dapat diuji. */
+    private const TODAY = '2026-11-05 09:00:00';
 
     protected User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
+        Carbon::setTestNow(self::TODAY);
         $this->user = User::factory()->create(['role' => 'admin']);
     }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    // ───────────────────────── Helpers ─────────────────────────
+
+    private function pasokan(array $plan, string $rm, string $bidang): int
+    {
+        return $plan['ckp'][$rm][$bidang] + $plan['talent_scouting'][$rm][$bidang] + $plan['rbb'][$rm][$bidang];
+    }
+
+    /** Simpan rencana pasokan satu tahun dengan perubahan sel tertentu, mis. ['rbb.RM-3.TAN' => 9]. */
+    private function savePlan(int $year, array $changes): void
+    {
+        $plan = app(MppSupplyPlanService::class);
+        $expected = $plan->matrixFor($year);
+        $cells = $expected;
+        foreach ($changes as $path => $value) {
+            [$source, $rm, $bidang] = explode('.', $path);
+            $cells[$source][$rm][$bidang] = $value;
+        }
+        $plan->save($year, $cells, $expected, 'Penyesuaian hasil rapat SDM', $this->user);
+    }
+
+    /** Pejabat RM-1 bidang TAN (heuristik "kebun"). */
+    private function makeKarpim(string $nik, string $tanggalLahir, array $overrides = []): Employee
+    {
+        Position::firstOrCreate(
+            ['nama' => 'Manajer Regulatif'],
+            ['rm_level' => 'RM-1', 'is_overflow' => false, 'is_active' => true]
+        );
+
+        return Employee::create(array_merge([
+            'nik' => $nik,
+            'nama' => 'Karyawan '.$nik,
+            'jabatan' => 'Manajer Regulatif',
+            'unit_kerja' => 'Kebun A',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'tmt_bekerja' => '2000-01-01',
+            'tanggal_lahir' => $tanggalLahir,
+            'status_penugasan' => 'Definitif',
+        ], $overrides));
+    }
+
+    // ───────────────────────── Halaman & komponen ─────────────────────────
 
     public function test_authenticated_admin_can_access_mutasi_mpp_tab(): void
     {
@@ -45,28 +111,20 @@ class ManPowerPlanningTest extends TestCase
         $response->assertSee('Kembali ke Hub Mutasi');
     }
 
-    public function test_livewire_mpp_component_renders_baseline_matrix_and_kpis(): void
+    public function test_matrix_renders_from_employee_records_only(): void
     {
-        Livewire::actingAs($this->user)
-            ->test(ManPowerPlanning::class)
-            ->assertSet('sourceMode', 'baseline')
-            ->assertSee('Standar Formasi Baku')
-            ->assertSee('444')
-            ->assertSee('344')
-            ->assertSee('-14')
-            ->assertSee('RM-1')
-            ->assertSee('RM-2')
-            ->assertSee('RM-3')
-            ->assertSee('JUMLAH');
-    }
+        $this->seed(PositionUnitSeeder::class);
 
-    public function test_mpp_component_can_toggle_live_database_mode(): void
-    {
         Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
-            ->call('setSourceMode', 'live')
-            ->assertSet('sourceMode', 'live')
-            ->assertSee('Sync Karyawan Database');
+            ->assertSee('Standar Formasi Baku')
+            ->assertSee('458')
+            ->assertSee('Posisi per')
+            ->assertSee('RM-1')
+            ->assertSee('JUMLAH')
+            // Satu sumber kebenaran: tidak ada lagi sakelar angka acuan korporat.
+            ->assertDontSee('Formasi Baku Korporasi')
+            ->assertDontSee('Sync Karyawan Database');
     }
 
     public function test_mpp_component_can_filter_by_field(): void
@@ -77,96 +135,1076 @@ class ManPowerPlanningTest extends TestCase
             ->assertSet('filterBidang', 'KEU');
     }
 
-    public function test_mpp_export_csv_streams_file(): void
+    public function test_mpp_export_excel_downloads_xlsx_file(): void
     {
-        $component = Livewire::actingAs($this->user)
+        Livewire::actingAs($this->user)
             ->test(ManPowerPlanning::class)
-            ->call('exportCsv');
-
-        $component->assertStatus(200);
-        $component->assertFileDownloaded();
+            ->call('exportExcel')
+            ->assertStatus(200)
+            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-11_'.Carbon::now()->format('Ymd_His').'.xlsx');
     }
 
-    public function test_mpp_service_returns_accurate_matrix_dimensions(): void
+    public function test_mpp_toolbar_offers_excel_only_without_csv_or_print(): void
     {
-        // Standar Formasi kini berasal dari kursi master formasi, sehingga master harus dimuat.
-        $this->seed(PositionUnitSeeder::class);
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Export Excel')
+            ->assertDontSee('CSV')
+            ->assertDontSee('Cetak');
+    }
 
+    // ───────────────────────── Tahun & posisi per bulan ─────────────────────────
+
+    public function test_default_position_is_the_current_month_of_the_current_year(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSet('planningYear', 2026)
+            ->assertSet('asOfMonth', 11)
+            ->assertSee('Realisasi per Nov 2026')
+            ->assertSee('Pensiun sd Des 2026')
+            ->assertSee('Kebutuhan 2027');
+    }
+
+    public function test_changing_the_year_resets_the_position_month(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('setPlanningYear', 2028)
+            ->assertSet('asOfMonth', 1)
+            ->assertSee('Realisasi per Jan 2028')
+            ->assertSee('Kebutuhan 2029')
+            ->assertSee('Kekurangan Formasi 2028')
+            ->call('setPlanningYear', 2025)
+            ->assertSet('asOfMonth', 12)
+            ->assertSee('Realisasi per Des 2025')
+            ->set('planningYear', 2027)
+            ->assertSet('asOfMonth', 1);
+    }
+
+    public function test_month_filter_sets_the_position_date(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('setAsOfMonth', 6)
+            ->assertSet('asOfMonth', 6)
+            ->assertSee('Realisasi per Jun 2026')
+            ->assertSee('Kursi kosong sejak MBT · Jul 2026 – Des 2027')
+            ->call('setAsOfMonth', 13)
+            ->assertSet('asOfMonth', 6)
+            ->set('asOfMonth', 0)
+            ->assertSet('asOfMonth', 6);
+    }
+
+    public function test_default_as_of_month_rule(): void
+    {
         $service = new ManPowerPlanningService;
-        $baseline = $service->getMppMatrix('baseline', 2026);
 
-        $this->assertEquals(444, $baseline['stats']['total_formasi']);
-        $this->assertEquals(344, $baseline['stats']['total_realisasi']);
-        $this->assertEquals(77.5, $baseline['stats']['fill_rate']);
-        $this->assertEquals(38, $baseline['stats']['total_pensiun']);
-        $this->assertEquals(-14, $baseline['stats']['total_kebutuhan']);
-        $this->assertCount(12, $baseline['matrix']); // 12 indicator rows
+        $this->assertSame(11, $service->defaultAsOfMonth(2026));
+        $this->assertSame(12, $service->defaultAsOfMonth(2025));
+        $this->assertSame(1, $service->defaultAsOfMonth(2027));
     }
 
-    public function test_mpp_service_excludes_overflow_positions_from_realisasi(): void
+    // ───────────────────────── Data karyawan pada tanggal posisi ─────────────────────────
+
+    public function test_realisasi_and_pensiun_follow_the_mbt_date_relative_to_the_position(): void
     {
-        // Set up live database scenario
+        // Lahir 1971-03-02 -> pensiun 2027-03-01, MBT 2026-09-01 (6 bulan sebelum pensiun).
+        $this->makeKarpim('77770001', '1971-03-02');
+        // Lahir 1971-11-14 -> pensiun 2027-11-01, MBT 2027-05-01.
+        $this->makeKarpim('77770002', '1971-11-14');
+        $service = new ManPowerPlanningService;
+
+        $june = $service->getPositionCounts(2026, 6);
+        $this->assertSame(2, $june['realisasi']['RM-1']['TAN']);
+        $this->assertSame(1, $june['pensiun_t']['RM-1']['TAN']);
+        $this->assertSame(1, $june['pensiun_t1']['RM-1']['TAN']);
+
+        // Per Oktober pejabat pertama sudah bebas tugas: tidak lagi menjabat, kursinya sudah kosong.
+        $october = $service->getPositionCounts(2026, 10);
+        $this->assertSame(1, $october['realisasi']['RM-1']['TAN']);
+        $this->assertSame(0, $october['pensiun_t']['RM-1']['TAN']);
+        $this->assertSame(1, $october['pensiun_t1']['RM-1']['TAN']);
+    }
+
+    public function test_position_excludes_ended_contracts_and_later_hires(): void
+    {
+        $this->makeKarpim('77770003', '1990-01-10', [
+            'status_karyawan' => 'Kontrak (PKWT)',
+            'tanggal_berakhir_kontrak' => '2026-05-31',
+        ]);
+        $this->makeKarpim('77770004', '1990-01-10', ['tmt_bekerja' => '2026-08-01']);
+        $service = new ManPowerPlanningService;
+
+        $this->assertSame(1, $service->getPositionCounts(2026, 5)['realisasi']['RM-1']['TAN']);
+        $this->assertSame(0, $service->getPositionCounts(2026, 6)['realisasi']['RM-1']['TAN']);
+        $this->assertSame(1, $service->getPositionCounts(2026, 8)['realisasi']['RM-1']['TAN']);
+    }
+
+    public function test_overflow_positions_are_counted_outside_realisasi(): void
+    {
         Position::create(['nama' => 'Manajer Regulatif', 'rm_level' => 'RM-1', 'is_overflow' => false, 'is_active' => true]);
         Position::create(['nama' => 'Advisor', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
+        $this->makeKarpim('99991111', '1990-01-10');
+        $this->makeKarpim('99992222', '1990-01-10', ['jabatan' => 'Advisor', 'unit_kerja' => 'Kantor Direksi']);
 
-        // Employee 1: Regular position
-        Employee::create([
-            'nik' => '99991111',
-            'nama' => 'Reguler',
-            'jabatan' => 'Manajer Regulatif',
-            'unit_kerja' => 'Kebun A',
-            'level' => 'Karpim',
-            'golongan' => 'IIIA/00',
-            'tmt_bekerja' => '2010-01-01',
-            'status_penugasan' => 'Definitif',
-        ]);
+        $counts = (new ManPowerPlanningService)->getPositionCounts(2026, 11);
 
-        // Employee 2: Overflow position
-        Employee::create([
-            'nik' => '99992222',
-            'nama' => 'Overflow',
-            'jabatan' => 'Advisor',
-            'unit_kerja' => 'Kantor Direksi',
-            'level' => 'Karpim',
-            'golongan' => 'IIIA/00',
-            'tmt_bekerja' => '2010-01-01',
-            'status_penugasan' => 'Definitif',
-        ]);
-
-        $service = new ManPowerPlanningService;
-        $liveStats = $service->getLiveDatabaseCounts(2026);
-
-        // Assert that the overflow employee is NOT counted in realisasi but counted in their respective overflow bins
-        $this->assertEquals(1, array_sum($liveStats['realisasi']['RM-1']));
-        $this->assertEquals(1, array_sum($liveStats['advisor']['RM-1']));
-        $this->assertEquals(0, array_sum($liveStats['diperban']['RM-1']));
+        $this->assertSame(1, array_sum($counts['realisasi']['RM-1']));
+        $this->assertSame(1, array_sum($counts['advisor']['RM-1']));
+        $this->assertSame(0, array_sum($counts['diperban']['RM-1']));
     }
 
-    public function test_baseline_standar_formasi_is_derived_from_seats(): void
+    // ───────────────────────── Standar formasi & pasokan ─────────────────────────
+
+    public function test_standar_formasi_is_derived_from_seats(): void
     {
         $this->seed(PositionUnitSeeder::class);
 
-        // Menambah kuota satu kursi Manajer (RM-1/TAN) harus langsung tampak pada matriks.
         DB::table('position_unit')
             ->where('unit_id', Unit::where('nama', 'Kebun Tajati')->value('id'))
             ->where('position_id', Position::where('nama', 'Manajer')->value('id'))
             ->increment('kuota', 3);
 
+        $service = new ManPowerPlanningService;
         $this->assertSame([
             'RM-1' => ['KEU' => 2, 'TAN' => 30, 'TEK' => 11, 'UMU' => 5],
-            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
-            'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
-        ], (new ManPowerPlanningService)->getBaselineData()['standar_formasi']);
+            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 20],
+            'RM-3' => ['KEU' => 66, 'TAN' => 146, 'TEK' => 61, 'UMU' => 65],
+        ], $service->standarFormasi());
+        $this->assertSame(461, $service->getMppMatrix(2026, 11)['stats']['total_formasi']);
     }
+
+    public function test_supply_rows_show_the_remaining_plan(): void
+    {
+        $this->savePlan(2028, ['rbb.RM-3.TAN' => 9]);
+
+        $matrix = (new ManPowerPlanningService)->getMppMatrix(2028, 1)['matrix'];
+
+        $this->assertSame(9, $matrix[8]['levels']['RM-3']['fields']['TAN']);
+        $this->assertSame('Sisa RBB 2028', $matrix[8]['label']);
+        $this->assertSame('Sisa CKP Internal', $matrix[6]['label']);
+    }
+
+    public function test_supply_already_hired_this_year_is_not_subtracted_twice(): void
+    {
+        // Rencana RBB 2026 RM-3 KEU = 8; satu karyawan RBB masuk Maret 2026 dan kini tercatat di Realisasi.
+        $this->savePlan(2026, ['rbb.RM-3.KEU' => 8]);
+        $this->makeAsistenKeuangan('88880001', ['jalur_masuk' => 'RBB', 'tmt_bekerja' => '2026-03-01']);
+        $this->makeAsistenKeuangan('88880002', ['jalur_masuk' => 'Reguler', 'tmt_bekerja' => '2026-03-01']);
+        $this->makeAsistenKeuangan('88880003', ['jalur_masuk' => 'RBB', 'tmt_bekerja' => '2025-03-01']);
+        $service = new ManPowerPlanningService;
+
+        $october = $service->getMppMatrix(2026, 10)['matrix'];
+        $this->assertSame(3, $october[2]['levels']['RM-3']['fields']['KEU']);
+        $this->assertSame(7, $october[8]['levels']['RM-3']['fields']['KEU']);
+
+        // Sebelum karyawan itu masuk, seluruh rencana masih tersisa.
+        $february = $service->getMppMatrix(2026, 2)['matrix'];
+        $this->assertSame(8, $february[8]['levels']['RM-3']['fields']['KEU']);
+    }
+
+    public function test_ckp_is_realised_on_the_promotion_into_karpim_not_on_the_hire_date(): void
+    {
+        // Karpel sejak 2015, dipromosikan lewat CKP menjadi staf RM-3 pada 1 Maret 2026.
+        $promoted = $this->makeAsistenKeuangan('88880031', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2015-02-01', 'tanggal_dalam_jabatan' => '2026-03-01']);
+        JobHistory::create([
+            'employee_nik' => $promoted->nik, 'jabatan' => 'Krani Keuangan', 'unit_kerja' => 'Bagian Keuangan Uji',
+            'level' => 'Karpel', 'tmt_awal' => '2015-02-01', 'jenis_mutasi' => 'PENUGASAN', 'is_applied' => true,
+        ]);
+        JobHistory::create([
+            'employee_nik' => $promoted->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
+            'level' => 'Karpim', 'tmt_awal' => '2026-03-01', 'jenis_mutasi' => 'PROMOSI', 'is_applied' => true,
+        ]);
+        // Penempatan pertama Karpim tercatat tanpa tanggal mulai bekerja pada master karyawan.
+        $placed = $this->makeAsistenKeuangan('88880032', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => null, 'tanggal_dalam_jabatan' => '2026-09-01']);
+        JobHistory::create([
+            'employee_nik' => $placed->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
+            'level' => 'Karpim', 'tmt_awal' => '2026-09-01', 'jenis_mutasi' => 'PENUGASAN', 'is_applied' => true,
+        ]);
+        $service = new ManPowerPlanningService;
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 2]);
+
+        // Rencana CKP 2026 RM-3 KEU = 2: belum ada promosi per Februari, satu per Juni, dua per Oktober.
+        $this->assertSame(0, $service->getPositionCounts(2026, 2)['hired_supply']['ckp']['RM-3']['KEU']);
+        $this->assertSame(1, $service->getPositionCounts(2026, 6)['hired_supply']['ckp']['RM-3']['KEU']);
+        $this->assertSame(2, $service->getPositionCounts(2026, 10)['hired_supply']['ckp']['RM-3']['KEU']);
+        $this->assertSame(0, $service->getMppMatrix(2026, 10)['matrix'][6]['levels']['RM-3']['fields']['KEU']);
+    }
+
+    public function test_cancelled_or_scheduled_placements_do_not_realise_supply(): void
+    {
+        $employee = $this->makeAsistenKeuangan('88880033', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2015-02-01']);
+        JobHistory::where('employee_nik', $employee->nik)->forceDelete();
+        // Terjadwal (belum diterapkan) dan dibatalkan: keduanya bukan realisasi.
+        JobHistory::create([
+            'employee_nik' => $employee->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
+            'level' => 'Karpim', 'tmt_awal' => '2026-03-01', 'jenis_mutasi' => 'PROMOSI', 'is_applied' => false,
+        ]);
+        JobHistory::create([
+            'employee_nik' => $employee->nik, 'jabatan' => 'Asisten Keuangan Uji', 'unit_kerja' => 'Bagian Keuangan Uji',
+            'level' => 'Karpim', 'tmt_awal' => '2026-04-01', 'jenis_mutasi' => 'PROMOSI', 'is_applied' => true,
+        ])->delete();
+
+        $hired = (new ManPowerPlanningService)->getPositionCounts(2026, 10)['hired_supply'];
+
+        // Tanpa penempatan Karpim yang sah, tanggal mulai bekerja 2015 dipakai: bukan realisasi 2026.
+        $this->assertSame(0, $hired['ckp']['RM-3']['KEU']);
+    }
+
+    public function test_remaining_supply_never_goes_below_zero(): void
+    {
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 2]);
+        foreach (['88880011', '88880012', '88880013'] as $nik) {
+            $this->makeAsistenKeuangan($nik, ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-02-01']);
+        }
+
+        // Rencana CKP 2026 RM-3 KEU = 2, sudah masuk 3.
+        $matrix = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix'];
+
+        $this->assertSame(0, $matrix[6]['levels']['RM-3']['fields']['KEU']);
+    }
+
+    // ───────────────────────── Rumus Kebutuhan ─────────────────────────
+
+    public function test_kebutuhan_follows_the_formula_and_totals_equal_the_cells(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->makeKarpim('77770010', '1971-12-20');
+        $this->makeAsistenKeuangan('88880020', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-04-01']);
+        $this->savePlan(2027, ['talent_scouting.RM-3.TAN' => 2]);
+        $matrix = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix'];
+        $planT1 = app(MppSupplyPlanService::class)->matrixFor(2027);
+
+        foreach (['RM-1', 'RM-2', 'RM-3'] as $rm) {
+            foreach (['KEU', 'TAN', 'TEK', 'UMU'] as $bidang) {
+                $cell = fn (int $no) => $matrix[$no]['levels'][$rm][$bidang] ?? $matrix[$no]['levels'][$rm]['fields'][$bidang];
+                $base = $cell(1) - $cell(2) + $cell(4);
+                $sisa = $cell(6) + $cell(7) + $cell(8);
+
+                $this->assertSame($base - $sisa, $cell(9), "Kebutuhan T {$rm} {$bidang}");
+                $this->assertSame($base + $cell(5) - ($sisa + $this->pasokan($planT1, $rm, $bidang)), $cell(10), "Kebutuhan T+1 {$rm} {$bidang}");
+            }
+        }
+
+        foreach ($matrix as $row) {
+            $this->assertSame(array_sum(array_column($row['levels'], 'subtotal')), $row['grand_total'], "Total baris {$row['no']}");
+        }
+    }
+
+    public function test_shortage_and_surplus_totals_are_split(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->savePlan(2026, ['rbb.RM-3.KEU' => 200]);
+        $service = new ManPowerPlanningService;
+        $mpp = $service->getMppMatrix(2026, 11);
+
+        foreach ([9, 10] as $no) {
+            $row = $mpp['matrix'][$no];
+            $cells = array_merge(...array_map(fn ($level) => array_values($level['fields']), array_values($row['levels'])));
+            $this->assertSame(array_sum(array_filter($cells, fn ($v) => $v > 0)), $row['shortage_total']);
+            $this->assertSame(-array_sum(array_filter($cells, fn ($v) => $v < 0)), $row['surplus_total']);
+            $this->assertSame($row['grand_total'], $row['shortage_total'] - $row['surplus_total']);
+
+            foreach ($row['levels'] as $level) {
+                $this->assertSame($level['subtotal'], $level['shortage'] - $level['surplus']);
+            }
+        }
+        $this->assertGreaterThan(0, $mpp['matrix'][9]['surplus_total']);
+        $this->assertSame($mpp['matrix'][9]['shortage_total'], $mpp['stats']['total_kekurangan']);
+        $this->assertSame($mpp['matrix'][9]['surplus_total'], $mpp['stats']['total_surplus']);
+
+    }
+
+    public function test_row_where_every_need_is_a_surplus(): void
+    {
+        // Tanpa kursi master (formasi 0) dan pasokan RM-3 besar: kekurangan 0, surplus positif, bersih negatif.
+        $changes = [];
+        foreach (['KEU', 'TAN', 'TEK', 'UMU'] as $bidang) {
+            $changes["rbb.RM-3.{$bidang}"] = 999;
+        }
+        $this->savePlan(2028, $changes);
+
+        $row = (new ManPowerPlanningService)->getMppMatrix(2028, 1)['matrix'][9];
+
+        $this->assertSame(0, $row['shortage_total']);
+        $this->assertGreaterThan(0, $row['surplus_total']);
+        $this->assertLessThan(0, $row['grand_total']);
+    }
+
+    public function test_kebutuhan_t1_subtracts_t_and_t1_supply(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $service = new ManPowerPlanningService;
+        $before = $service->getMppMatrix(2026, 11)['matrix'];
+
+        $this->savePlan(2027, ['ckp.RM-3.KEU' => 3]);
+        $after = $service->getMppMatrix(2026, 11)['matrix'];
+
+        $cell = fn (array $m, int $row) => $m[$row]['levels']['RM-3']['fields']['KEU'];
+        $this->assertSame($cell($before, 10) - 3, $cell($after, 10));
+        $this->assertSame($cell($before, 9), $cell($after, 9));
+    }
+
+    public function test_unplanned_year_counts_supply_as_zero_and_flags_it(): void
+    {
+        $service = new ManPowerPlanningService;
+        $mpp = $service->getMppMatrix(2029, 1);
+
+        foreach ([3, 6, 7, 8] as $no) {
+            $this->assertSame(0, $mpp['matrix'][$no]['grand_total']);
+        }
+        $this->assertTrue($mpp['stats']['supply_plan_missing']);
+        $this->assertSame([2029, 2030], $mpp['stats']['supply_plan_missing_years']);
+        // Tidak ada rencana bawaan sistem: tahun berjalan pun belum direncanakan sampai admin mengisinya.
+        $this->assertSame([2026, 2027], $service->getMppMatrix(2026, 11)['stats']['supply_plan_missing_years']);
+        $this->savePlan(2026, ['rbb.RM-3.KEU' => 1]);
+        $this->assertSame([2027], $service->getMppMatrix(2026, 11)['stats']['supply_plan_missing_years']);
+    }
+
+    // ───────────────────────── Drilldown ─────────────────────────
+
+    public function test_each_row_declares_what_its_cells_open(): void
+    {
+        $drills = array_map(fn ($row) => $row['drill'], (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix']);
+
+        $this->assertSame([
+            1 => null, 2 => 'realisasi', 3 => null, 4 => 'pensiun_t', 5 => 'pensiun_t1',
+            6 => 'supply_ckp', 7 => 'supply_talent_scouting', 8 => 'supply_rbb',
+            9 => 'formula', 10 => 'formula', 11 => 'advisor', 12 => 'diperban',
+        ], $drills);
+    }
+
+    public function test_every_personnel_cell_opens_exactly_its_count(): void
+    {
+        $this->makeKarpim('77770011', '1972-05-14'); // MBT 2027-11
+        $this->makeKarpim('77770012', '1971-09-02'); // MBT 2027-03
+        $this->makeKarpim('77770013', '1990-01-10');
+        Position::create(['nama' => 'Advisor RM-1', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
+        $this->makeKarpim('77770014', '1990-01-10', ['jabatan' => 'Advisor RM-1']);
+        $service = new ManPowerPlanningService;
+        $matrix = $service->getMppMatrix(2026, 6)['matrix'];
+
+        $checked = 0;
+        foreach ($matrix as $row) {
+            // Baris pasokan menampilkan sisa rencana; personilnya diuji pada test pasokan di bawah.
+            if ($row['drill'] === null || $row['drill'] === 'formula' || str_starts_with($row['drill'], 'supply_')) {
+                continue;
+            }
+            foreach ($row['levels'] as $rm => $level) {
+                foreach ($level['fields'] as $bidang => $value) {
+                    $this->assertCount($value, $service->getDrilldownEmployees($rm, $bidang, $row['drill'], 2026, 6), "{$row['label']} {$rm} {$bidang}");
+                    $checked += $value;
+                }
+            }
+        }
+        $this->assertGreaterThanOrEqual(5, $checked);
+        $this->assertSame('77770011', $service->getDrilldownEmployees('RM-1', 'TAN', 'pensiun_t1', 2026, 6)[0]['nik']);
+    }
+
+    public function test_position_members_match_every_personnel_cell(): void
+    {
+        $this->makeKarpim('77770011', '1972-05-14');
+        $this->makeKarpim('77770012', '1971-09-02');
+        $this->makeKarpim('77770013', '1990-01-10');
+        Position::create(['nama' => 'Advisor RM-1', 'rm_level' => 'RM-1', 'is_overflow' => true, 'is_active' => true]);
+        $this->makeKarpim('77770014', '1990-01-10', ['jabatan' => 'Advisor RM-1']);
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);
+        $this->makeAsistenKeuangan('88880061', ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-03-01']);
+        $service = new ManPowerPlanningService;
+        $mpp = $service->getMppMatrix(2026, 11);
+        $members = $service->getPositionMembers(2026, 11);
+
+        $checked = 0;
+        foreach ($mpp['matrix'] as $row) {
+            if ($row['drill'] === null || $row['drill'] === 'formula') {
+                continue;
+            }
+            foreach ($row['levels'] as $rm => $level) {
+                foreach (array_keys($level['fields']) as $bidang) {
+                    $expected = str_starts_with($row['drill'], 'supply_')
+                        ? $mpp['supply_breakdown'][substr($row['drill'], 7)][$rm][$bidang]['terealisasi']
+                        : $level['fields'][$bidang];
+                    $actual = array_filter($members, fn (array $m): bool => $m['scope'] === $row['drill'] && $m['rm_level'] === $rm && $m['bidang'] === $bidang);
+                    $this->assertCount($expected, $actual, "{$row['label']} {$rm} {$bidang}");
+                    $checked += $expected;
+                }
+            }
+        }
+        $this->assertGreaterThanOrEqual(6, $checked);
+
+        $ckp = array_values(array_filter($members, fn (array $m): bool => $m['scope'] === 'supply_ckp'));
+        $this->assertSame('88880061', $ckp[0]['employee_nik']);
+        $this->assertSame('2026-03-01', $ckp[0]['tanggal_penempatan']);
+        $this->assertNotEmpty($ckp[0]['jabatan']);
+        $this->assertArrayHasKey('unit_kerja', $ckp[0]);
+    }
+
+    public function test_matrix_exposes_planned_supply_for_t1(): void
+    {
+        $this->savePlan(2027, ['ckp.RM-3.KEU' => 3]);
+
+        $mpp = (new ManPowerPlanningService)->getMppMatrix(2026, 11);
+
+        $this->assertSame(3, $mpp['supply_t1']['RM-3']['KEU']);
+        $this->assertSame(0, $mpp['supply_t1']['RM-3']['TAN']);
+    }
+
+    public function test_supply_cells_report_plan_realised_and_remaining(): void
+    {
+        // Rencana CKP RM-3: KEU 1, TAN 2. Tiga promosi CKP KEU dan satu TAN sudah ditempatkan Maret 2026.
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 1, 'ckp.RM-3.TAN' => 2]);
+        foreach (['88880041', '88880042', '88880043'] as $nik) {
+            $this->makeAsistenKeuangan($nik, ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-03-01']);
+        }
+        Position::create(['nama' => 'Asisten Afdeling Uji', 'rm_level' => 'RM-3', 'is_overflow' => false, 'is_active' => true]);
+        $this->makeAsistenKeuangan('88880044', [
+            'jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-03-01', 'jabatan' => 'Asisten Afdeling Uji', 'unit_kerja' => 'Kebun Uji',
+        ]);
+        $service = new ManPowerPlanningService;
+        $mpp = $service->getMppMatrix(2026, 11);
+
+        $this->assertSame(['rencana' => 1, 'terealisasi' => 3, 'sisa' => 0], $mpp['supply_breakdown']['ckp']['RM-3']['KEU']);
+        $this->assertSame(['rencana' => 2, 'terealisasi' => 1, 'sisa' => 1], $mpp['supply_breakdown']['ckp']['RM-3']['TAN']);
+        $this->assertSame(0, $mpp['matrix'][6]['levels']['RM-3']['fields']['KEU']);
+        $this->assertSame(1, $mpp['matrix'][6]['levels']['RM-3']['fields']['TAN']);
+
+        $people = $service->getDrilldownEmployees('RM-3', 'KEU', 'supply_ckp', 2026, 11);
+        $this->assertCount(3, $people);
+        $this->assertSame('01 Mar 2026', $people[0]['tanggal_penempatan']);
+        $this->assertCount(0, $service->getDrilldownEmployees('RM-3', 'KEU', 'supply_rbb', 2026, 11));
+    }
+
+    public function test_supply_drawer_explains_plan_versus_realised(): void
+    {
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 1]);
+        foreach (['88880051', '88880052', '88880053'] as $nik) {
+            $this->makeAsistenKeuangan($nik, ['jalur_masuk' => 'CKP', 'tmt_bekerja' => '2026-03-01']);
+        }
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            // Sisa 0 tetapi ada realisasi: sel tetap dapat dibuka agar kelebihan realisasi terlihat.
+            ->assertSeeHtml("openDrilldown('RM-3', 'KEU', 6)")
+            ->assertDontSeeHtml("openDrilldown('RM-3', 'TAN', 6)")
+            ->call('openDrilldown', 'RM-3', 'KEU', 6)
+            ->assertSet('drilldownMode', 'supply')
+            ->assertSet('drilldownSupply', ['rencana' => 1, 'terealisasi' => 3, 'sisa' => 0])
+            ->assertCount('drilldownEmployees', 3)
+            ->assertSee('Rincian Pasokan CKP Internal')
+            ->assertSee('Terealisasi melebihi rencana: 2')
+            ->assertSee('3 Personil')
+            ->assertSee('Export Excel');
+    }
+
+    public function test_supply_and_formula_drawers_share_one_breakdown_card(): void
+    {
+        $this->savePlan(2026, ['ckp.RM-3.UMU' => 4]);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class);
+
+        // Operator tampil sebagai kolom sendiri di antara suku, bukan awalan label.
+        $component->call('openDrilldown', 'RM-3', 'UMU', 6)
+            ->assertSeeHtml('data-breakdown-card="supply"')
+            ->assertSee('Rincian Rencana vs Realisasi Pasokan')
+            // Penanda ASCII: respons Livewire setelah call() berupa JSON yang meng-escape karakter "−".
+            ->assertSeeHtmlInOrder(['Rencana 2026', 'data-op="minus"', 'Terealisasi', 'data-op="equals"', 'Sisa'])
+            ->assertDontSee('- Terealisasi');
+
+        $component->call('closeDrilldown')
+            ->call('openDrilldown', 'RM-3', 'UMU', 9)
+            ->assertSeeHtml('data-breakdown-card="formula"')
+            ->assertSee('Rincian Formula Kebutuhan Bersih')
+            ->assertSeeHtmlInOrder([
+                'data-breakdown-card="formula"', 'Formasi', 'data-op="minus"', 'Realisasi', 'data-op="plus"', 'Pensiun',
+                'data-op="minus"', 'Pasokan', 'data-op="equals"', 'Kebutuhan',
+            ])
+            ->assertDontSee('- Realisasi')
+            ->assertDontSee('= Kebutuhan');
+    }
+
+    public function test_opening_a_drawer_reads_the_employee_table_once(): void
+    {
+        $this->makeKarpim('77770061', '1990-01-10');
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $component->call('openDrilldown', 'RM-1', 'TAN', 2);
+        $employeeScans = collect(DB::getQueryLog())->pluck('query')
+            ->filter(fn (string $q) => preg_match('/from\s+"?employees"?\s*(where\s+"?employees"?\."?deleted_at"?\s+is\s+null)?\s*$/i', trim($q)))
+            ->count();
+        DB::disableQueryLog();
+
+        // Matriks drawer, daftar personil, dan render ulang memakai satu pembacaan data karyawan.
+        $this->assertSame(1, $employeeScans);
+        $component->assertCount('drilldownEmployees', 1);
+    }
+
+    public function test_plan_cells_do_not_open_a_drawer_and_kebutuhan_opens_the_formula(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 1)
+            ->assertSet('showDrilldown', false)
+            ->call('openDrilldown', 'RM-3', 'KEU', 9)
+            ->assertSet('showDrilldown', true)
+            ->assertSet('drilldownEmployees', [])
+            ->assertSee('Rincian Formula Kebutuhan')
+            ->assertDontSee('0 Personil')
+            ->assertDontSee('Export daftar personil ini ke Excel');
+    }
+
+    public function test_drilldown_formula_for_t1_uses_cumulative_remaining_supply(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->savePlan(2027, ['ckp.RM-3.KEU' => 3]);
+        $planT = app(MppSupplyPlanService::class)->matrixFor(2026);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-3', 'KEU', 10)
+            ->assertSet('drilldownFormula.pasokan', $this->pasokan($planT, 'RM-3', 'KEU') + 3);
+    }
+
+    public function test_reference_cells_show_their_values_without_a_drilldown(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->savePlan(2026, ['ckp.RM-3.TAN' => 7]);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSeeHtml('data-cell="1-RM-1-TAN">27<')
+            ->assertSeeHtml('data-cell="6-RM-3-TAN">7<')
+            ->assertDontSeeHtml("openDrilldown('RM-1', 'TAN', 1)");
+    }
+
+    // ───────────────────────── Tampilan ─────────────────────────
+
+    public function test_kebutuhan_kpi_shows_shortage_surplus_and_net(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $stats = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['stats'];
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Kekurangan Formasi 2026')
+            ->assertSee('Surplus '.$stats['total_surplus'])
+            ->assertSee('Kebutuhan Bersih '.sprintf('%+d', $stats['total_kebutuhan']));
+    }
+
+    public function test_pensiun_kpi_names_the_mbt_window(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Kursi kosong sejak MBT · Des 2026 – Des 2027')
+            ->assertDontSee('BUP periode')
+            ->call('setAsOfMonth', 12)
+            ->assertSee('Kursi kosong sejak MBT · Jan 2027 – Des 2027');
+    }
+
+    public function test_kebutuhan_totals_show_net_with_the_split_only_when_both_exist(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $this->savePlan(2026, ['rbb.RM-3.KEU' => 200]);
+        $row = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix'][9];
+        $this->assertGreaterThan(0, $row['surplus_total']);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('kurang '.$row['shortage_total'].' · surplus '.$row['surplus_total'])
+            ->assertDontSee('−0')
+            ->assertDontSee('bersih +');
+    }
+
+    public function test_kpi_cards_follow_the_shared_card_rules(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertDontSeeHtml('absolute bottom-0 left-0 right-0 h-1')
+            ->assertDontSeeHtml('text-teal-700');
+    }
+
+    public function test_rm_band_labels_follow_the_domain_definition(): void
+    {
+        $this->assertSame(['RM-1', 'RM-2', 'RM-3'], array_keys(ManPowerPlanningService::RM_BANDS));
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class);
+
+        foreach (ManPowerPlanningService::RM_BANDS as $band) {
+            $component->assertSee($band['short'])->assertSee($band['positions']);
+        }
+        $component->assertDontSee('Manajer / Kabag')
+            ->assertDontSee('Manajer Kebun / Kepala Bagian / Askep');
+    }
+
+    public function test_formasi_badges_follow_the_master_seats(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        DB::table('position_unit')
+            ->where('unit_id', Unit::where('nama', 'Kebun Tajati')->value('id'))
+            ->where('position_id', Position::where('nama', 'Manajer')->value('id'))
+            ->increment('kuota', 3);
+
+        $this->actingAs($this->user)
+            ->get(route('admin.mutasi.index', ['tab' => 'mpp']))
+            ->assertOk()
+            // Nilai lencana diperiksa langsung; pencarian teks "458" di seluruh halaman bisa kena ID acak Livewire.
+            ->assertViewHas('mppFormasiTotal', 461)
+            ->assertSeeInOrder(['Perencanaan Formasi (MPP)', '461']);
+    }
+
+    // ───────────────────────── Rencana pasokan ─────────────────────────
+
+    public function test_missing_plan_notice_is_shown(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Rencana pasokan 2026 belum diisi. Angka pasokan dihitung 0.')
+            ->assertSee('Rencana pasokan 2027 belum diisi. Angka pasokan dihitung 0.')
+            ->assertSee('Kelola Rencana Pasokan')
+            // Editor dibuka pada tahun dan posisi yang sama dengan matriks.
+            ->assertSeeHtml("open-mpp-supply-plan-editor', { year: 2026, month: 11 }");
+
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 1]);
+        $this->savePlan(2027, ['ckp.RM-3.KEU' => 1]);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertDontSee('belum diisi. Angka pasokan dihitung 0.');
+    }
+
+    public function test_supply_plan_provenance_is_shown(): void
+    {
+        // Belum ada rencana: tidak ada keterangan asal-usul, hanya pemberitahuan belum diisi.
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertDontSee('diperbarui oleh')
+            ->assertDontSee('angka acuan awal sistem');
+
+        Carbon::setTestNow('2026-11-05 14:20:00');
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->assertSee('Rencana pasokan 2026 diperbarui oleh '.$this->user->name.' · 05 Nov 2026 14:20');
+    }
+
+    public function test_matrix_confirms_a_saved_supply_plan(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->dispatch('mpp-supply-plan-saved', year: 2027)
+            ->assertSee('Rencana pasokan 2027 berhasil disimpan.');
+    }
+
+    public function test_matrix_listens_for_saved_supply_plans(): void
+    {
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class);
+
+        // getListeners() bersifat protected pada Livewire 3; dibaca lewat closure terikat.
+        $listeners = (fn () => $this->getListeners())->call($component->instance());
+
+        $this->assertArrayHasKey('mpp-supply-plan-saved', $listeners);
+    }
+
+    // ───────────────────────── Ekspor & keamanan ─────────────────────────
+
+    public function test_mpp_export_excel_has_shortage_and_surplus_columns(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $matrix = (new ManPowerPlanningService)->getMppMatrix(2026, 11)['matrix'];
+        Excel::fake();
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('exportExcel');
+
+        Excel::assertDownloaded(
+            'mpp_perencanaan_formasi_2026_2027_posisi_2026-11_'.Carbon::now()->format('Ymd_His').'.xlsx',
+            function (MppMatrixExport $export) use ($matrix) {
+                $header = $export->headings();
+                $shortageCol = array_search('TOTAL KEKURANGAN', $header, true);
+                $surplusCol = array_search('TOTAL SURPLUS', $header, true);
+                $this->assertNotFalse($shortageCol);
+                $this->assertNotFalse($surplusCol);
+                $this->assertCount(count($header), $export->array()[0]);
+
+                $byLabel = collect($export->array())->keyBy(1);
+                $this->assertSame($matrix[9]['shortage_total'], $byLabel['Kebutuhan 2026'][$shortageCol]);
+                $this->assertSame($matrix[9]['surplus_total'], $byLabel['Kebutuhan 2026'][$surplusCol]);
+                $this->assertNull($byLabel['Realisasi per Nov 2026'][$shortageCol]);
+                $this->assertNull($byLabel['Realisasi per Nov 2026'][$surplusCol]);
+                // Angka tetap numerik agar dapat dijumlah di Excel.
+                $this->assertIsInt($byLabel['Realisasi per Nov 2026'][array_search('TOTAL', $header, true)]);
+
+                return true;
+            }
+        );
+    }
+
+    public function test_mpp_personnel_export_is_excel_with_nik_as_text(): void
+    {
+        $this->makeKarpim('77770007', '1990-01-10');
+        Excel::fake();
+        Excel::matchByRegex();
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 2)
+            ->call('exportDrilldownExcel');
+
+        Excel::assertDownloaded(
+            '/^Personil_RM-1_TAN_.+_\d{8}_\d{6}\.xlsx$/',
+            function (MppPersonnelExport $export) {
+                $this->assertSame('NIK', $export->headings()[1]);
+                $this->assertSame(['B' => NumberFormat::FORMAT_TEXT], $export->columnFormats());
+                $this->assertContains('77770007', array_column($export->array(), 1));
+
+                return true;
+            }
+        );
+    }
+
+    public function test_non_admin_cannot_export_mpp_data(): void
+    {
+        $staff = User::factory()->create(['role' => 'user']);
+
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportExcel')->assertForbidden();
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('exportDrilldownExcel')->assertForbidden();
+    }
+
+    public function test_mpp_exports_are_written_to_the_audit_log_without_nik(): void
+    {
+        $this->makeKarpim('77770007', '1990-01-10');
+        Log::spy();
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 2)
+            ->call('exportDrilldownExcel')
+            ->call('exportExcel');
+
+        foreach (['Ekspor rincian personil MPP', 'Ekspor matriks MPP'] as $message) {
+            Log::shouldHaveReceived('info')
+                ->withArgs(fn ($msg, $ctx = []) => $msg === $message
+                    && ($ctx['user_id'] ?? null) === $this->user->id
+                    && ($ctx['posisi_per'] ?? null) === '2026-11'
+                    && ! str_contains(json_encode($ctx), '77770007'))
+                ->once();
+        }
+    }
+
+    public function test_mpp_personnel_access_is_recorded_on_master_audit_log_without_nik(): void
+    {
+        $this->makeKarpim('77770007', '1990-01-10');
+
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 2)
+            ->call('exportDrilldownExcel')
+            ->call('exportExcel');
+
+        $logs = MasterAuditLog::where('entity_type', 'mpp_access')->get()->keyBy('action');
+        $this->assertSame(
+            ['mpp_access.export_matrix', 'mpp_access.export_personnel', 'mpp_access.view_personnel'],
+            $logs->keys()->sort()->values()->all()
+        );
+        foreach ($logs as $log) {
+            $this->assertSame($this->user->id, $log->user_id);
+            $this->assertSame('2026-11', $log->new_values['posisi_per']);
+            $this->assertStringNotContainsString('77770007', json_encode($log->new_values));
+            $this->assertStringNotContainsString('77770007', $log->entity_label);
+        }
+        $this->assertSame('RM-1', $logs['mpp_access.view_personnel']->new_values['rm_level']);
+        $this->assertGreaterThan(0, $logs['mpp_access.view_personnel']->new_values['jumlah_baris']);
+    }
+
+    public function test_mpp_drilldown_without_personnel_is_not_recorded_as_personnel_access(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('openDrilldown', 'RM-1', 'TAN', 9);
+
+        $this->assertSame(0, MasterAuditLog::where('entity_type', 'mpp_access')->count());
+    }
+
+    public function test_mpp_component_ignores_unknown_filters_and_drilldown_targets(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(ManPowerPlanning::class)
+            ->call('setFilterBidang', 'XYZ')
+            ->assertSet('filterBidang', 'ALL')
+            ->call('setPlanningYear', 1900)
+            ->assertSet('planningYear', 2026)
+            ->set('planningYear', 3000)
+            ->assertSet('planningYear', 2026)
+            ->call('openDrilldown', 'RM-9', 'KEU', 2)
+            ->assertSet('showDrilldown', false);
+    }
+
+    // ───────────────────────── Periode bulanan (rekam, tutup, buka kembali) ─────────────────────────
+
+    private function periods(): MppPeriodService
+    {
+        return app(MppPeriodService::class);
+    }
+
+    private function realisasiCell(Testable $component): int
+    {
+        return $component->viewData('matrix')[2]['levels']['RM-3']['fields']['KEU'];
+    }
+
+    public function test_month_state_banner_and_source(): void
+    {
+        $october = fn () => Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+
+        $october()
+            ->assertViewHas('periodState', 'unclosed')
+            ->assertSee('Periode Okt 2026 belum pernah ditutup: angka dihitung dari data karyawan saat ini.')
+            ->assertSee('Rekam Draf')
+            ->assertDontSee('Tutup Periode');
+
+        $this->periods()->capture(2026, 10, null);
+        $october()
+            ->assertViewHas('periodState', 'draft')
+            ->assertSee('Draf periode Okt 2026 direkam oleh sistem · 05 Nov 2026 09:00. Belum ditutup.')
+            ->assertSee('Tutup Periode')
+            ->assertSee('Perbarui Draf')
+            ->assertDontSee('Buka Kembali');
+
+        $this->periods()->close(2026, 10, null, $this->user);
+        $october()
+            ->assertViewHas('periodState', 'closed')
+            ->assertSee('Periode Okt 2026 ditutup oleh '.$this->user->name.' · 05 Nov 2026 09:00 · Revisi 1')
+            ->assertSee('Buka Kembali')
+            ->assertDontSee('Tutup Periode');
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)
+            ->assertViewHas('periodState', 'live')
+            ->assertDontSee('Rekam Draf')
+            ->assertDontSee('belum pernah ditutup')
+            ->assertDontSee('Buka Kembali');
+    }
+
+    public function test_draft_banner_names_the_user_who_captured_it(): void
+    {
+        $this->periods()->capture(2026, 10, $this->user);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->assertSee('direkam oleh '.$this->user->name.' · 05 Nov 2026 09:00');
+    }
+
+    public function test_closed_month_renders_the_snapshot_after_data_changes(): void
+    {
+        $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $this->makeAsistenKeuangan('90000002');
+
+        $october = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+        $this->assertSame(1, $this->realisasiCell($october));
+        $this->assertSame(1, $october->viewData('stats')['total_realisasi']);
+
+        // Bulan tanpa snapshot tetap dihitung dari data terkini.
+        $this->assertSame(2, $this->realisasiCell($october->set('asOfMonth', 9)));
+    }
+
+    public function test_closed_month_shows_historical_jabatan(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $emp->update(['jabatan' => 'Jabatan Pindahan Baru']);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSet('showDrilldown', true)
+            ->assertSee('Asisten Keuangan Uji')
+            ->assertDontSee('Jabatan Pindahan Baru')
+            ->assertSee('Asisten 90000001');
+    }
+
+    public function test_closed_month_drawer_survives_deleted_employees(): void
+    {
+        $emp = $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $emp->delete();
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSet('showDrilldown', true)
+            ->assertSee('tidak lagi terdaftar');
+
+        $this->assertCount(1, $component->get('drilldownEmployees'));
+        $this->assertSame('90000001', $component->get('drilldownEmployees')[0]['nik']);
+    }
+
+    public function test_profile_link_is_hidden_for_employees_no_longer_registered(): void
+    {
+        $gone = $this->makeAsistenKeuangan('90000001');
+        $this->makeAsistenKeuangan('90000002');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $gone->delete();
+
+        $html = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 2)
+            ->assertSee('tidak lagi terdaftar')
+            ->html();
+
+        $this->assertStringNotContainsString(route('admin.employees.show', '90000001'), $html);
+        $this->assertStringContainsString(route('admin.employees.show', '90000002'), $html);
+        $this->assertSame(1, substr_count($html, 'Buka profil lengkap (tab baru)'));
+    }
+
+    public function test_close_panel_refuses_a_draft_updated_by_another_admin(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close');
+
+        Carbon::setTestNow('2026-11-05 09:30:00');
+        $this->periods()->capture(2026, 10, null);
+
+        $component->call('confirmPeriodAction')
+            ->assertSet('periodAction', 'close')
+            ->assertSee('telah diperbarui setelah Anda membukanya');
+        $this->assertSame('draft', $this->periods()->find(2026, 10)->status);
+
+        // Dibuka ulang setelah ditinjau: penutupan berhasil.
+        $component->call('requestPeriodAction', 'close')->call('confirmPeriodAction')
+            ->assertViewHas('periodState', 'closed');
+    }
+
+    public function test_snapshot_drawers_use_the_stored_supply_and_formula(): void
+    {
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 5]);
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        $this->savePlan(2026, ['ckp.RM-3.KEU' => 9]);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('openDrilldown', 'RM-3', 'KEU', 6);
+        $this->assertSame(5, $component->get('drilldownSupply')['rencana']);
+
+        $component->call('closeDrilldown')->call('openDrilldown', 'RM-3', 'KEU', 9);
+        $this->assertSame('formula', $component->get('drilldownMode'));
+    }
+
+    public function test_close_and_reopen_from_the_screen(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        $component = Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close')
+            ->assertSet('periodAction', 'close')
+            ->set('periodNote', 'Disetujui rapat SDM')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', '')
+            ->assertViewHas('periodState', 'closed');
+        $this->assertSame('closed', $this->periods()->find(2026, 10)->status);
+        $this->assertSame('Disetujui rapat SDM', $this->periods()->find(2026, 10)->close_note);
+
+        $component->call('requestPeriodAction', 'reopen')
+            ->set('periodReason', 'pendek')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', 'reopen')
+            ->assertSee('Alasan membuka kembali wajib diisi minimal 10 karakter.')
+            ->assertViewHas('periodState', 'closed');
+
+        $component->set('periodReason', 'Koreksi mutasi susulan')
+            ->call('confirmPeriodAction')
+            ->assertSet('periodAction', '')
+            ->assertViewHas('periodState', 'draft');
+        $this->assertSame(2, $this->periods()->find(2026, 10)->revision);
+    }
+
+    public function test_capture_from_the_screen_records_a_draft(): void
+    {
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('capturePeriod')
+            ->assertViewHas('periodState', 'draft');
+
+        $this->assertSame($this->user->id, $this->periods()->find(2026, 10)->captured_by);
+    }
+
+    public function test_period_actions_are_refused_for_the_current_month(): void
+    {
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)
+            ->call('capturePeriod')
+            ->assertSee('Periode berjalan atau mendatang belum dapat direkam atau ditutup.');
+
+        $this->assertNull($this->periods()->find(2026, 11));
+    }
+
+    public function test_period_panel_is_dismissed_when_the_month_changes(): void
+    {
+        $this->periods()->capture(2026, 10, null);
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('requestPeriodAction', 'close')
+            ->set('asOfMonth', 9)
+            ->assertSet('periodAction', '')
+            ->call('requestPeriodAction', 'bogus')
+            ->assertSet('periodAction', '');
+    }
+
+    public function test_snapshot_months_hide_the_plan_editor(): void
+    {
+        $this->periods()->capture(2026, 10, $this->user);
+
+        $october = fn () => Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10);
+
+        $october()->assertDontSee('Kelola Rencana Pasokan')->assertDontSee('belum diisi. Angka pasokan dihitung 0.');
+        $this->periods()->close(2026, 10, null, $this->user);
+        $october()->assertDontSee('Kelola Rencana Pasokan')->assertDontSee('belum diisi. Angka pasokan dihitung 0.');
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->assertSee('Kelola Rencana Pasokan');
+    }
+
+    public function test_snapshot_export_is_labelled(): void
+    {
+        $this->makeAsistenKeuangan('90000001');
+        $this->periods()->capture(2026, 10, $this->user);
+        $this->periods()->close(2026, 10, null, $this->user);
+        Log::spy();
+
+        Livewire::actingAs($this->user)->test(ManPowerPlanning::class)->set('asOfMonth', 10)
+            ->call('exportExcel')
+            ->assertFileDownloaded('mpp_perencanaan_formasi_2026_2027_posisi_2026-10_ditutup_rev1_'.Carbon::now()->format('Ymd_His').'.xlsx');
+
+        Log::shouldHaveReceived('info')
+            ->withArgs(fn ($msg, $ctx = []) => $msg === 'Ekspor matriks MPP'
+                && ($ctx['periode'] ?? null) === 'ditutup'
+                && ($ctx['revisi'] ?? null) === 1)
+            ->once();
+    }
+
+    public function test_non_admin_cannot_change_periods(): void
+    {
+        $staff = User::factory()->create(['role' => 'user']);
+
+        foreach (['capturePeriod', 'confirmPeriodAction', 'cancelPeriodAction'] as $action) {
+            Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call($action)->assertForbidden();
+        }
+        Livewire::actingAs($staff)->test(ManPowerPlanning::class)->call('requestPeriodAction', 'close')->assertForbidden();
+        $this->assertSame(0, MppPeriod::count());
+    }
+
+    // ───────────────────────── Klasifikasi RM & bidang ─────────────────────────
 
     public function test_determine_bidang_prefers_the_seat(): void
     {
         $this->seed(PositionUnitSeeder::class);
 
-        $employee = new Employee([
-            'jabatan' => 'Asisten Penggajian',
-            'unit_kerja' => 'Bagian Sumber Daya Manusia & Sistem Manajemen',
-        ]);
+        $employee = new Employee(['jabatan' => 'Asisten Tata Usaha', 'unit_kerja' => 'Kebun Kemitraan Area Kalbar']);
 
         $this->assertSame('KEU', (new ManPowerPlanningService)->determineBidang($employee));
     }
@@ -176,11 +1214,8 @@ class ManPowerPlanningTest extends TestCase
         $this->seed(PositionUnitSeeder::class);
         $service = new ManPowerPlanningService;
 
-        $pool = new Employee(['jabatan' => 'Advisor RM-1', 'unit_kerja' => 'Kebun Tajati']);
-        $karpel = new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan']);
-
-        $this->assertSame('TAN', $service->determineBidang($pool));
-        $this->assertSame('TEK', $service->determineBidang($karpel));
+        $this->assertSame('TAN', $service->determineBidang(new Employee(['jabatan' => 'Advisor RM-1', 'unit_kerja' => 'Kebun Tajati'])));
+        $this->assertSame('TEK', $service->determineBidang(new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan'])));
     }
 
     public function test_classify_position_flags_values_from_master_formasi_versus_estimates(): void
@@ -200,23 +1235,30 @@ class ManPowerPlanningTest extends TestCase
         $this->assertFalse($estimate['rm_from_formasi']);
     }
 
-    public function test_mpp_component_can_change_planning_year(): void
+    public function test_determine_rm_level_does_not_query_positions_per_employee(): void
     {
-        $yearT = Carbon::now()->year;
-        $yearT1 = $yearT + 1;
+        Position::create(['nama' => 'Manajer Regulatif', 'rm_level' => 'RM-1', 'is_overflow' => false, 'is_active' => true]);
+        Position::getAllCached();
+        $service = new ManPowerPlanningService;
 
-        Livewire::actingAs($this->user)
-            ->test(ManPowerPlanning::class)
-            ->assertSet('planningYear', 2026)
-            ->assertSee("Pensiun sd Des {$yearT}")
-            ->assertSee("Kebutuhan {$yearT}")
-            ->call('setPlanningYear', 2028)
-            ->assertSet('planningYear', 2028)
-            ->assertSee("Pensiun sd Des {$yearT}")
-            ->assertSee("Pensiun sd Des {$yearT1}")
-            ->assertSee("Kebutuhan {$yearT}")
-            ->assertSee("Kebutuhan {$yearT1}")
-            ->assertSee("BUP periode {$yearT} – {$yearT1}")
-            ->assertSee("Kebutuhan Bersih {$yearT}");
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        for ($i = 0; $i < 3; $i++) {
+            $service->determineRmLevel(new Employee(['jabatan' => 'Manajer Regulatif', 'level' => 'Karpim']));
+            $service->determineRmLevel(new Employee(['jabatan' => 'Operator Boiler', 'level' => 'Karpel']));
+        }
+        $queries = collect(DB::getQueryLog())->pluck('query')->filter(fn ($q) => str_contains($q, 'positions'));
+        DB::disableQueryLog();
+
+        $this->assertCount(0, $queries);
+    }
+
+    public function test_determine_rm_level_uses_the_karpel_band_from_the_master(): void
+    {
+        $this->seed(PositionUnitSeeder::class);
+        $service = new ManPowerPlanningService;
+
+        $this->assertSame('RM-5', $service->determineRmLevel(new Employee(['jabatan' => 'Satpam', 'unit_kerja' => 'Bagian Sekretariat & Hukum', 'level' => 'Karpel'])));
+        $this->assertSame('RM-4', $service->determineRmLevel(new Employee(['jabatan' => 'Operator Boiler', 'unit_kerja' => 'PKS Kembayan', 'level' => 'Karpel'])));
     }
 }

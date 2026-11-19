@@ -2,6 +2,7 @@
 
 namespace App\Services\Data;
 
+use App\Services\Mutasi\DispensasiBasis;
 use Carbon\Carbon;
 
 /**
@@ -31,6 +32,8 @@ final readonly class MutasiRequest
 
     public ?string $newJobGrade;
 
+    public ?string $alasanDispensasiPromosi;
+
     public function __construct(
         public string $employeeNik,
         public string $targetJabatan,
@@ -49,7 +52,11 @@ final readonly class MutasiRequest
         ?string $alasanDispensasi = null,
         ?string $newGolongan = null,
         ?string $newJobGrade = null,
+        public ?string $catatanKepatuhan = null,
+        public bool $dispensasiPromosi = false,
+        ?string $alasanDispensasiPromosi = null,
     ) {
+        $this->alasanDispensasiPromosi = self::blankToNull($alasanDispensasiPromosi);
         $this->nomorSk = self::blankToNull($nomorSk);
         $this->tanggalSk = self::blankToNull($tanggalSk);
         $this->catatan = self::blankToNull($catatan);
@@ -92,6 +99,35 @@ final readonly class MutasiRequest
             alasanDispensasi: $node['alasan_dispensasi'] ?? null,
             newGolongan: $node['new_golongan'] ?? null,
             newJobGrade: isset($node['new_job_grade']) ? (string) $node['new_job_grade'] : null,
+            dispensasiPromosi: ! empty($node['dispensasi_promosi']),
+            alasanDispensasiPromosi: $node['alasan_dispensasi_promosi'] ?? null,
+        );
+    }
+
+    /** Same request carrying the advisory compliance snapshot that is written to the audit trail. */
+    public function withCatatanKepatuhan(?string $catatan): self
+    {
+        return new self(
+            employeeNik: $this->employeeNik,
+            targetJabatan: $this->targetJabatan,
+            targetUnitKerja: $this->targetUnitKerja,
+            tmtAwal: $this->tmtAwal,
+            jenisMutasi: $this->jenisMutasi,
+            nomorSk: $this->nomorSk,
+            tanggalSk: $this->tanggalSk,
+            catatan: $this->catatan,
+            tanggalBerakhirSanksi: $this->tanggalBerakhirSanksi,
+            statusJabatan: $this->statusJabatan,
+            tmtAkhirEstimasi: $this->tmtAkhirEstimasi,
+            fileSk: $this->fileSk,
+            createdBy: $this->createdBy,
+            isDispensasi: $this->isDispensasi,
+            alasanDispensasi: $this->alasanDispensasi,
+            newGolongan: $this->newGolongan,
+            newJobGrade: $this->newJobGrade,
+            catatanKepatuhan: $catatan,
+            dispensasiPromosi: $this->dispensasiPromosi,
+            alasanDispensasiPromosi: $this->alasanDispensasiPromosi,
         );
     }
 
@@ -112,10 +148,10 @@ final readonly class MutasiRequest
         return Carbon::parse($this->tmtAwal)->subDay()->toDateString();
     }
 
-    /** A dispensation only counts when a written reason accompanies it. */
+    /** A dispensation only counts when a written basis (document reference) of meaningful length accompanies it. */
     public function hasDispensasi(): bool
     {
-        return $this->isDispensasi && $this->alasanDispensasi !== null;
+        return $this->isDispensasi && DispensasiBasis::hasReference($this->alasanDispensasi);
     }
 
     public function defaultCatatan(): string

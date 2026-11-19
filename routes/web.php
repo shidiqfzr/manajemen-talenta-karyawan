@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\EmployeeController as AdminEmployeeController;
+use App\Http\Controllers\Admin\EmployeeImportBatchController;
 use App\Http\Controllers\Admin\EvaluationController as AdminEvaluationController;
 use App\Http\Controllers\Admin\JobHistoryController as AdminJobHistoryController;
 use App\Http\Controllers\Admin\JobVacancyController;
 use App\Http\Controllers\Admin\Master\PositionController;
+use App\Http\Controllers\Admin\Master\StructureDecreeDownloadController;
+use App\Http\Controllers\Admin\Master\StructureDecreeTemplateController;
 use App\Http\Controllers\Admin\Master\UnitController;
 use App\Http\Controllers\Admin\MutasiController;
 use App\Http\Controllers\Admin\TrainingController as AdminTrainingController;
@@ -15,6 +18,7 @@ use App\Http\Controllers\DataController;
 use App\Http\Controllers\User\EmployeeController as UserEmployeeController;
 use App\Http\Controllers\User\TrainingController as UserTrainingController;
 use App\Models\Employee;
+use App\Models\StructureDecree;
 use App\Models\Unit;
 use App\Services\ManPowerPlanningService;
 use Illuminate\Http\Request;
@@ -27,13 +31,13 @@ Route::get('/', function () {
 
 // Login & Logout
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
+Route::post('/login', [LoginController::class, 'login'])->name('login.submit')->middleware('throttle:login');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 // User Routes
 Route::prefix('user')
     ->name('user.')
-    // ->middleware(['auth', 'role:user'])
+    ->middleware(['auth', 'role:user'])
     ->group(function () {
 
         // Employees
@@ -64,21 +68,24 @@ Route::prefix('admin')
             Route::get('/import/status/{token}', [AdminEmployeeController::class, 'importStatus'])->name('import.status');
             Route::post('/import/download-failed', [AdminEmployeeController::class, 'downloadFailedRows'])->name('import.downloadFailed');
             Route::post('/import/download-report', [AdminEmployeeController::class, 'downloadImportReport'])->name('import.downloadReport');
+            Route::get('/import/batches', [EmployeeImportBatchController::class, 'index'])->name('import.batches.index');
+            Route::get('/import/batches/{log}', [EmployeeImportBatchController::class, 'show'])->name('import.batches.show');
+            Route::post('/import/batches/{log}/approve', [EmployeeImportBatchController::class, 'approve'])->name('import.batches.approve')->middleware('throttle:10,1');
+            Route::post('/import/batches/{log}/reject', [EmployeeImportBatchController::class, 'reject'])->name('import.batches.reject')->middleware('throttle:10,1');
+            Route::post('/import/batches/{log}/rollback', [EmployeeImportBatchController::class, 'rollback'])->name('import.batches.rollback')->middleware('throttle:10,1');
             Route::get('/check-nik', [AdminEmployeeController::class, 'checkNik'])->name('checkNik')->middleware('throttle:60,1');
             Route::get('/export', [AdminEmployeeController::class, 'export'])->name('export');
             Route::get('/download-template', [AdminEmployeeController::class, 'downloadTemplate'])->name('downloadTemplate');
             Route::get('/{employee}/detail', [AdminEmployeeController::class, 'show'])->name('show');
             Route::get('/{employee}/edit', [AdminEmployeeController::class, 'edit'])->name('edit');
             Route::put('/{employee}', [AdminEmployeeController::class, 'update'])->name('update');
+            Route::post('/{employee}/separate', [AdminEmployeeController::class, 'separate'])->name('separate')->middleware('throttle:20,1');
+            Route::post('/{employee}/separation-sk', [AdminEmployeeController::class, 'recordSeparationSk'])->name('separation-sk')->middleware('throttle:20,1');
             Route::post('/bulk-destroy', [AdminEmployeeController::class, 'bulkDestroy'])->name('bulkDestroy');
             Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy'])->name('destroy');
 
-            // Employee Statistics (Legacy redirect to unified Employee Directory)
-            Route::prefix('statistics')->name('statistics.')->group(function () {
-                Route::get('/', function () {
-                    return redirect()->route('admin.employees.index');
-                })->name('index');
-            });
+            // Legacy Employee Statistics URL: kept as a redirect so old bookmarks reach the Employee Directory.
+            Route::get('statistics', fn () => redirect()->route('admin.employees.index'))->name('statistics.index');
 
             // Employee Job History
             Route::prefix('{employee}/job-history')->name('job-history.')->group(function () {
@@ -145,8 +152,39 @@ Route::prefix('admin')
             Route::post('units/{unit}/toggle', [UnitController::class, 'toggleStatus'])->name('units.toggle');
             Route::resource('units', UnitController::class)->only(['store', 'update', 'destroy']);
 
+            // Sebaran Formasi: gambaran lintas unit formasi jabatan terisi dan kosong (read-only, JobVacancyService)
+            Route::view('sebaran', 'admin.master.sebaran.index')->name('sebaran.index');
+            // Jabatan Penampungan: Advisor dan Diperbantukan di luar formasi (dibuat, dibuka pada unit, bezetting per unit)
+            Route::view('penampungan', 'admin.master.penampungan.index')->name('penampungan.index');
+            // Tautan lama tab "Formasi Lowong" diteruskan ke Sebaran Formasi dengan filternya.
+            // Tab lama hanya menampilkan formasi kosong, jadi tanpa status bawaannya tetap "kosong".
+            Route::get('lowongan', function (Request $request) {
+                $params = [];
+                foreach (['unit', 'status', 'search', 'durasi'] as $key) {
+                    $value = $request->query($key);
+                    $value = $key === 'status' && ($value === null || $value === '') ? 'kosong' : $value;
+
+                    if (is_string($value) && $value !== '') {
+                        $params[$key] = $value;
+                    }
+                }
+
+                return redirect()->route('admin.master.sebaran.index', $params, 301);
+            });
+
+            // Versi Struktur: struktur organisasi dan pemangku jabatan menurut SK yang berlaku pada versi atau tanggal terpilih (read-only)
+            Route::view('versi', 'admin.master.versi.index')->name('versi.index');
+
             // Riwayat perubahan master (read-only)
             Route::view('riwayat', 'admin.master.riwayat.index')->name('riwayat.index');
+
+            // Surat Keputusan (SK) struktur organisasi: daftar, buat, tinjau, detail, unduh berkas
+            Route::view('sk', 'admin.master.sk.index')->name('sk.index');
+            Route::view('sk/baru', 'admin.master.sk.create')->name('sk.create');
+            Route::get('sk/template', StructureDecreeTemplateController::class)->name('sk.template');
+            Route::get('sk/{decree}/tinjau', fn (StructureDecree $decree) => view('admin.master.sk.create', ['decree' => $decree]))->name('sk.review');
+            Route::get('sk/{decree}/unduh/{berkas}', StructureDecreeDownloadController::class)->name('sk.download');
+            Route::get('sk/{decree}', fn (StructureDecree $decree) => view('admin.master.sk.show', ['decree' => $decree]))->name('sk.show');
 
             // Formasi (formasi jabatan per unit)
             // Daftar unit; tautan lama ?unit= diteruskan ke halaman detail unit.

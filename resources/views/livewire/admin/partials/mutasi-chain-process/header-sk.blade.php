@@ -66,15 +66,23 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
             <!-- Dokumen SK PDF -->
-            <x-admin.file-upload 
-                wire-model="fileSk"
-                :file="$fileSk"
-                label="Berkas Lampiran SK Kolektif"
-                helper="(PDF, Maks. 10MB)"
-                button-text="Pilih Berkas"
-                change-button-text="Ganti Berkas"
-                error-key="fileSk"
-            />
+            <div>
+                <x-admin.file-upload 
+                    wire-model="fileSk"
+                    :file="$fileSk"
+                    label="Berkas Lampiran SK Kolektif"
+                    helper="(PDF, Maks. 10MB)"
+                    button-text="Pilih Berkas"
+                    change-button-text="Ganti Berkas"
+                    error-key="fileSk"
+                />
+                @if (! $fileSk && $proposal?->file_sk)
+                    <p class="text-[11px] text-primary-800 font-medium mt-1.5 inline-flex items-center gap-1.5">
+                        <i class="fas fa-paperclip text-[10px]" aria-hidden="true"></i>
+                        Berkas SK sudah tersimpan pada usulan ini.@unless ($locked) Unggah berkas baru untuk menggantinya.@endunless
+                    </p>
+                @endif
+            </div>
 
             <!-- Catatan SK -->
             <div>

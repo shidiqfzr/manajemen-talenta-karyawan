@@ -53,9 +53,9 @@ class UpdateEmployeeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nama.required' => 'Nama lengkap pegawai wajib diisi.',
+            'nama.required' => 'Nama lengkap karyawan wajib diisi.',
             'level.in' => 'Level strata harus bernilai Karpim atau Karpel.',
-            'rm_level.in' => 'RM Band harus bernilai RM-1, RM-2, RM-3, atau RM-4.',
+            'rm_level.in' => 'RM Band harus bernilai RM-1 sampai RM-7.',
             'status_karyawan.required' => 'Status kepegawaian wajib dipilih.',
             'job_grade.between' => 'Job Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',
             'person_grade.between' => 'Person Grade harus berada dalam rentang '.KepegawaianPolicy::GRADE_MIN.' sampai '.KepegawaianPolicy::GRADE_MAX.'.',

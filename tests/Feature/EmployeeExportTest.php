@@ -68,13 +68,13 @@ class EmployeeExportTest extends TestCase
         Excel::matchByRegex();
 
         Employee::factory()->create([
-            'nama' => 'PEGAWAI KEBUN MELIAU',
+            'nama' => 'KARYAWAN KEBUN MELIAU',
             'unit_kerja' => 'Kebun Inti Gunung Meliau',
             'jabatan' => 'Asisten Afdeling',
         ]);
 
         Employee::factory()->create([
-            'nama' => 'PEGAWAI PKS SAMUNTAI',
+            'nama' => 'KARYAWAN PKS SAMUNTAI',
             'unit_kerja' => 'PKS Samuntai',
             'jabatan' => 'Masinis Kepala',
         ]);
@@ -92,7 +92,7 @@ class EmployeeExportTest extends TestCase
                 $results = $export->query()->get();
 
                 return $results->count() === 1
-                    && $results->first()->nama === 'PEGAWAI KEBUN MELIAU';
+                    && $results->first()->nama === 'KARYAWAN KEBUN MELIAU';
             }
         );
     }
@@ -102,9 +102,9 @@ class EmployeeExportTest extends TestCase
         Excel::fake();
         Excel::matchByRegex();
 
-        $emp1 = Employee::factory()->create(['nik' => '13000001', 'nama' => 'PEGAWAI SATU']);
-        $emp2 = Employee::factory()->create(['nik' => '13000002', 'nama' => 'PEGAWAI DUA']);
-        $emp3 = Employee::factory()->create(['nik' => '13000003', 'nama' => 'PEGAWAI TIGA']);
+        $emp1 = Employee::factory()->create(['nik' => '13000001', 'nama' => 'KARYAWAN SATU']);
+        $emp2 = Employee::factory()->create(['nik' => '13000002', 'nama' => 'KARYAWAN DUA']);
+        $emp3 = Employee::factory()->create(['nik' => '13000003', 'nama' => 'KARYAWAN TIGA']);
 
         $response = $this->actingAs($this->adminUser)->get(route('admin.employees.export', [
             'niks' => ['13000001', '13000003'],
@@ -170,14 +170,14 @@ class EmployeeExportTest extends TestCase
 
     public function test_export_row_mapping_transforms_single_and_multi_concurrent_jobs_accurately(): void
     {
-        // 1. Pegawai Definitif Murni (Tanpa Tugas Rangkap)
+        // 1. Karyawan Definitif Murni (Tanpa Tugas Rangkap)
         $empSingle = Employee::factory()->create([
             'nik' => '13009988',
             'nama' => 'BUDI SANTOSO',
             'status_penugasan' => 'Definitif',
         ]);
 
-        // 2. Pegawai dengan 1 Tugas Rangkap (Plt)
+        // 2. Karyawan dengan 1 Tugas Rangkap (Plt)
         $empPlt = Employee::factory()->create([
             'nik' => '13009977',
             'nama' => 'AHMAD DAHLAN',
@@ -194,7 +194,7 @@ class EmployeeExportTest extends TestCase
             'tmt_akhir' => null,
         ]);
 
-        // 3. Pegawai dengan Multi Tugas Rangkap (Plt & Diperbantukan)
+        // 3. Karyawan dengan Multi Tugas Rangkap (Plt & Diperbantukan)
         $empMulti = Employee::factory()->create([
             'nik' => '13009966',
             'nama' => 'SITI AMINAH',
@@ -231,15 +231,15 @@ class EmployeeExportTest extends TestCase
         $rowPlt = $export->map($empPltLoaded);
         $rowMulti = $export->map($empMultiLoaded);
 
-        // Validasi Pegawai 1: Kolom O (index 14) harus kosong
-        $this->assertSame('', $rowSingle[14], 'Pegawai tanpa tugas rangkap harus memiliki sel kosong di kolom tugas rangkap');
+        // Validasi Karyawan 1: Kolom O (index 14) harus kosong
+        $this->assertSame('', $rowSingle[14], 'Karyawan tanpa tugas rangkap harus memiliki sel kosong di kolom tugas rangkap');
 
-        // Validasi Pegawai 2: 1 tugas rangkap dengan nomor SK dan TMT
+        // Validasi Karyawan 2: 1 tugas rangkap dengan nomor SK dan TMT
         $this->assertStringContainsString('[Plt] Pj. Asisten Kepala Tanaman — Kebun Danau Salak', $rowPlt[14]);
         $this->assertStringContainsString('SK: SK/001/DIR/2024', $rowPlt[14]);
         $this->assertStringContainsString('TMT: 2024-03-01', $rowPlt[14]);
 
-        // Validasi Pegawai 3: Multi tugas rangkap dipisahkan newline \n
+        // Validasi Karyawan 3: Multi tugas rangkap dipisahkan newline \n
         $this->assertStringContainsString("\n", $rowMulti[14], 'Multi tugas rangkap harus dipisahkan oleh baris baru');
         $this->assertStringContainsString('[Pjs] Pj. Masinis Kepala — PKS Rimba Belian', $rowMulti[14]);
         $this->assertStringContainsString('[Diperbantukan] Tim Pengadaan Logistik — Kantor Direksi Pontianak', $rowMulti[14]);
@@ -254,7 +254,7 @@ class EmployeeExportTest extends TestCase
         Log::shouldReceive('info')
             ->once()
             ->with(
-                'HRIS Export Data Pegawai dieksekusi',
+                'HRIS Export Data Karyawan dieksekusi',
                 \Mockery::on(function ($context) {
                     return isset($context['user_id'])
                         && $context['user_id'] === $this->adminUser->id
@@ -317,7 +317,7 @@ class EmployeeExportTest extends TestCase
         Log::shouldReceive('info')
             ->once()
             ->with(
-                'HRIS Export Data Pegawai dieksekusi',
+                'HRIS Export Data Karyawan dieksekusi',
                 \Mockery::on(function ($context) {
                     return isset($context['user_id'])
                         && $context['user_id'] === $this->adminUser->id
@@ -402,7 +402,7 @@ class EmployeeExportTest extends TestCase
     {
         $employee = new Employee([
             'nik' => '13999999',
-            'nama' => 'PEGAWAI NULL ATTRIBUTES',
+            'nama' => 'KARYAWAN NULL ATTRIBUTES',
             'tempat_lahir' => null,
             'jenis_kelamin' => null,
             'agama' => null,
@@ -424,7 +424,7 @@ class EmployeeExportTest extends TestCase
 
         $this->assertCount(26, $row);
         $this->assertSame('13999999', $row[0]);
-        $this->assertSame('PEGAWAI NULL ATTRIBUTES', $row[1]);
+        $this->assertSame('KARYAWAN NULL ATTRIBUTES', $row[1]);
         $this->assertSame('', $row[2]); // jenis_kelamin default empty string
         $this->assertSame('Tetap (PKWTT)', $row[7]); // status_karyawan fallback
         $this->assertSame('Definitif', $row[13]); // status_penugasan fallback

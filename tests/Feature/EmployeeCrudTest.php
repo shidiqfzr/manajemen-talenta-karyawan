@@ -3,13 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeDeletionArchive;
+use App\Models\Evaluation;
 use App\Models\JobHistory;
 use App\Models\Position;
+use App\Models\Training;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Formasi\MasterFormasiService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
 
 class EmployeeCrudTest extends TestCase
@@ -62,7 +67,7 @@ class EmployeeCrudTest extends TestCase
         $this->assertNotNull($employee);
         $this->assertEquals('BUDI PRASETYO TESTING', $employee->nama);
         $this->assertEquals('2044-06-01', $employee->tanggal_pensiun->toDateString()); // 1988 + 56 = 2044, startOfMonth of June
-        $this->assertEquals('2043-06-01', $employee->tanggal_mbt->toDateString());     // T-1 year from pensiun
+        $this->assertEquals('2043-12-01', $employee->tanggal_mbt->toDateString());     // 6 months before pensiun
 
         // 2. Verify initial JobHistory was atomically created
         $history = JobHistory::where('employee_nik', $nik)->first();
@@ -144,7 +149,7 @@ class EmployeeCrudTest extends TestCase
 
     public function test_directory_selection_uses_real_named_checkboxes_for_keyboard_users(): void
     {
-        foreach (['88990041' => 'PEGAWAI SATU', '88990042' => 'PEGAWAI DUA'] as $nik => $nama) {
+        foreach (['88990041' => 'KARYAWAN SATU', '88990042' => 'KARYAWAN DUA'] as $nik => $nama) {
             Employee::create([
                 'nik' => $nik,
                 'nama' => $nama,
@@ -158,12 +163,17 @@ class EmployeeCrudTest extends TestCase
 
         $response->assertOk()
             ->assertSee('type="checkbox"', false)
-            ->assertSee('aria-label="Pilih PEGAWAI SATU"', false)
-            ->assertSee('aria-label="Pilih PEGAWAI DUA"', false)
-            ->assertSee('aria-label="Pilih semua pegawai di halaman ini"', false)
-            ->assertSee('x-effect="$el.indeterminate', false)
+            ->assertSee('aria-label="Pilih KARYAWAN SATU"', false)
+            ->assertSee('aria-label="Pilih KARYAWAN DUA"', false)
+            // The row avatar (initials when there is no photo) sits in the selection column and the real checkbox overlays it.
+            ->assertSee('role="img" aria-label="KARYAWAN SATU"', false)
+            ->assertSee('peer-checked:opacity-100', false)
+            ->assertSee('[td:has(:checked)_&]:opacity-0', false)
+            // Page selection is the shared table checkbox (with an indeterminate state for a partial page).
+            ->assertSee('aria-label="Pilih semua di halaman ini"', false)
+            ->assertSee('x-bind:indeterminate=', false)
             ->assertSee('role="status"', false)
-            ->assertDontSee('Pilih Semua Pegawai di Halaman Ini (Tips');
+            ->assertDontSee('Pilih Semua Karyawan di Halaman Ini (Tips');
     }
 
     public function test_admin_can_delete_employee(): void
@@ -173,7 +183,7 @@ class EmployeeCrudTest extends TestCase
 
         $employee = Employee::create([
             'nik' => $nik,
-            'nama' => 'PEGAWAI DIHAPUS',
+            'nama' => 'KARYAWAN DIHAPUS',
             'jabatan' => 'Operator Pabrik',
             'unit_kerja' => 'PKS Parindu',
             'level' => 'Karpel',
@@ -186,11 +196,28 @@ class EmployeeCrudTest extends TestCase
             'tmt_awal' => '2022-01-01',
         ]);
 
-        $response = $this->actingAs($this->admin)->delete(route('admin.employees.destroy', $nik));
+        $response = $this->actingAs($this->admin)->delete(route('admin.employees.destroy', $nik), ['reason' => 'Data ganda hasil impor Excel']);
 
         $response->assertRedirect(route('admin.employees.index'));
         $this->assertNull(Employee::where('nik', $nik)->first());
         $this->assertEquals(0, JobHistory::where('employee_nik', $nik)->count());
+
+        // The placement history survives in the archive together with the reason.
+        $archive = EmployeeDeletionArchive::where('employee_nik', $nik)->sole();
+        $this->assertSame('Data ganda hasil impor Excel', $archive->reason);
+        $this->assertSame('Operator Pabrik', $archive->job_histories[0]['jabatan']);
+    }
+
+    public function test_single_delete_requires_a_reason(): void
+    {
+        $employee = Employee::factory()->create(['nik' => '77112266']);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.employees.destroy', $employee->nik), ['reason' => 'singkat'])
+            ->assertSessionHasErrors('reason');
+
+        $this->assertDatabaseHas('employees', ['nik' => $employee->nik]);
+        $this->assertSame(0, EmployeeDeletionArchive::count());
     }
 
     public function test_admin_can_access_create_form_with_master_dropdowns(): void
@@ -298,7 +325,7 @@ class EmployeeCrudTest extends TestCase
 
         $payload = fn (string $nik, string $jabatan = 'Manajer Kuota Form') => [
             'nik' => $nik,
-            'nama' => 'PEGAWAI KUOTA',
+            'nama' => 'KARYAWAN KUOTA',
             'jabatan' => $jabatan,
             'unit_kerja' => 'Kebun Kuota Form',
             'level' => 'Karpim',
@@ -322,11 +349,41 @@ class EmployeeCrudTest extends TestCase
         $this->assertDatabaseMissing('employees', ['nik' => '88770003']);
     }
 
+    public function test_store_accepts_an_opened_pool_jabatan_beyond_any_quota_and_rejects_it_where_it_is_not_opened(): void
+    {
+        $opened = Unit::firstOrCreate(['nama' => 'Group Manager Kalbar Uji'], ['kode' => 'GMK', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $closed = Unit::firstOrCreate(['nama' => 'Group Manager Kalselteng Uji'], ['kode' => 'GMS', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $service = new MasterFormasiService;
+        $advisor = $service->createPoolPosition(['nama' => 'Advisor Uji RM-2', 'jenis' => 'advisor', 'rm_level' => 'RM-2'], $this->admin);
+        $service->openPoolPosition($opened, $advisor, $this->admin);
+
+        $payload = fn (string $nik, string $unitName) => [
+            'nik' => $nik,
+            'nama' => 'ADVISOR UJI',
+            'jabatan' => 'Advisor Uji RM-2',
+            'unit_kerja' => $unitName,
+            'level' => 'Karpim',
+            'golongan' => 'IVA/00',
+            'job_grade' => 15,
+            'person_grade' => 15,
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ];
+
+        // A pool Jabatan has no quota: two Advisors fit in the unit where it is opened.
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780001', $opened->nama))->assertRedirect(route('admin.employees.index'));
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780002', $opened->nama))->assertRedirect(route('admin.employees.index'));
+        $this->assertDatabaseHas('employees', ['nik' => '88780002', 'jabatan' => 'Advisor Uji RM-2']);
+
+        // Not opened in this unit: rejected like any Jabatan outside the unit's Master Formasi.
+        $this->actingAs($this->admin)->post(route('admin.employees.store'), $payload('88780003', $closed->nama))->assertSessionHasErrors('jabatan');
+        $this->assertDatabaseMissing('employees', ['nik' => '88780003']);
+    }
+
     public function test_create_form_follows_position_control_and_form_accessibility_rules(): void
     {
         $html = $this->actingAs($this->admin)->get(route('admin.employees.create'))->assertOk()->getContent();
 
-        // Master formasi hanya diubah melalui Master Data, tidak dari form pegawai
+        // Master formasi hanya diubah melalui Master Data, tidak dari form karyawan
         $this->assertStringNotContainsString('Unit Baru', $html);
         $this->assertStringNotContainsString('Jabatan Baru', $html);
         $this->assertStringNotContainsString('Tambah Unit Baru', $html);
@@ -354,7 +411,7 @@ class EmployeeCrudTest extends TestCase
 
     public function test_check_nik_reports_availability_without_exposing_personal_data(): void
     {
-        Employee::factory()->create(['nik' => '88550001', 'nama' => 'RAHASIA PEGAWAI']);
+        Employee::factory()->create(['nik' => '88550001', 'nama' => 'RAHASIA KARYAWAN']);
 
         $taken = $this->actingAs($this->admin)->getJson(route('admin.employees.checkNik', ['nik' => '88550001']));
         $taken->assertOk()->assertJson(['valid' => true, 'exists' => true]);
@@ -392,7 +449,7 @@ class EmployeeCrudTest extends TestCase
 
         $payload = fn (string $nik, string $jalur) => [
             'nik' => $nik,
-            'nama' => 'PEGAWAI JALUR',
+            'nama' => 'KARYAWAN JALUR',
             'jabatan' => 'Asisten Jalur Form',
             'unit_kerja' => 'Kebun Jalur Form',
             'level' => 'Karpim',
@@ -532,7 +589,7 @@ class EmployeeCrudTest extends TestCase
 
         Employee::create([
             'nik' => '77112233',
-            'nama' => 'PEGAWAI BULK SATU',
+            'nama' => 'KARYAWAN BULK SATU',
             'jabatan' => 'Asisten Afdeling',
             'unit_kerja' => 'Kebun Parindu',
             'level' => 'Karpim',
@@ -543,7 +600,7 @@ class EmployeeCrudTest extends TestCase
 
         Employee::create([
             'nik' => '77112244',
-            'nama' => 'PEGAWAI BULK DUA',
+            'nama' => 'KARYAWAN BULK DUA',
             'jabatan' => 'Asisten Afdeling',
             'unit_kerja' => 'Kebun Parindu',
             'level' => 'Karpim',
@@ -554,27 +611,46 @@ class EmployeeCrudTest extends TestCase
 
         $response = $this->actingAs($this->admin)->post(route('admin.employees.bulkDestroy'), [
             'niks' => ['77112233', '77112244'],
+            'reason' => 'Pembersihan data ganda hasil impor',
         ]);
 
         $response->assertRedirect(route('admin.employees.index'));
         $response->assertSessionHas('success');
+        $this->assertSame(2, EmployeeDeletionArchive::count());
 
         $this->assertDatabaseMissing('employees', ['nik' => '77112233']);
         $this->assertDatabaseMissing('employees', ['nik' => '77112244']);
     }
 
+    public function test_legacy_bulk_delete_route_requires_the_delete_ability(): void
+    {
+        $employee = Employee::factory()->create(['nik' => '77112255']);
+
+        Gate::define('delete-employee', fn () => false);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.employees.bulkDestroy'), ['niks' => [$employee->nik], 'reason' => 'Pembersihan data ganda'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('employees', ['nik' => $employee->nik]);
+    }
+
     public function test_employee_mbt_and_pension_lifecycle_helpers(): void
     {
-        // Approaching MBT (age 54.5)
-        $approachingDate = Carbon::today()->subYears(54)->subMonths(6)->toDateString();
+        // Not yet approaching: MBT is still more than 6 months away (age 54.5)
+        $farDate = Carbon::today()->subYears(54)->subMonths(6)->toDateString();
+        $this->assertFalse((new Employee(['tanggal_lahir' => $farDate]))->isApproachingMbt());
+
+        // Approaching MBT: within 6 months of the MBT date (age 55 and 1 month)
+        $approachingDate = Carbon::today()->subYears(55)->subMonths(1)->toDateString();
         $empApproaching = new Employee(['tanggal_lahir' => $approachingDate]);
         $this->assertTrue($empApproaching->isApproachingMbt());
         $this->assertFalse($empApproaching->isMbtActive());
         $this->assertFalse($empApproaching->isPensionReached());
         $this->assertNotNull($empApproaching->mbt_countdown);
 
-        // MBT Active (age 55.5)
-        $mbtDate = Carbon::today()->subYears(55)->subMonths(6)->toDateString();
+        // MBT Active: between the MBT date and the pension date (age 55 and 8 months)
+        $mbtDate = Carbon::today()->subYears(55)->subMonths(8)->toDateString();
         $empMbt = new Employee(['tanggal_lahir' => $mbtDate]);
         $this->assertFalse($empMbt->isApproachingMbt());
         $this->assertTrue($empMbt->isMbtActive());
@@ -585,5 +661,89 @@ class EmployeeCrudTest extends TestCase
         $empPension = new Employee(['tanggal_lahir' => $pensionDate]);
         $this->assertFalse($empPension->isMbtActive());
         $this->assertTrue($empPension->isPensionReached());
+    }
+
+    public function test_karpel_can_be_stored_with_the_rm_5_band_of_its_position(): void
+    {
+        $nik = '88990066';
+        Employee::where('nik', $nik)->delete();
+
+        $unit = Unit::firstOrCreate(['nama' => 'Bagian Sekretariat & Hukum'], ['kode' => 'Bagian', 'wilayah' => 'Lainnya', 'is_active' => true]);
+        $pos = Position::firstOrCreate(['nama' => 'Satpam'], ['level' => 'Karpel', 'rm_level' => 'RM-5', 'is_active' => true]);
+        $unit->positions()->syncWithoutDetaching([$pos->id => ['kuota' => 1]]);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.employees.store'), [
+            'nik' => $nik,
+            'nama' => 'Karpel Testing',
+            'jabatan' => 'Satpam',
+            'unit_kerja' => 'Bagian Sekretariat & Hukum',
+            'level' => 'Karpel',
+            'rm_level' => 'RM-5',
+            'golongan' => 'IIA/00',
+            'tanggal_lahir' => '1990-06-15',
+            'tmt_bekerja' => '2015-01-01',
+            'tanggal_dalam_jabatan' => '2023-01-01',
+            'job_grade' => 5,
+            'person_grade' => 5,
+            'status_karyawan' => 'Tetap (PKWTT)',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame('RM-5', Employee::where('nik', $nik)->value('rm_level'));
+
+        Employee::where('nik', $nik)->delete();
+    }
+
+    public function test_profile_renders_three_history_tables_with_separate_pagination(): void
+    {
+        $employee = Employee::factory()->create();
+
+        // One row more than the shared page size, so every table has a second page.
+        for ($i = 1; $i <= (int) config('hris.pagination.default') + 1; $i++) {
+            JobHistory::create([
+                'employee_nik' => $employee->nik,
+                'jabatan' => 'Jabatan Riwayat '.$i,
+                'unit_kerja' => 'Kebun Riwayat',
+                'tmt_awal' => sprintf('2019-%02d-01', $i),
+            ]);
+            Evaluation::create([
+                'employee_nik' => $employee->nik,
+                'bidang_tugas' => 'Bidang Evaluasi '.$i,
+                'tanggal_pelaksanaan_asesmen' => sprintf('2024-%02d-01', $i),
+            ]);
+            Training::create([
+                'judul' => 'Pelatihan Profil '.$i,
+                'jenis' => 'Teknis',
+                'metode' => 'Luring',
+                'tanggal_mulai' => sprintf('2024-%02d-01', $i),
+                'tanggal_akhir' => sprintf('2024-%02d-02', $i),
+                'biaya_tiket_peserta' => 0,
+                'biaya_pelatihan' => 0,
+                'penyelenggara' => 'Lembaga Profil',
+                'nomor_surat' => 'NS/'.$i,
+                'tanggal_surat' => '2024-01-01',
+                'keterangan' => '-',
+                'bidang_pelatihan' => 'Tanaman',
+                'jam_belajar_per_hari' => 8,
+            ])->employees()->attach($employee->nik);
+        }
+
+        $response = $this->actingAs($this->admin)->get(route('admin.employees.show', $employee->nik));
+
+        $response->assertOk()
+            ->assertSee('aria-label="Halaman pelatihan"', false)
+            ->assertSee('aria-label="Halaman evaluasi"', false)
+            ->assertSee('aria-label="Halaman riwayat jabatan"', false)
+            ->assertSee("gotoPage(2, 'pelatihan_page')", false)
+            ->assertSee("gotoPage(2, 'evaluasi_page')", false)
+            ->assertSee("gotoPage(2, 'riwayat_jabatan_page')", false)
+            ->assertSee('id="per-page-pelatihan_page"', false)
+            ->assertSee('id="per-page-evaluasi_page"', false)
+            ->assertSee('id="per-page-riwayat_jabatan_page"', false);
+
+        // The three tables share one page, so their per-page select ids must not collide.
+        preg_match_all('/\sid="(per-page-[^"]+)"/', $response->getContent(), $matches);
+        $this->assertSame(array_unique($matches[1]), $matches[1]);
+        $this->assertCount(3, $matches[1]);
     }
 }

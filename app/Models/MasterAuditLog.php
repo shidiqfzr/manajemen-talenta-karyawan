@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -26,7 +27,11 @@ class MasterAuditLog extends Model
         'old_values',
         'new_values',
         'reason',
+        'decree_id',
     ];
+
+    /** SK yang sedang diterapkan; diisi oleh forDecree() agar setiap catatan memuat tautan ke SK-nya. */
+    private static ?int $ambientDecreeId = null;
 
     protected $casts = [
         'old_values' => 'array',
@@ -50,12 +55,51 @@ class MasterAuditLog extends Model
         'position.activated' => 'Jabatan diaktifkan',
         'position.deactivated' => 'Jabatan dinonaktifkan',
         'position.deleted' => 'Jabatan dihapus',
+        'pool.opened' => 'Jabatan penampungan dibuka pada unit',
+        'pool.closed' => 'Jabatan penampungan ditutup pada unit',
+        'decree.submitted' => 'SK struktur diajukan',
+        'decree.approved' => 'SK struktur disetujui',
+        'decree.rejected' => 'SK struktur ditolak',
+        'decree.cancelled' => 'SK struktur dibatalkan',
+        'decree.applied' => 'SK struktur diterapkan',
+        'decree.failed' => 'SK struktur gagal diterapkan',
+        'mpp_supply.created' => 'Rencana pasokan MPP dibuat',
+        'mpp_supply.updated' => 'Rencana pasokan MPP diubah',
+        'mpp_period.captured' => 'Draf periode MPP direkam',
+        'mpp_period.closed' => 'Periode MPP ditutup',
+        'mpp_period.reopened' => 'Periode MPP dibuka kembali',
+        'evaluation.created' => 'Penilaian karyawan ditambahkan',
+        'evaluation.updated' => 'Penilaian karyawan diubah',
+        'evaluation.deleted' => 'Penilaian karyawan dihapus',
+        'training.created' => 'Pelatihan ditambahkan',
+        'training.updated' => 'Pelatihan diubah',
+        'training.deleted' => 'Pelatihan dihapus',
+        'employee.separated' => 'Karyawan diberhentikan dari jabatan',
+        'employee.separation_sk_recorded' => 'SK pemberhentian karyawan dicatat',
+        'mpp_access.view_personnel' => 'Rincian personil MPP dibuka',
+        'mpp_access.export_personnel' => 'Rincian personil MPP diunduh',
+        'mpp_access.export_matrix' => 'Matriks MPP diunduh',
+        'seat_access.view_occupants' => 'Pemegang jabatan formasi dibuka',
+        'data_table.bulk' => 'Aksi massal pada tabel data',
+        'data_table.export' => 'Tabel data diunduh',
+        'structure_as_of.export' => 'Versi struktur diunduh',
     ];
 
     public const ENTITY_LABELS = [
         'unit' => 'Unit Kerja',
         'position' => 'Jabatan',
         'seat' => 'Formasi Jabatan',
+        'decree' => 'Surat Keputusan Struktur',
+        'pool_seat' => 'Jabatan Penampungan',
+        'employee' => 'Karyawan',
+        'evaluation' => 'Penilaian Karyawan',
+        'training' => 'Pelatihan',
+        'mpp_supply' => 'Rencana Pasokan MPP',
+        'mpp_period' => 'Periode MPP',
+        'mpp_access' => 'Akses Data MPP',
+        'seat_access' => 'Akses Data Formasi',
+        'data_table' => 'Tabel Data',
+        'structure_as_of' => 'Versi Struktur',
     ];
 
     /** Istilah bisnis untuk kolom yang tercatat pada nilai lama/baru. */
@@ -70,7 +114,63 @@ class MasterAuditLog extends Model
         'bidang' => 'Bidang',
         'kuota' => 'Kuota',
         'filled' => 'Terisi',
+        'jumlah' => 'Jumlah',
+        'status' => 'Status Periode',
+        'revision' => 'Revisi',
+        'indikator' => 'Indikator',
+        'unit' => 'Unit Kerja',
+        'jabatan' => 'Jabatan',
+        'tahun' => 'Tahun',
+        'posisi_per' => 'Posisi per',
+        'jumlah_baris' => 'Jumlah Baris',
+        'aksi' => 'Aksi',
+        'filter' => 'Filter',
+        'pencarian' => 'Pencarian',
+        'periode' => 'Periode',
+        'revisi' => 'Revisi',
+        'alasan' => 'Alasan',
+        'tanggal_berhenti' => 'Tanggal Berhenti',
+        'nomor_sk' => 'Nomor SK',
+        'tanggal_sk' => 'Tanggal SK',
+        'kolom_diubah' => 'Kolom Diubah',
+        'judul' => 'Judul Pelatihan',
+        'jenis' => 'Jenis Pelatihan',
+        'metode' => 'Metode',
+        'tanggal_mulai' => 'Tanggal Mulai',
+        'tanggal_akhir' => 'Tanggal Akhir',
+        'biaya_tiket_peserta' => 'Biaya Tiket Peserta',
+        'biaya_pelatihan' => 'Biaya Pelatihan',
+        'penyelenggara' => 'Penyelenggara',
+        'nomor_surat' => 'Nomor Surat',
+        'tanggal_surat' => 'Tanggal Surat',
+        'keterangan' => 'Keterangan',
+        'bidang_pelatihan' => 'Bidang Pelatihan',
+        'jam_belajar_per_hari' => 'Jam Belajar per Hari',
+        'nilai_kepemimpinan' => 'Nilai Kepemimpinan',
+        'nilai_perilaku_budaya' => 'Nilai Perilaku Budaya',
+        'nilai_pengalaman_teknis' => 'Nilai Pengalaman Teknis',
+        'nilai_kematangan_pribadi' => 'Nilai Kematangan Pribadi',
+        'skor_smkbk_9box' => 'Skor SMK-BK',
+        'skor_cli_9box' => 'Skor CLI',
+        'kategori_9box' => 'Kategori 9-Box',
+        'bidang_tugas' => 'Bidang Tugas',
+        'lembaga_asesmen' => 'Lembaga Asesmen',
+        'tanggal_pelaksanaan_asesmen' => 'Tanggal Pelaksanaan Asesmen',
+        'hasil_skor_asesmen' => 'Hasil Skor Asesmen',
+        'kategori_asesmen' => 'Kategori Asesmen',
+        'keterangan_asesmen' => 'Keterangan Asesmen',
+        'expired_asesmen' => 'Masa Berlaku Asesmen',
     ];
+
+    /**
+     * Pembukaan layar yang hanya membaca data (mis. rincian personil MPP, pemegang jabatan formasi) tetap
+     * tersimpan sebagai jejak akses (SECURITY.md, UU PDP), tetapi bukan perubahan data sehingga tidak
+     * ditampilkan pada layar Riwayat Perubahan.
+     */
+    public function scopeExcludingViewAccess(Builder $query): Builder
+    {
+        return $query->whereRaw("action not like '%!_access.view!_%' escape '!'");
+    }
 
     public static function actionLabel(string $action): string
     {
@@ -92,12 +192,40 @@ class MasterAuditLog extends Model
             $show = fn (mixed $value): string => match (true) {
                 $value === null => '-',
                 $key === 'is_active' => $value ? 'Aktif' : 'Nonaktif',
-                is_bool($value) => $value ? 'ya' : 'tidak',
-                default => (string) $value,
+                default => self::displayValue($value),
             };
 
             return (self::FIELD_LABELS[$key] ?? $key).': '.$show($old[$key] ?? null).' → '.$show($new[$key] ?? null);
         }, $keys);
+    }
+
+    /**
+     * Readable form of one stored value. Arrays (e.g. the active filters of a data table audit row)
+     * become a "Label=nilai" list; an empty array shows as "-".
+     */
+    private static function displayValue(mixed $value): string
+    {
+        if (is_array($value)) {
+            if ($value === []) {
+                return '-';
+            }
+
+            $parts = [];
+
+            foreach ($value as $key => $item) {
+                $item = self::displayValue($item);
+                $parts[] = is_string($key) ? (self::FIELD_LABELS[$key] ?? $key).'='.$item : $item;
+            }
+
+            return implode(', ', $parts);
+        }
+
+        return match (true) {
+            $value === null => '-',
+            is_bool($value) => $value ? 'ya' : 'tidak',
+            is_scalar($value) => (string) $value,
+            default => '-',
+        };
     }
 
     protected static function booted(): void
@@ -116,8 +244,24 @@ class MasterAuditLog extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Jalankan $callback sehingga setiap catatan yang dibuat di dalamnya tertaut ke SK $decreeId.
+     * Penanda dibersihkan walau $callback melempar galat.
+     */
+    public static function forDecree(int $decreeId, callable $callback): mixed
+    {
+        $previous = self::$ambientDecreeId;
+        self::$ambientDecreeId = $decreeId;
+
+        try {
+            return $callback();
+        } finally {
+            self::$ambientDecreeId = $previous;
+        }
+    }
+
     public static function record(
-        User $user,
+        ?User $user,
         string $action,
         string $entityType,
         ?int $entityId,
@@ -127,8 +271,8 @@ class MasterAuditLog extends Model
         ?string $reason = null,
     ): self {
         return static::create([
-            'user_id' => $user->id,
-            'user_name' => $user->name,
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'Sistem',
             'action' => $action,
             'entity_type' => $entityType,
             'entity_id' => $entityId,
@@ -136,6 +280,7 @@ class MasterAuditLog extends Model
             'old_values' => $old,
             'new_values' => $new,
             'reason' => $reason,
+            'decree_id' => self::$ambientDecreeId,
         ]);
     }
 }

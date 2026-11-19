@@ -6,9 +6,7 @@
                 <h4 class="text-xs font-bold text-surface-800 uppercase tracking-wider flex items-center gap-2">
                     <i class="fas fa-briefcase text-primary-600" aria-hidden="true"></i> Penugasan Sementara (Aktif)
                 </h4>
-                <button wire:click="openModal" class="text-xs font-semibold text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5">
-                    <i class="fas fa-plus" aria-hidden="true"></i> Tambah Penugasan
-                </button>
+                <x-admin.button variant="soft" size="sm" icon="fas fa-plus" wire:click="openModal" target="openModal">Tambah Penugasan</x-admin.button>
             </div>
             
             @foreach($penugasanAktif as $penugasan)
@@ -46,107 +44,78 @@
                 <i class="fas fa-briefcase text-base" aria-hidden="true"></i>
             </div>
             <h4 class="text-xs font-bold text-surface-700 uppercase tracking-wider mb-1">Tidak Ada Penugasan Sementara</h4>
-            <p class="text-xs text-surface-500 mb-3">Pegawai ini tidak memiliki tugas rangkap (Plt/Pjs) yang sedang aktif saat ini.</p>
+            <p class="text-xs text-surface-500 mb-3">Karyawan ini tidak memiliki tugas rangkap (Plt/Pjs) yang sedang aktif saat ini.</p>
             <x-admin.button wire:click="openModal" size="sm" icon="fas fa-plus" target="openModal">Tambah Penugasan Sementara</x-admin.button>
         </div>
     @endif
 
-    <!-- Modal Form Tambah Penugasan -->
-    <div x-data="{ open: @entangle('showModal') }" x-show="open" x-cloak class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true" x-trap.noscroll="open" tabindex="-1">
-        <!-- Backdrop -->
-        <div x-show="open" x-transition.opacity class="fixed inset-0 bg-surface-900/50 backdrop-blur-xs transition-opacity"></div>
+    {{-- Modal tambah penugasan sementara (cangkang x-admin.modal, DESIGN.md §7.6) --}}
+    <div x-data="{ open: @entangle('showModal') }">
+        <x-admin.modal size="lg" icon="fas fa-briefcase" title="Tambah Penugasan Sementara" form wire:submit="simpanPenugasan">
+            <!-- Status Penugasan -->
+            <div>
+                <label class="block text-xs font-bold text-surface-700 mb-1.5">Jenis Penugasan <span class="text-danger">*</span></label>
+                <select wire:model="statusPenugasan" required
+                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 transition">
+                    <option value="Plt">Pelaksana Tugas (Plt)</option>
+                    <option value="Pejabat Sementara (Pjs)">Pejabat Sementara (Pjs)</option>
+                    <option value="Diperbantukan">Diperbantukan / BKO</option>
+                </select>
+                @error('statusPenugasan') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
+            </div>
 
-        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                <div x-show="open" x-transition
-                    class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-surface-200">
-                    
-                    <div class="bg-white px-5 pb-4 pt-5 sm:p-6 sm:pb-4">
-                        <div class="flex items-center justify-between mb-5 pb-3 border-b border-surface-100">
-                            <h3 class="text-base font-bold text-surface-900 flex items-center gap-2" id="modal-title">
-                                <i class="fas fa-briefcase text-primary-600" aria-hidden="true"></i> Tambah Penugasan Sementara
-                            </h3>
-                            <button aria-label="Tutup" @click="open = false" type="button" class="text-surface-500 hover:text-surface-600 transition">
-                                <i class="fas fa-times text-base" aria-hidden="true"></i>
-                            </button>
-                        </div>
+            <!-- Unit Kerja -->
+            <div>
+                <label class="block text-xs font-bold text-surface-700 mb-1.5">Unit Kerja Tujuan <span class="text-danger">*</span></label>
+                <select wire:model.live="unitKerja" required
+                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 transition">
+                    <option value="">-- Pilih Unit Kerja --</option>
+                    @foreach($units as $u)
+                        <option value="{{ $u->nama }}">{{ $u->nama }}</option>
+                    @endforeach
+                </select>
+                @error('unitKerja') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
+            </div>
 
-                        <form wire:submit="simpanPenugasan" class="space-y-4">
-                            <!-- Status Penugasan -->
-                            <div>
-                                <label class="block text-xs font-bold text-surface-700 mb-1.5">Jenis Penugasan <span class="text-danger">*</span></label>
-                                <select wire:model="statusPenugasan" required
-                                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition">
-                                    <option value="Plt">Pelaksana Tugas (Plt)</option>
-                                    <option value="Pejabat Sementara (Pjs)">Pejabat Sementara (Pjs)</option>
-                                    <option value="Diperbantukan">Diperbantukan / BKO</option>
-                                </select>
-                                @error('statusPenugasan') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
-                            </div>
+            <!-- Jabatan -->
+            <div>
+                <label class="block text-xs font-bold text-surface-700 mb-1.5">Jabatan Tujuan <span class="text-danger">*</span></label>
+                <select wire:model="jabatan" required @if(empty($positions)) disabled @endif
+                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed transition">
+                    <option value="">-- Pilih Jabatan --</option>
+                    @foreach($positions as $p)
+                        <option value="{{ $p->nama }}">{{ $p->nama }}</option>
+                    @endforeach
+                </select>
+                @error('jabatan') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
+            </div>
 
-                            <!-- Unit Kerja -->
-                            <div>
-                                <label class="block text-xs font-bold text-surface-700 mb-1.5">Unit Kerja Tujuan <span class="text-danger">*</span></label>
-                                <select wire:model.live="unitKerja" required
-                                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition">
-                                    <option value="">-- Pilih Unit Kerja --</option>
-                                    @foreach($units as $u)
-                                        <option value="{{ $u->nama }}">{{ $u->nama }}</option>
-                                    @endforeach
-                                </select>
-                                @error('unitKerja') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
-                            </div>
-
-                            <!-- Jabatan -->
-                            <div>
-                                <label class="block text-xs font-bold text-surface-700 mb-1.5">Jabatan Tujuan <span class="text-danger">*</span></label>
-                                <select wire:model="jabatan" required @if(empty($positions)) disabled @endif
-                                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed transition">
-                                    <option value="">-- Pilih Jabatan --</option>
-                                    @foreach($positions as $p)
-                                        <option value="{{ $p->nama }}">{{ $p->nama }}</option>
-                                    @endforeach
-                                </select>
-                                @error('jabatan') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-4">
-                                <!-- TMT Awal -->
-                                <div>
-                                    <label class="block text-xs font-bold text-surface-700 mb-1.5">TMT Penugasan <span class="text-danger">*</span></label>
-                                    <input type="date" wire:model="tmtAwal" required
-                                        class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition">
-                                    @error('tmtAwal') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
-                                </div>
-                                <!-- Nomor SK -->
-                                <div>
-                                    <label class="block text-xs font-bold text-surface-700 mb-1.5">Nomor SK/Surat</label>
-                                    <input type="text" wire:model="nomorSk" placeholder="Opsional"
-                                        class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition">
-                                </div>
-                            </div>
-
-                            <!-- Catatan -->
-                            <div>
-                                <label class="block text-xs font-bold text-surface-700 mb-1.5">Catatan Tambahan</label>
-                                <textarea wire:model="catatan" rows="2" placeholder="Keterangan penugasan..."
-                                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition"></textarea>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="bg-surface-50 px-5 py-3.5 sm:flex sm:flex-row-reverse border-t border-surface-200 gap-2">
-                        <button type="button" wire:click="simpanPenugasan" wire:loading.attr="disabled"
-                            class="inline-flex w-full justify-center rounded-lg bg-primary-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-800 sm:w-auto transition-colors">
-                            <span wire:loading.remove wire:target="simpanPenugasan">Simpan Penugasan</span>
-                            <span wire:loading wire:target="simpanPenugasan"><i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i> Menyimpan...</span>
-                        </button>
-                        <button type="button" @click="open = false"
-                            class="mt-2 inline-flex w-full justify-center rounded-lg bg-white px-4 py-2 text-xs font-bold text-surface-700 shadow-xs border border-surface-300 hover:bg-surface-100 sm:mt-0 sm:w-auto transition-colors">
-                            Batal
-                        </button>
-                    </div>
+            <div class="grid grid-cols-2 gap-4">
+                <!-- TMT Awal -->
+                <div>
+                    <label class="block text-xs font-bold text-surface-700 mb-1.5">TMT Penugasan <span class="text-danger">*</span></label>
+                    <input type="date" wire:model="tmtAwal" required
+                        class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 transition">
+                    @error('tmtAwal') <span class="text-danger text-xs mt-1">{{ $message }}</span> @enderror
+                </div>
+                <!-- Nomor SK -->
+                <div>
+                    <label class="block text-xs font-bold text-surface-700 mb-1.5">Nomor SK/Surat</label>
+                    <input type="text" wire:model="nomorSk" placeholder="Opsional"
+                        class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 transition">
                 </div>
             </div>
-        </div>
+
+            <!-- Catatan -->
+            <div>
+                <label class="block text-xs font-bold text-surface-700 mb-1.5">Catatan Tambahan</label>
+                <textarea wire:model="catatan" rows="2" placeholder="Keterangan penugasan..."
+                    class="w-full px-3 py-2 bg-surface-50 border border-surface-200 rounded-lg text-xs font-medium text-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-primary-500 transition"></textarea>
+            </div>
+
+            <x-slot:footer>
+                <x-admin.button type="submit" icon="fas fa-check" target="simpanPenugasan">Simpan Penugasan</x-admin.button>
+            </x-slot:footer>
+        </x-admin.modal>
     </div>
 </div>

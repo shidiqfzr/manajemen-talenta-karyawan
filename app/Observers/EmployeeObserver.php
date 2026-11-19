@@ -27,7 +27,7 @@ class EmployeeObserver
             $employee->rm_level = app(ManPowerPlanningService::class)->determineRmLevel($employee);
         }
 
-        // 2. Auto-calculate Pensiun (56 tahun) & MBT (55 tahun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
+        // 2. Auto-calculate Pensiun (56 tahun) & MBT (6 bulan sebelum pensiun) if tanggal_lahir is present (DOMAIN.md Bab 5.1)
         if (! empty($employee->tanggal_lahir)) {
             $tglLahirStr = $employee->tanggal_lahir instanceof Carbon
                 ? $employee->tanggal_lahir->toDateString()
@@ -73,9 +73,11 @@ class EmployeeObserver
             'tmt_awal' => $start->toDateString(),
             'tmt_akhir' => null,
             'jenis_mutasi' => 'PENUGASAN',
-            'nomor_sk' => 'SK.DIR/REG5/REK-AWAL/'.date('Y'),
-            'tanggal_sk' => $start->toDateString(),
-            'catatan' => 'Pengangkatan / Penugasan awal pegawai',
+            // Data awal bukan SK Direksi: nomor dan tanggal SK sengaja kosong (tidak boleh direkayasa).
+            'sumber' => JobHistory::SUMBER_DATA_AWAL,
+            'nomor_sk' => null,
+            'tanggal_sk' => null,
+            'catatan' => 'Data awal penempatan karyawan (bukan SK mutasi)',
         ]);
     }
 
@@ -85,6 +87,11 @@ class EmployeeObserver
      */
     public function updated(Employee $employee): void
     {
+        // Karyawan yang sudah berhenti tidak membuka riwayat jabatan baru: jabatan terakhirnya menjadi arsip.
+        if ($employee->getOriginal('tanggal_berhenti') !== null) {
+            return;
+        }
+
         if (! $this->hasCoreJob($employee)) {
             return;
         }
@@ -140,6 +147,7 @@ class EmployeeObserver
                 'tmt_awal' => $newStart->toDateString(),
                 'tmt_akhir' => null,
                 'jenis_mutasi' => null,
+                'sumber' => JobHistory::SUMBER_PEMBARUAN_DATA,
                 'catatan' => $employee->historyNote,
             ]);
         });

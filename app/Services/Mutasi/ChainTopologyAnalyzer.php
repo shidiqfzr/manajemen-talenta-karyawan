@@ -3,7 +3,6 @@
 namespace App\Services\Mutasi;
 
 use App\Models\Employee;
-use App\Models\JobHistory;
 use App\Models\Position;
 use Carbon\Carbon;
 
@@ -36,14 +35,11 @@ class ChainTopologyAnalyzer
             if (! empty($node['dispensasi_tenure']) && ! empty($node['alasan_dispensasi_tenure'])) {
                 $reasons[] = '[Dispensasi Masa Dinas]: '.$node['alasan_dispensasi_tenure'];
             }
-            if (! empty($node['dispensasi_promosi']) && ! empty($node['alasan_dispensasi_promosi'])) {
-                $reasons[] = '[Dispensasi Promosi]: '.$node['alasan_dispensasi_promosi'];
-            }
             if (empty($reasons) && ! empty($node['alasan_dispensasi'])) {
                 $reasons[] = $node['alasan_dispensasi'];
             }
 
-            $node['is_dispensasi'] = ! empty($node['is_dispensasi']) || ! empty($node['dispensasi_tenure']) || ! empty($node['dispensasi_promosi']);
+            $node['is_dispensasi'] = ! empty($node['is_dispensasi']) || ! empty($node['dispensasi_tenure']);
             $node['alasan_dispensasi'] = $reasons ? implode(' | ', $reasons) : null;
 
             return $node;
@@ -125,7 +121,7 @@ class ChainTopologyAnalyzer
                 'is_valid' => false,
                 'topology' => 'invalid',
                 'topology_label' => 'Rantai Tidak Lengkap',
-                'errors' => ['Rantai mutasi kolektif memerlukan minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' pegawai.'],
+                'errors' => ['Rantai mutasi kolektif memerlukan minimal '.MutasiPolicy::MIN_CHAIN_PARTICIPANTS.' karyawan.'],
                 'warnings' => [],
                 'nodes_analysis' => [],
                 'unfilled_vacancies' => [],
@@ -135,7 +131,7 @@ class ChainTopologyAnalyzer
 
         $niks = array_column($nodes, 'employee_nik');
         if (count($niks) !== count(array_unique($niks))) {
-            $errors[] = 'Terdapat duplikasi pegawai di dalam daftar rantai mutasi.';
+            $errors[] = 'Terdapat duplikasi karyawan di dalam daftar rantai mutasi.';
         }
 
         $employees = Employee::with('currentJob')
@@ -146,9 +142,9 @@ class ChainTopologyAnalyzer
         // Check if all employees exist and are active (not retired)
         foreach ($niks as $nik) {
             if (! isset($employees[$nik])) {
-                $errors[] = "Data pegawai dengan NIK {$nik} tidak ditemukan.";
-            } elseif ($employees[$nik]->tanggal_pensiun && Carbon::parse($employees[$nik]->tanggal_pensiun)->lt(now()->startOfMonth())) {
-                $errors[] = "Pegawai {$employees[$nik]->nama} (NIK: {$nik}) telah memasuki Batas Usia Pensiun dan tidak dapat dimutasi.";
+                $errors[] = "Data karyawan dengan NIK {$nik} tidak ditemukan.";
+            } elseif ($this->guard->isRetired($employees[$nik])) {
+                $errors[] = "Karyawan {$employees[$nik]->nama} (NIK: {$nik}) {$this->guard->retiredReason($employees[$nik])} dan tidak dapat dimutasi.";
             }
         }
 
@@ -156,7 +152,7 @@ class ChainTopologyAnalyzer
             return [
                 'is_valid' => false,
                 'topology' => 'invalid',
-                'topology_label' => 'Data Pegawai Tidak Valid',
+                'topology_label' => 'Data Karyawan Tidak Valid',
                 'errors' => $errors,
                 'warnings' => [],
                 'nodes_analysis' => [],
@@ -167,6 +163,7 @@ class ChainTopologyAnalyzer
 
         $positions = Position::getAllCached();
         $targetPositions = [];
+        $targetCounts = [];
         $closedVacancies = [];
         $unfilledVacancies = [];
 
@@ -185,28 +182,37 @@ class ChainTopologyAnalyzer
             $targetUnitKerja = $node['target_unit_kerja'];
             $posKey = "{$targetJabatan}|{$targetUnitKerja}";
 
-            $jenisMutasi = $node['jenis_mutasi'] ?? 'MUTASI_UNIT';
-            if (! in_array($jenisMutasi, JobHistory::MUTASI_TYPES, true)) {
-                $errors[] = "Jenis mutasi '{$jenisMutasi}' untuk pegawai {$emp->nama} tidak dikenal dalam Pedoman Tata Kelola SDM.";
+            // Same per-participant placement rules as a single mutation (type, status, unit, Promosi/Demosi direction)
+            $violation = $this->guard->placementRuleViolation(
+                $emp,
+                $node['jenis_mutasi'] ?? 'MUTASI_UNIT',
+                $node['status_jabatan'] ?? 'Definitif',
+                $targetJabatan,
+                $targetUnitKerja
+            );
+            if ($violation !== null) {
+                $errors[] = $violation;
             }
 
             $isPool = isset($positions[$targetJabatan]) && ($positions[$targetJabatan]->is_overflow || $positions[$targetJabatan]->is_diperban);
 
             // Self-target guard
             if ($emp->jabatan === $targetJabatan && $emp->unit_kerja === $targetUnitKerja) {
-                $errors[] = "Pegawai {$emp->nama} sudah menempati posisi {$targetJabatan} di {$targetUnitKerja}.";
+                $errors[] = "Karyawan {$emp->nama} sudah menempati posisi {$targetJabatan} di {$targetUnitKerja}.";
             }
 
-            // Duplicate target guard (unless pool)
+            // Analyze target vacancy and occupancy. Bookings of the participants themselves do not count against the seats.
+            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja, $niks);
+
+            // Duplicate target guard (unless pool): a formasi takes as many participants as it has open seats (free seats not
+            // already booked by someone outside the chain), at least one
             if (! $isPool) {
-                if (isset($targetPositions[$posKey])) {
-                    $errors[] = "Konflik target: Formasi {$targetJabatan} di {$targetUnitKerja} ditargetkan oleh lebih dari satu pegawai.";
+                $targetCounts[$posKey] = ($targetCounts[$posKey] ?? 0) + 1;
+                if ($targetCounts[$posKey] > max(1, (int) ($analysis['open_slots'] ?? 1))) {
+                    $errors[] = "Konflik target: Formasi {$targetJabatan} di {$targetUnitKerja} ditargetkan oleh karyawan melebihi sisa kuotanya.";
                 }
                 $targetPositions[$posKey] = $node['employee_nik'];
             }
-
-            // Analyze target vacancy and occupancy
-            $analysis = $this->formations->analyzeTarget($targetJabatan, $targetUnitKerja);
             $occupant = $analysis['occupant'] ?? null;
             $linkType = 'vacant';
             $occupantNik = null;
@@ -214,7 +220,7 @@ class ChainTopologyAnalyzer
 
             if ($analysis['type'] === 'pool') {
                 $linkType = 'pool';
-            } elseif ($analysis['is_reserved'] && ! in_array($analysis['reserved_job']->employee_nik, $niks, true)) {
+            } elseif ($analysis['is_reserved']) {
                 $resName = $analysis['reserved_occupant']->nama ?? $analysis['reserved_job']->employee_nik;
                 $resTmt = $analysis['reserved_job']->tmt_awal ? Carbon::parse($analysis['reserved_job']->tmt_awal)->translatedFormat('d M Y') : 'mendatang';
                 $linkType = 'conflict';
@@ -239,7 +245,7 @@ class ChainTopologyAnalyzer
                     $linkType = 'chain'; // Valid link: occupant will also move!
                 } else {
                     $linkType = 'conflict';
-                    $errors[] = "Formasi target {$targetJabatan} di {$targetUnitKerja} saat ini diduduki oleh {$occupantNama} ({$occupantNik}) yang tidak diikutsertakan dalam rantai mutasi ini. Masukkan pegawai tersebut ke dalam rantai mutasi atau pilih formasi lain.";
+                    $errors[] = "Formasi target {$targetJabatan} di {$targetUnitKerja} saat ini diduduki oleh {$occupantNama} ({$occupantNik}) yang tidak diikutsertakan dalam rantai mutasi ini. Masukkan karyawan tersebut ke dalam rantai mutasi atau pilih formasi lain.";
                 }
             }
 
@@ -250,20 +256,17 @@ class ChainTopologyAnalyzer
 
             if ($tenure['is_applicable'] && ! $tenure['is_compliant']) {
                 if (! $isDispensasi) {
-                    $errors[] = "Pegawai {$emp->nama} belum memenuhi masa dinas minimal di {$emp->unit_kerja} ({$tenure['months']} bulan). Harap setujui dispensasi masa dinas.";
+                    $errors[] = "Karyawan {$emp->nama} belum memenuhi masa dinas minimal di {$emp->unit_kerja} ({$tenure['months']} bulan). Harap setujui dispensasi masa dinas.";
                 } else {
-                    $warnings[] = "Pegawai {$emp->nama} menggunakan Dispensasi Masa Dinas di {$emp->unit_kerja}.";
+                    $warnings[] = "Karyawan {$emp->nama} menggunakan Dispensasi Masa Dinas di {$emp->unit_kerja}.";
                 }
             }
 
             // Governance: Promotion eligibility
             $promo = $this->guard->checkPromotionEligibility($emp, $targetJabatan);
             if ($promo['is_applicable'] && ! $promo['is_eligible']) {
-                if (! $isDispensasi) {
-                    $errors[] = "Pegawai {$emp->nama} belum memenuhi kriteria promosi ke {$targetJabatan}. Harap setujui dispensasi promosi.";
-                } else {
-                    $warnings[] = "Pegawai {$emp->nama} dipromosikan dengan Dispensasi Khusus Direksi ke {$targetJabatan}.";
-                }
+                // Advisory: promotion qualification has no approval flow yet, so it warns instead of blocking
+                $warnings[] = "Karyawan {$emp->nama} belum memenuhi kualifikasi promosi ke {$targetJabatan}.";
             }
 
             $nodesAnalysis[] = [
@@ -285,18 +288,31 @@ class ChainTopologyAnalyzer
         }
 
         // Detect positions vacated by participants that are NOT filled by anyone in the chain
+        // Each arrival fills one seat vacated in that formasi; departures beyond the arrivals stay open (several holders of
+        // a multi-seat formasi may leave at once).
+        $arrivalsLeft = $targetCounts;
+        $unfilledLeaverNiks = [];
         foreach ($nodes as $node) {
             $emp = $employees[$node['employee_nik']];
             $vacatedKey = "{$emp->jabatan}|{$emp->unit_kerja}";
 
-            if (! isset($targetPositions[$vacatedKey]) && ! in_array($emp->nik, $temporaryNiks, true)) {
-                $unfilledVacancies[] = [
-                    'jabatan' => $emp->jabatan,
-                    'unit_kerja' => $emp->unit_kerja,
-                    'left_by' => $emp->nama,
-                    'left_by_nik' => $emp->nik,
-                ];
+            if (in_array($emp->nik, $temporaryNiks, true)) {
+                continue;
             }
+
+            if (($arrivalsLeft[$vacatedKey] ?? 0) > 0) {
+                $arrivalsLeft[$vacatedKey]--;
+
+                continue;
+            }
+
+            $unfilledLeaverNiks[] = $emp->nik;
+            $unfilledVacancies[] = [
+                'jabatan' => $emp->jabatan,
+                'unit_kerja' => $emp->unit_kerja,
+                'left_by' => $emp->nama,
+                'left_by_nik' => $emp->nik,
+            ];
         }
 
         // ── Graph Decomposition into Weakly Connected Components (Enterprise Multi-Cluster) ──
@@ -385,14 +401,14 @@ class ChainTopologyAnalyzer
                 $orderedIndices = [];
                 $loopback = null;
                 $clusterType = 'complex';
-                $clusterLabel = "Klaster Majemuk ({$compSize} Pegawai)";
+                $clusterLabel = "Alur Gabungan ({$compSize} Karyawan)";
 
                 if ($isCompCyclic) {
                     $clusterType = 'cyclic';
                     $cycleClusterCount++;
                     $clusterLabel = $compSize === 2
-                        ? 'Tukar Jabatan / Swap (2 Pegawai)'
-                        : "Rantai Siklis ({$compSize} Pegawai)";
+                        ? 'Tukar Jabatan (2 Karyawan)'
+                        : "Rantai Tertutup ({$compSize} Karyawan)";
 
                     // Order sequentially starting from node with lowest original index
                     $start = min($compNodeIndices);
@@ -446,11 +462,11 @@ class ChainTopologyAnalyzer
                     if ($compSize >= 2) {
                         $clusterType = 'domino';
                         $dominoClusterCount++;
-                        $clusterLabel = "Alur Domino ({$compSize} Pegawai)";
+                        $clusterLabel = "Rantai Terbuka ({$compSize} Karyawan)";
                     } else {
                         $clusterType = 'open';
                         $openClusterCount++;
-                        $clusterLabel = 'Transfer Mandiri (1 Pegawai)';
+                        $clusterLabel = 'Mutasi Mandiri (1 Karyawan)';
                     }
                 }
 
@@ -467,7 +483,7 @@ class ChainTopologyAnalyzer
                         ];
                     }
                     $empVacKey = "{$nodeData['current_jabatan']}|{$nodeData['current_unit']}";
-                    if (! isset($targetPositions[$empVacKey]) && ! in_array($nodeData['employee_nik'], $temporaryNiks, true)) {
+                    if (in_array($nodeData['employee_nik'], $unfilledLeaverNiks, true)) {
                         $clusterUnfilled[] = [
                             'jabatan' => $nodeData['current_jabatan'],
                             'unit_kerja' => $nodeData['current_unit'],
@@ -479,7 +495,7 @@ class ChainTopologyAnalyzer
                 $clusters[] = [
                     'id' => $compIdx + 1,
                     'type' => $clusterType,
-                    'title' => 'Klaster #'.($compIdx + 1)." • {$clusterLabel}",
+                    'title' => 'Alur Mutasi #'.($compIdx + 1)." • {$clusterLabel}",
                     'type_label' => $clusterLabel,
                     'is_zero_vacancy' => ($clusterType === 'cyclic'),
                     'node_indices' => $orderedIndices,
@@ -504,34 +520,34 @@ class ChainTopologyAnalyzer
                 $single = $clusters[0];
                 if ($single['type'] === 'cyclic') {
                     $topology = 'cyclic';
-                    $topologyLabel = 'Rantai Tertutup Tunggal (Siklis Sempurna / Net Zero Vacancy)';
+                    $topologyLabel = 'Rantai Tertutup (Tanpa Lowongan Baru)';
                 } elseif ($single['type'] === 'domino') {
                     $topology = 'domino';
-                    $topologyLabel = 'Efek Domino Terbuka (1 Ditutup, 1 Ditinggalkan)';
+                    $topologyLabel = 'Rantai Terbuka (1 Formasi Terisi, 1 Lowongan Baru)';
                 } else {
                     $topology = 'open';
-                    $topologyLabel = 'Transfer Mandiri (Formasi Bebas)';
+                    $topologyLabel = 'Mutasi Mandiri ke Formasi Kosong';
                 }
             } else {
                 if ($cycleClusterCount === $totalClusters) {
                     $topology = 'multi_cyclic';
-                    $topologyLabel = "Rantai Multi-Siklis ({$cycleClusterCount} Siklus Mandiri / Net Zero Vacancy)";
+                    $topologyLabel = "{$cycleClusterCount} Rantai Tertutup (Tanpa Lowongan Baru)";
                 } elseif ($dominoClusterCount === $totalClusters) {
                     $topology = 'multi_domino';
-                    $topologyLabel = "Rantai Multi-Domino ({$dominoClusterCount} Alur Domino Mandiri)";
+                    $topologyLabel = "{$dominoClusterCount} Rantai Terbuka";
                 } else {
                     $parts = [];
                     if ($cycleClusterCount > 0) {
-                        $parts[] = "{$cycleClusterCount} Siklis";
+                        $parts[] = "{$cycleClusterCount} Rantai Tertutup";
                     }
                     if ($dominoClusterCount > 0) {
-                        $parts[] = "{$dominoClusterCount} Domino";
+                        $parts[] = "{$dominoClusterCount} Rantai Terbuka";
                     }
                     if ($openClusterCount > 0) {
-                        $parts[] = "{$openClusterCount} Transfer Mandiri";
+                        $parts[] = "{$openClusterCount} Mutasi Mandiri";
                     }
                     $topology = 'multi_mixed';
-                    $topologyLabel = 'Rantai Majemuk Multi-Klaster ('.implode(', ', $parts).')';
+                    $topologyLabel = 'Gabungan '.$totalClusters.' Alur Mutasi ('.implode(', ', $parts).')';
                 }
             }
         }

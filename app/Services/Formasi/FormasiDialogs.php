@@ -42,13 +42,15 @@ class FormasiDialogs
      *
      * @return list<array{value: string, label: string}>
      */
-    public function rmOptions(?string $current = null): array
+    public function rmOptions(?string $current = null, ?string $level = null): array
     {
-        $options = collect(Position::KARPIM_RM_LEVELS)
+        $levels = $level === 'Karpel' ? Position::KARPEL_RM_LEVELS : Position::KARPIM_RM_LEVELS;
+
+        $options = collect($levels)
             ->map(fn ($rm) => ['value' => $rm, 'label' => Position::RM_LEVEL_LIST[$rm]])
             ->all();
 
-        if ($current && ! in_array($current, Position::KARPIM_RM_LEVELS, true)) {
+        if ($current && ! in_array($current, $levels, true)) {
             $options[] = ['value' => $current, 'label' => $current.' (nilai saat ini)'];
         }
 
@@ -102,7 +104,7 @@ class FormasiDialogs
         return [
             'title' => $unit->is_active ? 'Nonaktifkan Unit Kerja' : 'Aktifkan Unit Kerja',
             'description' => $unit->is_active
-                ? $unit->nama.' tidak akan muncul pada pilihan penempatan baru. Unit yang masih memiliki pegawai tidak dapat dinonaktifkan.'
+                ? $unit->nama.' tidak akan muncul pada pilihan penempatan baru. Unit yang masih memiliki karyawan tidak dapat dinonaktifkan.'
                 : $unit->nama.' akan kembali muncul pada pilihan penempatan.',
             'url' => route('admin.master.units.toggle', $unit),
             'method' => 'POST',
@@ -119,7 +121,7 @@ class FormasiDialogs
     {
         return [
             'title' => 'Hapus Unit Kerja',
-            'description' => $unit->nama.' hanya dapat dihapus bila tidak dipakai pegawai, formasi jabatan, maupun riwayat jabatan. Bila masih dipakai, gunakan Nonaktifkan.',
+            'description' => $unit->nama.' hanya dapat dihapus bila tidak dipakai karyawan, formasi jabatan, maupun riwayat jabatan. Bila masih dipakai, gunakan Nonaktifkan.',
             'url' => route('admin.master.units.destroy', $unit),
             'method' => 'DELETE',
             'submit' => 'Hapus Unit',
@@ -141,7 +143,7 @@ class FormasiDialogs
             'fields' => [
                 ['name' => 'nama', 'label' => 'Nama Jabatan', 'type' => 'text', 'value' => $seat->jabatan, 'required' => true],
                 ['name' => 'level', 'label' => 'Strata', 'type' => 'select', 'value' => $seat->level, 'required' => true, 'options' => $this->levelOptions()],
-                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $seat->rm_level, 'required' => false, 'options' => $this->rmOptions($seat->rm_level)],
+                ['name' => 'rm_level', 'label' => 'RM Band (berlaku untuk seluruh unit pemakai jabatan)', 'type' => 'select', 'value' => (string) $seat->rm_level, 'required' => false, 'options' => $this->rmOptions($seat->rm_level, $seat->level)],
                 ['name' => 'is_active', 'type' => 'hidden', 'value' => $seat->position_active ? '1' : '0'],
                 ['name' => 'return_unit', 'type' => 'hidden', 'value' => (string) $unit->id],
                 ['name' => 'reason', 'label' => 'Alasan Perubahan (wajib bila mengubah nama atau RM Band)', 'type' => 'textarea', 'value' => '', 'required' => false, 'placeholder' => self::REASON_HINT],
@@ -157,7 +159,7 @@ class FormasiDialogs
         return [
             'title' => $seat->position_active ? 'Nonaktifkan Jabatan' : 'Aktifkan Jabatan',
             'description' => $seat->position_active
-                ? $seat->jabatan.' tidak akan muncul pada pilihan penempatan baru. Jabatan yang masih dipegang pegawai tidak dapat dinonaktifkan.'
+                ? $seat->jabatan.' tidak akan muncul pada pilihan penempatan baru. Jabatan yang masih dipegang karyawan tidak dapat dinonaktifkan.'
                 : $seat->jabatan.' akan kembali muncul pada pilihan penempatan.',
             'url' => route('admin.master.positions.toggle', $seat->position_id),
             'method' => 'POST',

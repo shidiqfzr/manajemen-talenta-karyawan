@@ -82,6 +82,124 @@ class FormasiEditorTest extends TestCase
         $this->editor()->assertSee('Melebihi kuota');
     }
 
+    public function test_acting_holder_leaves_the_seat_vacant_and_the_vacancy_filter_finds_it(): void
+    {
+        $acting = $this->position('Manajer Dijabat Plt');
+        $this->seat($acting, 1);
+        $full = $this->position('Manajer Sudah Penuh');
+        $this->seat($full, 1);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $acting->nama, 'status_penugasan' => 'Plt']);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $full->nama]);
+
+        $this->editor()
+            ->assertSee('Diisi Pj/Plt')
+            ->call('toggleVacantFilter')
+            ->assertSet('seatStatusFilter', 'vacant')
+            ->assertSee('Manajer Dijabat Plt')
+            ->assertDontSee('Manajer Sudah Penuh')
+            ->call('toggleVacantFilter')
+            ->assertSet('seatStatusFilter', '');
+    }
+
+    public function test_unit_list_shows_vacant_slots_and_can_filter_units_with_vacancies(): void
+    {
+        $this->seat($this->position('Manajer Kosong Daftar'), 2);
+        $filledUnit = Unit::create(['nama' => 'Kebun Penuh Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 2]);
+        $position = $this->position('Manajer Penuh Daftar');
+        DB::table('position_unit')->insert(['unit_id' => $filledUnit->id, 'position_id' => $position->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
+        Employee::factory()->create(['unit_kerja' => $filledUnit->nama, 'jabatan' => $position->nama]);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
+            ->assertSee('2 kosong')
+            ->assertSee('Formasi Kosong')
+            ->set('statusFilter', 'vacant');
+
+        $list->assertSee('Kebun Editor Uji')->assertDontSee('Kebun Penuh Uji');
+        $this->assertSame(2, $list->instance()->overviewStats['vacant']);
+    }
+
+    public function test_pejabat_sementara_pjs_holder_leaves_the_seat_vacant_on_both_screens(): void
+    {
+        $position = $this->position('Manajer Dijabat Pjs');
+        $this->seat($position, 1);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'status_penugasan' => 'Pejabat Sementara (Pjs)']);
+
+        $unit = $this->editor();
+        $unit->assertSee('Diisi Pj/Plt');
+        $this->assertSame('acting', $unit->instance()->seats->first()->state);
+        $this->assertSame(1, $unit->instance()->seats->first()->vacant_slots);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class);
+        $this->assertSame(1, $list->instance()->overviewStats['vacant']);
+    }
+
+    public function test_a_page_beyond_the_last_page_is_stored_as_the_last_page(): void
+    {
+        foreach (range(1, 12) as $n) {
+            $this->seat($this->position(sprintf('Kepala Seksi Halaman %02d', $n)), 1);
+        }
+
+        Livewire::actingAs($this->admin)
+            ->withQueryParams(['page' => 50, 'per_page' => 10])
+            ->test(FormasiEditor::class, ['unitId' => $this->unit->id])
+            ->assertSet('paginators.page', 2);
+    }
+
+    public function test_opened_pool_positions_are_not_formasi_on_either_screen(): void
+    {
+        $advisor = Position::create(['nama' => 'Advisor RM-2', 'level' => 'Karpim', 'rm_level' => 'RM-2', 'is_active' => true, 'is_overflow' => true]);
+        DB::table('position_unit')->insert(['unit_id' => $this->unit->id, 'position_id' => $advisor->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $advisor->nama]);
+        $this->seat($this->position('Manajer Biasa'), 1);
+
+        $unitScreen = $this->editor();
+        $this->assertSame(['Manajer Biasa'], $unitScreen->instance()->seats->pluck('jabatan')->all());
+        $unitScreen->assertDontSee('Advisor RM-2');
+
+        $stats = Livewire::actingAs($this->admin)->test(FormasiEditor::class)->instance()->overviewStats;
+        $this->assertSame(1, $stats['seats']);
+        $this->assertSame(1, $stats['kuota']);
+        $this->assertSame(0, $stats['filled'], 'A pool holder never fills a formasi.');
+        $this->assertSame(0, $stats['over']);
+    }
+
+    public function test_a_pool_link_cannot_be_edited_or_removed_as_a_formasi(): void
+    {
+        $advisor = Position::create(['nama' => 'Advisor RM-2', 'level' => 'Karpim', 'rm_level' => 'RM-2', 'is_active' => true, 'is_overflow' => true]);
+        $linkId = DB::table('position_unit')->insertGetId(['unit_id' => $this->unit->id, 'position_id' => $advisor->id, 'kuota' => 0, 'bidang' => 'UMU', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->editor()
+            ->call('startRemoveSeat', $linkId)->assertSet('pendingOperation', null)
+            ->call('startUpdateSeat', $linkId, 3, 'TAN')->assertSet('pendingOperation', null)
+            ->call('openEditSeat', $linkId)->assertSet('editSeatId', null)
+            ->call('viewOccupants', $linkId)->assertSet('occupantSeatId', null);
+
+        $this->assertSame(0, (int) DB::table('position_unit')->where('id', $linkId)->value('kuota'));
+    }
+
+    public function test_unit_kosong_badge_links_to_sebaran_filtered_by_unit(): void
+    {
+        $this->seat($this->position('Manajer Kosong Tautan'), 1);
+
+        $url = route('admin.master.sebaran.index', ['tampilan' => 'unit', 'unit' => 'Kebun Editor Uji', 'status' => 'kosong']);
+
+        Livewire::actingAs($this->admin)->test(FormasiEditor::class)->assertSeeHtml(e($url));
+    }
+
+    public function test_editor_screens_never_say_lowong(): void
+    {
+        $partial = $this->position('Manajer Sebagian Kosong');
+        $this->seat($partial, 2);
+        Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $partial->nama]);
+
+        $unitScreen = strtolower($this->editor()->html());
+        $listScreen = strtolower(Livewire::actingAs($this->admin)->test(FormasiEditor::class)->html());
+
+        $this->assertStringNotContainsString('lowong', $unitScreen);
+        $this->assertStringNotContainsString('lowong', $listScreen);
+        $this->assertStringContainsString('sebagian kosong', $unitScreen);
+    }
+
     public function test_add_seat_flow_previews_then_confirms_and_audits(): void
     {
         $position = $this->position('Asisten Baru Uji');
@@ -105,7 +223,7 @@ class FormasiEditorTest extends TestCase
 
         $this->editor()
             ->call('startRemoveSeat', $seatId)
-            ->assertSee('2 pegawai')
+            ->assertSee('2 karyawan')
             ->assertSee('Mutasi')
             ->set('reason', 'Kursi dihapus karena restrukturisasi')
             ->call('confirm')
@@ -326,15 +444,98 @@ class FormasiEditorTest extends TestCase
     {
         $position = $this->position('Asisten Pemegang');
         $seatId = $this->seat($position, 2);
-        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Pegawai Pemegang Uji']);
+        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Karyawan Pemegang Uji']);
 
         $this->editor()
             ->call('viewOccupants', $seatId)
             ->assertSee('Pemegang Jabatan')
-            ->assertSee('Pegawai Pemegang Uji')
+            ->assertSee('Karyawan Pemegang Uji')
             ->assertDontSeeText($employee->nik)
             ->call('closeOccupants')
-            ->assertDontSee('Pegawai Pemegang Uji');
+            ->assertDontSee('Karyawan Pemegang Uji');
+    }
+
+    public function test_occupant_list_opens_as_a_right_drawer_with_profile_link_and_a_blur_free_overlay(): void
+    {
+        $position = $this->position('Asisten Drawer', 'Karpim', 'RM-3');
+        $seatId = $this->seat($position, 2, 'TAN');
+        $employee = Employee::factory()->create([
+            'unit_kerja' => $this->unit->nama,
+            'jabatan' => $position->nama,
+            'nama' => 'Karyawan Drawer Uji',
+            'golongan' => 'IVB/06',
+            'status_karyawan' => 'Tetap (PKWTT)',
+            'tanggal_pensiun' => '2030-02-01',
+            'tanggal_mbt' => '2029-02-01',
+        ]);
+
+        $html = $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Pemegang Jabatan')
+            ->assertSee('1 Personil')
+            ->assertSee('Bidang TAN')
+            ->assertSee('IVB/06')
+            ->assertSee('Tetap (PKWTT)')
+            ->assertSee('01 Feb 2029')
+            ->assertSee('01 Feb 2030')
+            ->assertDontSee('Lihat Profil')
+            ->assertSee('Tutup Panel')
+            ->assertDontSeeText($employee->nik)
+            ->html();
+
+        $this->assertStringContainsString('inset-y-0 right-0', $html);
+        $this->assertStringContainsString('fixed inset-0 bg-surface-950/30 transition-opacity', $html);
+        // Nama karyawan adalah tautan profil (tab baru), bukan tombol terpisah.
+        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('admin.employees.show', $employee->nik), '/').'"[^>]*target="_blank"[^>]*>\s*Karyawan Drawer Uji/', $html);
+    }
+
+    public function test_occupant_drawer_warns_when_the_seat_holds_more_people_than_the_list_limit(): void
+    {
+        $position = $this->position('Mandor Banyak');
+        $seatId = $this->seat($position, 300);
+        Employee::factory()->count(FormasiEditor::OCCUPANT_LIMIT + 1)->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama]);
+
+        $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Menampilkan '.FormasiEditor::OCCUPANT_LIMIT.' dari '.(FormasiEditor::OCCUPANT_LIMIT + 1).' karyawan');
+    }
+
+    public function test_opening_the_occupant_list_is_recorded_on_the_audit_log_without_personal_data(): void
+    {
+        $position = $this->position('Asisten Audit', 'Karpim', 'RM-3');
+        $seatId = $this->seat($position, 2, 'TAN');
+        $employee = Employee::factory()->create(['unit_kerja' => $this->unit->nama, 'jabatan' => $position->nama, 'nama' => 'Karyawan Audit Uji']);
+
+        $this->editor()->call('viewOccupants', $seatId)->call('closeOccupants');
+
+        $log = MasterAuditLog::where('action', 'seat_access.view_occupants')->sole();
+        $this->assertSame('seat_access', $log->entity_type);
+        $this->assertSame($this->admin->id, $log->user_id);
+        // assertEquals: a JSON column does not keep key order on every database (MySQL sorts the keys).
+        $this->assertEquals(
+            ['unit' => $this->unit->nama, 'jabatan' => 'Asisten Audit', 'rm_level' => 'RM-3', 'bidang' => 'TAN', 'jumlah_baris' => 1],
+            $log->new_values
+        );
+        $this->assertStringNotContainsString($employee->nik, json_encode($log->new_values).$log->entity_label);
+        $this->assertStringNotContainsString('Karyawan Audit Uji', json_encode($log->new_values).$log->entity_label);
+    }
+
+    public function test_opening_an_empty_or_foreign_seat_is_not_recorded_as_personnel_access(): void
+    {
+        $emptySeat = $this->seat($this->position('Asisten Tanpa Pemegang'), 1);
+        $other = Unit::create(['nama' => 'Kebun Asing Audit', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 3]);
+        $foreign = DB::table('position_unit')->insertGetId(['unit_id' => $other->id, 'position_id' => $this->position('Asisten Asing Audit')->id, 'kuota' => 1, 'bidang' => 'TAN', 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->editor()->call('viewOccupants', $emptySeat)->call('viewOccupants', $foreign);
+
+        $this->assertSame(0, MasterAuditLog::where('entity_type', 'seat_access')->count());
+    }
+
+    public function test_occupant_drawer_shows_an_empty_state_for_a_seat_without_holders(): void
+    {
+        $seatId = $this->seat($this->position('Asisten Kosong'), 1);
+
+        $this->editor()->call('viewOccupants', $seatId)
+            ->assertSee('Belum ada karyawan pada jabatan ini')
+            ->assertSee('0 Personil');
     }
 
     public function test_occupants_of_a_seat_in_another_unit_cannot_be_opened(): void
@@ -378,10 +579,11 @@ class FormasiEditorTest extends TestCase
 
         $component = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
             ->assertSee('Formasi Jabatan')
-            ->assertSee('Total Kuota')
+            ->assertSee('Total kuota 1')
+            ->assertDontSee('Total Kuota')
             ->assertSee('1 formasi melebihi kuota');
 
-        $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 1, 'filled' => 2, 'over' => 1], $component->instance()->overviewStats);
+        $this->assertSame(['units' => 1, 'seats' => 1, 'kuota' => 1, 'filled' => 2, 'over' => 1, 'vacant' => 0, 'vacant_formasi' => 0], $component->instance()->overviewStats);
     }
 
     public function test_add_dialog_is_one_form_with_name_suggestions_and_no_separate_create_button(): void
@@ -442,6 +644,61 @@ class FormasiEditorTest extends TestCase
         $this->assertFalse($editor->instance()->hasSeatFilters());
     }
 
+    public function test_unit_list_uses_shared_toolbar_and_header(): void
+    {
+        Unit::create(['nama' => 'Kebun Kedua Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Timur', 'is_active' => true, 'urutan' => 2]);
+
+        $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
+            ->assertSee('Daftar Unit Kerja')
+            ->assertSee('2 Unit Kerja')
+            ->assertSee('Filter Lanjutan')
+            ->assertSeeHtml('formasi-units-search')
+            ->assertDontSee('Reset Filter');
+
+        $list->set('statusFilter', 'inactive')->assertSee('Reset Filter')->assertSee('0 Unit Kerja');
+    }
+
+    public function test_seat_list_uses_shared_toolbar_and_header(): void
+    {
+        $this->seat($this->position('Asisten Alfa', 'Karpim', 'RM-3'), 2, 'TAN');
+        $this->seat($this->position('Kepala Bravo', 'Karpim', 'RM-1'), 1, 'KEU');
+
+        $editor = $this->editor()
+            ->assertSee('Formasi Jabatan — Kebun Editor Uji')
+            ->assertSee('2 Jabatan')
+            ->assertSee('Filter Lanjutan')
+            ->assertSeeHtml('formasi-seats-search');
+
+        $editor->set('rmFilter', 'RM-1')->assertSee('1 Jabatan')->assertSee('Reset Filter')->assertSee('Hapus filter RM Band');
+    }
+
+    public function test_seat_reset_keeps_unit_filters(): void
+    {
+        $editor = $this->editor()
+            ->set('unitQuery', 'Kebun')
+            ->set('wilayahFilter', 'Wilayah Kalimantan Barat')
+            ->set('statusFilter', 'active')
+            ->set('seatQuery', 'alfa')
+            ->set('rmFilter', 'RM-3')
+            ->set('bidangFilter', 'TAN')
+            ->set('seatStatusFilter', 'full')
+            ->call('resetSeatFilters')
+            ->assertSet('seatQuery', '')
+            ->assertSet('rmFilter', '')
+            ->assertSet('bidangFilter', '')
+            ->assertSet('seatStatusFilter', '')
+            ->assertSet('unitQuery', 'Kebun')
+            ->assertSet('wilayahFilter', 'Wilayah Kalimantan Barat')
+            ->assertSet('statusFilter', 'active');
+
+        $editor->set('seatQuery', 'alfa')->set('rmFilter', 'RM-3')->call('resetUnitFilters')
+            ->assertSet('unitQuery', '')
+            ->assertSet('wilayahFilter', '')
+            ->assertSet('statusFilter', '')
+            ->assertSet('seatQuery', 'alfa')
+            ->assertSet('rmFilter', 'RM-3');
+    }
+
     public function test_over_quota_kpi_card_toggles_the_status_filter(): void
     {
         $over = $this->position('Asisten Berlebih');
@@ -490,7 +747,7 @@ class FormasiEditorTest extends TestCase
         Employee::factory()->create(['unit_kerja' => 'BAGIAN LAMA']);
 
         $list = Livewire::actingAs($this->admin)->test(FormasiEditor::class)
-            ->assertSee('3 pegawai tercatat pada 2 unit kerja yang belum terdaftar di Master Unit')
+            ->assertSee('3 karyawan tercatat pada 2 unit kerja yang belum terdaftar di Master Unit')
             ->assertSee('DISTRIK LAMA - KEBUN HILANG (2)')
             ->assertSee('BAGIAN LAMA (1)');
         $this->assertSame(['DISTRIK LAMA - KEBUN HILANG', 'BAGIAN LAMA'], $list->instance()->unregisteredEmployeeUnits->pluck('unit_kerja')->all());

@@ -1,26 +1,29 @@
 {{--
     Hasil cek aturan masa dinas unit & kualifikasi promosi pada alur mutasi (DESIGN.md §7.2).
-    Semua lolos -> strip ringkas primary; ada pelanggaran -> panel warning dengan centang dispensasi + alasan wajib.
-    locked=true mengunci dispensasi selama masih ada kendala penempatan yang memblokir.
+    Semua lolos -> strip ringkas primary; ada pelanggaran -> satu kartu Dispensasi Direksi.
 
-    <x-admin.mutasi.compliance-guard :tenure-analysis="$tenure" :promotion-analysis="$promo" :locked="$hasBlocker" />
+    Satu kartu untuk semua jenis pengecualian: daftar pengecualian yang diajukan menyesuaikan aturan yang tidak terpenuhi,
+    sedangkan persetujuannya cukup satu dasar persetujuan berupa dokumen (nomor nota dinas / SK + tanggal, x-admin.mutasi.dispensasi-field).
+    Identik untuk Mutasi Tunggal maupun Mutasi Berantai dan untuk semua jenis mutasi.
+    Persetujuan wajib (proses tertahan sampai terpenuhi) dan tercatat di riwayat jabatan sebagai bahan audit.
+
+    Hierarki warna: amber hanya pada header kartu; badan kartu netral. Merah hanya untuk kriteria yang gagal.
+    locked = true (kendala penempatan belum selesai, DESIGN.md §7.2 "Terblokir"): kartu tetap terbaca tetapi isian dikunci.
+
+    <x-admin.mutasi.compliance-guard :tenure-analysis="$tenure" :promotion-analysis="$promo" />
 --}}
 @props([
     'tenureAnalysis' => null,
     'promotionAnalysis' => null,
     'currentUnit' => 'unit saat ini',
     'currentRm' => null,
-    'tenureModel' => 'form.dispensasiTenure',
-    'tenureReasonModel' => 'form.alasanDispensasiTenure',
-    'promotionModel' => 'form.dispensasiPromosi',
-    'promotionReasonModel' => 'form.alasanDispensasiPromosi',
-    'isTenureChecked' => false,
-    'isPromotionChecked' => false,
-    'errorTenureKey' => 'dispensasiTenure',
-    'errorTenureReasonKey' => 'alasanDispensasiTenure',
-    'errorPromoKey' => 'dispensasiPromosi',
-    'errorPromoReasonKey' => 'alasanDispensasiPromosi',
+    'employeeNik' => null,
+    'referenceModel' => 'form.alasanDispensasiDireksi',
+    'dateModel' => 'form.tanggalDispensasiDireksi',
+    'isApproved' => false,
     'locked' => false,
+    'errorReferenceKey' => 'alasanDispensasiDireksi',
+    'errorDateKey' => 'tanggalDispensasiDireksi',
 ])
 
 @php
@@ -57,116 +60,112 @@
         </span>
     </div>
 @else
-    <!-- ── 2. ADAPTIVE COMPLIANCE GUARD (Stacked / Full-Width agar Input & Teks Lega) ── -->
-    <div class="space-y-3.5 animate-fade-in">
+    <!-- ── 2. KARTU DISPENSASI DIREKSI (satu persetujuan untuk seluruh pengecualian regulasi) ── -->
+    @php
+        $exceptionCount = (int) $isTenureNonCompliant + (int) $isPromoNonCompliant;
+        $headingId = 'dispensasi-heading-'.trim(preg_replace('/[^a-z0-9]+/i', '-', $referenceModel), '-');
+        // Status berwarna + ikon + teks (bukan warna saja): terkunci -> menunggu, bukti lengkap -> tercatat, selain itu perlu dispensasi
+        [$pillClass, $pillIcon, $pillText] = match (true) {
+            $locked => ['bg-surface-100 text-surface-700 border-surface-300', 'fa-lock', 'Belum Tersedia'],
+            $isApproved => ['bg-primary-50 text-primary-800 border-primary-200', 'fa-check', 'Dispensasi Tercatat'],
+            default => ['bg-warning-50 text-warning-800 border-warning-200', 'fa-triangle-exclamation', 'Perlu Dispensasi'],
+        };
 
-        <!-- ── KARTU MASA DINAS UNIT KERJA (Tampil jika Melanggar Masa Dinas) ── -->
-        @if ($isTenureNonCompliant)
-            <div class="rounded-xl border border-warning-200 bg-warning-50/70 p-4 space-y-3 transition shadow-2xs">
-                <div class="flex items-center justify-between pb-2 border-b border-warning-200/80 gap-2">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <div class="w-6 h-6 rounded-md bg-warning text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
-                            <i class="fas fa-history" aria-hidden="true"></i>
-                        </div>
-                        <h4 class="text-xs font-bold text-warning-800 uppercase tracking-wider">
-                            Masa Dinas Unit Kerja
-                        </h4>
-                    </div>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning-100 text-warning-800 border border-warning-200 shrink-0">
-                        Perlu Dispensasi
-                    </span>
-                </div>
-
-                <div class="text-xs text-warning-800 leading-relaxed space-y-1">
-                    <p class="font-semibold text-warning-800">Peringatan Standar Regulasi Masa Dinas (2–3 Tahun):</p>
-                    <p class="text-warning-700 text-xs">
-                        Pegawai baru bertugas <strong class="font-bold text-warning-800">{{ \App\Services\Mutasi\TalentProfileBuilder::formatMonths($tenureAnalysis['months'] ?? 0) }}</strong> di {{ $currentUnit }}. Standar regulasi rotasi unit minimal 2–3 tahun demi kestabilan operasional perkebunan.
-                    </p>
-                </div>
-
-                <div class="pt-3 border-t border-warning-200/90 space-y-2">
-                    <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" wire:model.live="{{ $tenureModel }}" @disabled($locked) @if ($locked) aria-describedby="dispensasi-tenure-locked-note" @endif class="mt-0.5 w-4 h-4 rounded text-warning-700 border-warning focus:ring-warning cursor-pointer shrink-0">
-                        <span class="text-xs font-semibold text-warning-800">
-                            Rotasi unit sebelum 2 tahun ini telah disetujui melalui Dispensasi Khusus Direksi. <span class="text-danger-700 font-bold" aria-hidden="true">*</span><span class="sr-only">(wajib)</span>
-                        </span>
-                    </label>
-                    @if ($locked)
-                        <p id="dispensasi-tenure-locked-note" class="text-xs text-surface-700">Dapat diisi setelah kendala penempatan di atas diselesaikan.</p>
-                    @endif
-                    @if ($errors->has($errorTenureKey))
-                        <p class="text-danger-700 text-xs font-semibold">{{ $errors->first($errorTenureKey) }}</p>
-                    @endif
-                    @if (! $locked && $isTenureChecked)
-                        <input type="text" wire:model.live.debounce.300ms="{{ $tenureReasonModel }}" placeholder="Alasan pertimbangan / Nomor Nota Persetujuan Direksi..."
-                            class="w-full px-3.5 py-2 bg-white border border-warning-200 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-1 focus:ring-warning transition shadow-2xs">
-                        @if ($errors->has($errorTenureReasonKey))
-                            <p class="text-danger-700 text-xs mt-1">{{ $errors->first($errorTenureReasonKey) }}</p>
-                        @endif
-                    @endif
+        // Satu pola baris untuk setiap syarat: [ikon] Syarat (batas) - status, lalu satu baris fakta.
+        // Angka (batas, selisih, nilai kriteria) berasal dari service; view hanya menyusun teks.
+        $rows = [];
+        if ($isTenureNonCompliant) {
+            $tenureFacts = ! empty($tenureAnalysis['tmt_unit_kerja'])
+                ? 'Saat ini '.\App\Services\Mutasi\TalentProfileBuilder::formatMonths((int) ($tenureAnalysis['months'] ?? 0)).' di '.$currentUnit
+                : 'TMT unit kerja belum tercatat';
+            $rows[] = [
+                'type' => 'tenure',
+                'group' => null,
+                'met' => false,
+                'label' => 'Masa Dinas Unit Kerja',
+                'limit' => 'min. '.($tenureAnalysis['required_label'] ?? '2 tahun'),
+                'facts' => [$tenureFacts.' · kurang '.\App\Services\Mutasi\TalentProfileBuilder::formatMonths((int) ($tenureAnalysis['shortfall_months'] ?? 0))],
+                'dataGap' => false,
+            ];
+        }
+        if ($isPromoNonCompliant) {
+            $promoGroup = 'Kualifikasi Promosi '.($promotionAnalysis['current_rm'] ?? 'RM').' → '.($promotionAnalysis['target_rm'] ?? 'RM');
+            foreach (($promotionAnalysis['criteria'] ?? []) as $crit) {
+                $rows[] = [
+                    'type' => 'promotion',
+                    'group' => $promoGroup,
+                    'met' => ! empty($crit['met']),
+                    'label' => $crit['label'],
+                    'limit' => null,
+                    // Nilai gabungan ("Gol: .. | Masa Dinas: ..") dirapikan jadi satu baris fakta
+                    'facts' => [str_replace(' | ', ' · ', (string) ($crit['value'] ?? ''))],
+                    'dataGap' => ! empty($crit['is_data_gap']),
+                ];
+            }
+        }
+        $lastGroup = null;
+    @endphp
+    <section class="rounded-xl border border-warning-200 bg-white overflow-hidden animate-fade-in" aria-labelledby="{{ $headingId }}" data-dispensasi-card @if ($locked) data-dispensasi-locked-card @endif>
+        {{-- Header: satu-satunya area beraksen amber, identik pada semua keadaan; hanya pil status yang berubah --}}
+        <header class="flex items-start justify-between gap-3 px-4 sm:px-5 py-3.5 border-b bg-warning-50/70 border-warning-200">
+            <div class="flex items-start gap-2 min-w-0">
+                {{-- Kotak ikon setinggi baris judul (h-5 = leading text-sm) agar ikon sejajar tengah dengan judul; teks judul, subjudul, dan baris syarat berawal di tepi kiri yang sama --}}
+                <span class="flex h-5 w-4 shrink-0 items-center justify-center"><i class="fas fa-shield-halved text-warning-700 text-sm translate-y-px" aria-hidden="true"></i></span>
+                <div class="min-w-0">
+                    <h4 id="{{ $headingId }}" class="text-sm font-bold text-warning-800">Dispensasi Direksi</h4>
+                    <p class="text-xs text-surface-600">{{ $exceptionCount }} pengecualian regulasi memerlukan persetujuan Direksi</p>
                 </div>
             </div>
-        @endif
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold border shrink-0 whitespace-nowrap {{ $pillClass }}">
+                <i class="fas {{ $pillIcon }}" aria-hidden="true"></i>
+                {{ $pillText }}
+            </span>
+        </header>
 
-        <!-- ── KARTU SYARAT PROMOSI (Tampil jika Melanggar Syarat Promosi) ── -->
-        @if ($isPromoNonCompliant)
-            <div class="rounded-xl border border-warning-200/90 bg-warning-50/50 p-4 sm:p-5 space-y-3.5 transition shadow-2xs">
-                <div class="flex items-center justify-between pb-2 border-b border-warning-200/80 gap-2">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <div class="w-6 h-6 rounded-md bg-warning-700 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
-                            <i class="fas fa-chart-line" aria-hidden="true"></i>
-                        </div>
-                        <h4 class="text-xs font-bold text-warning-800 uppercase tracking-wider">
-                            Kualifikasi Promosi ({{ $promotionAnalysis['current_rm'] ?? 'RM' }} &rarr; {{ $promotionAnalysis['target_rm'] ?? 'RM' }})
-                        </h4>
-                        @if ($tenureAnalysis && ($tenureAnalysis['is_applicable'] ?? false) && ($tenureAnalysis['is_compliant'] ?? false))
-                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-primary-100 text-primary-800 border border-primary-200">
-                                Masa Dinas Unit Memenuhi Syarat
-                            </span>
+        <div class="px-4 sm:px-5 py-4 space-y-4">
+            <div>
+                <h5 class="sr-only">Pengecualian regulasi yang diajukan</h5>
+                <ul class="space-y-3">
+                    @foreach ($rows as $row)
+                        @if ($row['group'] && $row['group'] !== $lastGroup)
+                            @php $lastGroup = $row['group']; @endphp
+                            <li class="pt-1 text-xs font-bold text-surface-700 {{ $loop->first ? '' : 'border-t border-surface-200 pt-3' }}">{{ $row['group'] }}</li>
                         @endif
-                    </div>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning-100 text-warning-800 border border-warning-200 shrink-0">
-                        Perlu Dispensasi
-                    </span>
-                </div>
-
-                <div class="space-y-2 text-xs">
-                    @foreach ($promotionAnalysis['criteria'] ?? [] as $crit)
-                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-white/95 border border-warning-100/90 shadow-2xs text-xs gap-3">
-                            <div class="flex items-center gap-2.5 min-w-0">
-                                <i class="fas {{ !empty($crit['met']) ? 'fa-circle-check text-primary-600' : 'fa-circle-xmark text-danger' }} text-sm shrink-0" aria-hidden="true"></i>
-                                <span class="font-medium text-surface-800 truncate">{{ $crit['label'] }}</span>
+                        {{-- leading-5 + kotak ikon h-5: ikon sejajar tengah dengan baris syarat; baris fakta jatuh tepat di bawah teks syarat --}}
+                        <li class="flex items-start gap-2 text-xs leading-5" data-dispensasi-item="{{ $row['type'] }}" @if ($row['type'] === 'promotion') data-promotion-criteria @endif>
+                            <span class="flex h-5 w-4 shrink-0 items-center justify-center"><i class="fas {{ $row['met'] ? 'fa-circle-check text-primary-600' : 'fa-circle-xmark text-danger' }} text-sm" aria-hidden="true"></i></span>
+                            <div class="min-w-0">
+                                <p class="text-surface-900">
+                                    <span class="font-semibold">{{ $row['label'] }}</span>
+                                    @if ($row['limit'])
+                                        <span class="text-surface-600">({{ $row['limit'] }})</span>
+                                    @endif
+                                    <span class="font-medium {{ $row['met'] ? 'text-primary-700' : 'text-danger-700' }}">&mdash; {{ $row['met'] ? 'terpenuhi' : 'belum terpenuhi' }}</span>
+                                </p>
+                                <p class="text-surface-600">
+                                    {{ implode(' · ', array_filter($row['facts'])) }}
+                                    {{-- Data belum ada = celah data yang dapat dilengkapi, bukan standar yang gagal --}}
+                                    @if ($row['dataGap'] && $employeeNik)
+                                        &middot; <a href="{{ route('admin.evaluations.create', ['employee_nik' => $employeeNik]) }}" target="_blank" rel="noopener"
+                                            class="inline-flex items-center gap-1 font-semibold text-primary-700 hover:text-primary-800 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
+                                            Lengkapi data evaluasi
+                                            <i class="fas fa-arrow-up-right-from-square text-[10px]" aria-hidden="true"></i>
+                                            <span class="sr-only">(dibuka di tab baru)</span>
+                                        </a>
+                                    @endif
+                                </p>
                             </div>
-                            <span class="px-2 py-0.5 rounded text-xs font-bold shrink-0 ml-2 {{ !empty($crit['met']) ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-danger-50 text-danger-800 border border-danger-200' }}">
-                                {{ $crit['value'] }}
-                            </span>
-                        </div>
+                        </li>
                     @endforeach
-                </div>
-
-                <div class="pt-3 border-t border-warning-200/80 space-y-2">
-                    <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" wire:model.live="{{ $promotionModel }}" @disabled($locked) @if ($locked) aria-describedby="dispensasi-promo-locked-note" @endif class="mt-0.5 w-4 h-4 rounded text-warning-700 border-warning-200 focus:ring-warning cursor-pointer shrink-0">
-                        <span class="text-xs font-semibold text-warning-800 leading-relaxed">
-                            Pengajuan promosi ini telah memperoleh persetujuan Dispensasi Promosi Dipercepat / Keputusan Khusus Direksi. <span class="text-danger-700 font-bold" aria-hidden="true">*</span><span class="sr-only">(wajib)</span>
-                        </span>
-                    </label>
-                    @if ($locked)
-                        <p id="dispensasi-promo-locked-note" class="text-xs text-surface-700">Dapat diisi setelah kendala penempatan di atas diselesaikan.</p>
-                    @endif
-                    @if ($errors->has($errorPromoKey))
-                        <p class="text-danger-700 text-xs font-semibold">{{ $errors->first($errorPromoKey) }}</p>
-                    @endif
-                    @if (! $locked && $isPromotionChecked)
-                        <input type="text" wire:model.live.debounce.300ms="{{ $promotionReasonModel }}" placeholder="Alasan pertimbangan promosi / nomor rekomendasi asesmen..."
-                            class="w-full px-3.5 py-2 bg-white border border-warning-200 rounded-lg text-xs font-medium text-surface-800 placeholder-surface-400 focus:outline-none focus:border-warning-700 focus:ring-1 focus:ring-warning-200 transition shadow-2xs">
-                        @if ($errors->has($errorPromoReasonKey))
-                            <p class="text-danger-700 text-xs mt-1">{{ $errors->first($errorPromoReasonKey) }}</p>
-                        @endif
-                    @endif
-                </div>
+                </ul>
             </div>
-        @endif
 
-    </div>
+            <x-admin.mutasi.dispensasi-field
+                :locked="$locked"
+                :reference-model="$referenceModel"
+                :date-model="$dateModel"
+                :error-reference-key="$errorReferenceKey"
+                :error-date-key="$errorDateKey" />
+        </div>
+    </section>
 @endif

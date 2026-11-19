@@ -1,5 +1,8 @@
 @props([
     'wireModel' => 'fileSk',
+    'icon' => 'fas fa-file-pdf',
+    'iconActive' => 'text-danger',
+    'emptyText' => 'Belum ada dokumen PDF dipilih',
     'file' => null,
     'label' => 'Unggah Berkas PDF',
     'helper' => '(Opsional, Dokumen Resmi Maks. 5MB)',
@@ -12,7 +15,7 @@
 
 <div>
     @if ($label)
-        <label class="block text-xs font-semibold text-surface-700 mb-1.5">
+        <label for="{{ $id }}" class="block text-xs font-semibold text-surface-700 mb-1.5">
             {{ $label }}
             @if ($helper)
                 <span class="text-surface-500 font-normal text-xs">{{ $helper }}</span>
@@ -23,7 +26,7 @@
     <div class="relative w-full">
         {{-- Ikon Kiri Statis: Posisi absolut inset-y-0 left-0 pl-3.5 persis 1:1 dengan input standar --}}
         <div class="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-surface-500 z-10">
-            <i class="fas fa-file-pdf text-xs {{ $file ? 'text-danger' : 'text-surface-400' }}" aria-hidden="true"></i>
+            <i class="{{ $icon }} text-xs {{ $file ? $iconActive : 'text-surface-400' }}" aria-hidden="true"></i>
         </div>
 
         {{-- Bingkai Kontrol Input Penuh: pl-9.5 memberi jeda presisi bebas tumpang tindih --}}
@@ -48,7 +51,7 @@
                     </div>
                 @else
                     <div wire:loading.remove wire:target="{{ $wireModel }}" class="text-xs sm:text-sm text-surface-500 font-normal truncate select-none">
-                        Belum ada dokumen PDF dipilih
+                        {{ $emptyText }}
                     </div>
                 @endif
             </div>

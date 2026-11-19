@@ -1,6 +1,6 @@
 # DOMAIN.md — Domain Knowledge, Business Rules & Enterprise Architecture
 ## PT Perkebunan Nusantara IV Regional V (Kalimantan)
-### Sistem Informasi Manajemen Talenta & Formasi Pegawai
+### Sistem Informasi Manajemen Talenta & Formasi Karyawan
 
 > Dokumen ini adalah **acuan domain tunggal (Single Source of Truth for Business Domain & Enterprise Rules)** mengenai tata kelola kepegawaian, struktur organisasi perkebunan, hierarki jabatan manajerial, matriks talenta 9-box, serta aturan bisnis HR di lingkungan **PT Perkebunan Nusantara IV Regional V**.
 >
@@ -11,8 +11,8 @@
 ## Daftar Isi
 1. [Tujuan & Filosofi Domain](#1-tujuan--filosofi-domain)
 2. [Terminologi & Kamus Data Domain (Data Dictionary)](#2-terminologi--kamus-data-domain-data-dictionary)
-3. [Struktur Wilayah & Master Data 45 Unit Kerja](#3-struktur-wilayah--master-data-45-unit-kerja)
-4. [Strata Pegawai, RM Band, & 4 Bidang Fungsional](#4-strata-pegawai-rm-band--4-bidang-fungsional)
+3. [Struktur Wilayah & Master Data 47 Unit Kerja](#3-struktur-wilayah--master-data-47-unit-kerja)
+4. [Strata Karyawan, RM Band, & 4 Bidang Fungsional](#4-strata-karyawan-rm-band--4-bidang-fungsional)
 5. [Aturan Bisnis HR & Rumus Perhitungan](#5-aturan-bisnis-hr--rumus-perhitungan)
 6. [Manajemen Kinerja & Matriks Talenta (9-Box Grid)](#6-manajemen-kinerja--matriks-talenta-9-box-grid)
 7. [Pengembangan Kompetensi & Pelatihan (L&D)](#7-pengembangan-kompetensi--pelatihan-ld)
@@ -29,37 +29,53 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 1. **Agro-Industrial Dualism**: Membawahi dua domain operasional sekaligus — perkebunan (on-farm: panen kelapa sawit & getah karet) dan pabrik pengolahan (off-farm: PKS/Pabrik Kelapa Sawit & Pengolahan Karet).
 2. **Keterikatan Wilayah yang Luas**: Wilayah kerja terbentang di seluruh penjuru Kalimantan (Regional Office di Pontianak, kebun dan pabrik di Kalbar, Kalsel, Kalteng, hingga Kaltim). Kebijakan mutasi dan rotasi harus memperhitungkan masa dinas unit agar stabilitas produksi terjaga.
 3. **Hierarki Ketat & Rantai Formasi (Zero Leakage)**: Mutasi pimpinan tidak pernah berdiri sendiri; pemindahan satu manajer memicu rantai lowongan (*chain vacancy*) yang harus dipantau secara transparan sampai terisi (*closed*).
-4. **Kepastian Masa Pensiun & Regenerasi**: Batas Usia Pensiun (56 tahun) dan Masa Bebas Tugas/MBT (55 tahun) adalah angka pasti yang mengikat perhitungan kebutuhan formasi (MPP) hingga beberapa tahun ke depan ($T, T+1, T+2$).
+4. **Kepastian Masa Pensiun & Regenerasi**: Batas Usia Pensiun (56 tahun) dan Masa Bebas Tugas/MBT (6 bulan sebelum tanggal pensiun) adalah angka pasti yang mengikat perhitungan kebutuhan formasi (MPP) hingga beberapa tahun ke depan ($T, T+1, T+2$).
 
 ---
 
 ## 2. Terminologi & Kamus Data Domain (Data Dictionary)
 
-### 2.1 Entitas Pegawai (`Employee` / `employees`)
+### 2.0 Glosarium Istilah Baku (Ubiquitous Language)
+
+Satu konsep memakai satu istilah di seluruh antarmuka, pesan, ekspor, dan dokumentasi.
+
+| Konsep | Istilah baku di UI | Catatan |
+|---|---|---|
+| Orang yang bekerja di perusahaan | **Karyawan** (jamak: "karyawan") | Menggantikan "Pegawai" pada label, judul, pesan, dan ekspor. Contoh: "Daftar Karyawan", "Tambah Karyawan", "Nomor Induk Karyawan (NIK)". |
+| Strata | **Karyawan Pimpinan (Karpim)** dan **Karyawan Pelaksana (Karpel)** | Istilah resmi perusahaan; tidak diubah. |
+| Fungsi, regulasi, dan kebijakan | **Kepegawaian** | Tetap dipakai pada nama fungsi dan regulasi, misalnya "Peraturan Kepegawaian" dan `KepegawaianPolicy`. |
+| Nilai status tersimpan | `Calon Pegawai` | Nilai enum pada `status_karyawan`; tidak diubah agar data dan validasi impor tetap sah. |
+
+Aturan: identifier kode (kelas, tabel, kolom, rute, kunci kolom tabel) tidak diubah demi istilah; hanya teks yang terlihat pengguna dan komentar. Istilah baru wajib ditambahkan ke glosarium ini lebih dahulu.
+
+### 2.1 Entitas Karyawan (`Employee` / `employees`)
 
 | Field / Atribut | Tipe Data | Deskripsi & Validasi | Nilai Valid / Format |
 |---|---|---|---|
 | `nik` | `string(8)` | **Primary Key**. Nomor Induk Karyawan unik 8 digit numerik. Regex: `/^[0-9]{8}$/`. | `13004521`, `13004837` |
 | `nama` | `string` | Nama resmi sesuai SK Pengangkatan/KTP. Disimpan dalam format UPPERCASE. | `DONNY USMAN`, `HERRY WAHYUDI` |
-| `level` | `string` | Kategori strata pegawai: Karyawan Pimpinan atau Pelaksana. | `Karpim`, `Karpel` |
-| `rm_level` | `string/enum` | Eselon manajemen dan formasi: RM-1, RM-2, RM-3 (Karpim), dan RM-4 (Karpel). | `RM-1`, `RM-2`, `RM-3`, `RM-4` |
-| `bidang` | `string` | Bidang fungsional operasional pegawai. | `KEU`, `TAN`, `TEK`, `UMU` |
+| `level` | `string` | Kategori strata karyawan: Karyawan Pimpinan atau Pelaksana. | `Karpim`, `Karpel` |
+| `rm_level` | `string/enum` | Eselon manajemen dan formasi: RM-1, RM-2, RM-3 (Karpim), dan RM-4 s.d. RM-7 (Karpel). | `RM-1`, `RM-3`, `RM-5` |
+| `bidang` | `string` | Bidang fungsional operasional karyawan. | `KEU`, `TAN`, `TEK`, `UMU` |
 | `jabatan` | `string` | Nomenklatur jabatan dinas yang sedang diemban saat ini. | `Manajer Kebun`, `Askep Tanaman`, `Asisten Afdeling` |
-| `unit_kerja` | `string` | Nama unit kerja definitif dari 45 unit resmi perusahaan (§3). | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
+| `unit_kerja` | `string` | Nama unit kerja definitif dari 47 unit resmi perusahaan (§3). | `Kebun Inti Gunung Meliau`, `PKS Samuntai` |
 | `golongan` | `string` | Tingkat golongan kepangkatan beserta berkala genap (`[Gol]/[Berkala]`). | `IIIA/00`, `IIID/05`, `IVA/05` |
-| `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
-| `person_grade` | `integer` | Tingkat kompetensi individual pegawai (1 s.d. 16). | Karpel (RM-4): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
-| `jalur_masuk` | `string?` | Jalur rekrutmen/pengadaan pegawai yang berpengaruh ke supply pipa MPP. | `CKP`, `Talent Scouting`, `RBB`, `Reguler` |
-| `tanggal_lahir` | `date` | Tanggal lahir pegawai (dasar perhitungan pensiun & MBT). | `1980-08-15` |
+| `job_grade` | `integer` | Bobot kompleksitas jabatan (1 s.d. 16). | Karpel (RM-4 s.d. RM-7): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
+| `person_grade` | `integer` | Tingkat kompetensi individual karyawan (1 s.d. 16). | Karpel (RM-4 s.d. RM-7): 1-10; Karpim (RM-1 s.d. RM-3): 11-16 |
+| `jalur_masuk` | `string?` | Jalur rekrutmen/pengadaan karyawan yang berpengaruh ke supply pipa MPP. | `CKP`, `Talent Scouting`, `RBB`, `Reguler` |
+| `tanggal_lahir` | `date` | Tanggal lahir karyawan (dasar perhitungan pensiun & MBT). | `1980-08-15` |
 | `tempat_lahir` | `string(100)?` | Tempat/kota kelahiran sesuai KTP. | `Medan`, `Pontianak` |
-| `jenis_kelamin` | `string(10)?` | Jenis kelamin pegawai (Laki-laki / Perempuan). | `L`, `P` |
+| `jenis_kelamin` | `string(10)?` | Jenis kelamin karyawan (Laki-laki / Perempuan). | `L`, `P` |
 | `agama` | `string(50)?` | Agama resmi yang diakui pemerintah. | `Islam`, `Kristen Protestan`, `Katolik`, `Hindu`, `Buddha`, `Khonghucu` |
 | `tmt_bekerja` | `date` | Terhitung Mulai Tanggal pertama kali diangkat di PTPN. | `2005-01-01` |
 | `tanggal_diangkat_staf`| `date` | Tanggal resmi diangkat menjadi staf pimpinan (Karpim). Kosong jika Karpel. | `2012-06-01` |
 | `tmt_unit_kerja` | `date` | Tanggal mulai bertugas di unit kerja saat ini (dasar rotasi dinas). | `2022-03-01` |
 | `tanggal_dalam_jabatan` | `date` | Tanggal SK pengangkatan posisi jabatan saat ini. | `2023-01-01` |
 | `tanggal_pensiun` | `date` | Tanggal jatuh tempo pensiun (tepat 56 tahun). | Ditentukan otomatis oleh sistem |
-| `tanggal_mbt` | `date` | Tanggal Masa Bebas Tugas (tepat 1 tahun sebelum pensiun / 55 tahun). | Ditentukan otomatis oleh sistem |
+| `tanggal_mbt` | `date` | Tanggal Masa Bebas Tugas (tepat 6 bulan sebelum tanggal pensiun). | Ditentukan otomatis oleh sistem |
+| `tanggal_berhenti` | `date?` | Tanggal karyawan diberhentikan dari jabatan (pensiun). Terisi hanya oleh `PensiunService`; kosong = karyawan aktif. | Ditentukan otomatis oleh sistem |
+| `alasan_berhenti` | `string(30)?` | Alasan pemberhentian baku (`Employee::ALASAN_BERHENTI`). | `Pensiun`, `Pensiun Dini`, `Mengundurkan Diri`, `Meninggal Dunia`, `Pemutusan Hubungan Kerja` |
+| `nomor_sk_berhenti` / `tanggal_sk_berhenti` | `string(100)?` / `date?` | Dasar SK pemberhentian; boleh menyusul untuk pensiun otomatis. | `SK-001/PTPN4/2026` |
 | `susunan_keluarga` | `string` | Status tanggungan perkawinan & anak (PTKP). | `L`, `TK`, `K/0`, `K/1`, `K/2`, `K/3` |
 | `pendidikan_terakhir`| `string(100)?` | Jenjang pendidikan formal tertinggi yang ditamatkan. | `SD`, `SMP`, `SMA / SMK`, `D1 / D2`, `D3`, `D4 / S1`, `S2`, `S3` |
 | `sekolah` | `string?` | Nama institusi pendidikan formal / universitas. | `Universitas Gadjah Mada`, `INSTIPER` |
@@ -78,9 +94,10 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `tmt_akhir` | `date?` | Tanggal berakhir menjabat (NULL jika masih aktif). |
 | `status_jabatan` | `string` | Status jabatan: `Definitif`, `Pj (Pejabat Sementara)`, `Plt (Pelaksana Tugas)`. |
 | `jenis_mutasi` | `string` | Wajib salah satu dari `JobHistory::MUTASI_TYPES`: `PROMOSI`, `ROTASI`, `DEMOSI`, `MUTASI_UNIT`, `PENUGASAN`, `PENUGASAN_KHUSUS`, `SANKSI_INDISIPLINER`. |
+| `sumber` | `string(20)` | Asal baris: `mutasi` (bawaan; SK mutasi resmi lewat modul Mutasi), `data_awal` (penempatan awal saat karyawan dibuat lewat form atau impor), `pembaruan_data` (perubahan data jabatan/unit karyawan di luar Mutasi), `impor` (tugas rangkap hasil impor). Baris selain `mutasi` bukan SK Direksi: `nomor_sk` dan `tanggal_sk` **wajib kosong** (dilarang membuat nomor SK buatan). Layar Riwayat & Audit Log menampilkan `mutasi` secara bawaan; sumber lain dapat dipilih pada filter Sumber dan ditandai lencana. Tidak ada baris yang disembunyikan secara permanen atau dilewati. Ekspor Log Audit (22 kolom) mengikuti filter Sumber, memuat kolom `SUMBER CATATAN`, menulis status regulasi "Bukan SK Mutasi (Catatan Data Kepegawaian)" untuk baris selain `mutasi`, dan mencantumkan cakupan sumber pada metadata berkas. |
 | `batch_id` / `chain_order` | `uuid?` / `int?` | Penanda satu SK yang wajib diaktivasi/dibatalkan bersama (pasangan Swap & gerbong SK Kolektif). |
 | `is_applied` | `boolean` | `false` = mutasi terjadwal (TMT di masa depan, formasi target berstatus *Reserved*). |
-| `tanggal_berakhir_sanksi` | `date?` | Batas waktu sanksi indisipliner; diterapkan ke profil pegawai saat mutasi diaktivasi. |
+| `tanggal_berakhir_sanksi` | `date?` | Batas waktu sanksi indisipliner; diterapkan ke profil karyawan saat mutasi diaktivasi. |
 | `cancelled_by` / `alasan_pembatalan` / `deleted_at` | `fk?` / `string?` / `timestamp?` | Jejak audit pembatalan. Riwayat jabatan **tidak pernah dihapus permanen** (soft delete). |
 
 ### 2.3 Entitas Evaluasi Kinerja & 9-Box (`Evaluation` / `evaluations`)
@@ -90,7 +107,7 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `employee_nik` | `string(8)` | FK ke `employees.nik`. |
 | `skor_smkbk_9box` | `float/decimal` | Skor Sistem Manajemen Kinerja Berbasis Kompetensi (Sumbu X: Performance). |
 | `skor_cli_9box` | `float/decimal` | Skor Capacity / Leadership Index (Sumbu Y: Potential). |
-| `kategori_9box` | `integer (1-9)` | Hasil klasifikasi kuadran 9-box talent matrix (1 s.d. 9). |
+| `kategori_9box` | `string(100)?` | Kuadran 9-box talent matrix dalam format baku `Box N: Label` dengan N = 1 s.d. 9 (daftar pada §6, `Evaluation::BOX_LABELS`), mis. `Box 9: Star`. Dipilih dari daftar pada formulir dan divalidasi `EvaluationRequest`; aturan mutasi membaca nomor Box (`MutasiPolicy::GOOD_EVALUATION_BOXES`). Nilai bebas lama (mis. `Solid Performer`) tetap tersimpan dan dapat dipertahankan saat penilaian itu diubah, tetapi tidak berlaku untuk penilaian baru. |
 | `nilai_kepemimpinan` | `decimal` | Komponen penilaian pilar kepemimpinan. |
 | `nilai_perilaku_budaya`| `decimal` | Komponen penilaian budaya kerja AKHLAK BUMN. |
 | `nilai_pengalaman_teknis`| `decimal` | Komponen keahlian teknis agro/pabrik/keuangan. |
@@ -107,74 +124,79 @@ Pengelolaan SDM di BUMN Perkebunan (PTPN IV Regional V) memiliki karakteristik u
 | `jenis` | `string` | `Leadership`, `Teknis Kelapa Sawit`, `Teknis Pabrik`, `Finance/Akuntansi`, `K3 & Sustainability`. |
 | `metode` | `string` | `Klasikal (Tatap Muka)`, `In-House Training`, `E-Learning`, `Workshop Praktik`. |
 | `jumlah_man_hours` | `integer` | Akumulasi durasi pelatihan untuk pelaporan Man Hours Learning BUMN. |
-| `pivot.sertifikat` | `string?` | Path/URL bukti sertifikat kelulusan pegawai. |
+| `pivot.sertifikat` | `string?` | Path/URL bukti sertifikat kelulusan karyawan. |
+| `bidang_pelatihan` | `string` | Kode bidang fungsional (`KEU`, `TAN`, `TEK`, `UMU`, `Position::BIDANG_LIST`). |
+
+`jenis`, `metode`, dan `bidang_pelatihan` dipilih dari daftar baku di atas (`Training::JENIS_LIST`, `Training::METODE_LIST`, `Position::BIDANG_LIST`) dan divalidasi pada `TrainingRequest`; isian bebas tidak diterima. Pelatihan lama yang menyimpan nilai di luar daftar tetap dapat diubah tanpa memaksa penggantian nilai tersebut, tetapi nilai itu tidak berlaku untuk pelatihan baru.
 
 ---
 
-## 3. Struktur Wilayah & Master Data 45 Unit Kerja
+## 3. Struktur Wilayah & Master Data 47 Unit Kerja
 
-Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 45 unit kerja aktif, bersumber dari Excel formasi Karpim, lihat §3.6):
+Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-unit kebun dan pabrik (PKS) yang tersebar di seluruh Pulau Kalimantan (total 47 unit kerja aktif, bersumber dari Excel struktur organisasi, lihat §3.6):
 
 ### 3.1 Regional Office (Kantor Direksi / Head Office Pontianak)
 *Kode Wilayah: `REG`*
 
-1. **Bagian Sekretariat & Hukum** *(Tipe: KANDIR | Bidang: UMU)*
-2. **Bagian Sumber Daya Manusia & Sistem Manajemen** *(Tipe: KANDIR | Bidang: UMU)*
+1. **Divisi Satuan Pengawasan Intern** *(Tipe: KANDIR | Bidang: UMU)*
+2. **Divisi Sustainability & ESG** *(Tipe: KANDIR | Bidang: UMU)*
 3. **Bagian Tanaman** *(Tipe: KANDIR | Bidang: TAN)*
 4. **Bagian Teknik & Pengolahan** *(Tipe: KANDIR | Bidang: TEK)*
 5. **Bagian Akuntansi & Keuangan** *(Tipe: KANDIR | Bidang: KEU)*
-6. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: KEU)*
-7. **Bagian Pengadaan & Teknologi Informasi** *(Tipe: KANDIR | Bidang: UMU)*
-8. **Distrik Petani Mitra** *(Tipe: DISTRIK | Bidang: TAN)*
-9. **Kebun Kemitraan Area Kalbar** *(Tipe: KEBUN | Bidang: TAN)*
-10. **PMO Investasi Tanaman Wilayah Kalbar** *(Tipe: KANDIR | Bidang: TAN)*
-11. **PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng** *(Tipe: KANDIR | Bidang: TAN)*
-12. **PMO Batu Bara & Bisnis Lainnya** *(Tipe: KANDIR | Bidang: UMU)*
-13. **Kebun Kemitraan Area Kaltim-Sel** *(Tipe: KEBUN | Bidang: TAN)*
+6. **Bagian Pengadaan & Teknologi Informasi** *(Tipe: KANDIR | Bidang: UMU)*
+7. **Bagian Sekretariat & Hukum** *(Tipe: KANDIR | Bidang: UMU)*
+8. **Bagian Sumber Daya Manusia** *(Tipe: KANDIR | Bidang: UMU)*
+9. **Distrik Petani Mitra** *(Tipe: DISTRIK | Bidang: TAN)*
+10. **Kebun Kemitraan Area Kalbar** *(Tipe: KEBUN | Bidang: TAN)*
+11. **Kebun Kemitraan Area Kaltim-Sel** *(Tipe: KEBUN | Bidang: TAN)*
+12. **PMO Investasi Tanaman Wilayah Kalbar** *(Tipe: KANDIR | Bidang: TAN)*
+13. **PMO Investasi Tanaman Wilayah Kaltim & Kalsel-Teng** *(Tipe: KANDIR | Bidang: TAN)*
+14. **PMO Batu Bara & Bisnis Lainnya** *(Tipe: KANDIR | Bidang: UMU)*
+15. **Tim Penguatan ERP SAP** *(Tipe: KANDIR | Bidang: KEU)*
 
 ### 3.2 Wilayah Kalimantan Barat
 *Kode Wilayah: `KALBAR`*
 
-14. **Group Manager Kalbar** *(Tipe: GROUP | Bidang: TAN)*
-15. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN)*
-16. **PKS Gunung Meliau** *(Tipe: PKS | Bidang: TEK)*
-17. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN)*
-18. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN)*
-19. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN)*
-20. **PKS Rimba Belian** *(Tipe: PKS | Bidang: TEK)*
-21. **Kebun Sintang** *(Tipe: KEBUN | Bidang: TAN)*
-22. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN)*
-23. **PKS Ngabang** *(Tipe: PKS | Bidang: TEK)*
-24. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN)*
-25. **PKS Parindu** *(Tipe: PKS | Bidang: TEK)*
-26. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN)*
-27. **PKS Kembayan** *(Tipe: PKS | Bidang: TEK)*
+16. **Unit Group Kalimantan Barat** *(Tipe: GROUP | Bidang: TAN)*
+17. **Kebun Inti Gunung Meliau** *(Tipe: KEBUN | Bidang: TAN)*
+18. **PKS Gunung Meliau** *(Tipe: PKS | Bidang: TEK)*
+19. **Kebun Gunung Emas** *(Tipe: KEBUN | Bidang: TAN)*
+20. **Kebun Inti Sungai Dekan** *(Tipe: KEBUN | Bidang: TAN)*
+21. **Kebun Rimba Belian** *(Tipe: KEBUN | Bidang: TAN)*
+22. **PKS Rimba Belian** *(Tipe: PKS | Bidang: TEK)*
+23. **Kebun Sintang** *(Tipe: KEBUN | Bidang: TAN)*
+24. **Kebun Ngabang** *(Tipe: KEBUN | Bidang: TAN)*
+25. **PKS Ngabang** *(Tipe: PKS | Bidang: TEK)*
+26. **Kebun Parindu** *(Tipe: KEBUN | Bidang: TAN)*
+27. **PKS Parindu** *(Tipe: PKS | Bidang: TEK)*
+28. **Kebun Kembayan** *(Tipe: KEBUN | Bidang: TAN)*
+29. **PKS Kembayan** *(Tipe: PKS | Bidang: TEK)*
 
 ### 3.3 Wilayah Kalimantan Selatan & Kalimantan Tengah
 *Kode Wilayah: `KALSELTENG`*
 
-28. **Group Manager Kalselteng** *(Tipe: GROUP | Bidang: TAN)*
-29. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN)*
-30. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN)*
-31. **PKS Pamukan** *(Tipe: PKS | Bidang: TEK)*
-32. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN)*
-33. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN)*
-34. **PKS Pelaihari** *(Tipe: PKS | Bidang: TEK)*
-35. **Kebun Kumai** *(Tipe: KEBUN | Bidang: TAN)*
-36. **PKR Tambarangan** *(Tipe: PKR | Bidang: TEK)*
-37. **Proyek Batubara Danau Salak** *(Tipe: PROYEK | Bidang: UMU)*
-38. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN)*
+30. **Unit Group Kalimantan Selatan/Tengah** *(Tipe: GROUP | Bidang: TAN)*
+31. **Kebun Danau Salak** *(Tipe: KEBUN | Bidang: TAN)*
+32. **Kebun Pamukan** *(Tipe: KEBUN | Bidang: TAN)*
+33. **PKS Pamukan** *(Tipe: PKS | Bidang: TEK)*
+34. **Kebun Batulicin** *(Tipe: KEBUN | Bidang: TAN)*
+35. **Kebun Pelaihari** *(Tipe: KEBUN | Bidang: TAN)*
+36. **PKS Pelaihari** *(Tipe: PKS | Bidang: TEK)*
+37. **Kebun Kumai** *(Tipe: KEBUN | Bidang: TAN)*
+38. **PKR Tambarangan** *(Tipe: PKR | Bidang: TEK)*
+39. **Proyek Batubara Danau Salak** *(Tipe: PROYEK | Bidang: UMU)*
+40. **Kebun Raren Batuah** *(Tipe: KEBUN | Bidang: TAN)*
 
 ### 3.4 Wilayah Kalimantan Timur
 *Kode Wilayah: `KALTIM`*
 
-39. **Group Manager Kaltim** *(Tipe: GROUP | Bidang: TAN)*
-40. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN)*
-41. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN)*
-42. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN)*
-43. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
-44. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
-45. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
+41. **Unit Group Kalimantan Timur** *(Tipe: GROUP | Bidang: TAN)*
+42. **Kebun Tabara** *(Tipe: KEBUN | Bidang: TAN)*
+43. **Kebun Tajati** *(Tipe: KEBUN | Bidang: TAN)*
+44. **Kebun Inti Pandawa** *(Tipe: KEBUN | Bidang: TAN)*
+45. **PKS Longpinang** *(Tipe: PKS | Bidang: TEK)*
+46. **PKS Samuntai** *(Tipe: PKS | Bidang: TEK)*
+47. **Kebun-PKS Longkali** *(Tipe: KEBUN & PKS Terpadu | Bidang: TAN)*
 
 ### 3.5 Tata Kelola Master Data Dinamis (Hybrid Architecture)
 
@@ -183,8 +205,8 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
    - Kategori regulasi negara & pajak (`jenis_kelamin`, `agama`, `susunan_keluarga`, `pendidikan_terakhir`, `level`) bersifat statis dan didefinisikan terpusat sebagai *Constants* pada model `Employee`.
    - Unit Kerja (`Unit` / `units`) dan Jabatan Formasi (`Position` / `positions`) dikelola secara dinamis melalui antarmuka Master Data di Admin Panel (`/admin/master/units` dan `/admin/master/positions`).
 2. **Prinsip Proteksi Integritas (Anti-Broken Reference)**:
-   - Penghapusan unit kerja atau jabatan yang telah memiliki riwayat pegawai aktif ditolak oleh sistem (*integrity validation guard*).
-   - Penyesuaian restrukturisasi organisasi dilakukan melalui status `is_active` (*soft inactivation*). Entitas nonaktif tidak akan muncul pada pilihan penempatan pegawai baru, namun data historis pada `employees` dan `job_histories` tetap utuh.
+   - Penghapusan unit kerja atau jabatan yang telah memiliki riwayat karyawan aktif ditolak oleh sistem (*integrity validation guard*).
+   - Penyesuaian restrukturisasi organisasi dilakukan melalui status `is_active` (*soft inactivation*). Entitas nonaktif tidak akan muncul pada pilihan penempatan karyawan baru, namun data historis pada `employees` dan `job_histories` tetap utuh.
 3. **Penyelarasan Nomenklatur Otomatis**:
    - Jika nama unit atau jabatan diperbarui di Master Data, sistem secara transaksional menyelaraskan data terkait di tabel `employees` guna mencegah inkonsistensi pelaporan dan audit kepegawaian.
 
@@ -192,38 +214,72 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
 
    | Situasi | Perilaku |
    |---|---|
-   | Kuota diturunkan di bawah jumlah pegawai | **Diizinkan**, kursi ditandai "melebihi kuota" pada layar Formasi (pada MPP, kelebihan tampak sebagai kebutuhan negatif) |
-   | Kursi dihapus / unit atau jabatan dinonaktifkan saat masih ada pegawai atau mutasi terjadwal yang belum berlaku | **Ditolak**; pesan menyebut jumlahnya dan mengarahkan ke modul Mutasi |
-   | Unit atau jabatan dihapus | Hanya bila tidak dipakai pegawai, kursi, maupun riwayat jabatan; selain itu gunakan penonaktifan |
+   | Kuota diturunkan di bawah jumlah karyawan | **Diizinkan**, kursi ditandai "melebihi kuota" pada layar Formasi (pada MPP, kelebihan tampak sebagai kebutuhan negatif) |
+   | Kursi dihapus / unit atau jabatan dinonaktifkan saat masih ada karyawan atau mutasi terjadwal yang belum berlaku | **Ditolak**; pesan menyebut jumlahnya dan mengarahkan ke modul Mutasi |
+   | Unit atau jabatan dihapus | Hanya bila tidak dipakai karyawan, kursi, maupun riwayat jabatan; selain itu gunakan penonaktifan |
    | Unit atau jabatan diganti nama | Diizinkan; teks pada `employees` dan mutasi terjadwal yang belum berlaku diselaraskan, riwayat jabatan yang sudah berlaku tetap memakai nama lama |
    | Level RM jabatan diubah | Diizinkan dengan peringatan jumlah unit pemakai (berlaku untuk seluruh unit) |
    | Kursi baru | Unit dan jabatan harus aktif, pasangan tidak boleh ganda, kuota bilangan bulat minimal 1, **bidang wajib** untuk jabatan Karpim (KEU, TAN, TEK, UMU) |
    | Alasan perubahan (minimal 10 karakter) | **Wajib** untuk hapus kursi, nonaktifkan, hapus, ganti nama, dan ubah Level RM |
 
-   Pemindahan pegawai antarkursi tidak dilakukan oleh editor formasi; tetap melalui modul Mutasi agar setiap perubahan penempatan tercatat pada `job_histories`.
+   Pemindahan karyawan antarkursi tidak dilakukan oleh editor formasi; tetap melalui modul Mutasi agar setiap perubahan penempatan tercatat pada `job_histories`.
 ### 3.6 Sumber Master Formasi Karpim (Excel)
 1. **Baseline awal**: master formasi Karpim ini diturunkan satu kali dari berkas acuan `Unit dan Jabatan Karyawan Pimpinan.xlsx` (kolom `Bagian/Unit Kerja`, `Nama Jabatan`, `Level RM`, `Bidang`; satu baris = satu kursi). Berkas tersebut hanya pengetahuan domain untuk memperbaiki master dan tidak disimpan di repositori; setelah master diperbaiki, **basis data adalah sumber kebenaran** dan perubahan selanjutnya dilakukan melalui Master Data di Admin Panel (§3.5).
-2. **Alur baseline**: Excel → `php artisan formasi:build-seed <berkas>` (alat konversi sekali pakai) → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`. Seeder hanya untuk instalasi baru dan pengembangan; seeder tidak boleh dijalankan ulang pada basis data produksi karena menyelaraskan ulang atribut master.
-3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas; `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
+2. **Alur baseline**: Excel → `php artisan formasi:build-seed <berkas>` (alat konversi sekali pakai) → `database/data/master_formasi.json` (kode, wilayah, dan urutan tampilan unit dari `database/data/unit_metadata.json`) → `PositionUnitSeeder` → tabel `units`, `positions`, `position_unit`. Seeder hanya untuk instalasi baru dan pengembangan; seeder tidak boleh dijalankan ulang pada basis data produksi karena menyelaraskan ulang atribut master. Pada basis data yang dipertahankan, perubahan struktur hanya melalui SK (§3.7).
+3. **Kursi (`position_unit`)**: `kuota` adalah jumlah baris berulang pada berkas format lama atau nilai kolom `Kuota` pada berkas struktur organisasi (kosong berarti 0); `bidang` melekat pada kursi, sehingga jabatan yang sama dapat berbeda bidang antar unit (mis. `Manajer`: TAN, TEK, atau UMU). `positions.rm_level` melekat pada nama jabatan, sehingga Level RM sebuah jabatan harus sama di seluruh unit (parser menolak berkas yang melanggar).
 4. **Penulisan nama**: nama unit memakai `&` (bukan "dan"); singkatan (mis. QC, ESG, SDM, ERP) dan angka romawi tetap huruf besar; salah ketik yang diketahui dikoreksi oleh `FormasiNormalizer`.
-5. **Total formasi**: 45 unit, 392 kombinasi jabatan-unit, 444 kursi (RM-1: 45, RM-2: 71, RM-3: 328; KEU 70, TAN 211, TEK 84, UMU 79).
-6. **Di luar berkas**: jabatan pool (Advisor RM-n, Karyawan Diperbantukan RM-n, serta Kepala Bagian, Kepala Sub Bagian, dan Staf Pimpinan Diperbantukan) dibuat oleh seeder sebagai infrastruktur sistem tanpa kursi formasi.
-7. **Unit yang tidak lagi menjadi bagian formasi** pada revisi ini: Divisi Sistem Manajemen & Sustainability, Project Management Office (PMO), Satuan Pengawasan Internal (SPI), Unit Group Kalimantan Barat, Unit Group Kalimantan Selatan/Tengah, Unit Group Wilayah Kalimantan Timur, Kebun PKR Sintang, dan Proyek Batubara Danau Salak & Buntok. Pada basis data yang sudah berjalan, restrukturisasi tetap mengikuti §3.5 (`is_active`, riwayat tidak dihapus); pengosongan basis data hanya dilakukan pada fase pengembangan.
-8. **RM Band dan Bidang pegawai bersifat turunan, bukan input bebas**: RM Band pegawai mengikuti `positions.rm_level` jabatannya dan Bidang mengikuti `position_unit.bidang` (§4.3). Form tambah pegawai menampilkan RM Band hanya-baca dan `StoreEmployeeRequest` menolak nilai yang berbeda dari formasi. Import Data Karyawan tidak memiliki kolom Bidang; kolom `rm_level` opsional hanya untuk konfirmasi (kosong → diturunkan, berbeda dari formasi → baris ditolak, baik pegawai baru maupun eksisting). Perubahan jabatan, unit, atau RM Band hanya melalui modul Mutasi agar tercatat pada `job_histories`.
+5. **Total formasi**: 47 unit, 492 kombinasi jabatan-unit, 619 kursi. Karpim: 402 kombinasi, 458 kursi (RM-1: 45, RM-2: 75, RM-3: 338). Karpel: 90 kombinasi, 161 kursi (seluruhnya RM-5). Per bidang: KEU 92, TAN 248, TEK 98, UMU 181.
+6. **Di luar berkas**: jabatan pool (Advisor RM-n, Karyawan Diperbantukan RM-n, serta Kepala Bagian, Kepala Sub Bagian, dan Staf Pimpinan Diperbantukan) dibuat seeder sebagai infrastruktur sistem tanpa kuota formasi. Jabatan pool baru, misalnya "Asisten Diperbantukan" atau "Manajer Diperbantukan", dibuat admin pada tab **Jabatan Penampungan** (`MasterFormasiService::createPoolPosition()`), bukan sebagai formasi unit. Agar karyawan dapat ditempatkan pada jabatan itu di sebuah unit (penambahan manual, impor Excel, dan daftar jabatan pada template), jabatan harus **dibuka pada unit** tersebut (`openPoolPosition()`: baris `position_unit` berkuota 0 sebagai tanda dibuka); jabatan pool tidak menghabiskan kuota dan tidak dihitung sebagai formasi atau kekosongan. Menutupnya (`closePoolPosition()`) wajib beralasan dan diblokir selama masih ada karyawan yang menjabat.
+7. **Unit yang berganti nama atau berpindah formasi** pada revisi 1 September 2026 dicatat pada butir 12. Pada basis data yang sudah berjalan, restrukturisasi tetap mengikuti §3.5 (`is_active`, riwayat tidak dihapus); pengosongan basis data hanya dilakukan pada fase pengembangan.
+8. **RM Band dan Bidang karyawan bersifat turunan, bukan input bebas**: RM Band karyawan mengikuti `positions.rm_level` jabatannya dan Bidang mengikuti `position_unit.bidang` (§4.3). Form tambah karyawan menampilkan RM Band hanya-baca dan `StoreEmployeeRequest` menolak nilai yang berbeda dari formasi. Import Data Karyawan tidak memiliki kolom Bidang, Level, maupun RM Level pada template: ketiganya diturunkan dari Master Formasi. Berkas lama yang masih memuat kolom `LEVEL` atau `RM LEVEL` tetap diterima dan nilainya hanya dianggap konfirmasi (kosong → diturunkan, berbeda dari formasi → baris ditolak, baik karyawan baru maupun eksisting). Perubahan jabatan, unit, atau RM Band hanya melalui modul Mutasi agar tercatat pada `job_histories`.
 9. **Pratinjau klasifikasi pada form**: `ManPowerPlanningService@classifyPosition` (dipanggil endpoint `api.classify-position`) mengembalikan `bidang`, `rm_band`, serta penanda `bidang_from_formasi` dan `rm_from_formasi`. Nilai dari Master Formasi ditampilkan dengan badge "Master Formasi"; nilai dari pendeteksian cadangan (jabatan pool, Karpel, atau data lama) ditampilkan dengan badge "Perkiraan". RM Band master selalu didahulukan daripada heuristik golongan/grade.
-10. **Position control pada penambahan pegawai manual**: jabatan wajib menempati kursi aktif pada unit dan strata yang dipilih, dan jumlah pemangku definitif tidak boleh melebihi `kuota` (`FormasiSeatGuard`, sama dengan aturan import). Pemeriksaan dilakukan dalam `DB::transaction()` yang sama dengan penyimpanan pegawai. Jabatan pool dan penugasan non-definitif tidak menghabiskan kuota. Form pegawai **tidak** menyediakan pembuatan unit atau jabatan baru; perubahan master hanya melalui Master Data (§3.5) agar tercatat pada riwayat master dan kuota tidak dapat dilewati saat onboarding.
-11. **Cakupan master saat ini**: master formasi baru mencakup Karpim. Jabatan Karpel belum memiliki `rm_level` pada master sehingga masih berstatus "Perkiraan" dan tidak divalidasi terhadap formasi; setelah referensi formasi Karpel dimuat ke master, aturan butir 8 berlaku otomatis untuk Karpel tanpa perubahan kode.
+10. **Position control pada penambahan karyawan manual**: jabatan wajib menempati kursi aktif pada unit dan strata yang dipilih, dan jumlah pemangku definitif tidak boleh melebihi `kuota` (`FormasiSeatGuard`, sama dengan aturan import). Pemeriksaan dilakukan dalam `DB::transaction()` yang sama dengan penyimpanan karyawan. Jabatan pool dan penugasan non-definitif tidak menghabiskan kuota. Form karyawan **tidak** menyediakan pembuatan unit atau jabatan baru; perubahan master hanya melalui Master Data (§3.5) agar tercatat pada riwayat master dan kuota tidak dapat dilewati saat onboarding. Jabatan penampungan yang sudah dibuka pada unit (§3.6 butir 6) lolos pemeriksaan ini tanpa menghabiskan kuota.
+11. **Cakupan master saat ini**: master formasi mencakup seluruh Karpim serta Karpel pada 10 unit Regional Office; Karpel di unit lain (kebun, PKS, dan seterusnya) belum tercantum pada berkas acuan. Strata `RM 5` pada berkas disimpan sebagai `RM-5` dengan level `Karpel`. Karpel yang jabatannya belum memiliki band pada master diperkirakan `RM-4` oleh `determineRmLevel`. Standar Formasi dan matriks MPP hanya menghitung RM-1 s.d. RM-3, sehingga kursi Karpel tidak memengaruhi angka MPP.
+12. **Revisi Struktur Organisasi (1 September 2026)**: `database/data/master_formasi.json` mengikuti berkas `Struktur_Organisasi_PTPN_IV_Reg_V_1 September 2026.xlsx` (kolom `No`, `Unit/Bagian`, `Sub Bagian`, `Jabatan`, `Strata RM`, `Bidang`, `Kuota`, `Keterangan`; satu baris memuat kuota eksplisit). `formasi:build-seed` membaca tata letak ini maupun format lama 4 kolom (dikenali dari baris judul); `RM 5` ditulis `RM-5` dan level Karpim/Karpel diturunkan dari strata RM. Regional Office: 15 unit, 229 kombinasi jabatan-unit, 330 kursi. Perubahan dari revisi sebelumnya:
+    - **Ganti nama unit**: Group Manager Kalbar, Kalselteng, dan Kaltim menjadi Unit Group Kalimantan Barat, Kalimantan Selatan/Tengah, dan Kalimantan Timur (kode `Unit Group`); Bagian Sumber Daya Manusia & Sistem Manajemen menjadi Bagian Sumber Daya Manusia. Nama lama dicatat sebagai alias (butir 13).
+    - **Formasi Sistem Manajemen & Sustainability** (10 kursi) keluar dari Bagian Sumber Daya Manusia: sembilan kursi ke Bagian Teknik & Pengolahan dan Asisten Manajemen Risiko ke Bagian Akuntansi & Keuangan.
+    - **Kebun Kemitraan Area Kalbar (8 kursi) dan Kebun Kemitraan Area Kaltim-Sel (9 kursi)** menjadi unit tersendiri di Regional Office (kode `Kebun`), terpisah dari Distrik Petani Mitra.
+    - **Bidang berubah** untuk delapan jabatan: lima jabatan Distrik Petani Mitra (TAN menjadi UMU atau KEU), Asisten Penggajian dan Asisten Manajemen Risiko (UMU menjadi KEU), dan Coordinator Bisnis Batu Bara (UMU menjadi TEK).
+    - Kolom `Sub Bagian` dan `Keterangan` tidak disimpan pada master, sehingga baris jabatan sama pada satu unit dijumlahkan kuotanya. Enam jabatan Karpel berkuota kosong pada berkas (berbasis norma) disimpan dengan kuota 0 sampai kuotanya ditetapkan.
+    - Total kuota tetap 619. Berkas ini hanya mengubah master baseline; pada basis data yang sudah berjalan, perubahan unit, kursi, dan bidang diterapkan melalui SK (§3.7), bukan dengan menjalankan ulang seeder. SK berikutnya mengikuti §3.7.
+13. **Alias unit (nama lama)**: tabel `unit_aliases` menyimpan nama lama atau variasi penulisan unit agar berkas karyawan lama tetap terpetakan ke nama unit master saat ini. Alias dicatat otomatis saat unit diubah namanya (`MasterFormasiService@updateUnit`), dimuat dari baseline (`aliases` pada `unit_metadata.json` dan `master_formasi.json`), dan hanya berlaku untuk unit aktif. Tidak ada pemetaan nama unit yang tertanam di kode impor.
+14. **Template impor dan Strata turunan**: kolom template berurutan Unit Kerja lalu Jabatan (24 kolom A–X). Dropdown Jabatan bergantung pada Unit Kerja yang dipilih: daftar diambil langsung dari baris unit tersebut pada sheet `Formasi per Unit` (dibuat dari Master Formasi saat template diunduh, dikelompokkan per unit, tanpa kolom bantu). Sheet itu dikunci tanpa kata sandi; penyaringan boleh, pengurutan tidak, karena merusak pengelompokan per unit. Sheet itu juga menampilkan strata, RM Band, bidang, kuota, terisi, dan sisa kuota setiap Formasi Jabatan. **Strata dan RM Band diturunkan, bukan input**: template tidak memiliki kolom Level maupun RM Level; karyawan baru memakai strata dan RM Band Formasi Jabatan pada unit tersebut, karyawan eksisting memakai strata tercatatnya. Keduanya dapat dilihat pada sheet `Formasi per Unit`. Pesan galat pasangan Unit–Jabatan memuat petunjuk perbaikan: strata berbeda, unit lain yang memiliki jabatan itu, jabatan serupa pada unit, dan Formasi Jabatan yang masih kosong. Template perlu diunduh ulang bila Master Formasi berubah.
+
+### 3.7 Tata Kelola Revisi Struktur Organisasi (Surat Keputusan)
+
+Struktur organisasi berubah melalui Surat Keputusan (SK) Direksi yang berlaku pada tanggal tertentu. **SK struktur diterbitkan oleh Holding; PTPN IV Regional V tidak menerbitkannya, melainkan mencatat SK yang sudah diterima dan menerapkan perubahannya** (layar "Catat SK dari Holding"). Lampiran SK disiapkan dari **template** yang diunduh dari layar yang sama: berkas Excel berisi struktur saat ini dalam format unggahan (`StructureTemplateBuilder`), yang disesuaikan dengan Lampiran SK dari Holding (ubah kuota atau bidang, tambah baris, hapus baris); template yang diunggah tanpa perubahan menghasilkan selisih kosong, dan template tidak memuat data pribadi karyawan. Basis data adalah sumber kebenaran struktur; berkas Excel lampiran SK dan `master_formasi.json` hanya masukan (baseline instalasi baru), bukan cara menerapkan SK pada basis data yang dipertahankan.
+
+**Aturan baku**
+1. Setiap perubahan struktur (unit, jabatan, Formasi Jabatan, kuota, bidang, RM Band) wajib merujuk satu SK: nomor, tanggal SK, dan tanggal berlaku. Nomor SK disimpan ternormalisasi tanpa spasi di sekitar garis miring (`DPSB/SKPTS/ 352 /IX/2026` menjadi `DPSB/SKPTS/352/IX/2026`) dan tidak boleh ganda di antara SK yang masih berlaku (nomor SK yang ditolak atau dibatalkan boleh dipakai lagi).
+2. Perubahan tidak menyunting riwayat: nama lama menjadi alias (§3.6 butir 13), Formasi Jabatan berpenghuni tidak dihapus (kuota diturunkan, tampil melebihi kuota), unit dinonaktifkan bukan dihapus, dan `job_histories` tetap memakai nama yang berlaku saat itu.
+3. Penerapan hanya melalui layanan SK (`StructureDecreeService`): pratinjau selisih dan dampak, persetujuan empat mata, satu transaksi `DB::transaction()` yang memakai aturan `MasterFormasiService`, dan jejak audit pada `master_audit_logs` yang ditautkan ke SK (`decree_id`). Dilarang menyunting `master_formasi.json` atau menjalankan ulang seeder pada basis data yang dipertahankan.
+4. Karyawan terdampak tidak dipindahkan oleh SK. Karyawan pada Formasi Jabatan yang dihapus atau dikurangi dicatat pada daftar "Karyawan Perlu Penempatan Ulang" dan dipindahkan hanya melalui Mutasi (§5).
+5. SK yang sudah diterapkan tidak dibatalkan (tanpa undo); koreksi dilakukan dengan SK baru. Pembatalan hanya mungkin sebelum diterapkan.
+
+**Siklus status SK**: Draf → Diajukan → Disetujui (Terjadwal bila tanggal berlaku belum tiba) → Diterapkan; status lain: Ditolak, Dibatalkan, Perlu Tinjau Ulang (struktur berubah setelah diajukan, tidak ada yang diterapkan), Gagal (seluruh perubahan dibatalkan; SK tetap terbuka dan dapat diterapkan ulang setelah penyebabnya diperbaiki, atau dibatalkan). Hanya satu SK terbuka (draf sampai terjadwal, termasuk Perlu Tinjau Ulang dan Gagal) pada satu waktu. Tanggal berlaku tidak boleh lebih awal dari tanggal berlaku SK terakhir yang diterapkan; bawaannya sama dengan tanggal SK ("berlaku sejak tanggal ditetapkan"). Kebijakan persetujuan empat mata mengikuti `config('hris.structure.require_approval')`; izin `struktur.prepare` dan `struktur.approve`.
+
+**Cakupan.** SK mengatur tepat unit-unit yang tercantum pada berkas lampirannya; unit yang tidak tercantum tidak pernah dinonaktifkan secara implisit. Penutupan unit dipilih eksplisit pada tahap tinjau. Unit baru memerlukan kode, wilayah, dan urutan yang diisi admin; unit yang sudah ada mempertahankan atributnya. Jabatan Penampungan (Advisor, Diperbantukan) bukan formasi dan tidak ikut dibandingkan.
+
+**Baseline.** Basis data baru memuat satu catatan SK Diterapkan: `DPSB/SKPTS/352/IX/2026`, "Perubahan Struktur Organisasi Region Office PT Perkebunan Nusantara IV", tanggal SK dan tanggal berlaku 1 September 2026 (diktum KETIGA: berlaku sejak tanggal ditetapkan). SK ini mencabut ketentuan struktur organisasi Region Office Regional I–VII sebelumnya (diktum KEEMPAT). Atas keputusan pengguna, seluruh 47 unit pada berkas lampiran (termasuk kebun, PKS, dan Unit Group yang barisnya dibawa dari struktur sebelumnya) mengikuti SK ini.
+
+**Dampak pada MPP.** Periode MPP yang sudah direkam (draf atau tutup) menyimpan snapshot dan tidak berubah oleh SK. Sebelum SK diterapkan, periode bulan sebelumnya dibekukan lebih dulu agar perekaman bulanan tidak memakai struktur baru. Bulan lampau yang tidak pernah direkam tetap direkonstruksi dari struktur saat ini (batasan yang sudah ada, tanpa pengisian mundur), SK yang terlambat disetujui tidak menulis ulang periode yang sudah ditutup (buka kembali lewat alur yang ada bila perlu), dan MPP berjalan serta Standar Formasi mengikuti struktur baru sejak tanggal berlaku.
+
+**Penjadwal.** `hr:apply-structure-decrees` berjalan setiap hari pukul 00:00 (zona waktu aplikasi UTC, sama dengan seluruh tugas terjadwal lain) sebelum `hr:apply-effective-mutations` (00:01).
+
+**Struktur per tanggal.** `StructureAsOfService` menjawab "bagaimana struktur pada tanggal D": versi struktur adalah snapshot SK Diterapkan terbaru yang tanggal berlakunya tidak setelah D (SK Draf, Disetujui, Ditolak, Dibatalkan, dan SK tanpa snapshot tidak dihitung; SK berlaku pada hari tanggal berlakunya). Pemangku jabatan dibaca dari `job_histories` (`is_applied` benar, `tmt_awal` ≤ D, `tmt_akhir` kosong atau ≥ D, baris terhapus lunak diabaikan) dan dicocokkan dengan nama unit dan jabatan pada snapshot; karyawan yang tidak cocok dengan formasi mana pun (jabatan penampungan, unit yang sudah tidak ada) dihitung sebagai "di luar struktur", tidak dibuang. Tanggal sebelum SK pertama menghasilkan "belum tersedia" dan tidak pernah direkonstruksi dari struktur sekarang. Layarnya, "Versi Struktur" (`/admin/master/versi`; DESIGN.md §8.5b), memakai satu kendali waktu (versi atau tanggal), menampilkan struktur per jabatan atau per unit pada versi itu, membandingkan dua versi, dan baca-saja dengan NIK tersamar. Riwayat jabatan seorang karyawan terhadap versi struktur ada pada profil Karyawan, tab Riwayat Karir: kolom "Struktur yang Berlaku" pada tabel riwayat jabatan mencocokkan setiap penempatan dengan SK struktur yang berlaku pada tanggal mulainya (`PlacementStructureService`), dapat membandingkan versi itu dengan struktur sekarang lewat `StructureDiffCalculator`, dan setiap ekspor Excel tercatat pada `master_audit_logs` (`structure_as_of.export`) tanpa data pribadi.
+
+**Batasan yang sengaja diterima**: SK sebelum SK No. 352 hanya tercantum pada isian "Mencabut/Menggantikan" dan tidak memiliki struktur yang dapat ditampilkan; pencocokan pemangku memakai nama unit dan jabatan yang tercatat pada riwayat, sehingga riwayat yang ditulis dengan nama lama (sebelum unit berganti nama) tampil sebagai "di luar struktur" pada versi yang memakai nama baru.
 ---
 
-## 4. Strata Pegawai, RM Band, & 4 Bidang Fungsional
+## 4. Strata Karyawan, RM Band, & 4 Bidang Fungsional
 
-### 4.1 Strata Pegawai
+### 4.1 Strata Karyawan
 1. **Karyawan Pimpinan (Karpim)**:
    - Staf pimpinan/manajerial pemegang keputusan strategis & operasional (terbagi dalam eselon **RM-1**, **RM-2**, dan **RM-3**).
    - Golongan: **Golongan III** (`IIIA`, `IIIB`, `IIIC`, `IIID`) & **Golongan IV** (`IVA`, `IVB`, `IVC`, `IVD`).
    - Grade: **Job Grade 11 s.d. 16**, **Person Grade 11 s.d. 16**.
 2. **Karyawan Pelaksana (Karpel)**:
-   - Tenaga operasional non-staf lini depan (diklasifikasikan ke dalam **RM-4**).
+   - Tenaga operasional non-staf lini depan (diklasifikasikan ke dalam **RM-4**, **RM-5**, **RM-6**, dan **RM-7**).
    - Golongan: **Golongan I** (`IA` - `ID`) & **Golongan II** (`IIA` - `IID`).
    - Grade: **Job Grade 1 s.d. 10**, **Person Grade 1 s.d. 10**.
 
@@ -238,7 +294,7 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
           ┌──────────────────────────┬──────┴───────────────────┬────────────────────────┐
           ▼                          ▼                          ▼                        ▼
    ┌─────────────┐            ┌─────────────┐            ┌─────────────┐          ┌─────────────┐
-   │    RM-1     │            │    RM-2     │            │    RM-3     │          │    RM-4     │
+   │    RM-1     │            │    RM-2     │            │    RM-3     │          │ RM-4 s.d. 7 │
    │  PIMPINAN   │            │    MADYA    │            │   PRATAMA   │          │  PELAKSANA  │
    │ Job Gr: 15-16            │ Job Gr: 13-14            │ Job Gr: 11-12          │ Job Gr: 1-10│
    │ Gol: IV                  │ Gol: IIIC - IIID         │ Gol: IIIA - IIIB       │ Gol: I - II │
@@ -257,13 +313,13 @@ Operasional PTPN IV Regional V mencakup Kantor Direksi di Pontianak serta unit-u
    - Standar Golongan: `IIIA` s.d. `IIIB` (dan `IIIC`)
    - Standar Job Grade: `11` – `12`
    - Posisi Kunci: Asisten Afdeling/Kebun, Asisten Pengolahan, Asisten Bengkel/Maintenance, Asisten QC/Laboratorium, Asisten Tata Usaha (KTU), Asisten SDM/Humas.
-4. **RM-4 (Operational Staff / Karyawan Pelaksana Lini Depan)**:
+4. **RM-4 s.d. RM-7 (Operational Staff / Karyawan Pelaksana Lini Depan)**:
    - Standar Golongan: `IA` s.d. `IID`
    - Standar Job Grade: `1` – `10`
-   - Posisi Kunci: Mandor Panen/Pemeliharaan, Operator PKS, Krani Afdeling/Kantor, Mekanik Bengkel, Satpam/Keamanan Kebun. Disiapkan sebagai talenta internal untuk suksesi ke RM-3 via jalur **CKP**.
+   - Posisi Kunci: Mandor Panen/Pemeliharaan, Operator PKS, Krani Afdeling/Kantor, Mekanik Bengkel, Satpam/Keamanan Kebun. Band tiap jabatan mengikuti master formasi. Disiapkan sebagai talenta internal untuk suksesi ke RM-3 via jalur **CKP**.
 
 ### 4.3 4 Bidang Fungsional
-Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService@determineBidang` dengan urutan: (1) bidang kursi pada master formasi (`position_unit.bidang`) untuk pasangan (unit kerja, jabatan) pegawai; (2) bila pegawai tidak menempati kursi formasi (jabatan pool, Karpel, atau data lama), pendeteksian kata kunci berikut:
+Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService@determineBidang` dengan urutan: (1) bidang kursi pada master formasi (`position_unit.bidang`) untuk pasangan (unit kerja, jabatan) karyawan; (2) bila karyawan tidak menempati kursi formasi (jabatan pool, Karpel, atau data lama), pendeteksian kata kunci berikut:
 - **KEU (Keuangan & Akuntansi)**: mendeteksi kata kunci `keu`, `akuntan`, `anggaran`, `pajak`, `kas`, `perbendaharaan`, `tata usaha`.
 - **TAN (Tanaman & Agronomi)**: mendeteksi kata kunci `tanaman`, `agronomi`, `afdeling`, `rayon`, `panen`, `kebun`, `pemeliharaan`, `tbs`.
 - **TEK (Teknik & Pengolahan)**: mendeteksi kata kunci `teknik`, `pabrik`, `pks`, `pengolahan`, `bengkel`, `instalasi`, `mesin`, `mill`, `laboratorium`.
@@ -275,69 +331,93 @@ Klasifikasi bidang ditentukan secara deterministik oleh `ManPowerPlanningService
 
 ### 5.1 Perhitungan Batas Usia Pensiun (BUP) & MBT
 1. **Batas Usia Pensiun (56 Tahun)**:
-   - Jatuh tepat pada hari pertama bulan kelahiran pada saat pegawai berusia 56 tahun.
+   - Jatuh tepat pada hari pertama bulan kelahiran pada saat karyawan berusia 56 tahun.
    - **Formula Baku (PHP/Carbon)**:
      ```php
      $tanggalPensiun = Carbon::parse($tanggalLahir)->addYears(56)->startOfMonth();
      ```
    - Contoh: Lahir `1979-05-14` -> Pensiun pada `2035-06-01`.
-2. **Masa Bebas Tugas / MBT (55 Tahun)**:
-   - Diberikan T-1 tahun sebelum tanggal pensiun resmi untuk masa persiapan pensiun.
+2. **Masa Bebas Tugas / MBT (H-6 Bulan Sebelum Pensiun)**:
+   - Diberikan 6 bulan sebelum tanggal pensiun resmi untuk masa persiapan pensiun (sebelumnya 1 tahun; berlaku sejak 08/11/2026 untuk seluruh data, kecuali periode MPP yang sudah ditutup karena rekamannya baku).
+   - **Peringatan "Menjelang MBT"**: tampil pada Daftar Karyawan selama 6 bulan sebelum tanggal MBT (`KepegawaianPolicy::MBT_PERINGATAN_BULAN`).
    - **Formula Baku**:
      ```php
-     $tanggalMbt = Carbon::parse($tanggalPensiun)->subYear();
+     $tanggalMbt = Carbon::parse($tanggalPensiun)->subMonths(6);
      ```
-   - Contoh: Pensiun `2035-06-01` -> MBT pada `2034-06-01`.
+   - Contoh: Pensiun `2035-06-01` -> MBT pada `2034-12-01`.
 3. **Penyimpanan Database**:
-   - Jika saat create/import pegawai form tidak mengisi `tanggal_pensiun` dan `tanggal_mbt`, sistem **wajib** mengisi secara otomatis menggunakan rumus di atas.
+   - Jika saat create/import karyawan form tidak mengisi `tanggal_pensiun` dan `tanggal_mbt`, sistem **wajib** mengisi secara otomatis menggunakan rumus di atas.
+4. **Pemberhentian Pensiun (`PensiunService`, perintah `hr:process-retirements`, harian 00:05)**:
+   - Karyawan yang `tanggal_pensiun` efektifnya sudah tiba **dilepas dari jabatan**, bukan dihapus: dalam satu `DB::transaction()` riwayat jabatan yang masih terbuka ditutup (`tmt_akhir` = tanggal pensiun, catatan "Berakhir karena pensiun"), mutasi terjadwal yang belum berlaku dibatalkan dengan alasan tercatat, lalu `tanggal_berhenti` dan `alasan_berhenti = Pensiun` diisi. Proses idempotent dan mendukung `--dry-run`.
+   - Sejak itu kursi formasi **kosong** (chain vacancy) dan karyawan tidak dihitung sebagai pemegang jabatan, kuota terisi, maupun headcount aktif. Semua perhitungan kursi dan daftar wajib memakai scope `Employee::aktif()`; arsip dibaca lewat `Employee::berhenti()` (filter "Status Kepegawaian: Pensiun" pada Daftar Karyawan).
+   - Jabatan dan unit terakhir tetap tersimpan sebagai arsip dan dibekukan: karyawan yang sudah berhenti tidak membuka riwayat jabatan baru, tidak dapat dimutasi, dan tidak muncul pada pilihan karyawan (mutasi, penilaian, peserta pelatihan) maupun direktori karyawan. Perhitungan MPP tidak berubah: kursi sudah dianggap kosong sejak MBT (Bab 8).
+   - **Perpanjangan melewati BUP**: tetapkan `tanggal_pensiun` baru pada karyawan sebelum tanggal pensiun lama tiba; pemberhentian otomatis mengikuti tanggal efektif tersebut.
+   - **Pemberhentian lain** (Pensiun Dini, Mengundurkan Diri, Meninggal Dunia, PHK): tindakan admin "Berhentikan" pada profil karyawan (ability `separate-employee`), wajib bertanggal, dengan nomor dan tanggal SK. SK pensiun otomatis dapat dicatat menyusul lewat `PensiunService::catatSk()`.
+   - **Tanggal berhenti tidak boleh melewati hari ini**: pemberhentian berlaku seketika (kursi dikosongkan, riwayat ditutup, mutasi terjadwal dibatalkan), sehingga `PensiunService::separate()` menolak tanggal masa depan dan formulir memvalidasinya. Pemberhentian yang berlaku bulan depan dicatat pada tanggal berlakunya; pensiun normal tetap otomatis.
+   - **Satu aturan "sudah pensiun/berhenti"**: `MutasiGovernanceGuard::isRetired()` (berhenti, atau tanggal pensiun efektif sudah tiba, aturan yang sama dengan `PensiunService::dueEmployees()`) dipakai penjaga mutasi tunggal, analisis rantai, dan daftar pilihan karyawan. Karyawan yang berhenti bukan karena pensiun disebut "telah berhenti (alasan)", bukan "Batas Usia Pensiun". Arsip karyawan berhenti tidak menahan penonaktifan atau penghapusan unit/jabatan (hanya karyawan aktif yang dihitung; riwayat jabatan tetap menahan penghapusan).
+   - **Jejak audit**: setiap pemberhentian dan pencatatan SK tercatat pada Riwayat Perubahan (`employee.separated`, `employee.separation_sk_recorded`; pelaku "Sistem" untuk proses otomatis) di samping penutupan riwayat jabatan di `job_histories`.
+   - Urutan siklus: Aktif $\rightarrow$ Menjelang MBT $\rightarrow$ MBT (kursi sudah dihitung kosong untuk perencanaan) $\rightarrow$ Pensiun (jabatan dilepas, arsip).
 
 ### 5.2 Regulasi Mutasi & Chain Vacancy (`MutasiService`)
 1. **Masa Dinas Minimal di Unit Kerja**:
-   - Pegawai minimal menjabat **2 hingga 3 tahun** (`tmt_unit_kerja`) sebelum diperbolehkan rotasi unit, demi menjaga stabilitas rotasi panen dan olah pabrik.
+   - Karyawan minimal menjabat **2 hingga 3 tahun** (`tmt_unit_kerja`) sebelum diperbolehkan rotasi unit, demi menjaga stabilitas rotasi panen dan olah pabrik.
 2. **Tiga Mode Transaksi Mutasi**:
    - **Straight Transfer (Target Posisi Kosong)**:
-     - Pegawai dipindahkan ke posisi jabatan/unit baru yang sedang lowong.
-     - Posisi lama pegawai yang ditinggalkan **otomatis menjadi formasi kosong baru (1 chain vacancy)**.
+     - Karyawan dipindahkan ke posisi jabatan/unit baru yang sedang lowong.
+     - Posisi lama karyawan yang ditinggalkan **otomatis menjadi formasi kosong baru (1 chain vacancy)**.
      - Sistem mencatat riwayat jabatan baru di `job_histories` dengan `tmt_awal` mutasi dan menutup posisi sebelumnya dengan `tmt_akhir`.
+     - **Kursi kosong menurut kuota.** Formasi menerima penempatan selama jumlah seluruh pemegangnya masih kurang dari kuota master formasi (§3.6; formasi di luar master dihitung satu kursi; kuota 0 berarti tidak ada kursi). Pemegang mencakup karyawan yang menjabat, termasuk Pj/Plt, dan Pj/Plt yang ditempatkan lewat Mutasi (baris riwayat terbuka, karena baris karyawannya tetap di formasi asal); keduanya tidak dihitung dua kali. Formasi berkuota ganda yang belum penuh menerima Straight Transfer tanpa menukar siapa pun. Aturan ini dihitung oleh dua fungsi bersama, `JobVacancyService::freeSlots()` dan `JobVacancyService::isReserved()`, yang dipakai `FormationService::analyzeTarget()` (Mutasi tunggal dan berantai: `kuota`, `holders`, `free_slots`, `open_slots`, `multi_seat`) serta baris formasi pada monitoring dan Sebaran Formasi. Pemesanan mutasi terjadwal menutup formasi hanya bila jumlahnya menghabiskan kursi kosong, dan pemesanan atas nama peserta yang sedang dimutasi tidak dihitung terhadap dirinya.
    - **Swap Transfer (Target Posisi Terisi / 2 Arah)**:
-     - Pegawai A dipindahkan ke posisi Pegawai B, dan Pegawai B secara atomik ditukar menempati posisi Pegawai A.
+     - Karyawan A dipindahkan ke posisi Karyawan B, dan Karyawan B secara atomik ditukar menempati posisi Karyawan A.
      - Dijalankan dalam satu DB Transaction atomik (`DB::transaction`).
      - **Net zero vacancy** (tidak memunculkan formasi kosong baru).
      - Hanya untuk eselon/RM setara (*Lateral Swap*) dan status **Definitif**. Penugasan sementara (Pj/Plt) tidak melepaskan jabatan definitif asal, sehingga hanya dapat ditempatkan pada formasi kosong.
+     - Formasi yang tidak memiliki satu pejabat petahana untuk ditukar **tidak dapat ditukar**: formasi berkuota ganda yang seluruh kuotanya terisi (belum ada aturan memilih pemegang mana yang ditukar), formasi berkuota 0, dan formasi yang seluruh kursinya dijabat Pj/Plt. `MutasiService` menolaknya dengan pesan jelas (guard di service layer) dan layar Mutasi tunggal menutup opsi tukar; kosongkan satu kuota lebih dulu dengan memindahkan salah satu pemegang melalui mutasi terpisah.
      - Kedua baris riwayat berbagi satu `batch_id` sehingga aktivasi/pembatalan jadwal selalu berlaku untuk pasangan tersebut.
-   - **Chain / Collective Transfer (Mutasi Berantai / Gerbong SK Kolektif, $\ge 2$ Pegawai)**:
-     - Pemindahan sekelompok pegawai yang saling mengisi posisi dalam satu SK Direksi Kolektif berskala besar.
+   - **Chain / Collective Transfer (Mutasi Berantai / Gerbong SK Kolektif, $\ge 2$ Karyawan)**:
+     - Pemindahan sekelompok karyawan yang saling mengisi posisi dalam satu SK Direksi Kolektif berskala besar.
      - **Rantai Tertutup (Cyclic Loop)**: $A \to B \to C \to D \to A$ (posisi awal A diisi oleh D), menghasilkan **Net zero vacancy** tanpa ketergantungan urutan (*deadlock-free atomic assignment*).
      - **Rantai Terbuka (Open Domino Loop)**: $A \to \text{Posisi Kosong/Pensiun}, B \to A, C \to B, D \to C$ (posisi lama D menjadi formasi kosong baru), menghasilkan **1 chain vacancy** di ujung akhir rantai.
      - Seluruh riwayat mutasi dalam satu gerbong ditandai dengan `batch_id` yang sama pada `job_histories`.
+     - Satu formasi dapat ditargetkan beberapa peserta sebanyak kursi yang masih terbuka (kursi kosong dikurangi pemesanan pihak di luar rantai; minimal satu); peserta berikutnya dianggap konflik target (`ChainTopologyAnalyzer`). Kursi yang ditinggalkan beberapa pemegang formasi berkuota ganda dihitung per kursi: keberangkatan di atas jumlah kedatangan tetap dilaporkan sebagai formasi kosong yang belum terisi.
      - Formasi yang dijabat peserta berstatus Pj/Plt dianggap **tidak dilepaskan** dan tidak boleh ditargetkan peserta lain.
 3. **Guard Tata Kelola di Service Layer (wajib, tidak boleh hanya di UI)**:
-   - `jenis_mutasi` dan `status_jabatan` wajib bernilai dari daftar baku; pegawai yang melewati Batas Usia Pensiun ditolak.
+   - **Satu sumber aturan penempatan.** Aturan per peserta di bawah ini dihitung oleh `MutasiGovernanceGuard::placementRuleViolation()` dan berlaku sama untuk Mutasi Tunggal (`processMutasi`) maupun setiap peserta Mutasi Berantai (`ChainTopologyAnalyzer`, dijalankan ulang di dalam transaksi `processChainMutasi`). Satu pelanggaran pada satu peserta menolak seluruh gerbong tanpa menulis apa pun.
+   - **Hak akses.** Mutasi Tunggal langsung berlaku, sehingga memerlukan hak `mutasi.approve` (bukan hanya `mutasi.prepare`), diperiksa pada setiap request Livewire.
+   - `jenis_mutasi` dan `status_jabatan` wajib bernilai dari daftar baku; karyawan yang melewati Batas Usia Pensiun ditolak.
    - `ROTASI` wajib unit kerja yang sama; `MUTASI_UNIT` wajib unit kerja berbeda.
    - Penempatan **Definitif** ke RM lebih tinggi wajib berjenis `PROMOSI`, ke RM lebih rendah wajib `DEMOSI` (kecuali formasi pool Advisor/Diperbantukan).
    - Masa dinas unit < 24 bulan dan promosi yang belum memenuhi kriteria hanya dapat diproses dengan dispensasi **beserta alasan tertulis**.
+   - **Bukti dispensasi** (`DispensasiBasis`): persetujuan Direksi dibuktikan dengan **nomor nota dinas / SK persetujuan** (minimal 5 karakter) dan **tanggal persetujuan** (tidak boleh melewati hari ini), bukan pernyataan centang. Status "disetujui" diturunkan dari kelengkapan bukti ini, dihitung ulang di server (bukan dipercaya dari state komponen), dan berlaku sama untuk Mutasi Tunggal dan Mutasi Berantai. `MutasiRequest::hasDispensasi()` menolak alasan yang lebih pendek dari batas minimal. Teks yang disimpan di `alasan_dispensasi` berbentuk `<nomor> (disetujui dd/mm/yyyy)`.
+   - `checkTenureCompliance()` mengembalikan `required_months`, `required_label` (mis. "2 tahun"), dan `shortfall_months`; kriteria promosi yang datanya belum ada (mis. evaluasi SMKBK/9-Box) ditandai `is_data_gap` agar UI menawarkan pelengkapan data. View tidak menghitung selisih sendiri.
 4. **Siklus Mutasi Terjadwal**:
    - Aktivasi manual satu mutasi hanya mengaktifkan baris tersebut beserta anggota `batch_id`-nya; mutasi terjadwal lain tidak ikut teraktivasi.
    - Pembatalan dilakukan dengan soft delete yang mencatat `cancelled_by` dan `alasan_pembatalan`.
 5. **Jalur Karir & Promosi**:
    - **RM-3 $\rightarrow$ RM-2**: Syarat minimal Golongan `IIIC` atau masa dinas Asisten $\ge 4$ tahun dengan evaluasi kinerja minimal kategori "Baik".
    - **RM-2 $\rightarrow$ RM-1**: Syarat minimal Golongan `IIID` / `IVA` dan telah menjabat Askep/Kasubag minimal 3 tahun. (Kriteria sertifikat asesmen holding ditangguhkan).
+6. **Usulan Mutasi Berantai: Draf & Persetujuan Empat Mata** (`ChainProposalService`, tabel `mutasi_chain_proposals` + `mutasi_chain_proposal_events`):
+   - **Draf**: penyusun dapat menyimpan rantai kapan saja tanpa validasi kelengkapan. Yang disimpan hanya isian admin per peserta (`ChainProposalService::INPUT_FIELDS`: NIK, jenis, unit/formasi tujuan, status, golongan/job grade baru, catatan, bukti dispensasi Direksi) dan header SK, terenkripsi saat disimpan. Penghuni formasi, masa dinas, dan kelayakan promosi **selalu dihitung ulang** setiap kali draf dibuka, sehingga draf lama tidak membawa hasil analisis basi. Draf hanya terlihat dan dapat diubah oleh penyusunnya; draf yang belum pernah diajukan boleh dihapus.
+   - **Kebijakan persetujuan** (`config/hris.php` → `mutasi_chain.require_approval`, env `HRIS_MUTASI_CHAIN_REQUIRE_APPROVAL`, bawaan nonaktif). Aktif: penyusun mengajukan setelah seluruh pemeriksaan SK lolos; usulan dikunci dan diberi sidik jari SHA-256 atas header + isian; admin **lain** yang berhak `mutasi.approve` menyetujui (SK langsung terbit lewat `processChainMutasi`, divalidasi ulang di transaksinya) atau mengembalikan dengan alasan (min. 10 karakter). Yang disetujui adalah yang diajukan: sidik jari harus tetap sama. Penyusun dapat menarik usulan selama belum diputuskan. Usulan yang tidak diputuskan dalam `approval_ttl_days` (bawaan 7) kedaluwarsa (`hris:expire-mutasi-proposals`, harian). Nonaktif: admin yang berhak `mutasi.approve` menerbitkan SK langsung; draf asalnya ditutup sebagai "SK Diterbitkan" dalam transaksi yang sama.
+   - Siklus status: `draft` → `pending_approval` → `executed`; `pending_approval` → `rejected` (dapat direvisi menjadi `draft`) / `expired`; `pending_approval` → `draft` bila ditarik.
+   - `job_histories.created_by` mencatat penyusun; penyetuju tercatat pada usulan (`decided_by`) yang ditautkan lewat `batch_id`.
+   - **Alur mutasi tidak dibuat manual.** Pengelompokan peserta per alur (rantai tertutup, rantai terbuka, tukar jabatan) selalu diturunkan dari data oleh `ChainTopologyAnalyzer` (siapa mengisi formasi siapa). Tidak ada tombol "tambah siklus": alur baru terbentuk sendiri saat dua slot saling terhubung. Untuk menambah peserta ke alur tertentu, aksi **Isi Lowongan Tersisa** menambah slot yang langsung menargetkan formasi yang ditinggalkan alur itu (`unfilled_vacancies`).
 
-### 5.3 Validasi Integritas Data Pegawai
+### 5.3 Validasi Integritas Data Karyawan
 1. `nik` harus 8 digit numerik dan unik.
 2. `tanggal_lahir` < `tmt_bekerja` < `tanggal_diangkat_staf` $\le$ `tanggal_dalam_jabatan`.
 3. `tmt_bekerja` minimal 18 tahun setelah `tanggal_lahir`.
 4. Jika `level == 'Karpim'`, `job_grade` dan `person_grade` wajib $\ge 11$.
 
 ### 5.4 Jenis-Jenis Mutasi & Penugasan
-Dalam siklus rotasi pegawai, Sistem HRIS mendefinisikan beberapa tipe mutasi formal yang masing-masing memiliki peruntukan tersendiri:
+Dalam siklus rotasi karyawan, Sistem HRIS mendefinisikan beberapa tipe mutasi formal yang masing-masing memiliki peruntukan tersendiri:
 1. **Promosi**: Kenaikan tingkat Eselon (RM Level) atau Job Grade.
 2. **Demosi**: Penurunan tingkat Eselon (RM Level) atau Job Grade akibat underperformance atau reorganisasi.
 3. **Rotasi & Alih Tugas**: Perpindahan jabatan secara fungsional yang terjadi **di dalam satu Unit Kerja yang sama** (tidak pindah lokasi/rumah). Contoh: Asisten Afdeling 1 berotasi menjadi Asisten Afdeling 2 di kebun yang sama.
 4. **Mutasi Unit**: Perpindahan fisik/geografis melintasi **Unit Kerja yang berbeda** (harus pindah lokasi dari Kebun/Pabrik A ke Kebun/Pabrik B), meskipun jabatannya mungkin sama persis.
-5. **Penugasan (Assignment)**: Penempatan sementara (Pj/Plt) atau penempatan pada struktur formasi definitif yang bersifat operasional tanpa merubah hierarki organik pegawai.
-6. **Penugasan Khusus (Special Assignment / Overflow)**: Penempatan pegawai ke posisi "Keranjang Logis" atau "Pool" (*is_overflow* = true) seperti formasi **Advisor**. Biasanya ini digunakan untuk mengisolasi atau "memarkir" pegawai senior sementara menunggu posisi struktural yang cocok, namun **bukan** sebagai sebuah hukuman. Pegawai di pool ini tetap mendapatkan hak sesuai RM Level-nya.
-7. **Sanksi Indisipliner**: Pemindahan paksa pegawai ke posisi hukuman/penampungan (*is_diperban* = true) seperti **Karyawan Diperbantukan**. Ini merupakan tindakan indisipliner di mana pegawai dilucuti dari posisi strukturalnya. Posisi hukuman wajib dievaluasi kembali setelah batas waktu sanksi kedaluwarsa.
+5. **Penugasan (Assignment)**: Penempatan sementara (Pj/Plt) atau penempatan pada struktur formasi definitif yang bersifat operasional tanpa merubah hierarki organik karyawan.
+6. **Penugasan Khusus (Special Assignment / Overflow)**: Penempatan karyawan ke posisi "Keranjang Logis" atau "Pool" (*is_overflow* = true) seperti formasi **Advisor**. Biasanya ini digunakan untuk mengisolasi atau "memarkir" karyawan senior sementara menunggu posisi struktural yang cocok, namun **bukan** sebagai sebuah hukuman. Karyawan di pool ini tetap mendapatkan hak sesuai RM Level-nya.
+7. **Sanksi Indisipliner**: Pemindahan paksa karyawan ke posisi hukuman/penampungan (*is_diperban* = true) seperti **Karyawan Diperbantukan**. Ini merupakan tindakan indisipliner di mana karyawan dilucuti dari posisi strukturalnya. Posisi hukuman wajib dievaluasi kembali setelah batas waktu sanksi kedaluwarsa.
 
 ---
 
@@ -365,7 +445,8 @@ L │ Potensi Rendah /      Potensi Rendah /         Potensi Rendah /
 
 - **Sumbu X**: Kinerja individual berdasarkan SMKBK (Key Performance Indicators tahunan).
 - **Sumbu Y**: Potensi & kapabilitas kepemimpinan berdasarkan Capacity & Leadership Index (CLI).
-- **Asesmen Eksternal**: Pegawai di Box 8 & Box 9 adalah kandidat utama suksesi RM-1 dan RM-2, dengan syarat `expired_asesmen` belum kedaluwarsa.
+- **Penomoran Box**: dihitung dari kiri-bawah ke kanan-atas; baris naik menurut potensi (CLI), kolom naik menurut kinerja (SMK-BK). Nilai tersimpan berformat `Box N: Label` (Risk, Effective, Specialist, Dilemma, Core Talent, High Performer, Diamond, High Potential, Star) dan artinya diturunkan dari posisi N pada matriks (`Evaluation::boxMeaning()`), bukan ditulis dua kali. Sistem belum menurunkan Box dari skor karena ambang Rendah/Sedang/Tinggi pada skor SMK-BK dan CLI belum ditetapkan di dokumen ini; Box dipilih dari hasil asesmen resmi sampai ambang itu ditetapkan.
+- **Asesmen Eksternal**: Karyawan di Box 8 & Box 9 adalah kandidat utama suksesi RM-1 dan RM-2, dengan syarat `expired_asesmen` belum kedaluwarsa.
 
 ---
 
@@ -383,17 +464,28 @@ Modul Pelatihan (`Trainings`) berfungsi memantau investasi kompetensi talenta:
 
 ## 8. Perencanaan Tenaga Kerja (Man Power Planning / MPP)
 
-Service `ManPowerPlanningService` memuat data acuan baseline perusahaan:
+Service `ManPowerPlanningService` menghitung matriks MPP dari satu sumber kebenaran: standar formasi dari kursi master, angka aktual dari data karyawan, dan pasokan dari rencana pasokan per tahun. Tidak ada angka acuan korporat yang tertanam di kode.
 1. **Formasi Standar vs Realisasi**:
    - Formasi Standar per RM Band dan bidang diturunkan dari kursi master formasi (`FormasiCatalog::standarFormasi()`, §3.6), bukan angka tetap; jabatan pool (Advisor/Diperbantukan) tidak dihitung.
-   - Menghitung rasio pemenuhan formasi per RM Band (`RM-1`, `RM-2`, `RM-3`, `RM-4`) pada setiap bidang (KEU, TAN, TEK, UMU).
+   - Menghitung rasio pemenuhan formasi per RM Band (`RM-1`, `RM-2`, `RM-3`) pada setiap bidang (KEU, TAN, TEK, UMU).
 2. **Pipa Pasokan Talenta Rekrutmen (Recruitment Supply Channels)**:
-   - **CKP (Calon Karyawan Pimpinan) Internal**: Pasokan karir internal dari Karyawan Pelaksana (`RM-4`) berprestasi yang lulus seleksi asesmen untuk dipromosikan menjadi staf pimpinan (`RM-3`).
+   - **CKP (Calon Karyawan Pimpinan) Internal**: Pasokan karir internal dari Karyawan Pelaksana (`RM-4` s.d. `RM-7`) berprestasi yang lulus seleksi asesmen untuk dipromosikan menjadi staf pimpinan (`RM-3`).
    - **Talent Scouting (Eksternal)**: Pasokan rekrutmen kemitraan institusi pendidikan (MoU universitas / sekolah vokasi perkebunan) untuk percepatan pemenuhan formasi staf pratama (`RM-3`).
    - **RBB (Rekrutmen Bersama BUMN)**: Pasokan rekrutmen terbuka nasional terpusat Kementerian BUMN & Holding Perkebunan untuk formasi staf (`RM-3`).
-   - **Reguler / Mandiri**: Pasokan rekrutmen langsung/lokal untuk pemenuhan formasi tenaga pelaksana operasional (`RM-4`).
+   - **Reguler / Mandiri**: Pasokan rekrutmen langsung/lokal untuk pemenuhan formasi tenaga pelaksana operasional (`RM-4` s.d. `RM-7`).
+   - **Rencana Pasokan per Tahun** (tabel `mpp_supply_plans`): angka CKP Internal, Talent Scouting, RBB, dan Jabatan Prioritas Diisi per tahun x RM Band (`RM-1`..`RM-3`) x bidang diisi admin melalui laci "Kelola Rencana Pasokan" pada layar MPP, bukan angka tetap di kode. Setiap tahun berisi 48 sel bilangan bulat 0..999; tahun tanpa rencana dihitung 0 dan layar menampilkan pemberitahuan. Jabatan Prioritas Diisi hanya informasi dan tidak masuk rumus. Tidak ada rencana bawaan sistem: angka acuan korporat lama tidak dimuat, sehingga setiap tahun (termasuk tahun berjalan) harus diisi admin sebelum pasokan dihitung.
+   - **Pasokan T+1 kumulatif**: Kebutuhan $T+1$ = `Formasi - Realisasi + Pensiun T + Pensiun T+1 - (Pasokan T + Pasokan T+1)`.
+   - **Kekurangan vs Surplus**: sel Kebutuhan tetap bertanda, tetapi JUMLAH, TOTAL, dan KPI menampilkan total kekurangan (jumlah sel positif) dan total surplus (jumlah sel negatif) secara terpisah, dengan angka bersih sebagai keterangan, agar surplus satu bidang tidak menutupi kebutuhan bidang lain.
 3. **Proyeksi Pensiun Multitahun**:
-   - Sistem memproyeksikan data pensiun berjalan ($T$) dan tahun depan ($T+1$) untuk mengantisipasi regenerasi jabatan strategis tanpa jeda operasional.
+   - Sistem memproyeksikan data pensiun berjalan ($T$) dan tahun depan ($T+1$) untuk mengantisipasi regenerasi jabatan strategis tanpa jeda operasional. $T$ adalah tahun pada filter perencanaan, bukan tahun kalender berjalan.
+   - **Posisi per (bulan)**: MPP direncanakan per tahun $T$ dan dibaca pada tanggal posisi = hari terakhir bulan terpilih. Realisasi = pejabat yang menjabat pada tanggal posisi; Pensiun $T$ = kursi kosong setelah tanggal posisi s.d. Desember $T$; Pensiun $T+1$ = sepanjang $T+1$. Bawaan bulan: bulan berjalan (tahun berjalan), Desember (tahun lalu), Januari (tahun mendatang).
+   - Kursi dianggap kosong sejak **MBT** (§5.1), bukan sejak tanggal pensiun, karena pejabat sudah dibebaskan dari tugas. Karyawan yang sudah memasuki MBT pada atau sebelum tanggal posisi, yang kontraknya (`tanggal_berakhir_kontrak`) berakhir sebelum tanggal posisi, atau yang mulai bekerja setelah tanggal posisi tidak dihitung.
+   - **Jalur rekrutmen hanya memasok RM-3**: rencana CKP Internal, Talent Scouting, dan RBB hanya boleh diisi pada sel RM-3 (`MppSupplyPlan::SUPPLY_LEVELS`); sel RM-1/RM-2 jalur tersebut ditolak saat disimpan dan tidak tampil sebagai isian di editor. RM-1 dan RM-2 diisi lewat promosi (§5.2), bukan rekrutmen. Jabatan Prioritas Diisi boleh diisi pada semua band.
+   - **Sisa pasokan (rencana vs realisasi)**: pasokan terealisasi saat karyawan dengan `jalur_masuk` CKP, Talent Scouting, atau RBB **pertama kali ditempatkan sebagai Karpim** — penempatan Karpim pertama pada `job_histories` yang sudah diterapkan (`is_applied`) dan tidak dibatalkan; tanpa riwayat tersebut dipakai `tmt_bekerja`. Untuk CKP ini adalah tanggal promosi dari Karpel, bukan tanggal mulai bekerja. Bila tanggal itu jatuh pada tahun $T$ s.d. tanggal posisi dan karyawan berada di RM-3, ia sudah tercatat di Realisasi, sehingga pasokan $T$ yang dikurangkan adalah `max(0, rencana - terealisasi)` per sumber dan bidang. Pasokan $T+1$ dihitung penuh.
+   - **Rekonstruksi bulan lalu**: bulan lampau yang tidak pernah direkam dihitung dari data karyawan saat ini (TMT, MBT, akhir kontrak); mutasi jabatan setelah bulan tersebut tidak tercermin. Tidak ada pengisian mundur (*backfill*): sistem tidak membuat snapshot untuk bulan yang terlewat. Riwayat bulanan yang akurat hanya berasal dari periode yang direkam dan ditutup (lihat Penutupan Periode Bulanan di bawah). Perubahan struktur oleh SK tidak mengubah periode yang sudah direkam; bulan sebelumnya dibekukan sebelum SK diterapkan (§3.7).
+   - **Penutupan Periode Bulanan** (tabel `mpp_periods` dan `mpp_period_members`): hanya bulan sebelum bulan berjalan yang dapat direkam atau ditutup, dalam rentang tahun perencanaan (`ManPowerPlanningService::PLANNING_YEAR_MIN/MAX`). Siklus: **Draf** (salinan direkam, dapat diperbarui berulang) $\rightarrow$ **Ditutup** (dibekukan; perekaman ulang ditolak). Membuka kembali periode tertutup wajib beralasan (minimal 10 karakter), mengembalikannya ke Draf, dan menaikkan nomor `revision` (mulai 1); periode harus ditutup ulang. Satu baris per (tahun, bulan). Draf bulan sebelumnya direkam otomatis oleh penjadwal (`hris:mpp-capture-period`, tanggal 1 pukul 01:00) dan dilewati bila periode sudah ditutup; penutupan selalu manual oleh admin dan menutup isi draf yang ada, tanpa perekaman ulang diam-diam.
+   - **Isi snapshot**: kolom `snapshot` (JSON) berisi keluaran utuh `getMppMatrix()` (matriks, `supply_breakdown`, `supply_t1`, `stats`) pada bulan tersebut; `mpp_period_members` berisi personil di balik tiap sel personil per `scope` x `rm_level` x `bidang`: `employee_nik`, `jabatan`, `unit_kerja`, `golongan`, `jalur_masuk`, `tanggal_penempatan`, `tanggal_mbt` (atribut penentu sel dibekukan agar rincian periode tertutup tidak berubah oleh promosi atau koreksi data sesudahnya; baris lama tanpa `golongan` memakai golongan terkini sebagai cadangan). Nama, tanggal lahir, dan data pribadi lain tidak disimpan; `employee_nik` tanpa foreign key agar snapshot utuh walau karyawan berubah atau dihapus. Layar bulan snapshot membaca matriks dari `snapshot` dan drilldown dari `mpp_period_members`; nama, tanggal pensiun, dan status diambil dari data karyawan saat ini ("tidak lagi terdaftar" bila NIK sudah tidak ada).
+   - Rumus Kebutuhan murni `(Formasi - Realisasi + Pensiun) - Pasokan` tanpa angka tempelan; total baris selalu sama dengan jumlah selnya. Angka sel dan daftar personil drilldown berasal dari satu sumber (`ManPowerPlanningService`).
 4. **Jabatan Fungsional (Advisor) / Overflow Penampungan**:
    - Merupakan "jabatan penampungan" (overflow/parking position) fungsional yang diberikan kepada karyawan apabila kuota/formasi jabatan struktural untuk level mereka (berdasarkan RM-band/Golongan) di seluruh unit sudah terpenuhi secara penuh (tidak ada *vacancy*).
    - Di dalam Matriks MPP, kolom ini digunakan untuk menampung agregat kelebihan/surplus pejabat definitif di luar kuota plafon formasi standar.
@@ -408,9 +500,34 @@ Service `ManPowerPlanningService` memuat data acuan baseline perusahaan:
 AI dan pengembang harus memanfaatkan Service Layer yang ada:
 
 ### 9.1 `ManPowerPlanningService`
-- `determineRmLevel(Employee $emp): string` $\rightarrow$ `'RM-1'`, `'RM-2'`, `'RM-3'`, `'RM-4'`
+- `determineRmLevel(Employee $emp): string` $\rightarrow$ `'RM-1'` s.d. `'RM-7'`
 - `determineBidang(Employee $emp): string` $\rightarrow$ `'KEU'`, `'TAN'`, `'TEK'`, `'UMU'`
-- `getBaselineData(): array` $\rightarrow$ Data acuan MPP; `standar_formasi` diturunkan dari kursi master formasi melalui `FormasiCatalog`, sedangkan matriks pasokan dan proyeksi lain tetap berupa baseline.
+- `standarFormasi(): array` $\rightarrow$ Standar Formasi per RM Band dan bidang dari kursi master formasi melalui `FormasiCatalog`.
+- `defaultAsOfMonth(int $year): int` $\rightarrow$ Bulan "Posisi per" bawaan untuk satu tahun perencanaan.
+- `getPositionCounts(int $year, int $month): array` $\rightarrow$ Agregasi data karyawan pada posisi akhir bulan: `realisasi`, `pensiun_t`, `pensiun_t1`, `advisor`, `diperban`, `hired_supply` (pasokan yang sudah masuk tahun $T$ per sumber).
+- `getMppMatrix(int $planningYear, ?int $asOfMonth = null): array` $\rightarrow$ Matriks 12 baris; baris Kebutuhan memuat `shortage_total`/`surplus_total` (dan `shortage`/`surplus` per RM), `stats` memuat `total_kekurangan`, `total_surplus`, `as_of_month`, `as_of_label`, `pensiun_window_label`, `supply_plan_missing`, `supply_plan_missing_years`, `supply_plan_provenance`.
+- `supplyFor(int $year, string $rm, string $bidang): int` $\rightarrow$ Pasokan (CKP + Talent Scouting + RBB) yang direncanakan untuk satu sel.
+- `totalStandarFormasi(): int` $\rightarrow$ Total kursi Karpim RM-1 s.d. RM-3 dari master formasi (lencana tab MPP).
+- `RM_BANDS` $\rightarrow$ Label RM Band untuk layar (singkat dan posisi kunci) sesuai §4.2; satu-satunya sumber label RM di view MPP.
+- Setiap baris `getMppMatrix()` membawa `drill`: scope personil (`realisasi`, `pensiun_t`, `pensiun_t1`, `advisor`, `diperban`, `supply_ckp`, `supply_talent_scouting`, `supply_rbb`), `formula`, atau `null`. `getMppMatrix()` juga mengembalikan `supply_breakdown` (sumber => RM => bidang => `rencana`, `terealisasi`, `sisa`) sebagai dasar rincian rencana vs realisasi. `getDrilldownEmployees($rm, $bidang, $scope, $year, $month)` mengembalikan persis personil yang dihitung sel dengan scope tersebut pada tanggal posisi yang sama.
+- `getPositionMembers(int $year, int $month): array` $\rightarrow$ Seluruh personil di balik sel personil matriks pada posisi akhir bulan, satu entri per scope drilldown yang diikuti karyawan (`scope`, `rm_level`, `bidang`, `employee_nik`, `jabatan`, `unit_kerja`, `golongan`, `jalur_masuk`, `tanggal_penempatan`, `tanggal_mbt`); memakai aturan scope yang sama dengan `getDrilldownEmployees()` sehingga jumlah anggota sama dengan angka sel. Hanya RM-1 s.d. RM-3 dan empat bidang yang dihitung. `getMppMatrix()` juga mengembalikan `supply_t1` (pasokan rencana T+1 per RM x bidang) agar rumus Kebutuhan T+1 dapat dibaca dari snapshot.
+
+### 9.1a `MppSupplyPlanService` (`App\Services\Mpp`)
+Satu-satunya jalur baca/tulis rencana pasokan.
+- `matrixFor(int $year): array` $\rightarrow$ sumber => RM => bidang => jumlah, terisi nol.
+- `hasPlan(int $year): bool`
+- `validateCells(array $cells): array` $\rightarrow$ Validasi isian tanpa menyimpan (bentuk, bilangan bulat 0..999, RM-3 untuk jalur rekrutmen); dipakai editor saat meninjau dan oleh `save()`.
+- `save(int $year, array $cells, array $expected, ?string $reason, User $user): int` $\rightarrow$ validasi (rentang tahun `ManPowerPlanningService::PLANNING_YEAR_MIN/MAX`, 48 sel lengkap, bilangan bulat 0..999, alasan minimal 10 karakter), tolak simpanan yang menimpa perubahan admin lain (`$expected` berbeda dari yang tersimpan), lalu dalam satu `DB::transaction()` simpan sel dan catat satu baris `master_audit_logs` per sel yang berubah. Pelanggaran dilempar sebagai `MppPlanRuleViolationException` (pesan aman untuk admin).
+
+### 9.1b `MppPeriodService` (`App\Services\Mpp`)
+Satu-satunya jalur tulis periode bulanan MPP. Setiap tulis berjalan dalam satu `DB::transaction()` (dengan `lockForUpdate`, diulang hingga 3 kali bila deadlock) bersama baris `master_audit_logs`. Pelanggaran dilempar sebagai `MppPeriodRuleViolationException` (pesan aman untuk admin).
+- `find(int $year, int $month): ?MppPeriod`
+- `isClosable(int $year, int $month): bool` $\rightarrow$ Benar hanya untuk bulan 1..12 sebelum bulan berjalan.
+- `stateFor(int $year, int $month): string` $\rightarrow$ `'closed'` / `'draft'` (ada salinan), `'unclosed'` (bulan lampau belum pernah direkam), `'live'` (bulan berjalan atau mendatang).
+- `capture(int $year, int $month, ?User $user): MppPeriod` $\rightarrow$ Rekam atau perbarui draf: menyimpan `getMppMatrix()` dan `getPositionMembers()` pada saat itu (anggota lama diganti), `captured_at`/`captured_by`. `$user` null untuk penjadwal. Ditolak bila bulan belum dapat ditutup, di luar rentang tahun, atau periode sudah ditutup. Audit `mpp_period.captured`.
+- `close(int $year, int $month, ?string $note, User $user): MppPeriod` $\rightarrow$ Menutup draf yang ada (ditolak bila belum ada draf atau sudah ditutup); catatan opsional disimpan di `close_note`. Audit `mpp_period.closed`.
+- `reopen(int $year, int $month, ?string $reason, User $user): MppPeriod` $\rightarrow$ Alasan wajib minimal 10 karakter; hanya periode tertutup yang dapat dibuka. Status kembali `draft`, `revision` + 1, data penutupan dikosongkan. Audit `mpp_period.reopened` dengan alasan.
+- `membersFor(MppPeriod $period, string $scope, string $rm, string $bidang): array` $\rightarrow$ Personil satu sel dari snapshot, berbentuk sama dengan `getDrilldownEmployees()`.
 
 ### 9.2 `MutasiService`
 `MutasiService` adalah pintu masuk tunggal modul mutasi. Ia mengorkestrasi tiga mode transaksi (Straight, Swap, Chain) dan mendelegasikan tugas lain ke kolaborator di `App\Services\Mutasi\` — pemanggil (Livewire, controller, test) tetap memakai `MutasiService`:
@@ -419,27 +536,38 @@ AI dan pengembang harus memanfaatkan Service Layer yang ada:
 |---|---|
 | `FormationService` | Analisis formasi: kosong / terisi / *Reserved*, daftar jabatan target yang layak, RM band jabatan (`'RM-n'`), klasifikasi Karpim/Karpel. |
 | `MutasiGovernanceGuard` | Aturan tata kelola: batas usia pensiun, masa dinas unit, kriteria promosi, arah RM (Promosi/Demosi). |
-| `ChainTopologyAnalyzer` | Analisis graf SK Kolektif (siklis / domino / bentrok), normalisasi peserta & dispensasi, urutan alur domino. |
-| `PlacementWriter` | Jalur tulis tunggal: salin penempatan ke master pegawai & catat `job_histories`. |
+| `ChainTopologyAnalyzer` | Analisis graf SK Kolektif (siklis / domino / bentrok), normalisasi peserta & dispensasi, urutan alur domino. Label yang tampil memakai istilah bisnis: Rantai Tertutup, Rantai Terbuka, Tukar Jabatan, Mutasi Mandiri, Alur Gabungan, "Tanpa Lowongan Baru". |
+| `PensiunService` | Pemberhentian karyawan yang mencapai Batas Usia Pensiun: tutup riwayat jabatan, batalkan mutasi terjadwal, tandai `tanggal_berhenti` (§5.1 butir 4). |
+| `PlacementWriter` | Jalur tulis tunggal: salin penempatan ke master karyawan & catat `job_histories`. |
 | `ScheduledMutationService` | Siklus mutasi terjadwal: aktivasi TMT, aktivasi satu SK, pembatalan (soft delete + jejak audit). |
 | `MutasiHistoryReader` | Riwayat/audit trail, KPI, gerbong, detail. |
 | `TalentProfileBuilder` | Profil talenta (9-box, SMKBK/CLI, masa dinas, proyeksi pensiun, pelatihan). |
 | `MutasiLookup` | Data pendukung layar (kandidat, unit, jabatan, pratinjau kepatuhan). |
+| `ChainProposalService` | Usulan Mutasi Berantai: draf, pengajuan, penarikan, persetujuan/pengembalian empat mata, kedaluwarsa, sidik jari isian (§5.2.6). |
 | `MutasiPolicy` | Konstanta kebijakan SDM (24 bulan masa dinas unit, ambang golongan promosi, skor kinerja "Baik", minimal peserta SK Kolektif). Perubahan pedoman cukup di satu berkas. |
 
 Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan aman ditampilkan ke admin); data master tidak konsisten sebagai `MutasiIntegrityException`. Kesalahan lain tidak boleh ditelan komponen UI.
 
 - `analyzeTarget(string $jabatan, string $unitKerja): array` $\rightarrow$ Cek ketersediaan formasi (vacant vs occupied) untuk preview live impact panel UI.
 - `processMutasi(MutasiRequest $request): array` $\rightarrow$ Transaksi atomik perubahan jabatan biner (Straight & Swap), pembentukan chain vacancy, dan update riwayat jabatan. Menjalankan seluruh guard tata kelola §5.2.3 di sisi server. Input berupa value object `App\Services\Data\MutasiRequest` (immutable, string kosong dinormalisasi menjadi `null`); setiap peserta SK Kolektif dibentuk dengan `MutasiRequest::fromChainNode()`.
-- `applyPlacementToEmployee(...)` $\rightarrow$ Satu-satunya jalur tulis yang menyalin penempatan ke master pegawai (tanpa memicu `EmployeeObserver`). Dipakai oleh Straight/Swap/Chain, aktivasi mutasi terjadwal, dan pemeliharaan riwayat jabatan manual.
+- `applyPlacementToEmployee(...)` $\rightarrow$ Satu-satunya jalur tulis yang menyalin penempatan ke master karyawan (tanpa memicu `EmployeeObserver`). Dipakai oleh Straight/Swap/Chain, aktivasi mutasi terjadwal, dan pemeliharaan riwayat jabatan manual.
 - **Read model UI** (`getSelectableEmployees`, `getGroupedUnits`, `listTargetPositions`, `tenureComplianceFor`, `promotionEligibilityFor`, `getEmployeeSnapshot`, `getMutasiDetail`, `getPositionFlags`) $\rightarrow$ Komponen Livewire modul mutasi tidak boleh memanggil Eloquent/`DB::` secara langsung; seluruh akses data melalui `MutasiService`.
-- `validateChainTopology(array $nodes): array` $\rightarrow$ Validasi integritas graf rantai mutasi ($\ge 2$ pegawai), deteksi loop siklis vs domino terbuka, dan deteksi bentrok formasi ganda.
+- `validateChainTopology(array $nodes): array` $\rightarrow$ Validasi integritas graf rantai mutasi ($\ge 2$ karyawan), deteksi loop siklis vs domino terbuka, dan deteksi bentrok formasi ganda.
 - `processChainMutasi(array $headerData, array $nodes): array` $\rightarrow$ Eksekusi transaksional atomik seluruh mata rantai mutasi dalam 1 SK Kolektif berskala besar dengan penandaan `batch_id`. Peserta yang belum lengkap disaring dan kolom dispensasi per kriteria dilipat menjadi satu penanda + satu alasan tertulis oleh service (`prepareChainNodes`), bukan oleh komponen UI.
 - `resolvePositionRm(string $jabatan): string` / `deriveLevelForRm(string $rm): ?string` $\rightarrow$ Sumber tunggal RM band (format baku `'RM-n'`) dan klasifikasi Karpim/Karpel untuk seluruh alur penempatan.
 - `applyEffectiveMutations(?string $date)` / `applyScheduledMutation(int $id)` / `cancelScheduledMutation(...)` $\rightarrow$ Siklus hidup mutasi terjadwal (§5.2.4).
 
 ### 9.3 `JobVacancyService`
 - Mendeteksi formasi kosong manajerial aktif berdasarkan standar formasi unit vs pejabat definitif yang bertugas.
+- **Sebaran Formasi** (layar `/admin/master/sebaran`, Livewire `FormasiDistribution`, tab "Sebaran Formasi" pada Master Formasi; tautan lama `/admin/master/lowongan` dialihkan permanen dengan filternya). Gambaran lintas unit seluruh formasi jabatan, terisi maupun kosong. Kekosongan = kuota formasi dikurangi pejabat **definitif**, dihitung langsung dari `position_unit` dan `employees` tanpa status tersimpan, sehingga tidak dapat bergeser dari data karyawan dan formasi yang belum pernah terisi ikut terdeteksi. Hanya unit aktif dan jabatan aktif yang dihitung. Istilah antarmuka: **"Kosong"** (selaras "Formasi Kosong" pada modul Mutasi), bukan "Lowong".
+  - `classifySeat(int $kuota, int $definitive, int $acting): string` $\rightarrow$ sumber tunggal status formasi: `over` "Melebihi kuota" (definitif > kuota), `full` "Penuh", `acting` "Diisi Pj/Plt" (tanpa pejabat definitif, hanya Pj/Plt), `empty` "Kosong", `partial` "Sebagian kosong". Pj/Plt adalah penugasan sementara dan tidak mengisi kuota (§5.2). Layar Formasi Unit Kerja memakai fungsi yang sama.
+  - `getFormasiSeats(?string $search, ?string $unitKerja, ?string $status, ?string $wilayah, ?string $rmLevel, ?string $bidang, ?string $severity): Collection` $\rightarrow$ seluruh formasi dengan `kuota`, `filled`, `acting`, `vacant_slots`, `status`, `family`, `wilayah`, `vacant_since` (tmt_akhir terakhir pada `job_histories`), `days_vacant`, `severity` (`red` > 90 hari, `yellow` 30–90, `green` < 30, `unknown` belum pernah terisi), dan pemesanan oleh mutasi terjadwal (`is_applied = false`). `$status` berisi kunci status atau `kosong` (seluruh status kosong). Urutan bawaan: kekosongan terbanyak, lalu terlama kosong. Pencarian mencakup jabatan, rumpun, dan unit.
+  - `getJabatanDistribution(...)` (parameter sama) $\rightarrow$ satu baris per **rumpun jabatan**: `family`, `rm_levels`, `jabatan_count`, `unit_count`, `kuota`, `filled`, `acting`, `vacant_slots`, `vacant_units`, `fill_rate`, dan `seats` (rincian per unit). Filter diterapkan pada formasi sebelum dikelompokkan. Jumlah kueri tetap (tidak bertambah menurut jumlah formasi).
+  - `App\Services\Formasi\JabatanFamily::of(string $jabatan): string` $\rightarrow$ rumpun jabatan: angka romawi di akhir nama dibuang, termasuk sufiks huruf dan pasangan ("Asisten Afdeling I", "IIA", "I dan II", "VII & VIII" menjadi "Asisten Afdeling"). Singkatan (IT, QC, SDM) dan nama tempat tidak diubah, dan nama tidak pernah dipangkas sampai kosong.
+  - `getFormasiStatistics(): array` dan `getFormasiUnitSummary(): array` $\rightarrow$ kartu KPI dan kolom "Kosong" pada daftar unit Formasi Unit Kerja. `getFormasiVacancies()` tetap tersedia sebagai pintasan `getFormasiSeats(status: 'kosong')`.
+  - Layar ini baca-saja. Satu-satunya aksi adalah tautan "Isi lewat Mutasi" selama formasi **masih memiliki kursi kosong** (`free_slots` > 0: kuota dikurangi seluruh pemegang, termasuk Pj/Plt; menuju alur Mutasi resmi, tercatat pada `job_histories`). Formasi yang seluruh kursinya terisi, termasuk yang dijabat Pj/Plt, menampilkan "Ada pemegang aktif" (§5.2). Formasi yang sudah dipesan mutasi terjadwal menampilkan penanda "Terjadwal (SK)". Ekspor Excel mengikuti tampilan dan filter aktif dan tidak memuat nama karyawan (UU PDP). Cakupan mengikuti master formasi (§3.6), bukan daftar tetap: saat ini seluruh Karpim dan Karpel pada unit Regional Office, dan Karpel pada unit lain terbaca otomatis begitu formasinya ditambahkan ke master, tanpa perubahan kode.
+  - **Jabatan penampungan bukan formasi.** Advisor dan Diperbantukan (kolom `is_overflow` dan `is_diperban` pada `positions`, mis. "Advisor RM-3", "Karyawan Diperbantukan RM-2", "Kepala Bagian Diperbantukan") bersifat opsional pada sebuah bagian atau unit dan berbeda dari jabatan pada Master Formasi: tidak memiliki kuota, tidak mengisi maupun mengosongkan formasi mana pun, dan tidak pernah tampil sebagai formasi kosong. Mutasi memperlakukannya sebagai `pool` (selalu tersedia, tidak pernah ditukar atau dipesan, §5.2) dan hanya terjangkau lewat Penugasan Khusus dan Sanksi (daftar target promosi, rotasi, mutasi unit, dan penugasan tidak memuatnya), Master Formasi menolak menambahkannya sebagai formasi unit, dan `JobVacancyService` tetap mengabaikannya bila salah terpasang pada sebuah unit. Bidang karyawan pada jabatan penampungan tetap perkiraan (§3.6 butir 9); tautan unit tidak mengubahnya. Mutasi masih dapat menempatkan karyawan pada jabatan penampungan yang belum dibuka pada unit tujuan; baris itu tampil sebagai "Belum dibuka di unit" pada bezetting sebagai informasi, bukan kesalahan, dan penyelarasannya (membuka jabatan otomatis saat mutasi berlaku) menunggu keputusan SDM. Tugas Belajar belum ada kasusnya di PTPN IV Regional V sehingga tidak diberi aturan khusus; bila muncul, perlu keputusan SDM apakah kursinya dihitung terisi. Apakah "Diperbantukan" pada bezetting berarti sanksi indisipliner (rumusan §5.4 butir 7) atau penugasan biasa menunggu keputusan SDM; tab Jabatan Penampungan hanya mencatat jenisnya dan tidak mengubah aturan Mutasi.
+  - **Satu sumber untuk seluruh aplikasi.** `getVacancies()` (tab Monitoring Formasi Kosong pada modul Mutasi) dan `getStatistics()` memakai baris formasi yang sama dengan Sebaran Formasi: formasi kosong = kuota dikurangi pejabat definitif. Hasilnya dilengkapi pejabat terakhir, jenjang, dan golongan dari riwayat jabatan (`last_occupant_nik`, `last_occupant_name`, `level`, `golongan`), `duration_human`, dan terurut dari yang terlama kosong; formasi yang belum pernah terisi berada di akhir dengan `severity = unknown`. `getStatistics()['total_vacancies']` selalu sama dengan `getFormasiStatistics()['vacant_formasi']`, dan ember `critical_count`, `moderate_count`, `recent_count`, `unknown_count` berjumlah sama dengannya. Jabatan yang tidak tercantum pada master formasi (mis. Karpel di luar Regional Office, §3.6) tidak muncul sebagai kekosongan. Rantai mutasi (*chain vacancy*) dihitung `FormationService` dan `ChainTopologyAnalyzer` dari data karyawan; posisi yang ditinggalkan peserta tampil di monitoring bila tercantum pada master formasi dan kuotanya tidak lagi terisi pejabat definitif. Pejabat terakhir dan tanggal keluar diambil dari baris riwayat tertutup dengan `tmt_akhir` terbaru, tanpa baris karyawan yang masih menjabat di formasi itu (kenaikan golongan menutup dan membuka baris riwayat tanpa orangnya pergi).
 
 ### 9.4 `EmployeeExportService`
 - `exportExcel(Request|array $requestOrFilters, ?User $user)` $\rightarrow$ Orkestrasi ekspor data kepegawaian 26 kolom SSOT ke Excel, penyematan metadata dokumen UU PDP No. 27/2022, dan pencatatan security audit trail.
@@ -448,6 +576,17 @@ Pelanggaran aturan bisnis dilempar sebagai `MutasiRuleViolationException` (pesan
 ### 9.5 `EmployeeImportService`
 - `preview(UploadedFile $file): array` $\rightarrow$ Dry-run parsing Excel, validasi integritas master data, dan deteksi anomali formasi sebelum disimpan permanen.
 - `commit(string $token): array` $\rightarrow$ Eksekusi penyimpanan baris valid ke database secara transaksional.
+  Jaminan komit:
+  1. **Atomik**: seluruh baris valid beserta catatan `employee_import_logs` ditulis dalam satu `DB::transaction()`. Kendala sistem pada satu baris, atau jejak audit yang gagal tercatat, membatalkan seluruh komit (tidak ada data tersimpan). Baris yang melanggar aturan data tetap dilewati dan dilaporkan, sama seperti pada pratinjau.
+  2. **Berkas identik**: SHA-256 berkas dicatat saat pratinjau dan diverifikasi saat komit; berkas yang berubah sejak pratinjau ditolak. Hash tercatat pada jejak audit.
+  3. **Sekali jalan**: satu token pratinjau hanya dapat dikomit sekali; permintaan paralel ditolak, dan komit yang gagal melepas token agar dapat diulang.
+  4. **Kuota aman**: baris unit dikunci (`FOR UPDATE`) selama komit sehingga penambahan karyawan lain pada unit yang sama menunggu, setara `FormasiSeatGuard`.
+  5. **Pesan aman**: kendala internal dicatat ke log; admin hanya menerima pesan umum (`ImportAbortedException`), tanpa SQL atau path server.
+  6. **Peringatan formasi bergeser**: baris karyawan eksisting yang lolos validasi diperiksa terhadap Master Formasi (`EmployeeImportRowValidator@seatDriftWarnings`): unit tidak aktif, jabatan tidak lagi tercantum pada formasi unit, atau pemangku definitif melebihi kuota. Hasilnya hanya peringatan tinjauan pada pratinjau (`warning_count`, `warnings` per baris) dan tidak pernah menolak baris atau mengubah penempatan; penempatan tetap hanya melalui Mutasi. Strata yang belum memiliki formasi pada unit tersebut (mis. Karpel) tidak dinilai.
+  7. **Persetujuan empat mata (maker-checker)**: bila kebijakan aktif (`config/hris.php` → `import.require_approval`, env `HRIS_IMPORT_REQUIRE_APPROVAL`, bawaan nonaktif), `commit` hanya mengajukan: berkas dipindah ke penyimpanan privat dan dicatat pada `employee_import_logs` berstatus `pending_approval`; tidak ada data karyawan yang berubah. Admin LAIN (bukan pengaju) meninjau pratinjau terkini terhadap Master Formasi lalu menyetujui atau menolak; pengaju dapat menarik pengajuannya. Yang disimpan adalah yang ditinjau: sidik jari hasil pratinjau saat ditinjau harus sama saat disetujui, dan berkas harus identik (SHA-256). Penolakan dan penarikan wajib beralasan (min. 10 karakter). Pengajuan yang tidak diputuskan dalam `approval_ttl_days` (bawaan 7) kedaluwarsa otomatis. Seluruh jalur simpan lain (impor langsung, antrean, fallback sinkron) menolak bekerja tanpa persetujuan. Siklus status: `pending_approval` → `approved` → `completed` → `rolled_back` (atau `rejected`, `expired`).
+  8. **Pembatalan (undo)**: `EmployeeImportGovernanceService@rollback` (layar `/admin/employees/import/batches`), dalam `undo_window_days` (bawaan 7) sejak disimpan, wajib beralasan, dan atomik. Setiap karyawan yang diubah impor direkam pada `employee_import_changes` (terenkripsi): karyawan baru dihapus, karyawan yang diperbarui dikembalikan ke kondisi sebelum impor, dan tugas rangkap hasil impor dibatalkan (soft delete beserta pelaku dan alasan). Riwayat `job_histories` tidak pernah dihapus; pengembalian menambah catatan baru ("Pembatalan impor Excel #n"). Pembatalan dihentikan seluruhnya bila ada karyawan yang sudah berubah setelah impor (sidik jari atribut berbeda) atau, untuk karyawan baru, sudah memiliki evaluasi, pelatihan, atau riwayat baru.
+  9. **Jejak dan retensi**: `employee_import_logs` memuat pengaju, penyetuju, waktu, IP, alasan keputusan/pembatalan, dan sidik jari berkas; catatan riwayat penugasan pada impor yang disetujui menyebut pengaju dan penyetuju. Rekaman data sebelum impor dihapus setelah masa pembatalan (UU PDP) oleh `php artisan hris:purge-import-governance` (terjadwal harian), yang juga menandai pengajuan kedaluwarsa.
+  10. **Layar riwayat**: `/admin/employees/import/batches` menampilkan tab status, panel baris yang dilewati (alasan dikelompokkan dari ringkasan tersimpan; pesan dengan NIK disamarkan `12****78`), linimasa keputusan, serta pemeriksaan kesiapan pembatalan (`EmployeeImportGovernanceService@rollbackReadiness`). Pembatalan yang menyentuh `typed_confirmation_threshold` (bawaan 50) karyawan atau lebih wajib dikonfirmasi dengan mengetik `BATALKAN`; aturan ini ditegakkan di layanan, bukan hanya di antarmuka.
 
 ### 9.6 Master Formasi (`App\Services\Formasi\`)
 - `FormasiExcelParser::parse(string $path): array` $\rightarrow$ `['seats' => [...], 'errors' => [...]]`; membaca Excel formasi menjadi kursi per (unit, jabatan), menolak Level RM/Bidang tidak valid, kursi ganda bertentangan, dan jabatan dengan Level RM berbeda antar unit. Tidak mengakses database.
@@ -462,6 +601,7 @@ Satu-satunya jalur ubah unit, jabatan, dan kursi formasi. Setiap metode menerima
 - Kursi: `addSeat(Unit, Position, int $kuota, ?string $bidang, User): int`, `updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User)`, `removeSeat(int $positionUnitId, ?string $reason, User)`
 - `previewImpact(string $operation, array $params): ImpactResult` $\rightarrow$ `blocked`, `blockers`, `warnings`, `affectedEmployees`; dipakai panel dampak di layar Formasi dan pemeriksaan sisi server yang sama.
 - Layar: `/admin/master/formasi` (Livewire `FormasiEditor`), `/admin/master/riwayat` (riwayat perubahan, baca-saja); layar Unit Kerja dan Jabatan & Posisi memakai metode di atas untuk tambah, ubah, aktif/nonaktif, dan hapus.
+- Jabatan penampungan (layar `/admin/master/penampungan`, Livewire `PoolPositions`, tab "Jabatan Penampungan"): `createPoolPosition(array $data, User $user): Position` (jenis Advisor atau Diperbantukan, RM-1 s.d. RM-4, level Karpim, tanpa kuota dan tanpa unit; menolak nama ganda), `openPoolPosition(Unit $unit, Position $position, User $user): int` dan `closePoolPosition(Unit $unit, Position $position, ?string $reason, User $user): void`. Ketiganya berjalan dalam satu `DB::transaction()` dan tercatat pada `master_audit_logs` (`position.created`, `pool.opened`, `pool.closed`); jabatan biasa ditolak. Layar memiliki dua tampilan: Daftar Jabatan (jumlah unit dan karyawan per jabatan) dan Per Unit (bezetting: karyawan pada jabatan penampungan per unit, termasuk yang belum dibuka pada unitnya agar ketidaksesuaian terlihat). `renamePoolPosition(Position $position, string $nama, ?string $reason, User $user): Position` dan `deletePoolPosition(Position $position, ?string $reason, User $user): void` memperbaiki jabatan yang dibuat keliru (wajib beralasan; hapus diblokir selama jabatan masih dibuka pada unit, dijabat, atau tercatat pada riwayat). Penutupan mengunci baris unit (kunci yang sama dengan penjaga penambahan karyawan) dan juga diblokir oleh penugasan sementara Pj/Plt dan mutasi terjadwal menuju jabatan itu pada unit tersebut. Nama jabatan dibandingkan tanpa membedakan huruf besar-kecil, dan panjangnya maksimal 255 karakter. Layar Formasi Unit Kerja dan Sebaran Formasi tidak menghitung jabatan penampungan, dan pesan penghapusan unit atau jabatan menyebut tab Jabatan Penampungan bila hanya tautan penampungan yang menghalangi.
 ---
 
 ## 10. Sinkronisasi Domain ke UI ([DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md))
@@ -477,9 +617,9 @@ Tampilan UI wajib mencerminkan warna semantik domain yang telah disepakati di [D
 | **RM-1** | Pimpinan Puncak | `bg-orange-100 text-orange-800 border-orange-200` |
 | **RM-2** | Pimpinan Madya | `bg-sky-100 text-sky-800 border-sky-200` |
 | **RM-3** | Pimpinan Pratama | `bg-purple-100 text-purple-800 border-purple-200` |
-| **RM-4** | Pelaksana Lapangan | `bg-slate-100 text-slate-700 border-slate-200` |
+| **RM-4 s.d. RM-7** | Pelaksana Lapangan | `bg-slate-100 text-slate-700 border-slate-200` |
 | **Karpim** | Staf Pimpinan | `bg-primary/10 text-primary border-primary/20` |
-| **Karpel** | Pelaksana Lapangan (RM-4) | `bg-slate-100 text-slate-700 border-slate-200` |
+| **Karpel** | Pelaksana Lapangan (RM-4 s.d. RM-7) | `bg-slate-100 text-slate-700 border-slate-200` |
 
 ---
 
@@ -490,12 +630,28 @@ Saat AI Model menulis kode untuk repositori ini, patuhi aturan mutlak berikut:
 1. **Gunakan Service Layer, Jangan Duplikasi Logika**:
    - Selalu gunakan `ManPowerPlanningService` untuk menentukan RM level dan bidang fungsional. Jangan menulis `if/else` manual penentu RM di Blade template.
 2. **Kalkulasi Tanggal Pensiun & MBT Selalu Otomatis**:
-   - Dalam seeder, form create, ataupun import Excel pegawai, jika `tanggal_pensiun` tidak diberikan, kalkulasikan secara otomatis dari `tanggal_lahir` (+56 tahun dan -1 tahun untuk MBT).
+   - Dalam seeder, form create, ataupun import Excel karyawan, jika `tanggal_pensiun` tidak diberikan, kalkulasikan secara otomatis dari `tanggal_lahir` (+56 tahun dan -1 tahun untuk MBT).
 3. **Penyimpanan NIK & Tanggal**:
    - NIK selalu diperlakukan sebagai string (jangan cast ke int agar leading zero tidak hilang).
    - Format tanggal input selalu divalidasi `Y-m-d`.
 4. **Patuhi Pasangan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md)**:
    - Jika mengubah tampilan atau membuat komponen baru, rujuk [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) untuk struktur token CSS, modal dialog, formulir input, dan layout kartu enterprise.
+
+## 12. Register Keputusan Aturan Bisnis
+
+Aturan di bawah ini ditetapkan sementara oleh tim pengembang karena belum ada ketentuan tertulis dari SDM. Setiap aturan tetap berlaku di sistem, tetapi baru menjadi ketetapan setelah disetujui SDM: isi kolom **Keputusan SDM** dengan nama, jabatan, dan tanggal persetujuan, lalu ubah status menjadi *Disetujui*. Bila SDM memutuskan lain, ubah aturannya pada rujukan kode, perbarui bab terkait di dokumen ini, dan catat perubahannya pada riwayat revisi. Aturan bisnis baru yang belum punya dasar tertulis wajib ditambahkan ke daftar ini.
+
+| No | Aturan yang berlaku saat ini | Rujukan | Status | Pertanyaan untuk SDM | Keputusan SDM |
+|---|---|---|---|---|---|
+| 1 | Pj/Plt, termasuk yang ditempatkan lewat Mutasi, menempati satu kuota formasi dan tidak melepaskannya. | §5.2, `JobVacancyService::freeSlots()` | Sementara | Apakah penugasan sementara boleh dianggap tidak menempati kuota, sehingga pejabat definitif tetap dapat ditempatkan? | — |
+| 2 | Formasi berkuota ganda menerima penempatan langsung selama kuotanya belum penuh. Bila penuh, tukar jabatan ditolak. | §5.2, `FormationService::analyzeTarget()`, `MutasiService::resolveSwapOccupant()` | Sementara | Bila formasi berkuota ganda penuh, pemegang mana yang ditukar dan siapa yang memilihnya? | — |
+| 3 | Jabatan bernomor romawi dilaporkan sebagai satu rumpun pada Sebaran Formasi (mis. Asisten Afdeling I s.d. XIII menjadi "Asisten Afdeling"). | §9.3, `JabatanFamily::of()` | Sementara | Apakah pelaporan per rumpun sesuai kebutuhan, atau tiap afdeling dilaporkan terpisah? | — |
+| 4 | Jabatan di luar Master Formasi tidak dihitung sebagai formasi kosong. Saat ini Karpel hanya ada pada unit Regional Office. | §3.6, §9.3 | Sementara | Kapan formasi Karpel pada kebun dan pabrik ditambahkan ke Master Formasi, atau memang tidak dikendalikan? | — |
+| 5 | Jabatan penampungan (Advisor, Diperbantukan) dibuka per unit; hanya yang dibuka yang dapat dipakai pada penambahan manual dan impor. | §3.6 butir 6, `MasterFormasiService::openPoolPosition()` | Sementara | Apakah jabatan penampungan boleh dipakai di semua unit tanpa dibuka lebih dulu? | — |
+| 6 | Mutasi masih dapat menempatkan karyawan pada jabatan penampungan yang belum dibuka pada unit tujuan; baris itu tampil sebagai "Belum dibuka di unit". | §9.3 | Sementara | Apakah jabatan dibuka otomatis saat mutasi berlaku, atau penempatan seperti itu ditolak? | — |
+| 7 | Diperbantukan dicatat sebagai jenis jabatan penampungan; aturan Mutasi tetap memperlakukannya sebagai sanksi indisipliner. | §5.4 butir 7, §9.3 | Sementara | Apakah Diperbantukan di PTPN IV Regional V adalah sanksi, penugasan biasa, atau keduanya? Bila bukan sanksi, apakah tetap perlu tanggal berakhir? | — |
+| 8 | Tugas Belajar tidak diberi aturan khusus (belum ada kasus di PTPN IV Regional V); karyawan tetap terhitung mengisi formasinya. | §9.3 | Sementara | Bila kasusnya muncul, apakah kuota formasi karyawan itu dihitung terisi atau terbuka? | — |
+| 9 | Admin membuat, mengubah nama, membuka, menutup, dan menghapus jabatan penampungan; setiap perubahan tercatat pada riwayat perubahan master dengan alasan. | §9.7 | Sementara | Apakah cukup satu admin, atau perubahan perlu persetujuan dua pihak seperti impor Excel? | — |
 
 ---
 *Dokumen ini dirawat sebagai Single Source of Truth Domain PTPN IV Regional V berdampingan dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md).*

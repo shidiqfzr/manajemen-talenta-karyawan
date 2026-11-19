@@ -2,24 +2,42 @@
 
 namespace Tests\Feature;
 
+use App\Models\Position;
+use App\Models\Unit;
 use App\Services\Formasi\FormasiCatalog;
 use Database\Seeders\PositionUnitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class FormasiCatalogTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_standar_formasi_equals_corporate_mpp_matrix(): void
+    public function test_standar_formasi_equals_the_seeded_seats(): void
     {
         $this->seed(PositionUnitSeeder::class);
 
         $this->assertSame([
             'RM-1' => ['KEU' => 2, 'TAN' => 27, 'TEK' => 11, 'UMU' => 5],
-            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 16],
-            'RM-3' => ['KEU' => 63, 'TAN' => 146, 'TEK' => 61, 'UMU' => 58],
+            'RM-2' => ['KEU' => 5, 'TAN' => 38, 'TEK' => 12, 'UMU' => 20],
+            'RM-3' => ['KEU' => 66, 'TAN' => 146, 'TEK' => 61, 'UMU' => 65],
         ], app(FormasiCatalog::class)->standarFormasi());
+    }
+
+    public function test_a_pool_position_opened_on_a_unit_never_gives_a_seat_bidang(): void
+    {
+        $unit = Unit::create(['nama' => 'Kebun Katalog Uji', 'kode' => 'Kebun', 'wilayah' => 'Wilayah Kalimantan Barat', 'is_active' => true, 'urutan' => 1]);
+        $manager = Position::create(['nama' => 'Manajer Katalog', 'level' => 'Karpim', 'rm_level' => 'RM-1', 'is_active' => true]);
+        $advisor = Position::create(['nama' => 'Advisor RM-3', 'level' => 'Karpim', 'rm_level' => 'RM-3', 'is_active' => true, 'is_overflow' => true]);
+        foreach ([[$manager, 1, 'TAN'], [$advisor, 0, 'UMU']] as [$position, $kuota, $bidang]) {
+            DB::table('position_unit')->insert(['unit_id' => $unit->id, 'position_id' => $position->id, 'kuota' => $kuota, 'bidang' => $bidang, 'created_at' => now(), 'updated_at' => now()]);
+        }
+
+        $catalog = app(FormasiCatalog::class);
+
+        $this->assertSame('TAN', $catalog->seatBidang('Kebun Katalog Uji', 'Manajer Katalog'));
+        $this->assertNull($catalog->seatBidang('Kebun Katalog Uji', 'Advisor RM-3'), 'A pool Jabatan keeps the estimated Bidang, never the link marker.');
     }
 
     public function test_standar_formasi_is_zero_when_no_seats_are_seeded(): void

@@ -30,7 +30,7 @@ class ImportEmployeeFileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'import_file.required' => 'Berkas spreadsheet pegawai wajib diunggah.',
+            'import_file.required' => 'Berkas spreadsheet karyawan wajib diunggah.',
             'import_file.file' => 'Berkas yang diunggah harus berupa berkas valid.',
             'import_file.mimes' => 'Format berkas harus berupa spreadsheet Excel (.xlsx atau .xls).',
             'import_file.max' => 'Ukuran berkas spreadsheet maksimal 10 MB.',

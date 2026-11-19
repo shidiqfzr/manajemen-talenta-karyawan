@@ -4,6 +4,29 @@
 @source "../../app";
 @source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views";
 
+/* Very short viewports only, so normal laptop windows keep the same look as full screen */
+@custom-variant short (@media (max-height: 650px));
+
+/* Tailwind v4 preflight resets buttons to cursor: default; restore the hand on clickable controls. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  select:not(:disabled),
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 @theme {
   --color-primary-50: #F3FAF6;
   --color-primary-100: #E7F5EC;
@@ -66,4 +89,12 @@
   --color-info-800: #1D4766;
 
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Compact chevron for native selects (per-page menu); a CSS background keeps inline SVG out of the Blade views. */
+.select-chevron {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'><path d='M5.5 7.5 10 12l4.5-4.5z'/></svg>");
+  background-size: 14px;
+  background-position: right 4px center;
+  background-repeat: no-repeat;
 }

@@ -4,38 +4,43 @@
     'totalNodes',
     'groupedUnits',
     'filteredJobs' => [],
+    'group' => null,
+    'locked' => false,
 ])
 
-<div id="node-card-{{ $index }}" 
+<div id="node-card-{{ $index }}"
     x-data="{ isCollapsed: false }"
     @collapse-all-nodes.window="isCollapsed = true"
     @expand-all-nodes.window="isCollapsed = false"
-    class="bg-white rounded-2xl border border-surface-200 shadow-xs p-5 sm:p-6 space-y-4 transition hover:border-surface-300" 
+    @collapse-group.window="if ($event.detail.group === @js($group)) isCollapsed = true"
+    @expand-group.window="if ($event.detail.group === @js($group)) isCollapsed = false"
+    @expand-node.window="if ($event.detail.index === {{ $index }}) isCollapsed = false"
+    :class="isCollapsed ? '' : 'space-y-4'"
+    class="bg-white rounded-2xl border border-surface-200 shadow-xs p-5 sm:p-6 transition hover:border-surface-300"
     wire:key="node-{{ $index }}">
 
-    <!-- Card Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-surface-100">
+    <!-- Card Header: garis pemisah dan jarak hanya saat kartu terbuka, agar kartu lipat tidak menyisakan ruang kosong -->
+    <div :class="isCollapsed ? '' : 'pb-3 border-b border-surface-100'"
+        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex items-center gap-3">
             <span class="w-8 h-8 rounded-xl bg-surface-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs shrink-0">
                 #{{ $index + 1 }}
             </span>
             <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <h4 class="text-sm font-bold text-surface-900">
-                        {{ $node['employee_nama'] ? $node['employee_nama'] : 'Slot Mata Rantai #' . ($index + 1) }}
+                {{-- Nama dan NIK sejajar tengah: kedua teks memakai tinggi baris sama (leading-5) agar pusatnya berimpit --}}
+                <div class="flex items-center gap-x-2 gap-y-1 flex-wrap">
+                    <h4 class="text-sm leading-5 font-bold text-surface-900">
+                        {{ $node['employee_nama'] ? $node['employee_nama'] : 'Karyawan #' . ($index + 1) }}
                     </h4>
                     @if (!empty($node['employee_nik']))
-                        <span class="text-[11px] text-surface-500 font-mono">({{ $node['employee_nik'] }})</span>
+                        <span class="text-[13px] leading-5 text-surface-600 font-mono font-medium">({{ $node['employee_nik'] }})</span>
                     @endif
 
                     <!-- Summary Pills visible when Collapsed -->
                     <template x-if="isCollapsed">
                         <div class="inline-flex items-center gap-1.5 ml-1">
-                            @if ($node['link_type'] === 'chain')
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary-50 text-primary-700 border border-primary-200">
-                                    <i class="fas fa-link text-[10px] mr-0.5" aria-hidden="true"></i> Saling Isi
-                                </span>
-                            @elseif ($node['link_type'] === 'vacant')
+                            {{-- Status "saling isi" tidak ditampilkan: sudah tersirat pada judul alur (Rantai Tertutup/Terbuka) --}}
+                            @if ($node['link_type'] === 'vacant')
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-info-50 text-info-700 border border-info-200">
                                     <i class="fas fa-door-open text-[10px] mr-0.5" aria-hidden="true"></i> Isi Formasi
                                 </span>
@@ -49,7 +54,7 @@
                                 $needsTenureDisp = !($node['tenure_compliant'] ?? true);
                                 $needsPromoDisp = !($node['promotion_eligible'] ?? true);
                                 $tenureDispOk = !empty($node['dispensasi_tenure']) || !empty($node['is_dispensasi']);
-                                $promoDispOk = !empty($node['dispensasi_promosi']) || !empty($node['is_dispensasi']);
+                                $promoDispOk = !empty($node['dispensasi_promosi']);
                                 $allDispApproved = (!$needsTenureDisp || $tenureDispOk) && (!$needsPromoDisp || $promoDispOk);
                             @endphp
                             @if (($needsTenureDisp || $needsPromoDisp) && !empty($node['employee_nik']))
@@ -72,7 +77,7 @@
                         {{ $node['current_jabatan'] }} &bull; {{ $node['current_unit'] }}
                     </div>
                 @else
-                    <p class="text-[11px] text-surface-500 mt-0.5">Pilih pegawai untuk memulai konfigurasi rantai</p>
+                    <p class="text-[11px] text-surface-500 mt-0.5">Pilih karyawan untuk memulai pengisian mutasi</p>
                 @endif
             </div>
         </div>
@@ -83,7 +88,7 @@
                     wire:loading.attr="disabled"
                     wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200/80 transition cursor-pointer shadow-2xs"
-                    title="Buka panel rekam jejak talenta, matriks 9-box &amp; masa dinas pegawai ini">
+                    title="Buka panel rekam jejak talenta, matriks 9-box &amp; masa dinas karyawan ini">
                     <i wire:loading.remove wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')" class="fas fa-chart-line text-[11px]" aria-hidden="true"></i>
                     <i wire:loading wire:target="openTalentDrawer('{{ $node['employee_nik'] }}')" class="fas fa-spinner fa-spin text-[11px]" aria-hidden="true"></i>
                     <span class="hidden sm:inline">Rekam Jejak &amp; 9-Box</span>
@@ -94,15 +99,15 @@
             <!-- Collapse / Expand Toggle Button -->
             <button type="button" @click="isCollapsed = !isCollapsed"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-surface-600 hover:text-surface-900 bg-surface-100 hover:bg-surface-200 transition cursor-pointer"
-                :title="isCollapsed ? 'Buka detail formulir slot ini' : 'Lipat detail formulir slot ini'">
+                :title="isCollapsed ? 'Buka detail mutasi karyawan ini' : 'Lipat detail mutasi karyawan ini'">
                 <i class="fas text-[10px]" :class="isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-                <span x-text="isCollapsed ? 'Buka Slot' : 'Lipat'"></span>
+                <span x-text="isCollapsed ? 'Buka Detail' : 'Lipat'"></span>
             </button>
 
-            @if ($totalNodes > 2)
+            @if ($totalNodes > 2 && ! $locked)
                 <button type="button" wire:click="removeNode({{ $index }})"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-danger hover:bg-danger-50 transition cursor-pointer"
-                    title="Hapus slot pegawai ini dari rantai mutasi">
+                    title="Hapus karyawan ini dari daftar mutasi">
                     <i class="fas fa-trash-can text-xs" aria-hidden="true"></i>
                     <span class="hidden sm:inline">Hapus</span>
                 </button>
@@ -111,9 +116,11 @@
     </div>
 
     <!-- Spacious 2-Column Responsive Layout (Collapsible Body) -->
+    {{-- Locked proposal (submitted / issued / someone else's): every input below is disabled; the server refuses changes too --}}
+    <fieldset @disabled($locked) class="min-w-0 border-0 p-0 m-0">
     <div x-show="!isCollapsed" x-transition.opacity.duration.200ms class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
 
-        <!-- ── KOLOM KIRI: DATA PEGAWAI ASAL (Col 5) ── -->
+        <!-- ── KOLOM KIRI: DATA KARYAWAN ASAL (Col 5) ── -->
         <x-admin.mutasi.employee-selector 
             :node="$node"
             :index="$index"
@@ -177,13 +184,13 @@
                                 <i class="fas fa-building text-xs" aria-hidden="true"></i>
                             </div>
                             <select disabled class="w-full pl-9.5 pr-8 py-2.5 rounded-xl border border-surface-200 bg-surface-100 text-surface-500 cursor-not-allowed text-xs sm:text-sm font-medium appearance-none">
-                                <option value="">-- Pilih Pegawai Terlebih Dahulu --</option>
+                                <option value="">-- Pilih Karyawan Terlebih Dahulu --</option>
                             </select>
                             <div class="pointer-events-none absolute inset-y-0 right-0 pr-3.5 flex items-center text-surface-500">
                                 <i class="fas fa-chevron-down text-[10px]" aria-hidden="true"></i>
                             </div>
                         </div>
-                        <p class="text-[11px] text-surface-500 mt-1">Pilih pegawai pada slot ini terlebih dahulu.</p>
+                        <p class="text-[11px] text-surface-500 mt-1">Pilih karyawan pada slot ini terlebih dahulu.</p>
                     @elseif ($node['jenis_mutasi'] === 'ROTASI')
                         <div class="p-2.5 bg-surface-50 border border-surface-300 rounded-xl flex items-center justify-between text-xs sm:text-sm">
                             <div class="flex items-center gap-2">
@@ -299,7 +306,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div class="flex items-start gap-2.5">
                             @if ($node['link_type'] === 'chain')
-                                <i class="fas fa-check-circle text-primary-600 text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+                                <i class="fas fa-check-circle text-primary-600 text-sm h-4 w-4 inline-flex items-center justify-center shrink-0" aria-hidden="true"></i>
                                 <div>
                                     <span class="font-bold text-primary-900 block text-xs">Formasi Terhubung dalam Rantai:</span>
                                     <p class="text-[11px] text-primary-800 leading-relaxed mt-0.5">
@@ -307,7 +314,7 @@
                                     </p>
                                 </div>
                             @elseif ($node['link_type'] === 'vacant')
-                                <i class="fas fa-door-open text-info text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+                                <i class="fas fa-door-open text-info text-sm h-4 w-4 inline-flex items-center justify-center shrink-0" aria-hidden="true"></i>
                                 <div>
                                     <span class="font-bold text-info-800 block text-xs">Pengisian Formasi Lowong (Vacant):</span>
                                     <p class="text-[11px] text-info-800 leading-relaxed mt-0.5">
@@ -315,7 +322,7 @@
                                     </p>
                                 </div>
                             @elseif ($node['link_type'] === 'pool')
-                                <i class="fas fa-layer-group text-earth-600 text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+                                <i class="fas fa-layer-group text-earth-600 text-sm h-4 w-4 inline-flex items-center justify-center shrink-0" aria-hidden="true"></i>
                                 <div>
                                     <span class="font-bold text-earth-900 block text-xs">Formasi Penampungan Fungsional:</span>
                                     <p class="text-[11px] text-earth-800 leading-relaxed mt-0.5">
@@ -323,7 +330,7 @@
                                     </p>
                                 </div>
                             @else
-                                <i class="fas fa-triangle-exclamation text-warning-700 text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+                                <i class="fas fa-triangle-exclamation text-warning-700 text-sm h-4 w-4 inline-flex items-center justify-center shrink-0" aria-hidden="true"></i>
                                 <div>
                                     <span class="font-bold text-warning-800 block text-xs">Target Masih Terisi (Occupied):</span>
                                     <p class="text-[11px] text-warning-800 leading-relaxed mt-0.5">
@@ -351,24 +358,21 @@
             <!-- Compliance & Dispensasi Guard (Unified Enterprise Component) -->
             @if (!empty($node['employee_nik']) && !empty($node['target_jabatan']) && !empty($node['target_unit_kerja']))
                 <div class="pt-2">
-                    <x-admin.mutasi.compliance-guard 
+                    <x-admin.mutasi.compliance-guard
                         :tenure-analysis="$node['tenure_analysis'] ?? null"
                         :promotion-analysis="$node['promotion_analysis'] ?? null"
                         :current-unit="$node['current_unit'] ?? 'unit saat ini'"
                         :current-rm="$node['current_rm'] ?? 'RM'"
-                        tenure-model="nodes.{{ $index }}.dispensasi_tenure"
-                        tenure-reason-model="nodes.{{ $index }}.alasan_dispensasi_tenure"
-                        promotion-model="nodes.{{ $index }}.dispensasi_promosi"
-                        promotion-reason-model="nodes.{{ $index }}.alasan_dispensasi_promosi"
-                        :is-tenure-checked="!empty($node['dispensasi_tenure']) || !empty($node['is_dispensasi'])"
-                        :is-promotion-checked="!empty($node['dispensasi_promosi']) || !empty($node['is_dispensasi'])"
-                        error-tenure-key="nodes.{{ $index }}.dispensasi_tenure"
-                        error-tenure-reason-key="nodes.{{ $index }}.alasan_dispensasi_tenure"
-                        error-promo-key="nodes.{{ $index }}.dispensasi_promosi"
-                        error-promo-reason-key="nodes.{{ $index }}.alasan_dispensasi_promosi"
+                        :employee-nik="$node['employee_nik']"
+                        reference-model="nodes.{{ $index }}.alasan_dispensasi_direksi"
+                        date-model="nodes.{{ $index }}.tanggal_dispensasi_direksi"
+                        :is-approved="!empty($node['dispensasi_direksi'])"
+                        error-reference-key="nodes.{{ $index }}.alasan_dispensasi_direksi"
+                        error-date-key="nodes.{{ $index }}.tanggal_dispensasi_direksi"
                     />
                 </div>
             @endif
         </div>
     </div>
+    </fieldset>
 </div>

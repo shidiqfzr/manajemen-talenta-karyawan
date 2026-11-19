@@ -54,7 +54,7 @@ class BuildFormasiSeed extends Command
             $units[$seat['unit']][] = [
                 'nama' => $seat['jabatan'],
                 'bidang' => $seat['bidang'],
-                'level' => 'Karpim',
+                'level' => FormasiExcelParser::levelForRm($seat['rm_level']),
                 'rm_level' => $seat['rm_level'],
                 'kuota' => $seat['kuota'],
             ];
@@ -82,14 +82,15 @@ class BuildFormasiSeed extends Command
 
         $seed = [];
         foreach ($units as $name => $positions) {
-            $seed[] = [
+            $seed[] = array_filter([
                 'nama' => $name,
                 'kode' => $metadata[$name]['kode'],
                 'wilayah' => $metadata[$name]['wilayah'],
                 'is_active' => true,
                 'urutan' => $metadata[$name]['urutan'],
+                'aliases' => $metadata[$name]['aliases'] ?? [],
                 'positions' => $positions,
-            ];
+            ], fn ($value, $key) => $key !== 'aliases' || $value !== [], ARRAY_FILTER_USE_BOTH);
         }
 
         $out = $this->resolvePath((string) $this->option('out'));

@@ -3,7 +3,6 @@
 namespace App\Services\Mutasi;
 
 use App\Models\JobHistory;
-use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -36,6 +35,7 @@ class MutasiHistoryReader
         bool $onlyDue = false,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): Builder {
         $allowedSorts = ['tmt_awal', 'id', 'jabatan', 'unit_kerja', 'jenis_mutasi', 'nomor_sk'];
         $sortCol = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'tmt_awal';
@@ -51,10 +51,11 @@ class MutasiHistoryReader
                         );
                 });
             })
+            ->bySumber($sumber)
             ->when($unitKerja, fn ($q) => $q->where('unit_kerja', $unitKerja))
             ->when($jenisMutasi, fn ($q) => $q->where('jenis_mutasi', $jenisMutasi))
             ->when($isApplied !== null, fn ($q) => $q->where('is_applied', $isApplied))
-            ->when($onlyDue, fn ($q) => $q->where('is_applied', false)->where('tmt_awal', '<=', Carbon::today()->toDateString()))
+            ->when($onlyDue, fn ($q) => $q->dueForActivation())
             ->orderBy($sortCol, $direction)
             ->orderByDesc('id');
     }
@@ -68,9 +69,10 @@ class MutasiHistoryReader
         ?string $jenisMutasi = null,
         ?bool $isApplied = null,
         bool $onlyDue = false,
-        int $perPage = 15,
+        ?int $perPage = null,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): LengthAwarePaginator {
         return $this->getMutasiHistoryQuery(
             search: $search,
@@ -80,7 +82,8 @@ class MutasiHistoryReader
             onlyDue: $onlyDue,
             sortBy: $sortBy,
             sortDirection: $sortDirection,
-        )->paginate($perPage);
+            sumber: $sumber,
+        )->paginate($perPage ?? (int) config('hris.pagination.default'));
     }
 
     /**
@@ -88,15 +91,13 @@ class MutasiHistoryReader
      *
      * @return array{total: int, active: int, scheduled: int, due: int}
      */
-    public function getMutasiHistoryKpis(): array
+    public function getMutasiHistoryKpis(?string $sumber = null): array
     {
         return [
-            'total' => JobHistory::count(),
-            'active' => JobHistory::where('is_applied', true)->whereNull('tmt_akhir')->count(),
-            'scheduled' => JobHistory::where('is_applied', false)->count(),
-            'due' => JobHistory::where('is_applied', false)
-                ->where('tmt_awal', '<=', Carbon::today()->toDateString())
-                ->count(),
+            'total' => JobHistory::bySumber($sumber)->count(),
+            'active' => JobHistory::bySumber($sumber)->active()->count(),
+            'scheduled' => JobHistory::bySumber($sumber)->where('is_applied', false)->count(),
+            'due' => JobHistory::bySumber($sumber)->dueForActivation()->count(),
         ];
     }
 

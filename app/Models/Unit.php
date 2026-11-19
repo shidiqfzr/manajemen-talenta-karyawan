@@ -55,6 +55,11 @@ class Unit extends Model
     /**
      * Relasi ke Employee via string nama unit kerja (non-breaking legacy compatibility).
      */
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(UnitAlias::class);
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'unit_kerja', 'nama');

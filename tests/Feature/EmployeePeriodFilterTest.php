@@ -27,10 +27,16 @@ class EmployeePeriodFilterTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Daftar Karyawan');
         $response->assertSee('Unit Kerja');
-        $response->assertSee('Jabatan');
+        $response->assertSee('Bidang');
+        $response->assertSee('Semua Bidang');
         $response->assertSee('Eselon / RM Band');
-        $response->assertSee('Tahun Masuk (TMT)');
-        $response->assertSee('Export Data');
+        $response->assertSee('Golongan');
+        // Jabatan is a column and a search field, no longer a filter control.
+        $response->assertDontSee('Semua Jabatan');
+        // Period filters are reachable by link only; the panel keeps four primary filters.
+        $response->assertDontSee('Semua Angkatan');
+        // The shared table header's export button (runs the component's export()).
+        $response->assertSee('Ekspor Excel');
     }
 
     public function test_employees_can_be_filtered_by_rm_level(): void
@@ -47,26 +53,37 @@ class EmployeePeriodFilterTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('TESTING RM LEADERSHIP');
-        $response->assertSee('Eselon: <strong>RM-1</strong>', false);
+        $response->assertSee('Eselon / RM Band: <strong>RM-1 (Pimpinan / Senior Management)</strong>', false);
     }
 
-    public function test_employees_can_be_filtered_by_jabatan_and_unit_kerja(): void
+    public function test_employees_can_be_filtered_by_bidang_and_unit_kerja(): void
     {
-        $employee = Employee::factory()->create([
-            'nama' => 'TESTING JABATAN FILTER',
+        Employee::factory()->create([
+            'nama' => 'TESTING BIDANG TAN',
             'jabatan' => 'Asisten Tanaman Afdeling I',
             'unit_kerja' => 'Kebun Danau Salak',
         ]);
+        Employee::factory()->create([
+            'nama' => 'TESTING BIDANG KEU',
+            'jabatan' => 'Kepala Sub Bagian Pajak & Asuransi',
+            'unit_kerja' => 'Bagian Akuntansi & Keuangan',
+        ]);
 
         $response = $this->actingAs($this->user)->get(route('admin.employees.index', [
-            'jabatan' => 'Asisten Tanaman Afdeling I',
+            'bidang' => 'TAN',
             'unit_kerja' => 'Kebun Danau Salak',
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('TESTING JABATAN FILTER');
-        $response->assertSee('Jabatan: <strong>Asisten Tanaman Afdeling I</strong>', false);
-        $response->assertSee('Unit: <strong>Kebun Danau Salak</strong>', false);
+        $response->assertSee('TESTING BIDANG TAN');
+        $response->assertDontSee('TESTING BIDANG KEU');
+        $response->assertSee('Bidang: <strong>TAN</strong>', false);
+        $response->assertSee('Unit Kerja: <strong>Kebun Danau Salak</strong>', false);
+
+        // The filter and the Bidang column agree (both come from ManPowerPlanningService).
+        $keu = $this->actingAs($this->user)->get(route('admin.employees.index', ['bidang' => 'KEU']));
+        $keu->assertSee('TESTING BIDANG KEU');
+        $keu->assertDontSee('TESTING BIDANG TAN');
     }
 
     public function test_employees_omnisearch_searches_nik_nama_jabatan_and_unit_kerja(): void
@@ -97,26 +114,30 @@ class EmployeePeriodFilterTest extends TestCase
 
     public function test_employees_can_be_filtered_by_year_and_month(): void
     {
-        // Fetch an existing employee to test with their tmt_bekerja year/month
-        $employee = Employee::whereNotNull('tmt_bekerja')->first();
+        $employee = Employee::factory()->create([
+            'nama' => 'KARYAWAN ANGKATAN TEST',
+            'tmt_bekerja' => '2014-03-17',
+        ]);
+        Employee::factory()->create([
+            'nama' => 'KARYAWAN ANGKATAN LAIN',
+            'tmt_bekerja' => '2019-11-04',
+        ]);
 
-        if ($employee) {
-            $tmt = Carbon::parse($employee->tmt_bekerja);
-            $year = $tmt->year;
-            $month = $tmt->month;
+        $tmt = Carbon::parse($employee->tmt_bekerja);
+        $year = $tmt->year;
+        $month = $tmt->month;
 
-            $response = $this->actingAs($this->user)->get(route('admin.employees.index', [
-                'tahun_masuk' => $year,
-                'bulan_masuk' => $month,
-            ]));
+        $response = $this->actingAs($this->user)->get(route('admin.employees.index', [
+            'tahun_masuk' => $year,
+            'bulan_masuk' => $month,
+        ]));
 
-            $response->assertStatus(200);
-            $response->assertSee((string) $year);
-            $response->assertSee('Periode: Tahun '.$year);
-            $response->assertSee('Tahun: <strong>'.$year.'</strong>', false);
-        } else {
-            $this->assertTrue(true);
-        }
+        $response->assertStatus(200);
+        $response->assertSee((string) $year);
+        $response->assertSee('KARYAWAN ANGKATAN TEST');
+        $response->assertDontSee('KARYAWAN ANGKATAN LAIN');
+        $response->assertSee('Tahun Masuk (TMT): <strong>Tahun '.$year.'</strong>', false);
+        $response->assertSee('Bulan Masuk (TMT): <strong>Maret</strong>', false);
     }
 
     public function test_legacy_statistics_url_redirects_to_employees_index(): void
@@ -129,13 +150,13 @@ class EmployeePeriodFilterTest extends TestCase
     public function test_employees_can_be_filtered_by_status_khusus_sanksi_and_shows_governance_badges(): void
     {
         $sanctionedEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI SANKSI TEST',
+            'nama' => 'KARYAWAN SANKSI TEST',
             'jabatan' => 'Diperbantukan Bagian Operasional',
             'tanggal_berakhir_sanksi' => Carbon::today()->addDays(30)->toDateString(),
         ]);
 
         $normalEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI NORMAL TEST',
+            'nama' => 'KARYAWAN NORMAL TEST',
             'tanggal_berakhir_sanksi' => null,
         ]);
 
@@ -144,8 +165,8 @@ class EmployeePeriodFilterTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('PEGAWAI SANKSI TEST');
-        $response->assertDontSee('PEGAWAI NORMAL TEST');
+        $response->assertSee('KARYAWAN SANKSI TEST');
+        $response->assertDontSee('KARYAWAN NORMAL TEST');
         $response->assertSee('Tata Kelola: <strong>Masa Sanksi (Diperban)</strong>', false);
         $response->assertSee('Masa Sanksi s/d');
     }
@@ -153,12 +174,12 @@ class EmployeePeriodFilterTest extends TestCase
     public function test_employees_can_be_filtered_by_status_khusus_overflow_and_shows_pool_badges(): void
     {
         $advisorEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI ADVISOR TEST',
+            'nama' => 'KARYAWAN ADVISOR TEST',
             'jabatan' => 'Senior Advisor Agronomi',
         ]);
 
         $regularEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI REGULAR TEST',
+            'nama' => 'KARYAWAN REGULAR TEST',
             'jabatan' => 'Mandor Panen',
         ]);
 
@@ -167,8 +188,8 @@ class EmployeePeriodFilterTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('PEGAWAI ADVISOR TEST');
-        $response->assertDontSee('PEGAWAI REGULAR TEST');
+        $response->assertSee('KARYAWAN ADVISOR TEST');
+        $response->assertDontSee('KARYAWAN REGULAR TEST');
         $response->assertSee('Tata Kelola: <strong>Jabatan Overflow (Advisor)</strong>', false);
         $response->assertSee('Fungsional Pool');
     }
@@ -176,7 +197,7 @@ class EmployeePeriodFilterTest extends TestCase
     public function test_employees_can_be_filtered_by_status_khusus_rangkap(): void
     {
         $rangkapEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI RANGKAP TEST',
+            'nama' => 'KARYAWAN RANGKAP TEST',
             'jabatan' => 'Asisten Tanaman',
         ]);
         $rangkapEmp->jobHistories()->create([
@@ -188,7 +209,7 @@ class EmployeePeriodFilterTest extends TestCase
         ]);
 
         $singleEmp = Employee::factory()->create([
-            'nama' => 'PEGAWAI SINGLE TEST',
+            'nama' => 'KARYAWAN SINGLE TEST',
             'jabatan' => 'Mandor Panen',
         ]);
 
@@ -197,8 +218,8 @@ class EmployeePeriodFilterTest extends TestCase
         ]));
 
         $response->assertStatus(200);
-        $response->assertSee('PEGAWAI RANGKAP TEST');
-        $response->assertDontSee('PEGAWAI SINGLE TEST');
+        $response->assertSee('KARYAWAN RANGKAP TEST');
+        $response->assertDontSee('KARYAWAN SINGLE TEST');
         $response->assertSee('Tata Kelola: <strong>Tugas Rangkap</strong>', false);
     }
 
@@ -218,24 +239,27 @@ class EmployeePeriodFilterTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Verify table header sequence in HTML: Pegawai -> Jabatan & Unit Kerja -> Strata -> Eselon -> Golongan -> Aksi
+        // Verify table header sequence in HTML: Karyawan -> Jabatan & Unit Kerja -> Bidang -> Strata -> Eselon -> Golongan -> Aksi
         $content = $response->getContent();
-        $pegawaiPos = strpos($content, 'sort=nama');
-        $jabatanPos = strpos($content, 'sort=jabatan');
-        $strataPos = strpos($content, 'sort=level');
-        $eselonPos = strpos($content, 'sort=rm_level');
-        $golonganPos = strpos($content, 'sort=golongan');
-        $aksiPos = strpos($content, '>Aksi</th>');
+        $pegawaiPos = strpos($content, "sortBy('nama')");
+        $jabatanPos = strpos($content, "sortBy('jabatan')");
+        $bidangPos = preg_match('/<th[^>]*>\s*Bidang\s*<\/th>/', $content, $bidangMatch, PREG_OFFSET_CAPTURE) ? $bidangMatch[0][1] : false;
+        $strataPos = strpos($content, "sortBy('level')");
+        $eselonPos = strpos($content, "sortBy('rm_level')");
+        $golonganPos = strpos($content, "sortBy('golongan')");
+        $aksiPos = preg_match('/>\s*Aksi\s*<\/th>/', $content, $aksiMatch, PREG_OFFSET_CAPTURE) ? $aksiMatch[0][1] : false;
 
-        $this->assertNotFalse($pegawaiPos, 'Header Pegawai (sort=nama) harus ada');
+        $this->assertNotFalse($pegawaiPos, 'Header Karyawan (sort=nama) harus ada');
         $this->assertNotFalse($jabatanPos, 'Header Jabatan & Unit Kerja (sort=jabatan) harus ada');
         $this->assertNotFalse($strataPos, 'Header Strata (sort=level) harus ada');
         $this->assertNotFalse($eselonPos, 'Header Eselon (sort=rm_level) harus ada');
         $this->assertNotFalse($golonganPos, 'Header Golongan (sort=golongan) harus ada');
         $this->assertNotFalse($aksiPos, 'Header Aksi harus ada');
 
-        $this->assertTrue($pegawaiPos < $jabatanPos, 'Pegawai harus sebelum Jabatan & Unit Kerja');
-        $this->assertTrue($jabatanPos < $strataPos, 'Jabatan & Unit Kerja harus sebelum Strata');
+        $this->assertTrue($pegawaiPos < $jabatanPos, 'Karyawan harus sebelum Jabatan & Unit Kerja');
+        $this->assertNotFalse($bidangPos, 'Header Bidang harus ada');
+        $this->assertTrue($jabatanPos < $bidangPos, 'Jabatan & Unit Kerja harus sebelum Bidang');
+        $this->assertTrue($bidangPos < $strataPos, 'Bidang harus sebelum Strata');
         $this->assertTrue($strataPos < $eselonPos, 'Strata harus sebelum Eselon');
         $this->assertTrue($eselonPos < $golonganPos, 'Eselon harus sebelum Golongan');
         $this->assertTrue($golonganPos < $aksiPos, 'Golongan harus sebelum Aksi');

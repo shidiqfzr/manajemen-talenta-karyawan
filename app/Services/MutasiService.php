@@ -79,7 +79,13 @@ class MutasiService
 
             $this->guard->assertAllowed($employee, $request);
 
-            $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja);
+            // Advisory promotion qualification is snapshotted before the placement changes the employee's RM
+            $request = $request->withCatatanKepatuhan($this->guard->promotionAdvisory(
+                $employee, $request->targetJabatan, $request->dispensasiPromosi, $request->alasanDispensasiPromosi
+            ));
+
+            // The requester's own scheduled booking of this formasi must not block them (nor count against its seats).
+            $analysis = $this->formations->analyzeTarget($request->targetJabatan, $request->targetUnitKerja, [$request->employeeNik]);
             $this->assertTargetNotReservedByOthers($analysis, $request);
 
             if ($analysis['vacant'] || $analysis['type'] === 'pool') {
@@ -104,7 +110,8 @@ class MutasiService
      */
     private function assertTargetNotReservedByOthers(array $analysis, MutasiRequest $request): void
     {
-        if (! $analysis['is_reserved'] || ($analysis['reserved_job']->employee_nik ?? null) === $request->employeeNik) {
+        // Bookings by the requester are already left out of the analysis, so any reservation left belongs to others.
+        if (! $analysis['is_reserved']) {
             return;
         }
 
@@ -123,6 +130,17 @@ class MutasiService
      */
     private function resolveSwapOccupant(Employee $employee, array $analysis, MutasiRequest $request): Employee
     {
+        // A swap needs exactly one incumbent. There is none for a formasi without seats (quota 0) or one whose seats are all
+        // taken by temporary assignees, and no rule yet says which holder to swap with in a full multi-seat formasi.
+        if (($analysis['occupant'] ?? null) === null || ($analysis['multi_seat'] ?? false)) {
+            $kuota = (int) ($analysis['kuota'] ?? 1);
+
+            throw new MutasiRuleViolationException($kuota < 1
+                ? "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota 0 sehingga tidak menerima penempatan."
+                : "Formasi {$request->targetJabatan} di {$request->targetUnitKerja} berkuota {$kuota} dan seluruh kuotanya terisi. Tidak ada satu pejabat petahana untuk ditukar; kosongkan satu kuota lebih dulu dengan memindahkan salah satu pemegang melalui mutasi terpisah."
+            );
+        }
+
         // A Pj/Plt assignee keeps their definitive seat, so the occupant would have nowhere to go.
         if (! $request->isDefinitif()) {
             throw new MutasiRuleViolationException(
@@ -147,7 +165,7 @@ class MutasiService
 
         if ($empARm !== $empBRm) {
             throw new MutasiRuleViolationException(
-                "Tukar jabatan (Swap) hanya diperbolehkan untuk tingkat eselon/RM yang setara (Lateral Swap). Pegawai {$employee->nama} ({$empARm}) tidak setara dengan {$occupant->nama} ({$empBRm}). Gunakan alur mutasi ke formasi kosong."
+                "Tukar jabatan (Swap) hanya diperbolehkan untuk tingkat eselon/RM yang setara (Lateral Swap). Karyawan {$employee->nama} ({$empARm}) tidak setara dengan {$occupant->nama} ({$empBRm}). Gunakan alur mutasi ke formasi kosong."
             );
         }
 
@@ -219,6 +237,10 @@ class MutasiService
             foreach ($requests as $order => $request) {
                 $emp = $lockedEmployees[$request->employeeNik];
                 $profile = $this->resolvePlacementProfile($emp, $request);
+                $this->guard->assertPromotionDispensed($emp, $request);
+                $request = $request->withCatatanKepatuhan($this->guard->promotionAdvisory(
+                    $emp, $request->targetJabatan, $request->dispensasiPromosi, $request->alasanDispensasiPromosi
+                ));
 
                 if (! $isFutureTmt && $request->isDefinitif()) {
                     $this->placement->apply(
@@ -313,11 +335,13 @@ class MutasiService
             'golongan' => $request->newGolongan ?: $empA->golongan,
             'job_grade' => $request->newJobGrade ?: $empA->job_grade,
         ];
+        // Employee B keeps their own golongan / job grade (only A may receive a new one through the request), so
+        // B's new history row must record B's own values, matching the employee record.
         $profileB = [
             'rm_level' => $posA['rm_level'] ?? $empB->rm_level,
             'level' => $posA['level'] ?? $empB->level,
-            'golongan' => $posA['golongan'] ?? $empB->golongan,
-            'job_grade' => $posA['job_grade'],
+            'golongan' => $posB['golongan'],
+            'job_grade' => $posB['job_grade'],
         ];
 
         if (! $request->isFuture()) {
@@ -349,6 +373,7 @@ class MutasiService
             'catatan' => "{$baseNote} — bertukar dengan {$empA->nama}",
             'is_dispensasi' => false,
             'alasan_dispensasi' => null,
+            'catatan_kepatuhan' => null,
             'tanggal_berakhir_sanksi' => null,
             'batch_id' => $batchId,
             'chain_order' => 2,
@@ -372,9 +397,9 @@ class MutasiService
     // -------------------------------------------------------------------------
 
     /** @see FormationService::analyzeTarget() */
-    public function analyzeTarget(string $jabatan, string $unitKerja): array
+    public function analyzeTarget(string $jabatan, string $unitKerja, array $excludeNiks = []): array
     {
-        return $this->formations->analyzeTarget($jabatan, $unitKerja);
+        return $this->formations->analyzeTarget($jabatan, $unitKerja, $excludeNiks);
     }
 
     /** @see FormationService::getAvailableTargetPositions() */
@@ -476,8 +501,9 @@ class MutasiService
         bool $onlyDue = false,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): Builder {
-        return $this->history->getMutasiHistoryQuery($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $sortBy, $sortDirection);
+        return $this->history->getMutasiHistoryQuery($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $sortBy, $sortDirection, $sumber);
     }
 
     /** @see MutasiHistoryReader::getMutasiHistory() */
@@ -487,17 +513,18 @@ class MutasiService
         ?string $jenisMutasi = null,
         ?bool $isApplied = null,
         bool $onlyDue = false,
-        int $perPage = 15,
+        ?int $perPage = null,
         string $sortBy = 'tmt_awal',
         string $sortDirection = 'desc',
+        ?string $sumber = null,
     ): LengthAwarePaginator {
-        return $this->history->getMutasiHistory($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $perPage, $sortBy, $sortDirection);
+        return $this->history->getMutasiHistory($search, $unitKerja, $jenisMutasi, $isApplied, $onlyDue, $perPage, $sortBy, $sortDirection, $sumber);
     }
 
     /** @see MutasiHistoryReader::getMutasiHistoryKpis() */
-    public function getMutasiHistoryKpis(): array
+    public function getMutasiHistoryKpis(?string $sumber = null): array
     {
-        return $this->history->getMutasiHistoryKpis();
+        return $this->history->getMutasiHistoryKpis($sumber);
     }
 
     /** @see MutasiHistoryReader::getScheduledMutationsCount() */

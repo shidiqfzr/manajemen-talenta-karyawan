@@ -1,0 +1,243 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Livewire\Tables\JobHistoryTable;
+use App\Models\Employee;
+use App\Models\JobHistory;
+use App\Models\StructureDecree;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+use function Livewire\invade;
+
+/**
+ * SUT: App\Livewire\Tables\JobHistoryTable (employee profile, job history).
+ */
+class JobHistoryTableTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Employee $employee;
+
+    private Employee $other;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->employee = Employee::factory()->create();
+        $this->other = Employee::factory()->create();
+
+        // The employee observer seeds an initial history row; start from a known set instead.
+        JobHistory::query()->forceDelete();
+
+        // Seven positions: "Jabatan 01" is the oldest, "Jabatan 07" the newest.
+        for ($i = 1; $i <= 7; $i++) {
+            $this->makeHistory($this->employee, [
+                'jabatan' => sprintf('Jabatan %02d', $i),
+                'tmt_awal' => sprintf('2020-%02d-01', $i),
+            ]);
+        }
+
+        $this->makeHistory($this->other, ['jabatan' => 'Jabatan Karyawan Lain', 'tmt_awal' => '2021-01-01']);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function makeHistory(Employee $employee, array $attributes): JobHistory
+    {
+        return JobHistory::create($attributes + [
+            'employee_nik' => $employee->nik,
+            'unit_kerja' => 'Kebun Umum',
+            'level' => 'Karpim',
+            'golongan' => 'IIIA/00',
+            'jenis_mutasi' => 'ROTASI',
+            'nomor_sk' => 'SK/UMUM/001',
+            'catatan' => 'Catatan rahasia',
+        ]);
+    }
+
+    private function table()
+    {
+        return Livewire::test(JobHistoryTable::class, ['employeeId' => $this->employee->nik]);
+    }
+
+    public function test_header_shows_the_row_count_without_title_or_export(): void
+    {
+        $total = $this->table()->instance()->rows->total();
+        $html = $this->table()->html();
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+
+        $this->assertStringStartsWith($total.' Riwayat Jabatan', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringNotContainsString('Ekspor Excel', $html);
+        $this->assertStringNotContainsString('text-sm font-bold text-surface-900', $html, 'embedded tables have no header title');
+
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $this->table()->set('search', 'Jabatan 01')->html(), $filtered);
+        $this->assertStringStartsWith('1 Riwayat Jabatan', trim(preg_replace('/\s+/', ' ', strip_tags($filtered[1]))));
+    }
+
+    public function test_lists_only_this_employees_records(): void
+    {
+        $component = $this->table()->set('perPage', 10)
+            ->assertSee('Jabatan 01')
+            ->assertSee('Jabatan 07')
+            ->assertDontSee('Jabatan Karyawan Lain');
+
+        $this->assertSame(7, $component->instance()->rows->total());
+    }
+
+    public function test_default_sort_and_standard_page_size(): void
+    {
+        $component = $this->table()
+            ->assertSet('sortField', 'tmt_awal')
+            ->assertSet('sortDirection', 'desc')
+            ->assertSet('perPage', 25)
+            ->assertSeeInOrder(['Jabatan 07', 'Jabatan 06', 'Jabatan 05', 'Jabatan 04', 'Jabatan 03'])
+            ->assertSeeHtml('id="per-page-riwayat_jabatan_page"')
+            // Sortable headers: Periode, Jabatan, Unit Kerja only.
+            ->assertSeeHtml("sortBy('tmt_awal')")
+            ->assertSeeHtml("sortBy('jabatan')")
+            ->assertSeeHtml("sortBy('unit_kerja')")
+            ->assertDontSeeHtml("sortBy('jenis_mutasi')")
+            ->assertDontSeeHtml("sortBy('nomor_sk')");
+
+        $this->assertCount(7, $component->instance()->rows->items());
+        $this->assertSame([10, 25, 50, 100], invade($component->instance())->perPageOptions());
+    }
+
+    public function test_search_matches_declared_columns(): void
+    {
+        JobHistory::where('jabatan', 'Jabatan 02')->update(['unit_kerja' => 'Kebun Ngabang']);
+        JobHistory::where('jabatan', 'Jabatan 03')->update(['jenis_mutasi' => 'PROMOSI']);
+        JobHistory::where('jabatan', 'Jabatan 04')->update(['nomor_sk' => 'SK/DIR/777']);
+        JobHistory::where('jabatan', 'Jabatan 05')->update(['catatan' => 'Kata Tersembunyi']);
+
+        $component = $this->table();
+
+        $cases = ['Jabatan 01' => 'Jabatan 01', 'Ngabang' => 'Jabatan 02', 'PROMOSI' => 'Jabatan 03', 'DIR/777' => 'Jabatan 04'];
+
+        foreach ($cases as $term => $expected) {
+            $component->set('search', $term);
+            $titles = collect($component->instance()->rows->items())->pluck('jabatan')->all();
+            $this->assertSame([$expected], $titles, "Search for [{$term}]");
+        }
+
+        $component->set('search', 'Kata Tersembunyi');
+        $this->assertSame(0, $component->instance()->rows->total());
+        $component->set('search', 'Karyawan Lain');
+        $this->assertSame(0, $component->instance()->rows->total());
+    }
+
+    public function test_tampered_sort_field_is_ignored(): void
+    {
+        $this->table()
+            ->set('sortField', 'employee_nik; drop')
+            ->assertOk()
+            ->assertSet('sortField', 'tmt_awal')
+            ->assertSeeInOrder(['Jabatan 07', 'Jabatan 06', 'Jabatan 05']);
+    }
+
+    public function test_page_name_is_isolated(): void
+    {
+        // 25 newer positions fill page 1, so the seven seeded ones land on page 2.
+        for ($i = 1; $i <= 25; $i++) {
+            $this->makeHistory($this->employee, [
+                'jabatan' => sprintf('Tambahan %02d', $i),
+                'tmt_awal' => sprintf('2022-01-%02d', $i),
+            ]);
+        }
+
+        $component = $this->table()
+            ->call('gotoPage', 2, 'riwayat_jabatan_page')
+            ->assertSet('paginators.riwayat_jabatan_page', 2)
+            ->assertSee('Jabatan 02')
+            ->assertDontSee('Tambahan 25')
+            ->assertSeeHtml("gotoPage(1, 'riwayat_jabatan_page')")
+            ->assertSeeHtml('id="per-page-riwayat_jabatan_page"');
+
+        $this->assertSame('riwayat_jabatan_page', $component->instance()->rows->getPageName());
+        $this->assertSame(2, $component->instance()->rows->currentPage());
+    }
+
+    public function test_row_action_still_works(): void
+    {
+        $history = JobHistory::where('jabatan', 'Jabatan 07')->firstOrFail();
+        $foreign = JobHistory::where('employee_nik', $this->other->nik)->firstOrFail();
+
+        $this->table()
+            ->call('deleteRow', $history->id)
+            ->assertDontSee('Jabatan 07');
+
+        $this->assertNull(JobHistory::find($history->id));
+
+        // Another employee's history cannot be deleted through this table.
+        $this->table()->call('deleteRow', $foreign->id)->assertStatus(404);
+        $this->assertNotNull(JobHistory::find($foreign->id));
+
+        // Livewire drops flash data at the end of an update request that does not redirect, so the
+        // flashed text is checked by invoking the action directly on a mounted instance.
+        $second = JobHistory::where('jabatan', 'Jabatan 06')->firstOrFail();
+        $this->table()->instance()->deleteRow($second->id);
+        $this->assertSame('Riwayat jabatan berhasil dihapus.', session('message'));
+    }
+
+    public function test_employee_id_cannot_be_changed_from_the_client(): void
+    {
+        $this->expectException(CannotUpdateLockedPropertyException::class);
+
+        $this->table()->set('employeeId', $this->other->nik);
+    }
+
+    public function test_row_action_shows_loading_state(): void
+    {
+        $targets = 'search, sortBy, perPage, gotoPage, nextPage, previousPage, resetFilters, deleteRow';
+
+        // While the row action runs the skeleton replaces the rows, the table is busy, and the button is disabled.
+        $this->table()
+            ->assertSeeHtml('wire:loading.delay.remove wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.delay.class.remove="hidden" wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.attr="aria-busy" wire:target="'.$targets.'"')
+            ->assertSeeHtml('wire:loading.attr="disabled" wire:target="deleteRow"');
+    }
+
+    public function test_cancelling_the_delete_confirm_stops_the_livewire_call(): void
+    {
+        // Livewire ignores preventDefault, so a cancelled confirm must stop the wire:click listener itself.
+        $this->table()
+            ->assertSeeHtml("onclick=\"confirm('Hapus riwayat jabatan ini?') || event.stopImmediatePropagation()\"")
+            ->assertDontSeeHtml('return confirm(');
+    }
+
+    public function test_structure_in_force_column_matches_each_placement_with_the_decree_in_force_at_its_start(): void
+    {
+        StructureDecree::create([
+            'sk_number' => 'DPSB/SKPTS/352/IX/2026', 'title' => 'Perubahan Struktur', 'sk_date' => '2020-06-01', 'effective_date' => '2020-06-01',
+            'status' => StructureDecree::STATUS_APPLIED, 'source_path' => 'decrees/352.xlsx', 'source_sha256' => str_repeat('a', 64), 'applied_at' => now(),
+            'snapshot' => ['units' => ['Kebun Umum' => ['kode' => 'Kebun', 'wilayah' => 'W', 'urutan' => 1, 'is_active' => true, 'seats' => [
+                'Jabatan 07' => ['rm_level' => 'RM-1', 'level' => 'Karpim', 'bidang' => 'TAN', 'kuota' => 1],
+            ]]]],
+        ]);
+
+        $html = Livewire::test(JobHistoryTable::class, ['employeeId' => $this->employee->nik])
+            ->assertSee('Struktur yang Berlaku')
+            ->assertSee('DPSB/SKPTS/352/IX/2026')
+            ->assertSee('Tidak tercantum pada struktur SK')
+            ->assertSee('Sebelum SK struktur pertama')
+            ->html();
+
+        // Jabatan 07 (1 Jul 2020) ada pada versi itu; Jabatan 06 (hari berlakunya SK) tidak tercantum.
+        $this->assertSame(1, substr_count($html, 'Tidak tercantum pada struktur SK'));
+    }
+
+    public function test_structure_in_force_column_says_before_first_decree_when_no_decree_exists(): void
+    {
+        Livewire::test(JobHistoryTable::class, ['employeeId' => $this->employee->nik])
+            ->assertSee('Sebelum SK struktur pertama')
+            ->assertDontSee('Tidak tercantum pada struktur SK');
+    }
+}

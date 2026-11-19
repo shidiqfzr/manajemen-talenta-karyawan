@@ -46,7 +46,7 @@
     </div>
     
     @if($hint)
-        <p class="text-[10px] text-surface-500 mt-1">{!! $hint !!}</p>
+        <p class="text-[10px] text-surface-500 mt-1">{{ $hint }}</p>
     @endif
     
     @error($name) 

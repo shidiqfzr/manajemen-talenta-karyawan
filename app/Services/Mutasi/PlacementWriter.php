@@ -79,6 +79,7 @@ class PlacementWriter
             'catatan' => $request->catatan ?? $request->defaultCatatan(),
             'is_dispensasi' => $request->isDispensasi,
             'alasan_dispensasi' => $request->alasanDispensasi,
+            'catatan_kepatuhan' => $request->catatanKepatuhan,
         ], $overrides));
     }
 }

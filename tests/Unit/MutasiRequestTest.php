@@ -74,6 +74,8 @@ class MutasiRequestTest extends TestCase
         $this->assertFalse($this->make(['isDispensasi' => true, 'alasanDispensasi' => ' '])->hasDispensasi());
         $this->assertFalse($this->make(['isDispensasi' => false, 'alasanDispensasi' => 'Nota Dinas'])->hasDispensasi());
         $this->assertTrue($this->make(['isDispensasi' => true, 'alasanDispensasi' => 'Nota Dinas'])->hasDispensasi());
+        // A token reason is not a document reference
+        $this->assertFalse($this->make(['isDispensasi' => true, 'alasanDispensasi' => 'ok'])->hasDispensasi());
     }
 
     public function test_chain_node_combines_collective_sk_header_with_per_employee_choices(): void

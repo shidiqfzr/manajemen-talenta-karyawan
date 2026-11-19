@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\ImportAbortedException;
 use App\Exports\EmployeeTemplateExport;
 use App\Exports\FailedEmployeesWorkbook;
 use App\Exports\ImportSummaryExport;
@@ -12,162 +13,50 @@ use App\Http\Requests\Admin\ImportTokenRequest;
 use App\Http\Requests\Admin\StoreEmployeeRequest;
 use App\Http\Requests\Admin\UpdateEmployeeRequest;
 use App\Models\Employee;
+use App\Models\EmployeeImportLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Services\EmployeeDeletionService;
 use App\Services\EmployeeExportService;
 use App\Services\EmployeeImportService;
 use App\Services\FormasiSeatGuard;
 use App\Services\Import\EmployeeImportDictionary;
+use App\Services\PensiunService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
-    // Display all employees
-    public function index(Request $request)
+    // Display all employees: page-level KPI metrics and the expired-sanction notice. The directory list itself
+    // (search, filters, sort, pagination) and the KPI cards that drive it are the Livewire component
+    // App\Livewire\Admin\Employees\EmployeeTable, which receives these metrics as `kpi`.
+    public function index()
     {
-        $query = Employee::with(['concurrentJobs']);
-
-        // Text search (Omnisearch: NIK, Nama, Jabatan, Unit Kerja via Eloquent Scope)
-        if ($request->filled('search')) {
-            $query->search($request->search);
-        }
-
-        // Dropdown filters
-        if ($request->filled('jabatan')) {
-            $query->where('jabatan', $request->jabatan);
-        }
-
-        if ($request->filled('level')) {
-            $query->where('level', $request->level);
-        }
-
-        if ($request->filled('unit_kerja')) {
-            $query->where('unit_kerja', $request->unit_kerja);
-        }
-
-        if ($request->filled('rm_level')) {
-            $query->where('rm_level', $request->rm_level);
-        }
-
-        if ($request->filled('golongan')) {
-            $query->where('golongan', $request->golongan);
-        }
-
-        // Filter: Status Penugasan (Definitif vs Plt/Pjs/Diperbantukan)
-        if ($request->filled('status_penugasan')) {
-            $status = $request->status_penugasan;
-            if ($status === 'sementara') {
-                $query->whereHas('concurrentJobs');
-            } elseif ($status === 'definitif') {
-                $query->whereDoesntHave('concurrentJobs');
-            } else {
-                $query->whereHas('concurrentJobs', function ($q) use ($status) {
-                    $q->where('status_penugasan', $status);
-                });
-            }
-        }
-
-        // Filter: Status Khusus / Tata Kelola (Sanksi, Overflow, Rangkap)
-        if ($request->filled('status_khusus')) {
-            $khusus = $request->status_khusus;
-            if ($khusus === 'sanksi') {
-                $query->sanctionAll();
-            } elseif ($khusus === 'overflow') {
-                $query->overflow();
-            } elseif ($khusus === 'rangkap') {
-                $query->whereHas('concurrentJobs');
-            }
-        }
-
-        // Period filter: Tahun Masuk (TMT Bekerja)
-        if ($request->filled('tahun_masuk')) {
-            $query->whereYear('tmt_bekerja', $request->tahun_masuk);
-        }
-
-        // Period filter: Bulan Masuk (TMT Bekerja)
-        if ($request->filled('bulan_masuk')) {
-            $query->whereMonth('tmt_bekerja', $request->bulan_masuk);
-        }
-
-        // Fixed Global Headcount KPI Metrics (Executive Overview)
-        $totalEmployees = Employee::count();
-        $totalUnits = Employee::whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja');
-        $karpimCount = Employee::karpim()->count();
-        $pelaksanaCount = Employee::pelaksana()->count();
-
-        // Global reference
-        $globalTotalEmployees = $totalEmployees;
-        $penugasanSementaraCount = Employee::whereHas('concurrentJobs')->count();
-
-        // Special governance metrics
-        $sanksiAktifCount = Employee::sanctionActive()->count();
-        $sanksiTotalCount = Employee::sanctionAll()->count();
-        $overflowCount = Employee::overflow()->count();
-
-        // Column sorting (Enterprise HRIS standard: sortable table columns)
-        $sortColumn = $request->query('sort', 'nama');
-        $sortDirection = $request->query('direction', 'asc') === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['nama', 'jabatan', 'rm_level', 'level', 'golongan'];
-
-        if (in_array($sortColumn, $allowedSorts)) {
-            $query->orderBy($sortColumn, $sortDirection);
-        } else {
-            $query->orderBy('nama', 'asc');
-        }
-
-        $employees = $query->paginate(20)->withQueryString();
-
-        // Get unique sorted values for filters
-        $jabatans = Employee::select('jabatan')->whereNotNull('jabatan')->where('jabatan', '!=', '')->distinct()->orderBy('jabatan')->pluck('jabatan');
-        $levels = Employee::select('level')->whereNotNull('level')->where('level', '!=', '')->distinct()->orderBy('level')->pluck('level');
-        $units = Employee::select('unit_kerja')->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->orderBy('unit_kerja')->pluck('unit_kerja');
-        $golongans = Employee::select('golongan')->whereNotNull('golongan')->where('golongan', '!=', '')->distinct()->orderBy('golongan')->pluck('golongan');
-        $rmLevels = Employee::RM_LEVELS;
-
-        // Dynamic hire years from database (Fast substring extraction)
-        $availableYears = Employee::whereNotNull('tmt_bekerja')
-            ->pluck('tmt_bekerja')
-            ->map(fn ($date) => $date ? substr((string) $date, 0, 4) : null)
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values();
-
-        $months = [
-            '01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
-            '04' => 'April',   '05' => 'Mei',      '06' => 'Juni',
-            '07' => 'Juli',    '08' => 'Agustus',  '09' => 'September',
-            '10' => 'Oktober', '11' => 'November', '12' => 'Desember',
-        ];
-
         // Fetch employees with expired sanctions (Diperban)
-        $expiredSanksiEmployees = Employee::sanctionExpired()
+        $expiredSanksiEmployees = Employee::aktif()->sanctionExpired()
             ->orderBy('tanggal_berakhir_sanksi', 'asc')
             ->get();
 
-        return view('admin.employees.index', compact(
-            'employees',
-            'jabatans',
-            'levels',
-            'units',
-            'golongans',
-            'rmLevels',
-            'availableYears',
-            'months',
-            'totalEmployees',
-            'totalUnits',
-            'karpimCount',
-            'pelaksanaCount',
-            'globalTotalEmployees',
-            'expiredSanksiEmployees',
-            'penugasanSementaraCount',
-            'sanksiAktifCount',
-            'sanksiTotalCount',
-            'overflowCount'
-        ));
+        // Fixed Global Headcount KPI Metrics (Executive Overview). The Karpim/Karpel counts use the same
+        // equality condition as the table's `level` filter, so a card's count matches the rows it shows.
+        $kpi = [
+            'total' => Employee::aktif()->count(),
+            'units' => Employee::aktif()->whereNotNull('unit_kerja')->where('unit_kerja', '!=', '')->distinct()->count('unit_kerja'),
+            'karpim' => Employee::aktif()->where('level', Employee::LEVEL_KARPIM)->count(),
+            'karpel' => Employee::aktif()->where('level', Employee::LEVEL_KARPEL)->count(),
+            // Special governance metrics
+            'rangkap' => Employee::aktif()->whereHas('concurrentJobs')->count(),
+            'sanksi' => Employee::aktif()->sanctionActive()->count(),
+            'overflow' => Employee::aktif()->overflow()->count(),
+            'expired' => $expiredSanksiEmployees->count(),
+        ];
+
+        return view('admin.employees.index', compact('kpi', 'expiredSanksiEmployees'));
     }
 
     // Show form to create new employee (can be pre-filled from vacancy)
@@ -196,7 +85,7 @@ class EmployeeController extends Controller
         $familyStatuses = Employee::FAMILY_STATUSES;
         $educationLevels = Employee::EDUCATION_LEVELS;
         $entryChannels = Employee::ENTRY_CHANNELS;
-        $rmLevels = Employee::RM_LEVELS;
+        $rmLevels = Position::RM_LEVEL_LIST;
 
         return view('admin.employees.add-employee', compact(
             'prefill',
@@ -276,38 +165,54 @@ class EmployeeController extends Controller
             return back()->withErrors(['jabatan' => $seatError])->withInput();
         }
 
-        return redirect()->route('admin.employees.index')->with('success', "Pegawai baru ({$employee->nama}) berhasil ditambahkan dan formasi jabatan telah terisi.");
+        return redirect()->route('admin.employees.index')->with('success', "Karyawan baru ({$employee->nama}) berhasil ditambahkan dan formasi jabatan telah terisi.");
     }
 
     public function show($nik)
     {
         $employee = Employee::where('nik', $nik)->firstOrFail();
 
-        $histories = $employee->jobHistories()->paginate(10);
-        $trainings = $employee->trainings()->paginate(10);
-        $evaluations = $employee->evaluations()->latest()->paginate(5);
+        $histories = $employee->jobHistories()->paginate((int) config('hris.pagination.default'));
+        $trainings = $employee->trainings()->paginate((int) config('hris.pagination.default'));
+        $evaluations = $employee->evaluations()->latest()->paginate((int) config('hris.pagination.default'));
 
-        return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations'));
+        // Dampak pemberhentian yang ditampilkan pada modal sebelum eksekusi (DESIGN.md §7.2).
+        // Pemberhentian berlaku seketika, jadi tanggal bawaan tidak pernah melewati hari ini.
+        $today = Carbon::today()->toDateString();
+        $pensiun = $employee->effective_tanggal_pensiun?->toDateString();
+        $separationImpact = [
+            'active_jobs' => $employee->activeJobs()->count(),
+            'scheduled' => $employee->scheduledJobs()->count(),
+            'pensiun' => $pensiun !== null && $pensiun <= $today ? $pensiun : null,
+            'today' => $today,
+        ];
+
+        return view('admin.employees.show', compact('employee', 'histories', 'trainings', 'evaluations', 'separationImpact'));
     }
 
     /**
-     * Tampilkan halaman khusus Wizard Impor Data Pegawai (Workday / SAP Multi-Step Standard).
+     * Tampilkan halaman khusus Wizard Impor Data Karyawan (Workday / SAP Multi-Step Standard).
      */
     public function importPage()
     {
         $dictionaryCategories = EmployeeImportDictionary::getCategories();
+        $pendingApprovalCount = EmployeeImportLog::where('status', EmployeeImportLog::STATUS_PENDING)->count();
 
-        return view('admin.employees.import', compact('dictionaryCategories'));
+        return view('admin.employees.import', compact('dictionaryCategories', 'pendingApprovalCount'));
     }
 
     public function import(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
     {
-        $summary = $importService->directImport(
-            $request->file('import_file'),
-            auth()->user(),
-            $request->ip(),
-            $request->userAgent()
-        );
+        try {
+            $summary = $importService->directImport(
+                $request->file('import_file'),
+                auth()->user(),
+                $request->ip(),
+                $request->userAgent()
+            );
+        } catch (ImportAbortedException $e) {
+            return back()->withErrors(['import_file' => $e->getMessage()]);
+        }
 
         return redirect()
             ->route('admin.employees.index')
@@ -319,7 +224,11 @@ class EmployeeController extends Controller
 
     public function previewImport(ImportEmployeeFileRequest $request, EmployeeImportService $importService)
     {
-        $previewData = $importService->preview($request->file('import_file'), auth()->user());
+        try {
+            $previewData = $importService->preview($request->file('import_file'), auth()->user());
+        } catch (ImportAbortedException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'success' => true,
@@ -348,6 +257,16 @@ class EmployeeController extends Controller
                 ]);
             }
 
+            if ($summary['pending_approval'] ?? false) {
+                return response()->json([
+                    'success' => true,
+                    'is_async' => false,
+                    'pending_approval' => true,
+                    'batch_url' => route('admin.employees.import.batches.show', $summary['batch_id']),
+                    'summary' => $summary['summary'],
+                ]);
+            }
+
             session()->flash('success', "{$summary['created']} data baru ditambahkan, {$summary['updated']} data diperbarui, ".($summary['unchanged'] ?? 0)." data tetap/identik, {$summary['skipped']} baris dilewati.");
             session()->flash('import_summary', $summary);
 
@@ -357,7 +276,7 @@ class EmployeeController extends Controller
                 'redirect_url' => route('admin.employees.index'),
                 'summary' => $summary,
             ]);
-        } catch (\DomainException|\RuntimeException $e) {
+        } catch (ImportAbortedException|\DomainException|\RuntimeException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -489,7 +408,7 @@ class EmployeeController extends Controller
         $familyStatuses = Employee::FAMILY_STATUSES;
         $educationLevels = Employee::EDUCATION_LEVELS;
         $entryChannels = Employee::ENTRY_CHANNELS;
-        $rmLevels = Employee::RM_LEVELS;
+        $rmLevels = Position::RM_LEVEL_LIST;
 
         return view('admin.employees.edit-employee', compact(
             'employee',
@@ -512,6 +431,11 @@ class EmployeeController extends Controller
 
         $validated = $request->validated();
 
+        // Karyawan yang sudah pensiun: data jabatan dan masa pensiun dibekukan sebagai arsip.
+        if ($employee->isSeparated()) {
+            $validated = array_diff_key($validated, array_flip(['status_penugasan', 'golongan', 'tanggal_dalam_jabatan', 'tmt_unit_kerja', 'job_grade', 'person_grade', 'tanggal_mbt', 'tanggal_pensiun']));
+        }
+
         if ($request->hasFile('foto')) {
             // Delete old foto if exists
             if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
@@ -525,54 +449,107 @@ class EmployeeController extends Controller
 
         // Standardize data (Uppercase nama & trim unit_kerja)
         $validated['nama'] = strtoupper(trim($validated['nama']));
-        $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
+        if (! $employee->isSeparated()) {
+            $validated['status_penugasan'] = $validated['status_penugasan'] ?? 'Definitif';
+        }
 
         DB::transaction(function () use ($employee, $validated) {
             $employee->update($validated);
         });
 
-        return redirect()->route('admin.employees.index')->with('success', 'Data pegawai berhasil diperbarui.');
-    }
-
-    // Delete employee
-    public function destroy($nik)
-    {
-        $employee = Employee::findOrFail($nik);
-
-        DB::transaction(function () use ($employee) {
-            // Delete foto if exists
-            if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
-                Storage::disk('public')->delete($employee->foto);
-            }
-
-            $employee->delete();
-        });
-
-        return redirect()->route('admin.employees.index')->with('success', 'Data pegawai berhasil dihapus.');
+        return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil diperbarui.');
     }
 
     /**
-     * Hapus massal data pegawai terpilih secara transaksional.
+     * Memberhentikan karyawan dari jabatan (pensiun dini, mengundurkan diri, meninggal dunia, PHK, atau pensiun yang
+     * dimajukan). Pensiun normal berjalan otomatis; tindakan ini wajib bertanggal dan tercatat pada Riwayat Perubahan.
      */
-    public function bulkDestroy(Request $request)
+    public function separate(Request $request, $nik, PensiunService $pensiun)
     {
+        Gate::authorize('separate-employee');
+
+        $validated = $request->validate([
+            'alasan' => ['required', Rule::in(Employee::ALASAN_BERHENTI)],
+            'tanggal_berhenti' => ['required', 'date', 'before_or_equal:today'],
+            'nomor_sk' => ['nullable', 'string', 'max:100'],
+            'tanggal_sk' => ['nullable', 'date', 'required_with:nomor_sk'],
+        ], [
+            'alasan.required' => 'Alasan pemberhentian wajib dipilih.',
+            'tanggal_berhenti.required' => 'Tanggal berhenti wajib diisi.',
+            'tanggal_berhenti.before_or_equal' => 'Tanggal berhenti tidak boleh melewati hari ini. Catat pemberhentian pada tanggal berlakunya.',
+            'tanggal_sk.required_with' => 'Tanggal SK wajib diisi bila nomor SK diisi.',
+        ]);
+
+        $employee = Employee::findOrFail($nik);
+
+        $done = $pensiun->separate(
+            $employee,
+            $validated['alasan'],
+            Carbon::parse($validated['tanggal_berhenti']),
+            $validated['nomor_sk'] ?? null,
+            isset($validated['tanggal_sk']) ? Carbon::parse($validated['tanggal_sk']) : null,
+            $request->user(),
+        );
+
+        return redirect()->route('admin.employees.show', $employee)->with(
+            $done ? 'success' : 'error',
+            $done ? 'Karyawan berhasil diberhentikan dari jabatan dan kursi formasinya dikosongkan.' : 'Karyawan sudah diberhentikan sebelumnya.'
+        );
+    }
+
+    /** Mencatat SK pemberhentian yang terbit setelah pemberhentian diproses. */
+    public function recordSeparationSk(Request $request, $nik, PensiunService $pensiun)
+    {
+        Gate::authorize('separate-employee');
+
+        $validated = $request->validate([
+            'nomor_sk' => ['required', 'string', 'max:100'],
+            'tanggal_sk' => ['required', 'date'],
+        ], [
+            'nomor_sk.required' => 'Nomor SK wajib diisi.',
+            'tanggal_sk.required' => 'Tanggal SK wajib diisi.',
+        ]);
+
+        $employee = Employee::findOrFail($nik);
+        abort_unless($employee->isSeparated(), 422, 'Karyawan belum diberhentikan.');
+
+        $pensiun->catatSk($employee, $validated['nomor_sk'], Carbon::parse($validated['tanggal_sk']), $request->user());
+
+        return redirect()->route('admin.employees.show', $employee)->with('success', 'SK pemberhentian berhasil dicatat.');
+    }
+
+    // Delete employee
+    public function destroy(Request $request, $nik, EmployeeDeletionService $deletion)
+    {
+        Gate::authorize('delete-employee');
+
+        $validated = $request->validate(['reason' => EmployeeDeletionService::REASON_RULES]);
+
+        $employee = Employee::findOrFail($nik);
+
+        // Archive (master data, placement history, actor, reason), delete, and remove the photo after commit.
+        $deletion->deleteMany(Employee::whereKey($employee->nik), $request->user(), $validated['reason']);
+
+        return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil dihapus.');
+    }
+
+    /**
+     * Hapus massal data karyawan terpilih secara transaksional.
+     */
+    public function bulkDestroy(Request $request, EmployeeDeletionService $deletion)
+    {
+        // Same ability as the Daftar Karyawan bulk action.
+        Gate::authorize('delete-employee');
+
         $validated = $request->validate([
             'niks' => 'required|array|min:1',
             'niks.*' => 'required|string|size:8',
+            'reason' => EmployeeDeletionService::REASON_RULES,
         ]);
 
-        $count = count($validated['niks']);
+        // Same archive, photo-and-row deletion (one transaction) as the Daftar Karyawan bulk action.
+        $count = $deletion->deleteMany(Employee::whereIn('nik', $validated['niks']), $request->user(), $validated['reason']);
 
-        DB::transaction(function () use ($validated) {
-            $employees = Employee::whereIn('nik', $validated['niks'])->get();
-            foreach ($employees as $employee) {
-                if ($employee->foto && Storage::disk('public')->exists($employee->foto)) {
-                    Storage::disk('public')->delete($employee->foto);
-                }
-                $employee->delete();
-            }
-        });
-
-        return redirect()->route('admin.employees.index')->with('success', "{$count} data pegawai terpilih berhasil dihapus.");
+        return redirect()->route('admin.employees.index')->with('success', "{$count} data karyawan terpilih berhasil dihapus.");
     }
 }

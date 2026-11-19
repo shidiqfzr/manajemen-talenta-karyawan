@@ -7,6 +7,7 @@
     'shortcut' => '/',
     'clearUrl' => null,
     'debounce' => '300ms',
+    'maxlength' => null,
     'containerClass' => 'relative flex-1',
 ])
 
@@ -63,6 +64,7 @@
             @input="hasValue = !!$event.target.value"
         @endif
         placeholder="{{ $placeholder }}"
+        @if($maxlength) maxlength="{{ $maxlength }}" @endif
         class="w-full pl-10 pr-16 py-2.5 bg-white border border-surface-300 rounded-xl text-xs sm:text-sm text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-600 transition shadow-2xs">
 
     <!-- Right-side Actions: Clear Button / Keyboard Shortcut Hint -->

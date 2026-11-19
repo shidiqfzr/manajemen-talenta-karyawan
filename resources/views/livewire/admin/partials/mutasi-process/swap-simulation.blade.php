@@ -30,12 +30,12 @@
 
             <!-- 2-Column Bilateral Flow Cards -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                <!-- SISI KIRI: Pegawai Pemohon -->
+                <!-- SISI KIRI: Karyawan Pemohon -->
                 <div class="p-4 sm:p-5 bg-gradient-to-br from-white to-primary-50/30 rounded-xl border border-primary-200 shadow-2xs space-y-3 flex flex-col justify-between">
                     <div class="flex items-center justify-between pb-2 border-b border-primary-100">
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-primary-600"></span>
-                            <span class="text-[11px] font-bold text-primary-800 uppercase tracking-wider">Pegawai Pemohon</span>
+                            <span class="text-[11px] font-bold text-primary-800 uppercase tracking-wider">Karyawan Pemohon</span>
                         </div>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary-100 text-primary-800 border border-primary-200">
                             {{ $employeeDetails['rm_level'] ?? '—' }}

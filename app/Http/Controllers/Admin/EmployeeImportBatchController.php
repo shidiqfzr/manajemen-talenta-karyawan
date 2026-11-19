@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Exceptions\ImportAbortedException;
+use App\Http\Controllers\Controller;
+use App\Models\EmployeeImportLog;
+use App\Services\EmployeeImportGovernanceService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\View\View;
+
+/**
+ * Riwayat dan tata kelola impor data karyawan: persetujuan empat mata (maker-checker) dan pembatalan (undo).
+ * Seluruh aturan berada di EmployeeImportGovernanceService; controller hanya menerjemahkan HTTP.
+ */
+class EmployeeImportBatchController extends Controller
+{
+    public function __construct(private EmployeeImportGovernanceService $governance) {}
+
+    public function index(Request $request): View|RedirectResponse
+    {
+        // Old links used `q`; the shared table reads `search`.
+        if ($request->query->has('q')) {
+            $query = $request->query();
+            if (is_string($query['q'])) {
+                $query['search'] = $query['q'];
+            }
+            unset($query['q']);
+
+            return redirect()->route('admin.employees.import.batches.index', $query);
+        }
+
+        // The list, status tabs and search live in the ImportBatchTable Livewire component.
+        return view('admin.employees.import-batches.index', [
+            'requiresApproval' => EmployeeImportGovernanceService::requiresApproval(),
+            'undoWindowDays' => (int) config('hris.import.undo_window_days', 7),
+            'approvalTtlDays' => (int) config('hris.import.approval_ttl_days', 7),
+        ]);
+    }
+
+    public function show(Request $request, EmployeeImportLog $log): View
+    {
+        $review = null;
+        $reviewRows = null;
+        $reviewError = null;
+
+        if ($log->status === EmployeeImportLog::STATUS_PENDING) {
+            try {
+                $review = $this->governance->review($log, $request->boolean('refresh'));
+                $reviewRows = $this->paginate($review['summary']['sample_rows'] ?? [], $request);
+            } catch (ImportAbortedException $e) {
+                $reviewError = $e->getMessage();
+            }
+        }
+
+        $canRollback = $log->isWithinUndoWindow() && $log->changes()->exists();
+
+        // Baris yang dilewati: dari pratinjau terkini (pengajuan) atau dari ringkasan yang tersimpan (tanpa NIK).
+        $skipped = $review['summary']['errors'] ?? ($log->metadata['summary']['errors'] ?? []);
+
+        return view('admin.employees.import-batches.show', [
+            'log' => $log,
+            'review' => $review,
+            'reviewRows' => $reviewRows,
+            'reviewError' => $reviewError,
+            'isMaker' => $log->user_id === $request->user()->id,
+            'canRollback' => $canRollback,
+            'undoDeadline' => $log->undoDeadline(),
+            'readiness' => $canRollback ? $this->governance->rollbackReadiness($log) : null,
+            'typedConfirmation' => $this->governance->requiresTypedConfirmation($log),
+            'confirmationWord' => EmployeeImportGovernanceService::CONFIRMATION_WORD,
+            'skippedGroups' => EmployeeImportGovernanceService::groupSkippedRows($skipped),
+            'skippedRows' => $skipped,
+            'correctionExpiresAt' => ($log->committed_at ?? $log->created_at)->copy()->addHours(2),
+            'canDownloadFailed' => $log->token && Cache::has("import_failed_rows_{$log->token}"),
+        ]);
+    }
+
+    public function approve(Request $request, EmployeeImportLog $log): RedirectResponse
+    {
+        $data = $request->validate(['reviewed_digest' => ['required', 'string', 'size:64']]);
+
+        try {
+            $result = $this->governance->approve($log, $request->user(), $data['reviewed_digest'], $request->ip(), $request->userAgent());
+        } catch (ImportAbortedException $e) {
+            return redirect()->route('admin.employees.import.batches.show', $log)->with('error', $e->getMessage());
+        }
+
+        $message = ($result['is_async'] ?? false)
+            ? 'Persetujuan diterima. Data karyawan sedang disimpan di antrean latar belakang.'
+            : "Impor disetujui dan disimpan: {$result['created']} data baru, {$result['updated']} data diperbarui, ".($result['unchanged'] ?? 0).' data tetap.';
+
+        return redirect()->route('admin.employees.import.batches.show', $log)->with('success', $message);
+    }
+
+    public function reject(Request $request, EmployeeImportLog $log): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:500']], [
+            'reason.required' => 'Alasan wajib diisi.',
+            'reason.min' => 'Alasan minimal 10 karakter agar tercatat jelas pada jejak audit.',
+        ]);
+
+        try {
+            $this->governance->reject($log, $request->user(), $data['reason'], $request->ip());
+        } catch (ImportAbortedException $e) {
+            return redirect()->route('admin.employees.import.batches.show', $log)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('admin.employees.import.batches.index')->with('success', 'Pengajuan impor ditolak. Data karyawan tidak berubah.');
+    }
+
+    public function rollback(Request $request, EmployeeImportLog $log): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:500'],
+            'confirmation' => ['nullable', 'string', 'max:20'],
+        ], [
+            'reason.required' => 'Alasan pembatalan wajib diisi.',
+            'reason.min' => 'Alasan minimal 10 karakter agar tercatat jelas pada jejak audit.',
+        ]);
+
+        try {
+            $result = $this->governance->rollback($log, $request->user(), $data['reason'], $request->ip(), $data['confirmation'] ?? null);
+        } catch (ImportAbortedException $e) {
+            return redirect()->route('admin.employees.import.batches.show', $log)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('admin.employees.import.batches.show', $log)
+            ->with('success', "Impor dibatalkan: {$result['deleted']} karyawan baru dihapus dan {$result['restored']} karyawan dikembalikan ke kondisi sebelum impor.");
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function paginate(array $rows, Request $request): LengthAwarePaginator
+    {
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = (int) config('hris.pagination.default');
+
+        return new LengthAwarePaginator(
+            array_slice($rows, ($page - 1) * $perPage, $perPage),
+            count($rows),
+            $perPage,
+            $page,
+            ['path' => $request->url()]
+        );
+    }
+}

@@ -221,10 +221,10 @@
                             </div>
                         </div>
 
-                        <!-- Usia & Proyeksi Pensiun (56 Th) / MBT (55 Th) -->
+                        <!-- Usia & Proyeksi Pensiun (56 Th) / MBT (H-6 bulan) -->
                         <div class="p-3 rounded-xl bg-surface-50 border border-surface-200/80 space-y-1.5 text-[11px]">
                             <div class="flex items-center justify-between">
-                                <span class="text-surface-500">Usia Pegawai:</span>
+                                <span class="text-surface-500">Usia Karyawan:</span>
                                 <span class="font-bold text-surface-900">{{ $data['usia_formatted'] }}</span>
                             </div>
                             <div class="flex items-center justify-between">

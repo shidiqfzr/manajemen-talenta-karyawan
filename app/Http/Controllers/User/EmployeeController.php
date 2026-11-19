@@ -9,14 +9,15 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        $employees = Employee::all();
+        $employees = Employee::aktif()->get();
 
         return view('user.employees.index', compact('employees'));
     }
 
     public function show($nik)
     {
-        $employee = Employee::findOrFail($nik);
+        // Karyawan berhenti hanya arsip internal HR: tidak ditampilkan kepada peran user (UU PDP).
+        $employee = Employee::aktif()->findOrFail($nik);
 
         return view('user.employees.show', compact('employee'));
     }

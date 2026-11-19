@@ -88,7 +88,7 @@
             class="absolute left-0 right-0 top-full mt-1.5 bg-white border border-surface-200 rounded-2xl shadow-xl max-h-80 overflow-y-auto z-40 divide-y divide-surface-100 overflow-hidden">
             <template x-for="emp in filtered.slice(0, 30)" :key="emp.nik">
                 <div @click="select(emp.nik)"
-                    :class="isAlreadySelected(emp.nik) ? 'opacity-40 cursor-not-allowed bg-surface-50' : 'hover:bg-primary-50/60 cursor-pointer'"
+                    :class="isAlreadySelected(emp.nik) ? 'opacity-40 cursor-not-allowed bg-surface-50' : 'hover:bg-surface-100 cursor-pointer'"
                     class="p-3 text-surface-800 transition flex items-center justify-between gap-3 text-xs">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="w-9 h-9 rounded-xl bg-primary-100 text-primary-800 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs"
@@ -109,7 +109,7 @@
                 </div>
             </template>
             <div x-show="filtered.length === 0" class="p-4 text-center text-xs text-surface-500 italic">
-                Tidak ada pegawai yang cocok dengan kata kunci.
+                Tidak ada karyawan yang cocok dengan kata kunci.
             </div>
         </div>
     </div>

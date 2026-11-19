@@ -1,4 +1,4 @@
-    <!-- ── 2. LIVE TOPOLOGY MONITORING & FLOW VISUALIZER (CLEAN ENTERPRISE WHITE) ── -->
+    <!-- ── 2. LIVE TOPOLOGY MONITORING & FLOW VISUALIZER (shown to users as "Peta Alur Mutasi") ── -->
     <div id="topologyMonitoringCard" class="bg-white rounded-2xl border border-surface-200 shadow-xs p-6 space-y-5">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-surface-100">
             <div class="flex items-center gap-3">
@@ -6,8 +6,8 @@
                     <i class="fas fa-diagram-project" aria-hidden="true"></i>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-surface-900 tracking-tight">Topologi Aliran Rantai Mutasi</h3>
-                    <p class="text-xs text-surface-500">Deteksi otomatis siklus tertutup, pengisian formasi kosong, dan keterkaitan alih tugas</p>
+                    <h3 class="text-base font-bold text-surface-900 tracking-tight">Peta Alur Mutasi</h3>
+                    <p class="text-xs text-surface-500">Deteksi otomatis rantai tertutup, pengisian formasi kosong, dan lowongan yang ditinggalkan</p>
                 </div>
             </div>
 
@@ -58,7 +58,7 @@
                 @else
                     <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-surface-100 text-surface-700 border border-surface-200">
                         <i class="fas fa-circle-notch fa-spin text-[10px]" aria-hidden="true"></i>
-                        <span>Menunggu Input Pegawai</span>
+                        <span>Menunggu Input Karyawan</span>
                     </span>
                 @endif
             </div>
@@ -68,7 +68,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div class="p-3.5 rounded-xl border border-surface-200 bg-surface-50/60 flex items-center justify-between">
                 <div>
-                    <span class="text-xs text-surface-500 font-medium block">Total Pegawai Terlibat</span>
+                    <span class="text-xs text-surface-500 font-medium block">Total Karyawan Terlibat</span>
                     <span class="text-xl font-bold text-surface-900 mt-0.5 block">{{ count($nodes) }} Orang</span>
                 </div>
                 <div class="w-9 h-9 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
@@ -101,18 +101,6 @@
             </div>
         </div>
 
-        <!-- Executive Flow Visualizer Header -->
-        <div class="flex items-center justify-between pb-1">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-surface-800 tracking-tight">Visualisasi Aliran Formasi</span>
-                <span class="text-[10px] text-surface-500 hidden sm:inline">&bull; Presentasi Rapat Direksi &amp; Pemetaan Mutasi</span>
-            </div>
-            <span class="text-[11px] font-semibold text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-full border border-primary-200/60 flex items-center gap-1.5">
-                <i class="fas fa-project-diagram text-[10px]" aria-hidden="true"></i>
-                <span>Diagram Alur Eksekutif</span>
-            </span>
-        </div>
-
         @php
             $flowClusters = $this->getOrderedFlowClusters();
         @endphp
@@ -120,7 +108,7 @@
         <!-- ── UNIFIED COMPACT EXECUTIVE MULTI-CLUSTER FLOW DIAGRAM ── -->
         <div class="space-y-5">
             @forelse ($flowClusters as $cluster)
-                <div class="bg-white rounded-2xl border border-surface-200 shadow-xs overflow-hidden">
+                <div id="alur-{{ $cluster['key'] }}" class="bg-white rounded-2xl border border-surface-200 shadow-xs overflow-hidden scroll-mt-24" wire:key="flow-{{ $cluster['key'] }}">
                     <!-- Cluster Header Strip -->
                     <div class="px-5 py-3.5 bg-surface-50/90 border-b border-surface-200 flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-3">
@@ -129,18 +117,25 @@
                             </span>
                             <div>
                                 <h4 class="text-xs sm:text-sm font-bold text-surface-900 tracking-tight">{{ $cluster['title'] }}</h4>
-                                <span class="text-[10px] text-surface-500 block">Subgraf alur mutasi mandiri dalam SK Direksi Bersama</span>
+                                <span class="text-[10px] text-surface-500 block">Bagian dari SK Direksi Kolektif yang sama</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             @if ($cluster['is_zero_vacancy'])
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-primary-800 border border-primary-300">
-                                    <i class="fas fa-check-circle text-primary-600" aria-hidden="true"></i> Net Zero Vacancy
+                                    <i class="fas fa-check-circle text-primary-600" aria-hidden="true"></i> Tanpa Lowongan Baru
                                 </span>
                             @endif
                             <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-surface-100 text-surface-700 border border-surface-200">
-                                {{ count($cluster['nodes']) }} Pegawai
+                                {{ count($cluster['nodes']) }} Karyawan
                             </span>
+                            {{-- Lompat ke rincian alur ini pada Rincian Mutasi Karyawan dan buka kartunya --}}
+                            <button type="button"
+                                @click="$dispatch('expand-group', { group: @js($cluster['key']) }); $nextTick(() => document.getElementById(@js('rincian-' . $cluster['key']))?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-primary-700 hover:text-primary-900 hover:bg-primary-50 transition cursor-pointer"
+                                title="Buka kartu karyawan pada alur ini">
+                                Lihat Rincian <i class="fas fa-arrow-down-long text-[10px]" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -284,7 +279,7 @@
                                                 <span></span>
                                             @endif
 
-                                            <button type="button" @click="document.getElementById('node-card-{{ $n['original_slot_index'] }}')?.scrollIntoView({behavior: 'smooth', block: 'center'})"
+                                            <button type="button" @click="$dispatch('expand-node', { index: {{ $n['original_slot_index'] }} }); $nextTick(() => document.getElementById('node-card-{{ $n['original_slot_index'] }}')?.scrollIntoView({behavior: 'smooth', block: 'center'}))"
                                                 class="text-surface-500 hover:text-surface-800 font-medium transition inline-flex items-center gap-1 cursor-pointer py-0.5 px-1.5 rounded hover:bg-surface-100"
                                                 title="Lompat ke kartu formulir slot #{{ $n['slot_number'] }}">
                                                 <span>Slot #{{ $n['slot_number'] }}</span>
@@ -294,7 +289,16 @@
                                     </div>
 
                                     <!-- Compact Connector Pipeline to Next Node WITHIN THIS CLUSTER -->
-                                    @if ($i < count($cluster['nodes']) - 1)
+                                    {{-- Arrow only for a real link: this node targets the seat held by the next node --}}
+                                    @php
+                                        $nextNode = $cluster['nodes'][$i + 1] ?? null;
+                                        $hasRealLink = $nextNode
+                                            && ! empty($n['occupant_nik'])
+                                            && $n['occupant_nik'] === ($nextNode['employee_nik'] ?? null);
+                                    @endphp
+                                    @if ($nextNode && ! $hasRealLink)
+                                        <div class="w-6 shrink-0" aria-hidden="true"></div>
+                                    @elseif ($hasRealLink)
                                         <div class="w-14 sm:w-16 flex flex-col items-center justify-center shrink-0 relative px-0">
                                             @if ($n['link_type'] === 'chain')
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary-50 text-primary-800 border border-primary-300 shadow-2xs whitespace-nowrap mb-1" title="Mengisi posisi {{ $n['occupant_nama'] }}">
@@ -356,9 +360,17 @@
                                                 {{ $cluster['unfilled_vacancies'][0]['unit_kerja'] ?? '' }}
                                             </div>
                                         </div>
-                                        <div class="text-[10px] text-surface-500 pt-1.5 border-t border-warning-100 flex items-center gap-1">
-                                            <i class="fas fa-exclamation-triangle text-[10px] text-warning-700" aria-hidden="true"></i>
-                                            <span>Menjadi lowongan di ujung rantai</span>
+                                        <div class="text-[10px] text-surface-500 pt-1.5 border-t border-warning-100 flex items-center justify-between gap-1">
+                                            <span class="inline-flex items-center gap-1">
+                                                <i class="fas fa-exclamation-triangle text-[10px] text-warning-700" aria-hidden="true"></i>
+                                                <span>Menjadi lowongan di ujung rantai</span>
+                                            </span>
+                                            @unless ($this->isLocked)
+                                                <button type="button" wire:click="fillVacancy({{ $cluster['id'] }}, 0)"
+                                                    wire:loading.attr="disabled" wire:target="fillVacancy"
+                                                    class="font-bold text-warning-800 hover:text-warning-700 underline underline-offset-2 cursor-pointer shrink-0"
+                                                    title="Tambah karyawan untuk mengisi formasi ini">Isi Lowongan</button>
+                                            @endunless
                                         </div>
                                     </div>
                                 </div>
@@ -375,17 +387,16 @@
                                     </div>
                                     <div>
                                         <h4 class="text-xs font-bold text-primary-950 flex items-center gap-1.5">
-                                            <span>Siklus Tertutup Sempurna ({{ $cluster['type_label'] }})</span>
-                                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-primary-200/80 text-primary-900">100% Balanced</span>
+                                            <span>{{ $cluster['type_label'] }}</span>
                                         </h4>
                                         <p class="text-[11px] text-primary-800 mt-0.5 leading-tight">
-                                            Posisi awal <strong>{{ $cluster['loopback']['to_nama'] }}</strong> ({{ $cluster['loopback']['to_jabatan'] }} di {{ $cluster['loopback']['to_unit'] }}) secara langsung diisi kembali oleh <strong>{{ $cluster['loopback']['from_nama'] }}</strong>. Alur siklus ini terhubung bulat mandiri tanpa menyisakan kekosongan formasi.
+                                            Posisi awal <strong>{{ $cluster['loopback']['to_nama'] }}</strong> ({{ $cluster['loopback']['to_jabatan'] }} di {{ $cluster['loopback']['to_unit'] }}) secara langsung diisi kembali oleh <strong>{{ $cluster['loopback']['from_nama'] }}</strong>. Rantai ini tertutup sehingga tidak ada formasi yang menjadi kosong.
                                         </p>
                                     </div>
                                 </div>
                                 <div class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-primary-300 text-primary-800 font-bold text-[11px] shrink-0 shadow-2xs">
                                     <i class="fas fa-check-circle text-primary-600 text-[10px]" aria-hidden="true"></i>
-                                    <span>Zero Vacancy</span>
+                                    <span>Tanpa Lowongan Baru</span>
                                 </div>
                             </div>
                         @endif
@@ -394,7 +405,7 @@
                 </div>
             @empty
                 <div class="p-8 text-center bg-white rounded-2xl border border-surface-200">
-                    <p class="text-xs text-surface-500">Pilih minimal 2 pegawai untuk melihat visualisasi topologi alur mutasi.</p>
+                    <p class="text-xs text-surface-500">Pilih minimal 2 karyawan untuk melihat peta alur mutasi.</p>
                 </div>
             @endforelse
         </div>

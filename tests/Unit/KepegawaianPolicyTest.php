@@ -14,9 +14,13 @@ class KepegawaianPolicyTest extends TestCase
         $this->assertNull(KepegawaianPolicy::tanggalPensiun('bukan tanggal'));
     }
 
-    public function test_mbt_is_one_year_before_retirement(): void
+    public function test_mbt_is_six_months_before_retirement(): void
     {
-        $this->assertSame('2040-05-01', KepegawaianPolicy::tanggalMbt('2041-05-01'));
+        $this->assertSame('2040-11-01', KepegawaianPolicy::tanggalMbt('2041-05-01'));
+        // Crossing a year boundary: pension in March, MBT the previous September.
+        $this->assertSame('2034-09-01', KepegawaianPolicy::tanggalMbt('2035-03-01'));
+        $this->assertSame(6, KepegawaianPolicy::MBT_BULAN_SEBELUM_PENSIUN);
+        $this->assertSame(6, KepegawaianPolicy::MBT_PERINGATAN_BULAN);
         $this->assertNull(KepegawaianPolicy::tanggalMbt(null));
     }
 

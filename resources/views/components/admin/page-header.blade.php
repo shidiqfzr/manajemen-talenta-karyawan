@@ -1,8 +1,12 @@
-@props(['title', 'subtitle' => '', 'icon', 'backUrl' => null, 'backLabel' => 'Kembali', 'breadcrumbs' => []])
+{{--
+    Kepala halaman admin. Slot opsional memuat aksi tambahan di sebelah tombol kembali:
+    <x-admin.page-header title="..." icon="fas fa-file" back-url="..."> <x-admin.button size="sm" variant="secondary">Aksi</x-admin.button> </x-admin.page-header>
+--}}
+@props(['title', 'subtitle' => '', 'icon' => 'fas fa-file-alt', 'backUrl' => null, 'backLabel' => 'Kembali', 'breadcrumbs' => []])
 
 <div class="bg-white rounded-xl sm:rounded-2xl border border-surface-200/80 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div class="flex items-center gap-4 min-w-0 flex-1">
-        <div class="w-12 h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-600 to-teal-700 text-white flex items-center justify-center text-xl shadow-md shadow-primary-600/20 shrink-0">
+        <div class="w-12 h-12 rounded-xl sm:rounded-2xl bg-primary-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">
             <i class="{{ $icon }}"></i>
         </div>
         <div class="min-w-0 flex-1">
@@ -30,9 +34,14 @@
         </div>
     </div>
 
-    @if($backUrl && $backLabel)
-        <x-admin.button href="{{ $backUrl }}" variant="secondary" icon="fas fa-arrow-left" class="whitespace-nowrap shrink-0">
-            {{ $backLabel }}
-        </x-admin.button>
+    @if (! $slot->isEmpty() || ($backUrl && $backLabel))
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            {{ $slot }}
+            @if($backUrl && $backLabel)
+                <x-admin.button href="{{ $backUrl }}" variant="secondary" icon="fas fa-arrow-left" class="whitespace-nowrap shrink-0">
+                    {{ $backLabel }}
+                </x-admin.button>
+            @endif
+        </div>
     @endif
 </div>

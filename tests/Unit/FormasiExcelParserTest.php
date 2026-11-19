@@ -117,6 +117,79 @@ class FormasiExcelParserTest extends TestCase
         $this->assertSame(1, $result['errors'][0]['row']);
     }
 
+    public function test_parser_reads_struktur_organisasi_format_with_explicit_kuota_and_rm_5(): void
+    {
+        $result = (new FormasiExcelParser)->parse($this->workbook([
+            [1, 'Bagian Tanaman', '-', 'Kepala Bagian Tanaman', 'RM 1', 'TAN', 1, null],
+            [2, 'Bagian Tanaman', 'Pemetaan', 'Asisten Pemetaan', 'RM 3', 'TAN', 3, 'Catatan'],
+            [3, 'Bagian Tanaman', 'Pemetaan', 'Krani Pemetaan', 'RM 5', 'TAN', '8', null],
+            [4, 'Bagian Tanaman', 'Pemetaan', 'Krani Pemetaan', 'RM 5', 'TAN', 2, null],
+            [null, null, null, null, null, null, null, null],
+        ], FormasiExcelParser::HEADERS_STRUKTUR));
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame([
+            ['unit' => 'Bagian Tanaman', 'jabatan' => 'Kepala Bagian Tanaman', 'rm_level' => 'RM-1', 'bidang' => 'TAN', 'kuota' => 1],
+            ['unit' => 'Bagian Tanaman', 'jabatan' => 'Asisten Pemetaan', 'rm_level' => 'RM-3', 'bidang' => 'TAN', 'kuota' => 3],
+            ['unit' => 'Bagian Tanaman', 'jabatan' => 'Krani Pemetaan', 'rm_level' => 'RM-5', 'bidang' => 'TAN', 'kuota' => 10],
+        ], $result['seats']);
+    }
+
+    public function test_parser_does_not_leak_library_deprecation_notices_to_the_error_handler(): void
+    {
+        // Berkas contoh dibuat lebih dulu: hanya pembacaan oleh parser yang diukur.
+        $file = $this->workbook([
+            ['BAGIAN TANAMAN', 'ASISTEN PEMETAAN', 'RM-3', 'TAN'],
+            ['BAGIAN TANAMAN', 'KEPALA BAGIAN', 'RM-1', 'TAN'],
+        ]);
+
+        $notices = 0;
+        set_error_handler(function () use (&$notices): bool {
+            $notices++;
+
+            return true;
+        }, E_DEPRECATED);
+
+        try {
+            $result = (new FormasiExcelParser)->parse($file);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertCount(2, $result['seats']);
+        $this->assertSame(0, $notices, 'Pembacaan Excel membanjiri penangan galat dengan notis deprecated dari pustaka.');
+    }
+
+    public function test_level_for_rm_maps_rm_1_to_3_to_karpim_and_the_rest_to_karpel(): void
+    {
+        $this->assertSame('Karpim', FormasiExcelParser::levelForRm('RM-1'));
+        $this->assertSame('Karpim', FormasiExcelParser::levelForRm('RM-3'));
+        $this->assertSame('Karpel', FormasiExcelParser::levelForRm('RM-5'));
+    }
+
+    public function test_parser_rejects_invalid_kuota_in_struktur_organisasi_format(): void
+    {
+        $result = (new FormasiExcelParser)->parse($this->workbook([
+            [1, 'Bagian Tanaman', '-', 'Asisten A', 'RM 3', 'TAN', -1, null],
+            [2, 'Bagian Tanaman', '-', 'Asisten B', 'RM 3', 'TAN', 'dua', null],
+            [3, 'Bagian Tanaman', '-', 'Asisten C', 'RM 4', 'TAN', 1, null],
+            [4, 'Bagian Tanaman', '-', 'Asisten D', 'RM 3', 'TAN', 1, null],
+        ], FormasiExcelParser::HEADERS_STRUKTUR));
+
+        $this->assertSame([2, 3, 4], array_column($result['errors'], 'row'));
+        $this->assertSame(['Asisten D'], array_column($result['seats'], 'jabatan'));
+    }
+
+    public function test_parser_treats_blank_kuota_as_zero_for_norm_based_seats(): void
+    {
+        $result = (new FormasiExcelParser)->parse($this->workbook([
+            [1, 'Bagian Sekretariat & Hukum', '-', 'Supir Pool', 'RM 5', 'UMU', null, 'Norma: 1 orang / kendaraan'],
+        ], FormasiExcelParser::HEADERS_STRUKTUR));
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(0, $result['seats'][0]['kuota']);
+    }
+
     public function test_parser_ignores_trailing_blank_rows_and_trims_cells(): void
     {
         $result = (new FormasiExcelParser)->parse($this->workbook([

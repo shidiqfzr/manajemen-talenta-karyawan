@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobHistory;
+use App\Models\MutasiChainProposal;
 use App\Services\JobVacancyService;
+use App\Services\ManPowerPlanningService;
+use App\Support\HrisPermission;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 
 class MutasiController extends Controller
@@ -13,21 +17,31 @@ class MutasiController extends Controller
     /**
      * Display the unified Mutasi & Penempatan Hub.
      */
-    public function index(Request $request, JobVacancyService $service)
+    public function index(Request $request, JobVacancyService $service, ManPowerPlanningService $mpp)
     {
         $stats = $service->getStatistics();
+        // Lencana tab MPP mengikuti kursi master formasi, bukan angka tetap.
+        $mppFormasiTotal = $mpp->totalStandarFormasi();
         $totalHistories = JobHistory::count();
+
+        // Usulan Mutasi Berantai tab: preparers see their own, approvers see every submitted proposal
+        $canSeeProposals = Gate::any([HrisPermission::MUTASI_PREPARE, HrisPermission::MUTASI_APPROVE]);
+        $pendingProposals = $canSeeProposals
+            ? MutasiChainProposal::where('status', MutasiChainProposal::STATUS_PENDING)
+                ->when(! Gate::allows(HrisPermission::MUTASI_APPROVE), fn ($q) => $q->where('created_by', $request->user()->id))
+                ->count()
+            : 0;
 
         // Determine active tab: default to 'vacancies'
         $activeTab = $request->query('tab');
         if ($activeTab === 'process') {
             return redirect()->route('admin.mutasi.create', $request->except('tab'));
         }
-        if (! $activeTab) {
+        if (! $activeTab || ($activeTab === 'usulan' && ! $canSeeProposals)) {
             $activeTab = 'vacancies';
         }
 
-        return view('admin.mutasi.index', compact('stats', 'totalHistories', 'activeTab'));
+        return view('admin.mutasi.index', compact('stats', 'totalHistories', 'activeTab', 'mppFormasiTotal', 'canSeeProposals', 'pendingProposals'));
     }
 
     /**

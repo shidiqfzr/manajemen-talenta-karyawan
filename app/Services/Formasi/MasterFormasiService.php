@@ -8,7 +8,9 @@ use App\Models\JobHistory;
 use App\Models\MasterAuditLog;
 use App\Models\Position;
 use App\Models\Unit;
+use App\Models\UnitAlias;
 use App\Models\User;
+use App\Services\JobVacancyService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
@@ -18,7 +20,7 @@ use InvalidArgumentException;
 /**
  * Satu-satunya jalur ubah master unit, jabatan, dan formasi jabatan (DOMAIN.md §3.5).
  * Setiap perubahan: dipratinjau dampaknya, diterapkan dalam satu transaksi, dan
- * dicatat pada master_audit_logs. Pemindahan pegawai tetap melalui modul Mutasi.
+ * dicatat pada master_audit_logs. Pemindahan karyawan tetap melalui modul Mutasi.
  */
 class MasterFormasiService
 {
@@ -31,10 +33,11 @@ class MasterFormasiService
     /**
      * @return int id formasi jabatan (position_unit) yang dibuat
      */
-    public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user): int
+    public function addSeat(Unit $unit, Position $position, int $kuota, ?string $bidang, User $user, bool $allowZero = false): int
     {
-        return DB::transaction(function () use ($unit, $position, $kuota, $bidang, $user): int {
-            $this->assertSeatInput($position, $kuota, $bidang);
+        return DB::transaction(function () use ($unit, $position, $kuota, $bidang, $user, $allowZero): int {
+            $this->lockUnit($unit->id);
+            $this->assertSeatInput($position, $kuota, $bidang, $allowZero);
             $this->assertNotBlocked($this->previewImpact('seat.add', ['unit_id' => $unit->id, 'position_id' => $position->id]));
 
             try {
@@ -59,12 +62,16 @@ class MasterFormasiService
         });
     }
 
-    public function updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User $user): void
+    /**
+     * @param  bool  $allowZero  hanya untuk penerapan SK struktur: formasi berbasis norma atau berpenghuni dapat berkuota 0
+     *                           (tidak ada kursi); editor Master Formasi tetap menolak kuota di bawah 1
+     */
+    public function updateSeat(int $positionUnitId, int $kuota, ?string $bidang, User $user, bool $allowZero = false): void
     {
-        DB::transaction(function () use ($positionUnitId, $kuota, $bidang, $user): void {
-            $seat = $this->findSeat($positionUnitId);
+        DB::transaction(function () use ($positionUnitId, $kuota, $bidang, $user, $allowZero): void {
+            $seat = $this->findSeatLocked($positionUnitId);
             $position = Position::findOrFail($seat->position_id);
-            $this->assertSeatInput($position, $kuota, $bidang);
+            $this->assertSeatInput($position, $kuota, $bidang, $allowZero);
 
             if ($seat->kuota === $kuota && $seat->bidang === $bidang) {
                 return;
@@ -89,7 +96,7 @@ class MasterFormasiService
     public function removeSeat(int $positionUnitId, ?string $reason, User $user): void
     {
         DB::transaction(function () use ($positionUnitId, $reason, $user): void {
-            $seat = $this->findSeat($positionUnitId);
+            $seat = $this->findSeatLocked($positionUnitId);
             $this->assertNotBlocked($this->previewImpact('seat.remove', ['seat_id' => $positionUnitId]));
             $reason = $this->requireReason($reason);
 
@@ -102,6 +109,193 @@ class MasterFormasiService
                 $reason
             );
         });
+    }
+
+    // ───────────────── Jabatan penampungan (Advisor, Diperbantukan) ─────────────────
+
+    /**
+     * Jenis jabatan penampungan => [is_overflow, is_diperban], sama dengan data seeder. Jabatan penampungan opsional pada
+     * sebuah unit, bukan bagian Master Formasi: tanpa kuota, tidak mengisi atau mengosongkan formasi mana pun (DOMAIN.md §3.6).
+     */
+    public const POOL_TYPES = ['advisor' => [true, false], 'diperbantukan' => [true, true]];
+
+    /** RM Band jabatan penampungan yang tersedia. */
+    public const POOL_RM_LEVELS = ['RM-1', 'RM-2', 'RM-3', 'RM-4'];
+
+    /** Bidang bawaan jabatan penampungan, sama dengan data seeder. */
+    private const POOL_BIDANG = 'UMU';
+
+    /**
+     * Membuat jabatan penampungan baru (level Karpim, tanpa kuota dan tanpa unit). Untuk dipakai pada sebuah unit,
+     * jabatan ini harus dibuka lebih dulu lewat openPoolPosition().
+     *
+     * @param  array{nama?: ?string, jenis?: ?string, rm_level?: ?string}  $data
+     */
+    public function createPoolPosition(array $data, User $user): Position
+    {
+        return DB::transaction(function () use ($data, $user): Position {
+            $nama = trim((string) ($data['nama'] ?? ''));
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
+            }
+            $this->assertNameLength($nama);
+
+            $jenis = $data['jenis'] ?? null;
+            if (! is_string($jenis) || ! isset(self::POOL_TYPES[$jenis])) {
+                throw new FormasiRuleViolationException('Jenis jabatan penampungan harus Advisor atau Diperbantukan.');
+            }
+
+            $rm = $data['rm_level'] ?? null;
+            if (! in_array($rm, self::POOL_RM_LEVELS, true)) {
+                throw new FormasiRuleViolationException('RM Band jabatan penampungan harus RM-1 sampai RM-4.');
+            }
+
+            $this->assertPositionNameFree($nama);
+
+            [$overflow, $diperban] = self::POOL_TYPES[$jenis];
+            $position = Position::create([
+                'nama' => $nama,
+                'bidang' => self::POOL_BIDANG,
+                'level' => 'Karpim',
+                'rm_level' => $rm,
+                'is_active' => true,
+                'is_overflow' => $overflow,
+                'is_diperban' => $diperban,
+            ]);
+
+            MasterAuditLog::record(
+                $user, 'position.created', 'position', $position->id, $position->nama, null,
+                $position->only(['nama', 'bidang', 'level', 'rm_level']) + ['jenis' => $jenis]
+            );
+
+            return $position;
+        });
+    }
+
+    /**
+     * Membuka jabatan penampungan pada sebuah unit agar karyawan dapat ditempatkan padanya (penambahan manual dan impor
+     * memeriksa jabatan terhadap unit). Baris `position_unit` berkuota 0 hanyalah tanda "dibuka"; jabatan penampungan
+     * tidak dihitung sebagai formasi.
+     */
+    public function openPoolPosition(Unit $unit, Position $position, User $user): int
+    {
+        return DB::transaction(function () use ($unit, $position, $user): int {
+            $this->assertIsPool($position);
+            if (! $unit->is_active) {
+                throw new FormasiRuleViolationException("Unit '{$unit->nama}' tidak aktif sehingga tidak dapat menerima jabatan penampungan.");
+            }
+
+            try {
+                $id = DB::table('position_unit')->insertGetId([
+                    'unit_id' => $unit->id,
+                    'position_id' => $position->id,
+                    'kuota' => 0,
+                    'bidang' => $position->bidang ?? self::POOL_BIDANG,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' sudah dibuka pada unit '{$unit->nama}'.");
+            }
+
+            MasterAuditLog::record(
+                $user, 'pool.opened', 'pool_seat', $id, $this->seatLabel($unit->nama, $position->nama),
+                null, ['jenis' => $position->is_diperban ? 'diperbantukan' : 'advisor']
+            );
+
+            return $id;
+        });
+    }
+
+    /**
+     * Menutup jabatan penampungan pada sebuah unit. Diblokir selama masih ada karyawan yang menjabatnya pada unit itu,
+     * dan wajib beralasan; pemindahan karyawan tetap melalui modul Mutasi.
+     */
+    public function closePoolPosition(Unit $unit, Position $position, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($unit, $position, $reason, $user): void {
+            $this->assertIsPool($position);
+
+            $this->lockUnit($unit->id);
+
+            $link = DB::table('position_unit')->where('unit_id', $unit->id)->where('position_id', $position->id)->lockForUpdate()->first();
+            if ($link === null) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' belum dibuka atau sudah ditutup pada unit '{$unit->nama}'.");
+            }
+
+            $holders = Employee::aktif()->where('unit_kerja', $unit->nama)->where('jabatan', $position->nama)->count();
+            if ($holders > 0) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$holders} karyawan pada unit '{$unit->nama}'. Pindahkan karyawan tersebut lebih dulu melalui modul Mutasi.");
+            }
+
+            $assignees = (int) app(JobVacancyService::class)->temporaryHolderCounts($position->nama, $unit->nama)->sum();
+            if ($assignees > 0) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' masih dijabat {$assignees} penugasan sementara (Pj/Plt) pada unit '{$unit->nama}'. Akhiri penugasan tersebut lebih dulu melalui modul Mutasi.");
+            }
+
+            $pending = $this->pendingMutations($unit->nama, $position->nama);
+            if ($pending > 0) {
+                throw new FormasiRuleViolationException("{$pending} mutasi terjadwal belum berlaku menuju jabatan penampungan '{$position->nama}' pada unit '{$unit->nama}'. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.");
+            }
+
+            $reason = $this->requireReason($reason);
+
+            if (DB::table('position_unit')->where('id', $link->id)->delete() !== 1) {
+                throw new FormasiRuleViolationException("Jabatan penampungan '{$position->nama}' sudah ditutup pada unit '{$unit->nama}'.");
+            }
+
+            MasterAuditLog::record(
+                $user, 'pool.closed', 'pool_seat', $link->id, $this->seatLabel($unit->nama, $position->nama),
+                ['jenis' => $position->is_diperban ? 'diperbantukan' : 'advisor'], null, $reason
+            );
+        });
+    }
+
+    /**
+     * Mengubah nama jabatan penampungan (mis. salah ketik). Wajib beralasan dan tercatat sebagai perubahan nama jabatan.
+     */
+    public function renamePoolPosition(Position $position, string $nama, ?string $reason, User $user): Position
+    {
+        return DB::transaction(function () use ($position, $nama, $reason, $user): Position {
+            $this->assertIsPool($position);
+
+            $nama = trim($nama);
+            if ($nama === '') {
+                throw new FormasiRuleViolationException('Nama jabatan wajib diisi.');
+            }
+            $this->assertNameLength($nama);
+            if (Position::whereRaw('lower(nama) = ?', [mb_strtolower($nama)])->where('id', '!=', $position->id)->exists()) {
+                throw new FormasiRuleViolationException("Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain.");
+            }
+
+            return $this->updatePosition($position, ['nama' => $nama], $reason, $user);
+        });
+    }
+
+    /**
+     * Menghapus jabatan penampungan yang tidak lagi diperlukan. Diblokir selama masih dibuka pada unit, dijabat, atau
+     * tercatat pada riwayat jabatan (gunakan penutupan atau Nonaktifkan); wajib beralasan.
+     */
+    public function deletePoolPosition(Position $position, ?string $reason, User $user): void
+    {
+        DB::transaction(function () use ($position, $reason, $user): void {
+            $this->assertIsPool($position);
+            $this->deletePosition($position, $reason, $user);
+        });
+    }
+
+    private function assertNameLength(string $nama): void
+    {
+        if (mb_strlen($nama) > 255) {
+            throw new FormasiRuleViolationException('Nama jabatan maksimal 255 karakter.');
+        }
+    }
+
+    private function assertIsPool(Position $position): void
+    {
+        if (! ($position->is_overflow || $position->is_diperban)) {
+            throw new FormasiRuleViolationException("'{$position->nama}' bukan jabatan penampungan. Formasi jabatan biasa dikelola melalui Formasi.");
+        }
     }
 
     // ─────────────────────────────── Unit kerja ───────────────────────────────
@@ -137,7 +331,7 @@ class MasterFormasiService
     }
 
     /**
-     * Mengubah atribut unit. Perubahan nama (rename) menyelaraskan teks unit pada pegawai
+     * Mengubah atribut unit. Perubahan nama (rename) menyelaraskan teks unit pada karyawan
      * dalam transaksi yang sama; riwayat jabatan tetap memakai nama lama.
      *
      * @param  array{nama?: string, kode?: ?string, wilayah?: string, urutan?: ?int}  $data
@@ -165,6 +359,10 @@ class MasterFormasiService
             $unit->update($changes);
 
             if ($isRename) {
+                // Nama lama tetap dikenali impor karyawan; nama baru yang sebelumnya alias kini menjadi nama resmi.
+                UnitAlias::remember($unit, $oldName, 'rename');
+                UnitAlias::where('alias_key', UnitAlias::keyFor($unit->nama))->delete();
+
                 Employee::where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
                 JobHistory::where('is_applied', false)->where('unit_kerja', $oldName)->update(['unit_kerja' => $unit->nama]);
             }
@@ -230,8 +428,8 @@ class MasterFormasiService
             $this->assertKnownLevel($level);
             $bidang = $data['bidang'] ?? null;
             $this->assertKnownBidang($bidang);
-            $rm = $level === 'Karpel' ? null : ($data['rm_level'] ?? null);
-            $this->assertKnownRm($rm);
+            $rm = $level === 'Karpel' ? $this->karpelRm($data['rm_level'] ?? null) : ($data['rm_level'] ?? null);
+            $this->assertKnownRm($rm, $level);
 
             $position = Position::create([
                 'nama' => $nama,
@@ -251,7 +449,7 @@ class MasterFormasiService
     }
 
     /**
-     * Mengubah atribut jabatan. Perubahan nama menyelaraskan teks jabatan pada pegawai
+     * Mengubah atribut jabatan. Perubahan nama menyelaraskan teks jabatan pada karyawan
      * dalam transaksi yang sama; perubahan Level RM berlaku untuk seluruh unit pemakai jabatan.
      *
      * @param  array{nama?: string, bidang?: ?string, level?: string, rm_level?: ?string}  $data
@@ -261,7 +459,7 @@ class MasterFormasiService
         return DB::transaction(function () use ($position, $data, $reason, $user): Position {
             $incoming = Arr::only($data, ['nama', 'bidang', 'level', 'rm_level']);
             if (($incoming['level'] ?? $position->level) === 'Karpel') {
-                $incoming['rm_level'] = null;
+                $incoming['rm_level'] = $this->karpelRm($incoming['rm_level'] ?? $position->rm_level);
             }
 
             $changes = $this->changedAttributes($position, $incoming);
@@ -276,7 +474,7 @@ class MasterFormasiService
                 $this->assertKnownBidang($changes['bidang']);
             }
             if (array_key_exists('rm_level', $changes)) {
-                $this->assertKnownRm($changes['rm_level']);
+                $this->assertKnownRm($changes['rm_level'], $incoming['level'] ?? $position->level);
             }
 
             $isRename = isset($changes['nama']);
@@ -370,12 +568,13 @@ class MasterFormasiService
     private function previewUnitDeactivate(int $unitId): ImpactResult
     {
         $unit = Unit::findOrFail($unitId);
-        $employees = Employee::where('unit_kerja', $unit->nama)->count();
+        // Hanya karyawan aktif yang menahan unit; arsip karyawan berhenti tidak dapat dipindahkan lewat Mutasi.
+        $employees = Employee::aktif()->where('unit_kerja', $unit->nama)->count();
         $pending = $this->pendingMutations($unit->nama);
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih tercatat di unit ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$employees} karyawan masih tercatat di unit ini. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju unit ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -389,16 +588,24 @@ class MasterFormasiService
     private function previewUnitDelete(int $unitId): ImpactResult
     {
         $unit = Unit::findOrFail($unitId);
-        $employees = Employee::where('unit_kerja', $unit->nama)->count();
-        $seats = DB::table('position_unit')->where('unit_id', $unit->id)->count();
+        $employees = Employee::aktif()->where('unit_kerja', $unit->nama)->count();
+        $links = DB::table('position_unit')
+            ->join('positions', 'positions.id', '=', 'position_unit.position_id')
+            ->where('position_unit.unit_id', $unit->id)
+            ->get(['positions.is_overflow', 'positions.is_diperban']);
+        $poolLinks = $links->filter(fn ($link) => $link->is_overflow || $link->is_diperban)->count();
+        $seats = $links->count() - $poolLinks;
         $history = JobHistory::where('unit_kerja', $unit->nama)->count();
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih tercatat di unit ini.";
+            $blockers[] = "{$employees} karyawan masih tercatat di unit ini.";
         }
         if ($seats > 0) {
             $blockers[] = "Unit ini masih memiliki {$seats} formasi jabatan.";
+        }
+        if ($poolLinks > 0) {
+            $blockers[] = "Unit ini masih membuka {$poolLinks} jabatan penampungan; tutup melalui tab Jabatan Penampungan.";
         }
         if ($history > 0) {
             $blockers[] = "Unit ini tercatat pada {$history} riwayat jabatan.";
@@ -427,7 +634,7 @@ class MasterFormasiService
         $warnings = [];
 
         if ($employees > 0) {
-            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama unitnya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+            $warnings[] = "{$employees} karyawan akan ikut diperbarui nama unitnya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
         }
         if ($pending > 0) {
             $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama unit tujuannya.";
@@ -439,12 +646,12 @@ class MasterFormasiService
     private function previewPositionDeactivate(int $positionId): ImpactResult
     {
         $position = Position::findOrFail($positionId);
-        $employees = Employee::where('jabatan', $position->nama)->count();
+        $employees = Employee::aktif()->where('jabatan', $position->nama)->count();
         $pending = $this->pendingMutations(null, $position->nama);
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih memegang jabatan ini. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$employees} karyawan masih memegang jabatan ini. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju jabatan ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -458,16 +665,18 @@ class MasterFormasiService
     private function previewPositionDelete(int $positionId): ImpactResult
     {
         $position = Position::findOrFail($positionId);
-        $employees = Employee::where('jabatan', $position->nama)->count();
+        $employees = Employee::aktif()->where('jabatan', $position->nama)->count();
         $seats = DB::table('position_unit')->where('position_id', $position->id)->count();
         $history = JobHistory::where('jabatan', $position->nama)->count();
         $blockers = [];
 
         if ($employees > 0) {
-            $blockers[] = "{$employees} pegawai masih memegang jabatan ini.";
+            $blockers[] = "{$employees} karyawan masih memegang jabatan ini.";
         }
         if ($seats > 0) {
-            $blockers[] = "Jabatan ini masih menjadi {$seats} formasi jabatan.";
+            $blockers[] = $position->is_overflow || $position->is_diperban
+                ? "Jabatan ini masih dibuka pada {$seats} unit; tutup melalui tab Jabatan Penampungan terlebih dahulu."
+                : "Jabatan ini masih menjadi {$seats} formasi jabatan.";
         }
         if ($history > 0) {
             $blockers[] = "Jabatan ini tercatat pada {$history} riwayat jabatan.";
@@ -496,7 +705,7 @@ class MasterFormasiService
         $warnings = [];
 
         if ($employees > 0) {
-            $warnings[] = "{$employees} pegawai akan ikut diperbarui nama jabatannya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
+            $warnings[] = "{$employees} karyawan akan ikut diperbarui nama jabatannya; riwayat jabatan yang sudah berlaku tetap memakai nama lama.";
         }
         if ($pending > 0) {
             $warnings[] = "{$pending} mutasi terjadwal akan ikut diperbarui nama jabatan tujuannya.";
@@ -542,7 +751,7 @@ class MasterFormasiService
 
         if ($kuota < $filled) {
             return ImpactResult::ok(
-                ["Kuota {$kuota} lebih kecil dari {$filled} pegawai yang menempati formasi ini; formasi ini akan ditandai melebihi kuota."],
+                ["Kuota {$kuota} lebih kecil dari {$filled} karyawan yang menempati formasi ini; formasi ini akan ditandai melebihi kuota."],
                 $filled
             );
         }
@@ -558,7 +767,7 @@ class MasterFormasiService
         $blockers = [];
 
         if ($filled > 0) {
-            $blockers[] = "{$filled} pegawai masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan pegawai tersebut melalui Mutasi terlebih dahulu.";
+            $blockers[] = "{$filled} karyawan masih menempati jabatan '{$seat->jabatan}' di '{$seat->unit_nama}'. Pindahkan karyawan tersebut melalui Mutasi terlebih dahulu.";
         }
         if ($pending > 0) {
             $blockers[] = "{$pending} mutasi terjadwal belum berlaku menuju formasi ini. Batalkan atau terapkan terlebih dahulu pada modul Mutasi.";
@@ -634,7 +843,7 @@ class MasterFormasiService
 
     private function assertPositionNameFree(string $nama): void
     {
-        if (Position::where('nama', $nama)->exists()) {
+        if (Position::whereRaw('lower(nama) = ?', [mb_strtolower($nama)])->exists()) {
             throw new FormasiRuleViolationException("Nama jabatan '{$nama}' sudah digunakan oleh jabatan lain.");
         }
     }
@@ -653,9 +862,15 @@ class MasterFormasiService
         }
     }
 
-    private function assertKnownRm(mixed $rm): void
+    /** Jabatan Karpel hanya memakai RM Band Karpel; nilai lain dianggap belum ditetapkan. */
+    private function karpelRm(mixed $rm): ?string
     {
-        if ($rm !== null && ! in_array($rm, ['RM-1', 'RM-2', 'RM-3'], true)) {
+        return in_array($rm, Position::KARPEL_RM_LEVELS, true) ? $rm : null;
+    }
+
+    private function assertKnownRm(mixed $rm, ?string $level): void
+    {
+        if ($level !== 'Karpel' && $rm !== null && ! in_array($rm, Position::KARPIM_RM_LEVELS, true)) {
             throw new FormasiRuleViolationException('Level RM jabatan Karpim harus RM-1, RM-2, atau RM-3.');
         }
     }
@@ -667,9 +882,9 @@ class MasterFormasiService
         }
     }
 
-    private function assertSeatInput(Position $position, int $kuota, ?string $bidang): void
+    private function assertSeatInput(Position $position, int $kuota, ?string $bidang, bool $allowZero = false): void
     {
-        if ($kuota < 1) {
+        if ($kuota < ($allowZero ? 0 : 1)) {
             throw new FormasiRuleViolationException('Kuota harus berupa bilangan bulat minimal 1.');
         }
 
@@ -684,6 +899,23 @@ class MasterFormasiService
         if ($bidang === null && $position->level === 'Karpim') {
             throw new FormasiRuleViolationException("Bidang wajib diisi untuk formasi Karpim jabatan '{$position->nama}'.");
         }
+    }
+
+    /**
+     * Same lock as FormasiSeatGuard: an employee being added to this unit at the same moment waits for us, or we
+     * for it, so the occupancy we preview and audit is the occupancy the change lands on. Call inside a transaction.
+     */
+    protected function lockUnit(int $unitId): void
+    {
+        Unit::whereKey($unitId)->lockForUpdate()->first();
+    }
+
+    /** The seat read under the unit lock (the unit is only known from the seat, so it is read again after locking). */
+    private function findSeatLocked(int $positionUnitId): object
+    {
+        $this->lockUnit($this->findSeat($positionUnitId)->unit_id);
+
+        return $this->findSeat($positionUnitId);
     }
 
     private function findSeat(int $positionUnitId): object
@@ -709,7 +941,7 @@ class MasterFormasiService
 
     /**
      * Mutasi terjadwal (belum berlaku) yang menuju unit dan/atau jabatan tertentu.
-     * Saat TMT tiba, teks unit dan jabatan pada pegawai disalin dari baris ini.
+     * Saat TMT tiba, teks unit dan jabatan pada karyawan disalin dari baris ini.
      */
     private function pendingMutations(?string $unitNama, ?string $jabatan = null): int
     {
@@ -721,7 +953,7 @@ class MasterFormasiService
 
     private function filled(string $unitNama, string $jabatan): int
     {
-        return Employee::where('unit_kerja', $unitNama)->where('jabatan', $jabatan)->count();
+        return Employee::aktif()->where('unit_kerja', $unitNama)->where('jabatan', $jabatan)->count();
     }
 
     private function seatLabel(string $unitNama, string $jabatan): string

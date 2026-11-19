@@ -65,6 +65,104 @@ class MutasiServiceTest extends TestCase
         $this->assertEquals('ROTASI', $newJob->jenis_mutasi);
     }
 
+    public function test_transfer_into_a_multi_seat_formasi_with_a_free_seat_does_not_swap_anyone(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 3]);
+
+        $holder = Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+
+        $result = $this->service->processMutasi(new MutasiRequest($mover->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+
+        $this->assertSame('transfer', $result['type'], 'A free seat takes a straight transfer; nobody is swapped out.');
+        $this->assertSame('Asisten Pengolahan', $mover->refresh()->jabatan);
+        $this->assertSame('Asisten Pengolahan', $holder->refresh()->jabatan, 'The existing holder keeps the seat.');
+        $this->assertSame(2, Employee::where('jabatan', 'Asisten Pengolahan')->where('unit_kerja', 'Unit Multi')->count());
+    }
+
+    public function test_placing_into_a_full_multi_seat_formasi_is_rejected_without_changing_anything(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 2]);
+
+        Employee::factory()->count(2)->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+        $historiesBefore = JobHistory::count();
+
+        try {
+            $this->service->processMutasi(new MutasiRequest($mover->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+            $this->fail('A full multi-seat formasi must not be swapped into.');
+        } catch (MutasiRuleViolationException $e) {
+            $this->assertStringContainsString('berkuota 2', $e->getMessage());
+            $this->assertStringContainsString('seluruh kuotanya terisi', $e->getMessage());
+        }
+
+        $this->assertSame('Asisten Tanaman', $mover->refresh()->jabatan);
+        $this->assertSame($historiesBefore, JobHistory::count());
+    }
+
+    public function test_a_requester_holding_the_latest_booking_is_not_blocked_by_it(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Booking']);
+        $kosong = Position::factory()->create(['nama' => 'Posisi Kosong Dipesan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($kosong->id);
+
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Booking']);
+        JobHistory::create(['employee_nik' => $mover->nik, 'jabatan' => 'Posisi Kosong Dipesan', 'unit_kerja' => 'Unit Booking', 'tmt_awal' => now()->addMonth()->toDateString(), 'is_applied' => false]);
+
+        $result = $this->service->processMutasi(new MutasiRequest($mover->nik, 'Posisi Kosong Dipesan', 'Unit Booking', now()->toDateString(), 'ROTASI'));
+
+        $this->assertSame('transfer', $result['type']);
+        $this->assertSame('Posisi Kosong Dipesan', $mover->refresh()->jabatan);
+    }
+
+    public function test_a_zero_quota_formasi_rejects_placement(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Nol']);
+        $seat = Position::factory()->create(['nama' => 'Petugas Mess', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 0]);
+        $mover = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Nol']);
+
+        $this->expectException(MutasiRuleViolationException::class);
+        $this->expectExceptionMessage('berkuota 0');
+
+        $this->service->processMutasi(new MutasiRequest($mover->nik, 'Petugas Mess', 'Unit Nol', now()->toDateString(), 'ROTASI'));
+    }
+
+    public function test_a_plt_placed_through_mutasi_uses_a_seat_of_a_multi_seat_formasi(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Unit Multi']);
+        $seat = Position::factory()->create(['nama' => 'Asisten Pengolahan', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        $unit->positions()->attach($seat->id, ['kuota' => 2]);
+        Employee::factory()->create(['jabatan' => 'Asisten Pengolahan', 'unit_kerja' => 'Unit Multi']);
+        $acting = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+        $definitive = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Unit Multi']);
+
+        $this->service->processMutasi(new MutasiRequest(
+            employeeNik: $acting->nik,
+            targetJabatan: 'Asisten Pengolahan',
+            targetUnitKerja: 'Unit Multi',
+            tmtAwal: now()->toDateString(),
+            jenisMutasi: 'PENUGASAN',
+            statusJabatan: 'Plt',
+        ));
+
+        try {
+            $this->service->processMutasi(new MutasiRequest($definitive->nik, 'Asisten Pengolahan', 'Unit Multi', now()->toDateString(), 'ROTASI'));
+            $this->fail('The Plt took the second seat, so a definitive placement must be rejected.');
+        } catch (MutasiRuleViolationException $e) {
+            $this->assertStringContainsString('berkuota 2', $e->getMessage());
+        }
+    }
+
     public function test_simultaneous_swap_when_target_occupied()
     {
         // Setup
@@ -94,6 +192,28 @@ class MutasiServiceTest extends TestCase
         $this->assertEquals(2, JobHistory::where('tmt_akhir', null)->count());
         $this->assertTrue(JobHistory::where('employee_nik', $empA->nik)->where('jabatan', 'Posisi B')->whereNull('tmt_akhir')->exists());
         $this->assertTrue(JobHistory::where('employee_nik', $empB->nik)->where('jabatan', 'Posisi A')->whereNull('tmt_akhir')->exists());
+    }
+
+    public function test_swap_history_records_each_employees_own_golongan_and_grade(): void
+    {
+        // Same RM Band on both seats, so the swap is a plain Rotasi whatever golongan each employee holds.
+        Position::factory()->create(['nama' => 'Posisi A', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Posisi B', 'rm_level' => 'RM-3']);
+        $empA = Employee::factory()->create(['jabatan' => 'Posisi A', 'unit_kerja' => 'Unit A', 'golongan' => 'IIIC/00', 'job_grade' => '12']);
+        $empB = Employee::factory()->create(['jabatan' => 'Posisi B', 'unit_kerja' => 'Unit A', 'golongan' => 'IIID/00', 'job_grade' => '13']);
+
+        $this->service->processMutasi(new MutasiRequest($empA->nik, 'Posisi B', 'Unit A', now()->toDateString(), 'ROTASI'));
+
+        foreach ([$empA, $empB] as $employee) {
+            $employee->refresh();
+            $history = JobHistory::where('employee_nik', $employee->nik)->whereNull('tmt_akhir')->firstOrFail();
+
+            $this->assertSame($employee->golongan, $history->golongan, "{$employee->nik}: history golongan must match the employee record");
+            $this->assertSame((string) $employee->job_grade, (string) $history->job_grade, "{$employee->nik}: history job grade must match the employee record");
+        }
+
+        $this->assertSame('IIID/00', $empB->golongan, 'A swap does not change the displaced employee\'s golongan');
+        $this->assertSame('13', (string) $empB->job_grade);
     }
 
     public function test_multi_occupancy_pool_advisor_does_not_trigger_swap()
@@ -285,10 +405,10 @@ class MutasiServiceTest extends TestCase
         $empD = Employee::factory()->create(['nama' => 'KARYAWAN D', 'jabatan' => 'Asisten Teknik Belian', 'unit_kerja' => 'PKS Rimba Belian', 'tmt_unit_kerja' => now()->subYears(3)]);
 
         $nodes = [
-            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
         ];
 
         $analysis = $this->service->validateChainTopology($nodes);
@@ -328,10 +448,10 @@ class MutasiServiceTest extends TestCase
         // 6 Nodes combined in 1 collective transaction
         $nodes = [
             // Cycle 1
-            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
             // Cycle 2 (Independent swap)
             ['employee_nik' => $empE->nik, 'target_jabatan' => 'Kepala Bagian SDM', 'target_unit_kerja' => 'Kantor Direksi Pontianak', 'jenis_mutasi' => 'PROMOSI', 'is_dispensasi' => true, 'status_jabatan' => 'Definitif'],
             ['employee_nik' => $empF->nik, 'target_jabatan' => 'Kasubag SDM', 'target_unit_kerja' => 'Kantor Direksi Pontianak', 'jenis_mutasi' => 'DEMOSI', 'is_dispensasi' => true, 'status_jabatan' => 'Definitif'],
@@ -387,10 +507,10 @@ class MutasiServiceTest extends TestCase
         ];
 
         $nodes = [
-            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
-            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'ROTASI', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empA->nik, 'target_jabatan' => 'Asisten Teknik Meliau', 'target_unit_kerja' => 'PKS Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empB->nik, 'target_jabatan' => 'Asisten Tanaman Belian', 'target_unit_kerja' => 'Kebun Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empC->nik, 'target_jabatan' => 'Asisten Teknik Belian', 'target_unit_kerja' => 'PKS Rimba Belian', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
+            ['employee_nik' => $empD->nik, 'target_jabatan' => 'Asisten Tanaman Meliau', 'target_unit_kerja' => 'Kebun Inti Gunung Meliau', 'jenis_mutasi' => 'MUTASI_UNIT', 'status_jabatan' => 'Definitif'],
         ];
 
         $result = $this->service->processChainMutasi($header, $nodes);
@@ -435,8 +555,8 @@ class MutasiServiceTest extends TestCase
         Position::factory()->create(['nama' => 'Asisten Afdeling 1', 'rm_level' => 'RM-3']);
         Position::factory()->create(['nama' => 'Asisten Afdeling 2', 'rm_level' => 'RM-3']);
 
-        $empA = Employee::factory()->create(['nama' => 'PEGAWAI A', 'jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
-        $empB = Employee::factory()->create(['nama' => 'PEGAWAI B', 'jabatan' => 'Asisten Afdeling 2', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
+        $empA = Employee::factory()->create(['nama' => 'KARYAWAN A', 'jabatan' => 'Asisten Afdeling 1', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
+        $empB = Employee::factory()->create(['nama' => 'KARYAWAN B', 'jabatan' => 'Asisten Afdeling 2', 'unit_kerja' => 'Kebun A', 'tmt_unit_kerja' => now()->subYears(3)]);
 
         // Target 'Askep Tanaman' in 'Kebun B' is currently VACANT!
         $nodes = [
@@ -461,8 +581,8 @@ class MutasiServiceTest extends TestCase
         Position::factory()->create(['nama' => 'Jabatan X', 'rm_level' => 'RM-3']);
         Position::factory()->create(['nama' => 'Jabatan Y', 'rm_level' => 'RM-3']);
 
-        $empA = Employee::factory()->create(['nama' => 'PEGAWAI A', 'jabatan' => 'Jabatan X', 'unit_kerja' => 'Kebun A']);
-        $empOutsider = Employee::factory()->create(['nama' => 'PEGAWAI LUAR', 'jabatan' => 'Jabatan Y', 'unit_kerja' => 'Kebun A']);
+        $empA = Employee::factory()->create(['nama' => 'KARYAWAN A', 'jabatan' => 'Jabatan X', 'unit_kerja' => 'Kebun A']);
+        $empOutsider = Employee::factory()->create(['nama' => 'KARYAWAN LUAR', 'jabatan' => 'Jabatan Y', 'unit_kerja' => 'Kebun A']);
 
         // empA tries to target Jabatan Y which is occupied by empOutsider, but empOutsider is not in chain
         $nodes = [
@@ -675,6 +795,43 @@ class MutasiServiceTest extends TestCase
             ->assertExitCode(0);
     }
 
+    public function test_unmet_promotion_is_refused_without_direksi_dispensation_basis(): void
+    {
+        $emp = Employee::factory()->create([
+            'jabatan' => 'Asisten Kebun A',
+            'unit_kerja' => 'Kebun Sawit A',
+            'golongan' => 'IIIA/00',
+            'rm_level' => 'RM-3',
+            'level' => 'Karpim',
+            'tmt_unit_kerja' => now()->subYears(3)->toDateString(),
+        ]);
+        Position::factory()->create(['nama' => 'Askep Tanaman B', 'rm_level' => 'RM-2']);
+        Unit::factory()->create(['nama' => 'Kebun Sawit B']);
+
+        $request = fn (bool $dispensed, string $basis) => new MutasiRequest(
+            employeeNik: $emp->nik,
+            targetJabatan: 'Askep Tanaman B',
+            targetUnitKerja: 'Kebun Sawit B',
+            tmtAwal: now()->addDays(5)->toDateString(),
+            jenisMutasi: 'PROMOSI',
+            statusJabatan: 'Definitif',
+            dispensasiPromosi: $dispensed,
+            alasanDispensasiPromosi: $basis,
+        );
+
+        foreach ([[false, ''], [true, 'ok']] as [$dispensed, $basis]) {
+            try {
+                $this->service->processMutasi($request($dispensed, $basis));
+                $this->fail('Promotion without a valid Direksi basis must be refused.');
+            } catch (MutasiRuleViolationException $e) {
+                $this->assertStringContainsString('Dispensasi Promosi Direksi', $e->getMessage());
+            }
+        }
+
+        $this->service->processMutasi($request(true, 'Keputusan Direksi No. 12/BOD/2026'));
+        $this->assertDatabaseHas('job_histories', ['employee_nik' => $emp->nik, 'jabatan' => 'Askep Tanaman B']);
+    }
+
     public function test_scheduled_promotion_persists_and_restores_job_grade_when_applied(): void
     {
         $emp = Employee::factory()->create([
@@ -701,6 +858,8 @@ class MutasiServiceTest extends TestCase
             statusJabatan: 'Definitif',
             isDispensasi: true,
             alasanDispensasi: 'Promosi: Keputusan Direksi No. 12/BOD/2026',
+            dispensasiPromosi: true,
+            alasanDispensasiPromosi: 'Keputusan Direksi No. 12/BOD/2026',
             newGolongan: 'IIIC/00',
             newJobGrade: '13'
         ));
@@ -801,6 +960,30 @@ class MutasiServiceTest extends TestCase
             jenisMutasi: 'PENUGASAN',
             statusJabatan: 'Definitif'
         ));
+    }
+
+    public function test_promosi_and_demosi_target_list_only_offers_one_rm_band_up_or_down(): void
+    {
+        $unit = Unit::factory()->create(['nama' => 'Kebun A']);
+        $positions = collect([
+            'Pos RM1' => 'RM-1',
+            'Pos RM2' => 'RM-2',
+            'Pos RM3' => 'RM-3',
+            'Pos RM4' => 'RM-4',
+            'Pos RM5' => 'RM-5',
+        ])->map(fn ($rm, $nama) => Position::factory()->create(['nama' => $nama, 'rm_level' => $rm]));
+        $unit->positions()->attach($positions->pluck('id'));
+
+        $emp = Employee::factory()->create(['jabatan' => 'Pos RM3', 'unit_kerja' => 'Kebun A']);
+
+        $this->assertSame(
+            ['Pos RM2'],
+            array_values($this->service->listTargetPositions($emp->nik, 'Kebun A', 'PROMOSI'))
+        );
+        $this->assertSame(
+            ['Pos RM4'],
+            array_values($this->service->listTargetPositions($emp->nik, 'Kebun A', 'DEMOSI'))
+        );
     }
 
     public function test_service_enforces_tenure_dispensasi_and_known_mutation_types(): void
@@ -914,6 +1097,88 @@ class MutasiServiceTest extends TestCase
     // Chain governance, node preparation & flow ordering
     // -------------------------------------------------------------------------
 
+    /**
+     * Two employees of one unit who swap an RM-3 and an RM-1 formasi: the minimum chain on which every
+     * per-participant governance guard of a single mutation (DOMAIN.md §5.2.3) must also hold.
+     *
+     * @return array{0: Employee, 1: Employee}
+     */
+    private function chainPairAcrossRm(): array
+    {
+        Unit::factory()->create(['nama' => 'Kebun A']);
+        Unit::factory()->create(['nama' => 'Kebun B']);
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+        Position::factory()->create(['nama' => 'Manajer Kebun', 'rm_level' => 'RM-1']);
+
+        $asisten = Employee::factory()->create(['jabatan' => 'Asisten Tanaman', 'unit_kerja' => 'Kebun A', 'rm_level' => 'RM-3', 'tmt_unit_kerja' => now()->subYears(3)]);
+        $manajer = Employee::factory()->create(['jabatan' => 'Manajer Kebun', 'unit_kerja' => 'Kebun A', 'rm_level' => 'RM-1', 'tmt_unit_kerja' => now()->subYears(3)]);
+
+        return [$asisten, $manajer];
+    }
+
+    public function test_chain_applies_the_same_governance_guards_as_a_single_mutation(): void
+    {
+        [$asisten, $manajer] = $this->chainPairAcrossRm();
+
+        $node = fn (Employee $emp, string $jabatan, string $unit, string $jenis, string $status = 'Definitif') => [
+            'employee_nik' => $emp->nik, 'target_jabatan' => $jabatan, 'target_unit_kerja' => $unit,
+            'jenis_mutasi' => $jenis, 'status_jabatan' => $status,
+        ];
+        $errorsOf = fn (array $nodes) => implode(' ', $this->service->validateChainTopology($nodes)['errors']);
+
+        // Definitif to a higher RM must be filed as Promosi, to a lower RM as Demosi
+        $wrongDirection = $this->service->validateChainTopology([
+            $node($asisten, 'Manajer Kebun', 'Kebun A', 'PENUGASAN'),
+            $node($manajer, 'Asisten Tanaman', 'Kebun A', 'PENUGASAN'),
+        ]);
+        $this->assertFalse($wrongDirection['is_valid']);
+        $this->assertStringContainsString('wajib diproses sebagai Promosi', implode(' ', $wrongDirection['errors']));
+        $this->assertStringContainsString('wajib diproses sebagai Demosi', implode(' ', $wrongDirection['errors']));
+
+        // The matching types pass the direction guard
+        $this->assertTrue($this->service->validateChainTopology([
+            $node($asisten, 'Manajer Kebun', 'Kebun A', 'PROMOSI'),
+            $node($manajer, 'Asisten Tanaman', 'Kebun A', 'DEMOSI'),
+        ])['is_valid']);
+
+        // ROTASI stays inside the unit, MUTASI_UNIT must leave it
+        $this->assertStringContainsString('Rotasi & Alih Tugas hanya berlaku', $errorsOf([
+            $node($asisten, 'Manajer Kebun', 'Kebun B', 'ROTASI'),
+            $node($manajer, 'Asisten Tanaman', 'Kebun A', 'DEMOSI'),
+        ]));
+        $this->assertStringContainsString('Mutasi Unit wajib menuju unit kerja yang berbeda', $errorsOf([
+            $node($asisten, 'Manajer Kebun', 'Kebun A', 'MUTASI_UNIT'),
+            $node($manajer, 'Asisten Tanaman', 'Kebun A', 'DEMOSI'),
+        ]));
+
+        // status_jabatan must come from the fixed list
+        $this->assertStringContainsString("Status jabatan 'Bebas'", $errorsOf([
+            $node($asisten, 'Manajer Kebun', 'Kebun A', 'PROMOSI', 'Bebas'),
+            $node($manajer, 'Asisten Tanaman', 'Kebun A', 'DEMOSI'),
+        ]));
+    }
+
+    public function test_process_chain_refuses_a_batch_that_breaks_a_governance_guard_and_writes_nothing(): void
+    {
+        [$asisten, $manajer] = $this->chainPairAcrossRm();
+
+        try {
+            $this->service->processChainMutasi(
+                ['nomor_sk' => 'SK/KOLEKTIF/001', 'tanggal_sk' => now()->toDateString(), 'tmt_awal' => now()->toDateString()],
+                [
+                    ['employee_nik' => $asisten->nik, 'target_jabatan' => 'Manajer Kebun', 'target_unit_kerja' => 'Kebun A', 'jenis_mutasi' => 'PENUGASAN'],
+                    ['employee_nik' => $manajer->nik, 'target_jabatan' => 'Asisten Tanaman', 'target_unit_kerja' => 'Kebun A', 'jenis_mutasi' => 'DEMOSI'],
+                ]
+            );
+            $this->fail('Rantai yang melanggar aturan arah Promosi/Demosi seharusnya ditolak.');
+        } catch (MutasiRuleViolationException $e) {
+            $this->assertStringContainsString('wajib diproses sebagai Promosi', $e->getMessage());
+        }
+
+        $this->assertSame('Asisten Tanaman', $asisten->fresh()->jabatan);
+        $this->assertSame(0, JobHistory::where('nomor_sk', 'SK/KOLEKTIF/001')->count());
+    }
+
     public function test_chain_rejects_unknown_mutation_type_and_retired_participant(): void
     {
         Unit::factory()->create(['nama' => 'Kebun A']);
@@ -1000,7 +1265,7 @@ class MutasiServiceTest extends TestCase
     public function test_prepare_chain_nodes_drops_incomplete_rows_and_folds_dispensasi(): void
     {
         $prepared = $this->service->prepareChainNodes([
-            ['employee_nik' => '11111111', 'target_jabatan' => 'A', 'target_unit_kerja' => 'U1', 'dispensasi_promosi' => true, 'alasan_dispensasi_promosi' => 'Rekomendasi BOD'],
+            ['employee_nik' => '11111111', 'target_jabatan' => 'A', 'target_unit_kerja' => 'U1', 'dispensasi_tenure' => true, 'alasan_dispensasi_tenure' => 'Rekomendasi BOD'],
             ['employee_nik' => '', 'target_jabatan' => 'B', 'target_unit_kerja' => 'U2'],
             ['employee_nik' => '33333333', 'target_jabatan' => 'C', 'target_unit_kerja' => 'U3', 'is_dispensasi' => true, 'alasan_dispensasi' => 'Keputusan Direksi'],
             ['employee_nik' => '44444444', 'target_jabatan' => 'D', 'target_unit_kerja' => 'U4'],
@@ -1010,7 +1275,7 @@ class MutasiServiceTest extends TestCase
         $this->assertSame([0, 1, 2], array_keys($prepared));
 
         $this->assertTrue($prepared[0]['is_dispensasi']);
-        $this->assertSame('[Dispensasi Promosi]: Rekomendasi BOD', $prepared[0]['alasan_dispensasi']);
+        $this->assertSame('[Dispensasi Masa Dinas]: Rekomendasi BOD', $prepared[0]['alasan_dispensasi']);
         $this->assertTrue($prepared[1]['is_dispensasi']);
         $this->assertSame('Keputusan Direksi', $prepared[1]['alasan_dispensasi']);
         $this->assertFalse($prepared[2]['is_dispensasi']);
@@ -1057,5 +1322,17 @@ class MutasiServiceTest extends TestCase
         $this->expectException(MutasiIntegrityException::class);
 
         $this->service->processMutasi(new MutasiRequest($empA->nik, 'Posisi B', 'Unit A', now()->toDateString(), 'ROTASI'));
+    }
+
+    public function test_rm_5_to_karpim_promotion_follows_the_ckp_path(): void
+    {
+        Position::factory()->create(['nama' => 'Asisten Tanaman', 'rm_level' => 'RM-3']);
+
+        $emp = Employee::factory()->create(['jabatan' => 'Krani Pemetaan', 'level' => 'Karpel', 'rm_level' => 'RM-5']);
+
+        $result = $this->service->checkPromotionEligibility($emp, 'Asisten Tanaman');
+
+        $this->assertTrue($result['is_applicable']);
+        $this->assertSame('Jalur Karir CKP (Calon Karyawan Pimpinan)', $result['criteria'][0]['label']);
     }
 }

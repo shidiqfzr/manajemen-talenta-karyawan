@@ -17,7 +17,7 @@ class JobHistoryController extends Controller
      */
     public function index(Employee $employee)
     {
-        $histories = $employee->jobHistories()->paginate(10);
+        $histories = $employee->jobHistories()->paginate((int) config('hris.pagination.default'));
 
         return view('admin.employees.job-history.index', compact('employee', 'histories'));
     }
@@ -136,7 +136,7 @@ class JobHistoryController extends Controller
         if ($employee->currentJob?->is($job_history)) {
             return redirect()
                 ->to(route('admin.employees.show', $employee->nik).'#riwayat-jabatan')
-                ->with('error', 'Riwayat jabatan aktif tidak dapat dihapus. Gunakan modul Mutasi & Penempatan untuk mengubah jabatan pegawai.');
+                ->with('error', 'Riwayat jabatan aktif tidak dapat dihapus. Gunakan modul Mutasi & Penempatan untuk mengubah jabatan karyawan.');
         }
 
         // Soft delete — the record is retained for audit trail purposes

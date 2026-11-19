@@ -4,29 +4,44 @@ namespace App\Livewire\Admin;
 
 use App\Exceptions\MutasiRuleViolationException;
 use App\Exports\MutasiHistoryExport;
+use App\Livewire\Concerns\WithDataTable;
 use App\Models\JobHistory;
+use App\Models\User;
 use App\Services\MutasiService;
+use App\Support\DataTable\Column;
+use App\Support\DataTable\Filter;
+use App\Support\DataTable\QueryPipeline;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
-use Maatwebsite\Excel\Facades\Excel;
 
+/**
+ * Mutation history (Riwayat Mutasi): the audit trail of every mutation, TMT schedule activation and
+ * the compliance log export.
+ *
+ * Runs on the shared data table layer (WithDataTable), which validates search, sort, filters and
+ * page size; the meaning of each status and record source is defined only by the JobHistory scopes
+ * (DOMAIN.md), never by this component.
+ */
 class MutasiHistory extends Component
 {
-    use WithPagination;
+    use WithDataTable;
 
-    public string $search = '';
-
+    #[Url(except: '')]
     public string $unitFilter = '';
 
+    #[Url(except: '')]
     public string $mutasiFilter = '';
 
-    public string $statusFilter = ''; // '' = all, 'applied' = aktif/diterapkan, 'scheduled' = terjadwal
+    /** '' = all; otherwise a key of statusOptions(): 'active', 'applied', 'scheduled' or 'due'. */
+    #[Url(except: '')]
+    public string $statusFilter = '';
 
-    public string $sortField = 'tmt_awal';
-
-    public string $sortDirection = 'desc';
-
-    public int $perPage = 15;
+    /** '' (default) = official mutations only; 'semua' = every record, or one key of JobHistory::SUMBER_LABELS. */
+    #[Url(except: '')]
+    public string $sumberFilter = '';
 
     public ?string $selectedBatchId = null;
 
@@ -36,19 +51,156 @@ class MutasiHistory extends Component
 
     public ?JobHistory $detailJob = null;
 
-    protected $queryString = [
-        'search' => ['except' => ''],
-        'unitFilter' => ['except' => ''],
-        'mutasiFilter' => ['except' => ''],
-        'statusFilter' => ['except' => ''],
-        'sortField' => ['except' => 'tmt_awal'],
-        'sortDirection' => ['except' => 'desc'],
-    ];
+    /**
+     * Admin-only screen that changes formation data and shows personal data: refuse non-admins on every
+     * request, because route middleware is not re-applied to Livewire update requests.
+     */
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->role === 'admin', 403, 'Unauthorized.');
+    }
 
+    /**
+     * Known units for the unit filter; computed once per request because filters() is built several times.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function units(): array
+    {
+        return app(MutasiService::class)->getKnownUnits()->all();
+    }
+
+    protected function baseQuery(): Builder
+    {
+        // The compliance export maps employee and creator per row: keep them eager loaded.
+        return JobHistory::with(['employee', 'creator'])
+            // The official-only default is enforced here, not left to the trait's normalisation.
+            ->when($this->sumber() === 'resmi', fn (Builder $query) => $query->bySumber('resmi'));
+    }
+
+    protected function columns(): array
+    {
+        return [
+            Column::make('employee_nik', 'Karyawan')
+                ->sortable()
+                ->searchable(fn (Builder $query, string $term) => $query->whereHas(
+                    'employee',
+                    fn (Builder $employee) => QueryPipeline::whereLikeAny($employee, ['nama', 'nik'], $term)
+                ))
+                ->width('w-[18%]'),
+            Column::make('jabatan', 'Jabatan & Unit Kerja')
+                ->sortable()
+                ->searchable(fn (Builder $query, string $term) => QueryPipeline::whereLikeAny($query, ['jabatan', 'unit_kerja'], $term))
+                ->width('w-[24%]'),
+            Column::make('jenis_mutasi', 'Jenis & Regulasi')->sortable()->align('center')->width('w-[12%]'),
+            Column::make('tmt_awal', 'TMT Efektif')->sortable()->width('w-[12%]'),
+            Column::make('status', 'Status')->align('center')->width('w-[12%]'),
+            Column::make('nomor_sk', 'Dasar SK')->sortable()->width('w-[14%]'),
+            Column::make('aksi', 'Aksi')->align('center')->width('w-[8%]'),
+        ];
+    }
+
+    protected function filters(): array
+    {
+        $units = $this->units;
+        $sumberOptions = ['semua' => 'Semua Catatan'];
+
+        foreach (JobHistory::SUMBER_LABELS as $key => $label) {
+            if ($key !== JobHistory::SUMBER_MUTASI) {
+                $sumberOptions[$key] = $label;
+            }
+        }
+
+        return [
+            Filter::select('unitFilter', 'Unit Kerja', array_combine($units, $units))
+                ->icon('fas fa-building')
+                ->allLabel('Semua Unit Kerja')
+                ->apply(fn (Builder $query, string $value) => $query->where('unit_kerja', $value)),
+            Filter::select('mutasiFilter', 'Jenis Mutasi', array_combine(
+                JobHistory::MUTASI_TYPES,
+                array_map(fn (string $type) => JobHistory::labelFor($type), JobHistory::MUTASI_TYPES)
+            ))
+                ->icon('fas fa-tag')
+                ->apply(fn (Builder $query, string $value) => $query->where('jenis_mutasi', $value)),
+            // The KPI cards are the control for this filter; the toolbar only shows it as a removable chip.
+            Filter::select('statusFilter', 'Status', $this->statusOptions())
+                ->icon('fas fa-flag')
+                ->withoutControl()
+                ->apply(fn (Builder $query, string $value) => $query->byStatus($value)),
+            Filter::select('sumberFilter', 'Sumber Catatan', $sumberOptions)
+                ->icon('fas fa-layer-group')
+                ->allLabel('Mutasi Resmi')
+                ->apply(fn (Builder $query, string $value) => $query->bySumber($value)),
+        ];
+    }
+
+    /**
+     * Status filter options, keyed by the JobHistory::byStatus values. `active` matches the Aktif Menjabat
+     * KPI card; `applied` also lists finished rows.
+     *
+     * @return array<string, string>
+     */
+    private function statusOptions(): array
+    {
+        return [
+            'active' => 'Aktif Menjabat',
+            'scheduled' => 'Terjadwal',
+            'due' => 'Siap Diaktifkan',
+            'applied' => 'Sudah Diterapkan',
+        ];
+    }
+
+    protected function defaultSort(): array
+    {
+        return ['tmt_awal', 'desc'];
+    }
+
+    protected function tableLabel(): string
+    {
+        return 'Riwayat Mutasi';
+    }
+
+    protected function exportName(): ?string
+    {
+        return 'riwayat-mutasi';
+    }
+
+    protected function exportFileName(): string
+    {
+        return 'Audit_Log_Mutasi_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
+    }
+
+    /** The compliance workbook (Inspektorat/BPK format) over exactly the rows on screen. */
+    protected function buildExport(Builder $query, ?User $user): object
+    {
+        return new MutasiHistoryExport(['sumber' => $this->sumber()], $user, $query);
+    }
+
+    /**
+     * Source scope for the base query, the KPI counts and the export metadata. Fails closed: the empty
+     * default, SUMBER_MUTASI itself and any unknown value all mean official mutations ('resmi').
+     */
+    private function sumber(): string
+    {
+        $value = $this->sumberFilter;
+
+        if ($value === 'semua' || ($value !== JobHistory::SUMBER_MUTASI && array_key_exists($value, JobHistory::SUMBER_LABELS))) {
+            return $value;
+        }
+
+        return 'resmi';
+    }
+
+    /** KPI-card toggle; values outside the status filter options are ignored (server calls bypass the trait's normalisation). */
     public function toggleStatusFilter(string $status): void
     {
+        if ($status !== '' && ! array_key_exists($status, $this->statusOptions())) {
+            return;
+        }
+
         $this->statusFilter = ($this->statusFilter === $status) ? '' : $status;
-        $this->resetPage();
+        $this->resetPage($this->paginationName());
     }
 
     public function showDetail(int $id, MutasiService $service): void
@@ -61,17 +213,6 @@ class MutasiHistory extends Component
     {
         $this->selectedJobId = null;
         $this->detailJob = null;
-    }
-
-    public function sortBy(string $field): void
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-        $this->resetPage();
     }
 
     public function viewBatch(string $batchId, MutasiService $service): void
@@ -100,7 +241,7 @@ class MutasiHistory extends Component
         $item = collect($result['items'])->firstWhere('id', $jobHistoryId);
         $msg = "Sukses! Mutasi atas nama {$item['nama']} ke {$item['jabatan']} di {$item['unit_kerja']} berhasil diaktifkan.";
         if ($result['activated_count'] > 1) {
-            $msg .= " ({$result['activated_count']} pegawai dalam satu SK turut diaktifkan.)";
+            $msg .= " ({$result['activated_count']} karyawan dalam satu SK turut diaktifkan.)";
         }
         session()->flash('mutasi_success', $msg);
 
@@ -124,7 +265,7 @@ class MutasiHistory extends Component
     {
         try {
             $result = $service->cancelScheduledMutation($jobHistoryId, 'Dibatalkan oleh Administrator SDM');
-            session()->flash('mutasi_success', "Sukses! Jadwal mutasi ({$result['cancelled_count']} pegawai) berhasil dibatalkan dan formasi telah dilepaskan.");
+            session()->flash('mutasi_success', "Sukses! Jadwal mutasi ({$result['cancelled_count']} karyawan) berhasil dibatalkan dan formasi telah dilepaskan.");
             if ($this->selectedJobId === $jobHistoryId) {
                 $this->closeDetailModal();
             }
@@ -134,86 +275,11 @@ class MutasiHistory extends Component
         }
     }
 
-    public function updatingSearch(): void
+    public function render(MutasiService $service): View
     {
-        $this->resetPage();
-    }
-
-    public function updatingUnitFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingMutasiFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function resetFilters(): void
-    {
-        $this->reset(['search', 'unitFilter', 'mutasiFilter', 'statusFilter']);
-        $this->sortField = 'tmt_awal';
-        $this->sortDirection = 'desc';
-        $this->resetPage();
-    }
-
-    public function exportAuditLog()
-    {
-        $isApplied = match ($this->statusFilter) {
-            'applied' => true,
-            'scheduled', 'due' => false,
-            default => null,
-        };
-        $onlyDue = ($this->statusFilter === 'due');
-
-        $filters = [
-            'search' => $this->search ?: null,
-            'unitKerja' => $this->unitFilter ?: null,
-            'jenisMutasi' => $this->mutasiFilter ?: null,
-            'isApplied' => $isApplied,
-            'onlyDue' => $onlyDue,
-            'sortBy' => $this->sortField,
-            'sortDirection' => $this->sortDirection,
-        ];
-
-        $filename = 'Audit_Log_Mutasi_PTPN4_Reg5_'.now()->format('Ymd_His').'.xlsx';
-
-        return Excel::download(new MutasiHistoryExport($filters, auth()->user()), $filename);
-    }
-
-    public function render(MutasiService $service)
-    {
-        $isApplied = match ($this->statusFilter) {
-            'applied' => true,
-            'scheduled', 'due' => false,
-            default => null,
-        };
-        $onlyDue = ($this->statusFilter === 'due');
-
-        $history = $service->getMutasiHistory(
-            search: $this->search ?: null,
-            unitKerja: $this->unitFilter ?: null,
-            jenisMutasi: $this->mutasiFilter ?: null,
-            isApplied: $isApplied,
-            onlyDue: $onlyDue,
-            perPage: $this->perPage,
-            sortBy: $this->sortField,
-            sortDirection: $this->sortDirection,
-        );
-
-        $units = $service->getKnownUnits();
-        $mutasiTypes = JobHistory::MUTASI_TYPES;
-        $kpis = $service->getMutasiHistoryKpis();
+        $kpis = $service->getMutasiHistoryKpis($this->sumber());
 
         return view('livewire.admin.mutasi-history', [
-            'history' => $history,
-            'units' => $units,
-            'mutasiTypes' => $mutasiTypes,
             'totalCount' => $kpis['total'],
             'activeCount' => $kpis['active'],
             'scheduledCount' => $kpis['scheduled'],

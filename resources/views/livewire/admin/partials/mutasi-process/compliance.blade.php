@@ -1,8 +1,9 @@
     <!-- ── 2. PANEL UJI KELAYAKAN REGULASI & DISPENSASI (PRE-FLIGHT CLEARANCE PANEL) ── -->
     @if (!empty($form->targetJabatan) && !empty($form->targetUnitKerja) && $targetAnalysis)
         @php
-            $isTenureNonCompliant = $tenureAnalysis && !$tenureAnalysis['is_compliant'];
-            $isPromoNonCompliant = $promotionAnalysis && $promotionAnalysis['is_applicable'] && !$promotionAnalysis['is_eligible'];
+            // Same applicability rules as x-admin.mutasi.compliance-guard so the header status agrees with its cards
+            $isTenureNonCompliant = $tenureAnalysis && !($tenureAnalysis['is_compliant'] ?? true) && ($tenureAnalysis['is_applicable'] ?? true);
+            $isPromoNonCompliant = $promotionAnalysis && ($promotionAnalysis['is_applicable'] ?? false) && !($promotionAnalysis['is_eligible'] ?? true);
             $isSwapBlocked = ($targetAnalysis['type'] === 'occupied') && (!($isSwapAllowed ?? true));
             $isOccupancyIssue = $isSwapBlocked || in_array($targetAnalysis['type'], ['reserved', 'same']);
             $hasAnyWarning = $isTenureNonCompliant || $isPromoNonCompliant || $isOccupancyIssue;
@@ -24,22 +25,9 @@
                             {{-- "Tunggal" only fits an occupied formasi that a chain mutation can free up --}}
                             <p class="text-xs font-semibold text-danger-800 mt-0.5">{{ $isSwapBlocked && ! ($employeeDetails['is_retired'] ?? false) ? 'Tidak Dapat Diproses Tunggal' : 'Tidak Dapat Diproses' }}</p>
                         @elseif ($hasAnyWarning)
-                            <p class="text-xs font-semibold text-warning-800 mt-0.5">Perlu Dispensasi</p>
+                            <p class="text-xs font-semibold text-warning-800 mt-0.5">{{ $isTenureNonCompliant || $isPromoNonCompliant ? 'Perlu Dispensasi' : 'Perlu Perhatian' }}</p>
                         @else
                             <p class="text-xs font-semibold text-primary-800 mt-0.5">Memenuhi Standar Regulasi</p>
-                        @endif
-                        <p class="text-xs text-surface-500 mt-0.5">
-                            Pemeriksaan kesesuaian masa dinas unit, kualifikasi jenjang eselon, dan ketersediaan formasi jabatan tujuan
-                        </p>
-                        @if (count($this->outstandingIssues) >= 2)
-                            <div class="mt-2 text-xs text-surface-700">
-                                <p class="font-bold">{{ count($this->outstandingIssues) }} hal perlu diselesaikan</p>
-                                <ol class="list-decimal pl-4 mt-0.5 space-y-0.5">
-                                    @foreach ($this->outstandingIssues as $issue)
-                                        <li>{{ $issue }}</li>
-                                    @endforeach
-                                </ol>
-                            </div>
                         @endif
                     </div>
                 </div>
@@ -100,10 +88,11 @@
                                     <i class="fas fa-id-card text-surface-400" aria-hidden="true"></i>
                                     Profil Pejabat Petahana Saat Ini
                                 </span>
+                                {{-- Kartu yang sama dengan karyawan yang dimutasi, agar petahana dibaca dengan format identik --}}
                                 <x-admin.employee-profile-card
                                     :employee="$occ"
-                                    :show-grade-badge="false"
-                                    :unit-tenure="$occ['tenure_text'] ?? null"
+                                    :nik="$occ['nik']"
+                                    :show-readiness-metrics="true"
                                 />
                             </div>
                         @endif
@@ -116,12 +105,11 @@
                                     Gunakan <strong>Mutasi Berantai</strong> untuk memindahkan pejabat petahana secara berantai (domino) ke formasi lain dalam satu SK kolektif.
                                 </p>
                             </div>
-                            <a href="{{ route('admin.mutasi.chain') }}"
-                               aria-label="Selesaikan melalui Mutasi Berantai untuk memindahkan {{ $occ['nama'] ?? 'pejabat petahana' }}"
-                               class="inline-flex items-center justify-center gap-2 min-h-11 px-3.5 py-2 rounded-xl bg-primary-700 hover:bg-primary-800 text-white font-bold text-xs shadow-xs transition shrink-0 cursor-pointer">
-                                <i class="fas fa-link text-xs" aria-hidden="true"></i>
-                                <span>Selesaikan melalui Mutasi Berantai</span>
-                            </a>
+                            <x-admin.button href="{{ route('admin.mutasi.chain') }}"
+                                aria-label="Selesaikan melalui Mutasi Berantai untuk memindahkan {{ $occ['nama'] ?? 'pejabat petahana' }}"
+                                icon="fas fa-link"
+                                size="sm"
+                                class="min-h-9 shrink-0">Selesaikan melalui Mutasi Berantai</x-admin.button>
                         </div>
                     </div>
                 @endif
@@ -145,7 +133,7 @@
                     <div class="text-xs text-warning-800 leading-relaxed flex-1">
                         <span class="font-bold text-warning-800 block">Formasi Telah Dipesan (Reserved)</span>
                         <p class="mt-0.5 text-warning-800">
-                            Posisi ini telah dipesan oleh mutasi terjadwal atas nama <strong>{{ $targetAnalysis['reserved_occupant']['nama'] ?? 'pegawai lain' }}</strong> (TMT Efektif: {{ $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-' }}). Pilih formasi lain yang tersedia.
+                            Posisi ini telah dipesan oleh mutasi terjadwal atas nama <strong>{{ $targetAnalysis['reserved_occupant']['nama'] ?? 'karyawan lain' }}</strong> (TMT Efektif: {{ $targetAnalysis['reserved_occupant']['tmt_awal'] ?? '-' }}). Pilih formasi lain yang tersedia.
                         </p>
                     </div>
                 </div>
@@ -156,23 +144,20 @@
                 </div>
             @endif
 
+            {{-- :locked = kendala penempatan (mis. formasi terisi) belum selesai: persetujuan dikunci sampai formasi tersedia (DESIGN.md §7.2) --}}
             <!-- 2. Adaptive Compliance Guard (Clean Enterprise HRIS) -->
-            <x-admin.mutasi.compliance-guard 
+            <x-admin.mutasi.compliance-guard
                 :tenure-analysis="$tenureAnalysis"
                 :promotion-analysis="$promotionAnalysis"
                 :current-unit="$employeeDetails['unit_kerja'] ?? 'unit saat ini'"
                 :current-rm="$employeeDetails['rm_level'] ?? 'RM'"
-                tenure-model="form.dispensasiTenure"
-                tenure-reason-model="form.alasanDispensasiTenure"
-                promotion-model="form.dispensasiPromosi"
-                promotion-reason-model="form.alasanDispensasiPromosi"
-                :is-tenure-checked="(bool) $form->dispensasiTenure"
-                :is-promotion-checked="(bool) $form->dispensasiPromosi"
+                :employee-nik="$form->employeeNik"
+                reference-model="form.alasanDispensasiDireksi"
+                date-model="form.tanggalDispensasiDireksi"
+                :is-approved="$this->dispensasiApproved"
                 :locked="(bool) $this->blockingReason"
-                error-tenure-key="dispensasiTenure"
-                error-tenure-reason-key="alasanDispensasiTenure"
-                error-promo-key="dispensasiPromosi"
-                error-promo-reason-key="alasanDispensasiPromosi"
+                error-reference-key="alasanDispensasiDireksi"
+                error-date-key="tanggalDispensasiDireksi"
             />
         </div>
     @endif

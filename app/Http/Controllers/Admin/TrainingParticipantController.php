@@ -23,7 +23,7 @@ class TrainingParticipantController extends Controller
      */
     public function create(Training $training)
     {
-        $employees = Employee::all();
+        $employees = Employee::aktif()->get();
 
         return view('admin.trainings.add-participant', compact('training', 'employees'));
     }

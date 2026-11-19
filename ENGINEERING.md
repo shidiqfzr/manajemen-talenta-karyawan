@@ -1,6 +1,6 @@
 # ENGINEERING.md — Engineering Standards, SDLC & Testing Strategy
 ## PT Perkebunan Nusantara IV Regional V (Kalimantan)
-### Sistem Informasi Manajemen Talenta & Formasi Pegawai
+### Sistem Informasi Manajemen Talenta & Formasi Karyawan
 
 > Dokumen ini adalah **acuan standar rekayasa perangkat lunak (Single Source of Truth for Engineering & QA)** yang memandu arsitektur teknis, standar implementasi kode, alur perencanaan (planning), dan strategi pengujian (testing) pada aplikasi HRIS & Formasi Talenta PTPN IV Regional V.
 >
@@ -81,6 +81,8 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
   - `App\Services\TrainingExportService`: Ekspor laporan dan surat tugas.
   - `App\Services\EmployeeExportService`: Orkestrasi ekspor data kepegawaian berstandar UU PDP No. 27/2022, sanitasi parameter filter, penyematan metadata/print footer rahasia, dan pencatatan audit trail.
   - `App\Services\EmployeeImportService`: Validasi pra-impor, preview dry-run, dan jejak audit impor tanpa data pribadi.
+  - `App\Services\EmployeeImportGovernanceService`: Persetujuan empat mata (maker-checker), pembatalan (undo) impor, dan pembersihan pengajuan/rekaman kedaluwarsa; kebijakan diatur pada `config/hris.php`.
+  - `App\Services\Structure\StructureDecreeService`: Siklus SK struktur organisasi (draf, tinjau, ajukan, setujui, terapkan). Penerapan berjalan dalam satu `DB::transaction()` dan memanggil operasi `MasterFormasiService`, bukan menulis tabel master langsung; `StructureDiffCalculator` murni (tanpa akses basis data). Perintah `hr:apply-structure-decrees` dijadwalkan harian 00:00 (UTC), sebelum `hr:apply-effective-mutations`; izin `struktur.prepare` dan `struktur.approve` pada `config/hris.php`. Lihat DOMAIN.md §3.7.
   - `App\Services\KepegawaianPolicy`: Satu-satunya sumber Batas Usia Pensiun (56), MBT (T-1), dan rentang grade per strata Karpim/Karpel. Dilarang menulis ulang angka-angka ini di model, validator, atau layar.
 
 ### 2.2 Eloquent Models & Database Practices
@@ -109,20 +111,25 @@ Dilarang menempatkan kalkulasi matematika, klasifikasi data kepegawaian, atau mu
    use Illuminate\Support\Facades\DB;
 
    DB::transaction(function () use ($data) {
-       // Operasi mutasi pegawai + pencatatan riwayat + penyesuaian vacancy
+       // Operasi mutasi karyawan + pencatatan riwayat + penyesuaian vacancy
    });
    ```
 
 ### 2.3 Livewire Component Standards
-- Setiap komponen tabel Livewire (`App\Livewire\Tables\`) harus mendukung:
-  - Debounce pada input pencarian: `wire:model.live.debounce.300ms="search"`.
-  - Pagination dinamis (`WithPagination`) dengan URL query string persistence.
-  - State reset saat filter berubah: `public function updatingSearch() { $this->resetPage(); }`.
+- Setiap komponen tabel data Livewire **wajib** memakai trait `App\Livewire\Concerns\WithDataTable` dan komponen `x-admin.table.*` (DESIGN.md §6, §7.5). Modul hanya mendeklarasikan `baseQuery()`, `columns()` (`Column`), `filters()` (`Filter`), `bulkActions()` (`BulkAction`), `defaultSort()`, dan `tableLabel()`. **Dilarang** menulis ulang `sortBy`, `updatingSearch`, `updatingPerPage`, atau `orderBy($this->sortField)` di modul: urutan, pencarian, filter, dan jumlah baris per halaman divalidasi di trait.
+  - Debounce pencarian 300ms dan batas 100 karakter disediakan toolbar (`wire:model.live.debounce.300ms="search"`); jangan membuat kolom pencarian sendiri.
+  - Paginasi seragam: bawaan 25 baris per halaman, pilihan 10/25/50/100, bersumber dari `config('hris.pagination')`. Modul, controller, dan view **dilarang** menetapkan `perPage`, `perPageOptions()`, `defaultPerPage()`, atau `paginate(<angka>)` sendiri; tabel Livewire mewarisi dari `WithDataTable`, paginator non-Livewire memakai `config('hris.pagination.default')`.
+  - URL query string: `search`, `sort`, `direction`, `per_page` dikelola trait; properti filter modul memakai `#[Url(as: '...', except: '')]`. Tabel sematan (beberapa tabel dalam satu halaman) menonaktifkan sinkronisasi URL (`syncsUrl()` false) dan memakai `paginationName()` yang unik.
+  - Aksi massal dan ekspor: izin Gate diperiksa pada setiap panggilan sebelum ada query, aksi massal dijalankan dalam `DB::transaction()` bersama catatan audit, dan keduanya tercatat lewat `MasterAuditLog` tanpa kata kunci pencarian. Ekspor hanya Excel dengan batas 10.000 baris; sel berawalan `=`, `+`, `-`, `@`, tab, atau CR dinetralkan oleh satu penjaga `App\Support\SpreadsheetCell::neutralise()`; semua exporter wajib memakainya dan dilarang menulis ulang aturannya (diuji di `SpreadsheetCellTest`).
+  - Properti publik Livewire dapat diubah klien: ID induk tabel (mis. `employeeId`) **wajib** `#[Locked]`, dan metode yang mengembalikan Builder atau penangan aksi massal (`bulk<Nama>`) **wajib** `protected`.
+  - Komponen tabel yang memakai trait: `Tables\JobHistoryTable`, `Tables\EvaluationTable`, `Tables\TrainingTable`, `Admin\Master\AuditHistory`, `Admin\MutasiHistory`, ditambah `Admin\EvaluationIndexTable`, `Admin\TrainingIndexTable`, `Admin\TrainingParticipantTable`, `Admin\Employees\ImportBatchTable`, dan `Admin\Employees\EmployeeTable`. Daftar berbasis koleksi (`Tables\JobVacancyTable`, daftar Formasi) tidak dapat memakai trait yang khusus Eloquent, sehingga hanya memakai komponen tampilan `x-admin.table.*`.
+  - Pengujian: perilaku trait di `WithDataTableTest`, komponen di `TableComponentsTest`, dan satu kelas uji per tabel modul.
 
 ### 2.4 Prinsip DRY (Don't Repeat Yourself) & Reusability
 Prinsip DRY adalah fondasi utama arsitektur aplikasi ini. Dilarang keras melakukan penyalinan (copy-paste) kode secara masif baik di Backend maupun Frontend.
 - **Backend (Single Source of Truth):** Segala bentuk kalkulasi (Pensiun, MBT, RM Level) wajib dipusatkan di **Service Layer**. Tidak boleh ada kalkulasi duplikat di Controller, Command, atau Livewire.
 - **Frontend (UI Components):** Elemen visual yang digunakan lebih dari satu kali (seperti *Page Header*, *Card*, *Combobox*, *Modal*) **wajib** diabstraksi menjadi **Blade Components** (contoh: `<x-admin.page-header>`) di `resources/views/components/`. Hal ini menjamin keseragaman UI dan mempermudah perubahan tema secara terpusat sesuai `DESIGN.md`.
+- **Balok bangun bersama (dijaga `tests/Unit/SharedBuildingBlocksGuardTest.php`):** satu implementasi untuk setiap aturan lintas layar, tanpa salinan baru. Penyamaran NIK hanya lewat `App\Support\NikMasker` (UU PDP); tabel untuk data dalam memori (hasil service, bukan query) memakai concern `App\Livewire\Concerns\WithCollectionTable` (opsi baris per halaman dari `config/hris.pagination`, pengirisan koleksi dengan klem halaman) sebagai pasangan `WithDataTable` untuk tabel bersumber query; pengalih tampilan dalam satu halaman memakai `<x-admin.segmented>`. Menemukan logika yang sama di dua tempat berarti mengekstraknya, bukan menyalinnya ke tempat ketiga.
 
 ---
 
@@ -139,7 +146,7 @@ tests/
 ### 3.1 Unit Testing (Formula & Business Logic)
 Setiap perubahan pada aturan bisnis HR wajib diverifikasi dengan Unit Test:
 1. **Uji Formula Pensiun & MBT**:
-   - Pastikan pegawai yang lahir pada tanggal tertentu memiliki `tanggal_pensiun` tepat pada awal bulan usia 56 tahun.
+   - Pastikan karyawan yang lahir pada tanggal tertentu memiliki `tanggal_pensiun` tepat pada awal bulan usia 56 tahun.
    - Pastikan `tanggal_mbt` jatuh tepat 1 tahun sebelum pensiun.
 2. **Uji Penentuan RM Band & Bidang**:
    - Memastikan klasifikasi `determineRmLevel()` dan `determineBidang()` menghasilkan nilai yang deterministik untuk berbagai kombinasi jabatan dan unit kerja.
@@ -165,9 +172,9 @@ Pengujian alur kerja mencakup:
    - Admin dapat mengakses direktori dan dashboard formasi.
 2. **Alur Mutasi Atomik (`MutasiServiceTest`)**:
    - Pengujian **Straight Transfer**: Memastikan lowongan terbuka di posisi lama.
-   - Pengujian **Swap Transfer**: Memastikan dua pegawai bertukar jabatan secara simultan tanpa meninggalkan formasi bocor (*zero net vacancy*).
+   - Pengujian **Swap Transfer**: Memastikan dua karyawan bertukar jabatan secara simultan tanpa meninggalkan formasi bocor (*zero net vacancy*).
 3. **Import & Export Excel**:
-   - Pengujian unggah template Excel data pegawai dengan validasi baris gagal/berhasil.
+   - Pengujian unggah template Excel data karyawan dengan validasi baris gagal/berhasil.
 
 ### 3.3 Menjalankan Pengujian
 ```bash

@@ -79,9 +79,25 @@ class MasterAuditLogTest extends TestCase
         $byDate->assertSee('Unit Lama Empat')->assertDontSee('Seat Satu');
     }
 
+    public function test_history_hides_view_only_access_entries_but_keeps_them_stored_and_shows_exports(): void
+    {
+        MasterAuditLog::record($this->admin, 'mpp_access.view_personnel', 'mpp_access', null, 'Rincian Lihat MPP 2026-11', null, ['tahun' => 2026]);
+        MasterAuditLog::record($this->admin, 'seat_access.view_occupants', 'seat_access', 5, 'Pemegang Lihat Formasi');
+        MasterAuditLog::record($this->admin, 'mpp_access.export_matrix', 'mpp_access', null, 'Matriks Unduh MPP 2026-11', null, ['tahun' => 2026]);
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Unit A — Seat Satu');
+
+        Livewire::actingAs($this->admin)->test(AuditHistory::class)
+            ->assertSee('Seat Satu')
+            ->assertSee('Matriks Unduh MPP')
+            ->assertDontSee('Rincian Lihat MPP')
+            ->assertDontSee('Pemegang Lihat Formasi');
+
+        $this->assertSame(2, MasterAuditLog::whereIn('action', ['mpp_access.view_personnel', 'seat_access.view_occupants'])->count());
+    }
+
     public function test_history_shows_who_what_and_reason_but_no_employee_data(): void
     {
-        $employee = Employee::factory()->create(['nama' => 'Pegawai Rahasia Uji']);
+        $employee = Employee::factory()->create(['nama' => 'Karyawan Rahasia Uji']);
         MasterAuditLog::record(
             $this->admin, 'seat.removed', 'seat', 9, 'Kebun Uji — Manajer',
             ['kuota' => 1, 'bidang' => 'TAN', 'filled' => 0], null, 'Kursi dihapus karena restrukturisasi'
@@ -105,6 +121,43 @@ class MasterAuditLogTest extends TestCase
         $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'));
 
         $response->assertSee('Kuota: 1 → 3')->assertSee('Bidang: - → TAN')->assertSee('Status: Aktif → Nonaktif');
+    }
+
+    public function test_change_summary_renders_data_table_audit_details_readably(): void
+    {
+        $plain = MasterAuditLog::record($this->admin, 'data_table.export', 'data_table', null, 'Riwayat Jabatan', null, [
+            'jumlah_baris' => 12, 'filter' => [], 'pencarian' => true,
+        ]);
+        $filtered = MasterAuditLog::record($this->admin, 'data_table.bulk', 'data_table', null, 'Riwayat Jabatan', null, [
+            'aksi' => 'nonaktifkan', 'jumlah_baris' => 3, 'filter' => ['bidang' => 'KEU'], 'pencarian' => false,
+        ]);
+
+        $this->assertSame(
+            ['Jumlah Baris: - → 12', 'Filter: - → -', 'Pencarian: - → ya'],
+            $plain->changeSummary(),
+        );
+        $this->assertSame(
+            ['Aksi: - → nonaktifkan', 'Jumlah Baris: - → 3', 'Filter: - → Bidang=KEU', 'Pencarian: - → tidak'],
+            $filtered->changeSummary(),
+        );
+    }
+
+    public function test_history_page_renders_with_data_table_audit_rows(): void
+    {
+        MasterAuditLog::record($this->admin, 'data_table.export', 'data_table', null, 'Riwayat Jabatan', null, [
+            'jumlah_baris' => 12, 'filter' => [], 'pencarian' => false,
+        ]);
+        MasterAuditLog::record($this->admin, 'data_table.bulk', 'data_table', null, 'Riwayat Jabatan', null, [
+            'aksi' => 'nonaktifkan', 'jumlah_baris' => 3, 'filter' => ['bidang' => 'KEU'], 'pencarian' => true,
+        ]);
+
+        $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))
+            ->assertOk()
+            ->assertSee('Tabel data diunduh')
+            ->assertSee('Aksi massal pada tabel data')
+            ->assertSee('Tabel Data')
+            ->assertSee('Filter: - → Bidang=KEU')
+            ->assertDontSee('Array');
     }
 
     public function test_record_stores_the_audit_row_with_a_user_snapshot(): void
@@ -181,10 +234,137 @@ class MasterAuditLogTest extends TestCase
             ->assertSee('Kebun Tajati — Manajer');
     }
 
+    public function test_history_keeps_its_url_keys(): void
+    {
+        $other = User::factory()->create(['role' => 'admin', 'name' => 'Admin Lain']);
+
+        foreach (range(1, 55) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, sprintf('Seat Nomor %02d', $i));
+        }
+        MasterAuditLog::record($this->admin, 'unit.created', 'unit', 100, 'Unit Bukan Seat');
+        MasterAuditLog::record($other, 'seat.added', 'seat', 101, 'Seat Dari Lain');
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index', [
+            'entity_type' => 'seat',
+            'user_id' => $this->admin->id,
+            'from' => '2000-01-01',
+            'to' => '2099-12-31',
+            'sort' => 'entity_label',
+            'direction' => 'asc',
+            'per_page' => 50,
+            'page' => 2,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Seat Nomor 51')->assertSee('Seat Nomor 55')
+            ->assertDontSee('Seat Nomor 50')
+            ->assertDontSee('Unit Bukan Seat')->assertDontSee('Seat Dari Lain');
+    }
+
+    public function test_history_ignores_tampered_url_state(): void
+    {
+        foreach (range(1, 30) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, "Unit Uji — Jabatan {$i}", null, ['kuota' => 1]);
+        }
+
+        $response = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index', [
+            'sort' => 'password',
+            'direction' => 'sideways',
+            'per_page' => 999,
+            'entity_type' => 'zzz',
+            'user_id' => 'abc',
+            'from' => '2026-02-30',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Jabatan 30')->assertSee('Jabatan 6')->assertDontSee('Jabatan 5')
+            ->assertDontSee('Filter Aktif:');
+    }
+
+    public function test_history_date_range_includes_the_whole_end_day(): void
+    {
+        $last = MasterAuditLog::record($this->admin, 'unit.created', 'unit', 1, 'Hari Akhir Audit');
+        $next = MasterAuditLog::record($this->admin, 'unit.created', 'unit', 2, 'Hari Esok Audit');
+        DB::table('master_audit_logs')->where('id', $last->id)->update(['created_at' => '2026-01-31 23:59:00']);
+        DB::table('master_audit_logs')->where('id', $next->id)->update(['created_at' => '2026-02-01 00:00:00']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['from' => '2026-01-01', 'to' => '2026-01-31']))
+            ->assertSee('Hari Akhir Audit')
+            ->assertDontSee('Hari Esok Audit');
+    }
+
+    public function test_history_from_after_to_shows_the_filtered_empty_state(): void
+    {
+        $this->log();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['from' => '2020-02-01', 'to' => '2020-01-01']))
+            ->assertOk()
+            // The empty-state button comes after its message; the toolbar's own Reset button comes before it.
+            ->assertSeeInOrder(['Tidak ada data yang sesuai dengan pencarian atau filter.', 'Reset filter']);
+    }
+
+    public function test_history_search_treats_wildcards_literally(): void
+    {
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Seat_1');
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 2, 'SeatX1');
+
+        $component = Livewire::actingAs($this->admin)->test(AuditHistory::class)->set('search', 'Seat_1');
+
+        // Assert on the listed rows, not the page text: the search chip also prints the term.
+        $this->assertSame(['Seat_1'], $component->instance()->rows->pluck('entity_label')->all());
+    }
+
+    public function test_history_shows_active_filter_chips(): void
+    {
+        MasterAuditLog::record($this->admin, 'seat.added', 'seat', 1, 'Unit A — Seat Satu');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.master.riwayat.index', ['entity_type' => 'seat']))
+            ->assertSee('Filter Aktif:')
+            ->assertSeeHtml('Jenis Data: <strong>Formasi Jabatan</strong>');
+    }
+
+    public function test_history_announces_the_result_count(): void
+    {
+        foreach (range(1, 3) as $i) {
+            MasterAuditLog::record($this->admin, 'unit.created', 'unit', $i, "Unit Hitung {$i}");
+        }
+
+        $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->html();
+
+        // One permanent live region, owned by the shared table header (count badge + range).
+        $this->assertSame(1, substr_count($html, 'role="status"'));
+        $this->assertStringContainsString('<p role="status" aria-live="polite" aria-atomic="true"', $html);
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertSame('3 Catatan | Menampilkan 1 – 3 dari 3', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertStringContainsString('Riwayat Perubahan', trim(preg_replace('/\s+/', ' ', strip_tags($html))));
+        $this->assertStringNotContainsString('ditemukan', $html);
+        $this->assertStringNotContainsString('Ekspor Excel', $html, 'this screen has no export');
+    }
+
+    public function test_history_shows_the_filtered_count_above_the_empty_state(): void
+    {
+        foreach (range(1, 3) as $i) {
+            MasterAuditLog::record($this->admin, 'seat.added', 'seat', $i, "Seat Hitung {$i}");
+        }
+
+        $html = Livewire::actingAs($this->admin)->test(AuditHistory::class)->set('entityType', 'position')->html();
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
+
+        // Zero results: the header badge says 0, no range, and the filtered empty state follows below it.
+        preg_match('/<p role="status"[^>]*>(.*?)<\/p>/s', $html, $region);
+        $this->assertSame('0 Catatan', trim(preg_replace('/\s+/', ' ', strip_tags($region[1]))));
+        $this->assertLessThan(strpos($text, 'Tidak ada data yang sesuai dengan pencarian atau filter.'), strpos($text, '0 Catatan'));
+        $this->assertStringContainsString('Reset Filter', $html);
+        $this->assertStringNotContainsString('Hapus Filter Tambahan', $html);
+    }
+
     public function test_pages_use_the_shared_module_header_with_the_current_page_in_the_breadcrumb(): void
     {
         $html = $this->actingAs($this->admin)->get(route('admin.master.riwayat.index'))->getContent();
 
-        $this->assertMatchesRegularExpression('/aria-label="Breadcrumb".*Core HR.*Master Formasi.*aria-current="page">Riwayat Perubahan</s', $html);
+        $this->assertMatchesRegularExpression('/aria-label="Breadcrumb".*Core HR.*Formasi.*aria-current="page">Riwayat Perubahan</s', $html);
     }
 }

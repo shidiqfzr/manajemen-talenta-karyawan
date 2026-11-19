@@ -16,8 +16,11 @@ final class KepegawaianPolicy
     /** Batas Usia Pensiun (BUP) normal dalam tahun. */
     public const BATAS_USIA_PENSIUN = 56;
 
-    /** Masa Bebas Tugas (MBT) dimulai sekian tahun sebelum tanggal pensiun (usia 55). */
-    public const MBT_TAHUN_SEBELUM_PENSIUN = 1;
+    /** Masa Bebas Tugas (MBT) dimulai sekian bulan sebelum tanggal pensiun (H-6 bulan; DOMAIN.md Bab 5.1). */
+    public const MBT_BULAN_SEBELUM_PENSIUN = 6;
+
+    /** Peringatan "Menjelang MBT" tampil sekian bulan sebelum tanggal MBT. */
+    public const MBT_PERINGATAN_BULAN = 6;
 
     /** Rentang Job Grade / Person Grade per strata: [min, max]. */
     public const GRADE_RANGE = [
@@ -52,7 +55,7 @@ final class KepegawaianPolicy
     }
 
     /**
-     * Tanggal MBT: sekian tahun sebelum tanggal pensiun.
+     * Tanggal MBT: sekian bulan (MBT_BULAN_SEBELUM_PENSIUN) sebelum tanggal pensiun.
      */
     public static function tanggalMbt(?string $tanggalPensiun): ?string
     {
@@ -61,7 +64,7 @@ final class KepegawaianPolicy
         }
 
         try {
-            return Carbon::parse($tanggalPensiun)->subYears(self::MBT_TAHUN_SEBELUM_PENSIUN)->toDateString();
+            return Carbon::parse($tanggalPensiun)->subMonthsNoOverflow(self::MBT_BULAN_SEBELUM_PENSIUN)->toDateString();
         } catch (\Exception) {
             return null;
         }
