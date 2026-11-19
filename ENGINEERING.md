@@ -225,7 +225,7 @@ Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap p
 - **Backend**: Pint (`--test`), `composer audit`, dan seluruh suite PHPUnit pada PHP 8.4 dengan SQLite dalam memori. Aset dibangun lebih dulu karena tampilan memakai `@vite()`.
 - **Frontend**: `npm audit --audit-level=high` (celah tingkat tinggi dan kritis menggagalkan build) dan `npm run test:js`.
 - **E2E Playwright** tidak ikut gerbang karena berjalan lama pada server satu-utas; jalankan lokal sebelum merilis perubahan layar (§3.6).
-- **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala; setiap pembaruan melalui gerbang yang sama.
+- **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala. Pembaruan minor dan patch digabung dalam satu pull request per ekosistem dan wajib lolos gerbang yang sama. Peningkatan versi mayor tidak pernah otomatis (misalnya PHPUnit tetap 11 sesuai standar ini); itu keputusan tersendiri yang memperbarui dokumen ini bila standarnya berubah.
 - Perubahan ke `main` hanya melalui pull request; push langsung, push paksa, dan penghapusan cabang `main` dinonaktifkan.
 
 ---
