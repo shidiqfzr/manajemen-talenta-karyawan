@@ -222,7 +222,7 @@ npm run e2e           # menjalankan seluruh pengujian E2E
 
 ### 3.7 Gerbang CI (GitHub Actions)
 Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap push ke `main`; hasilnya menjadi syarat penggabungan ke `main`.
-- **Backend**: Pint (`--test`), `composer audit`, dan seluruh suite PHPUnit pada PHP 8.3 dengan SQLite dalam memori. Aset dibangun lebih dulu karena tampilan memakai `@vite()`.
+- **Backend**: Pint (`--test`), `composer audit`, dan seluruh suite PHPUnit pada PHP 8.4 dengan SQLite dalam memori. Aset dibangun lebih dulu karena tampilan memakai `@vite()`.
 - **Frontend**: `npm audit --audit-level=high` (celah tingkat tinggi dan kritis menggagalkan build) dan `npm run test:js`.
 - **E2E Playwright** tidak ikut gerbang karena berjalan lama pada server satu-utas; jalankan lokal sebelum merilis perubahan layar (§3.6).
 - **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala; setiap pembaruan melalui gerbang yang sama.

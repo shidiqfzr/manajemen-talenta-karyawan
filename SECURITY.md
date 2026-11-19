@@ -12,7 +12,7 @@ Pembaruan keamanan hanya diberikan untuk versi aktif berikut:
 
 | Versi Aplikasi | Laravel Core | PHP Runtime | Status Keamanan |
 |---|---|---|---|
-| **v1.x (Main Branch)** | `11.x` / `13.x` | `8.2+` / `8.3+` / `8.5+` | :white_check_mark: Didukung Penuh (Active Patches) |
+| **v1.x (Main Branch)** | `13.x` | `8.4+` | :white_check_mark: Didukung Penuh (Active Patches) |
 | **< v1.0.0 (Legacy)** | `<= 10.x` | `<= 8.1` | :x: Tidak Didukung |
 
 ---

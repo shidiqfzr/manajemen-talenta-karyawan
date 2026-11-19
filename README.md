@@ -38,7 +38,7 @@ Proyek ini dipandu oleh empat pilar dokumentasi arsitektur utama:
 
 ## 🚀 Tech Stack
 
-- **Framework**: Laravel 11.x (PHP 8.2+)
+- **Framework**: Laravel 13.x (PHP 8.4+)
 - **Frontend / Styling**: Tailwind CSS, Alpine.js, Blade Components
 - **Interactivity**: Laravel Livewire
 - **Database**: MySQL / MariaDB
