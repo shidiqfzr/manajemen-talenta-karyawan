@@ -5,9 +5,9 @@
 > Dokumen ini adalah **acuan standar rekayasa perangkat lunak (Single Source of Truth for Engineering & QA)** yang memandu arsitektur teknis, standar implementasi kode, alur perencanaan (planning), dan strategi pengujian (testing) pada aplikasi HRIS & Formasi Talenta PTPN IV Regional V.
 >
 > Dokumen ini melengkapi:
-> - [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) (Logika Bisnis & Kamus Data)
-> - [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) (Design System & UI/UX Guidelines)
-> - [SECURITY.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/SECURITY.md) (Kebijakan Keamanan & Kepatuhan Data)
+> - [DOMAIN.md](DOMAIN.md) (Logika Bisnis & Kamus Data)
+> - [DESIGN.md](DESIGN.md) (Design System & UI/UX Guidelines)
+> - [SECURITY.md](SECURITY.md) (Kebijakan Keamanan & Kepatuhan Data)
 
 ---
 
@@ -38,8 +38,8 @@ Pengembangan modul atau penambahan fitur di repositori ini mengikuti alur **Agil
 ```
 
 ### Tahap 1: Verifikasi Domain & Desain (Pre-Development Alignment)
-- Konsultasikan kebutuhan dengan [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) (apakah melibatkan formula pensiun, RM Band, bidang fungsional, atau alur mutasi).
-- Periksa kesesuaian komponen visual dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) (palet warna token, card styling, loading indicator).
+- Konsultasikan kebutuhan dengan [DOMAIN.md](DOMAIN.md) (apakah melibatkan formula pensiun, RM Band, bidang fungsional, atau alur mutasi).
+- Periksa kesesuaian komponen visual dengan [DESIGN.md](DESIGN.md) (palet warna token, card styling, loading indicator).
 
 ### Tahap 2: Implementasi Service & Model (Business Logic First)
 - Bangun logika bisnis murni di dalam `App\Services\` (bukan di dalam Controller atau Blade template).
