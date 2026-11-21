@@ -95,3 +95,7 @@ Perintah ini menjalankan gerbang yang sama dengan CI: Pint, `composer audit`, PH
 ### Produksi
 
 Instalasi dan pembaruan produksi dilakukan oleh pemelihara (ENGINEERING.md §4). Akun awal produksi: isi `HRIS_ADMIN_*` pada `.env`, jalankan `php artisan db:seed --class=UserSeeder --force` (membuat satu administrator tanpa akun demo), lalu hapus `HRIS_ADMIN_PASSWORD` dari `.env`. Jangan menjalankan `composer setup`, `db:seed` penuh, atau `migrate:fresh` pada basis data produksi.
+
+### Berkontribusi
+
+Baca [CONTRIBUTING.md](CONTRIBUTING.md): cara membuat cabang dan commit, standar kode, aturan privasi data karyawan, dan cara melaporkan kerentanan.

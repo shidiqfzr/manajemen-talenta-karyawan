@@ -189,6 +189,12 @@ php artisan test --stop-on-failure
 
 # Menjalankan pengujian logika JavaScript (modul Alpine tanpa peramban, runner bawaan Node)
 npm run test:js
+
+# Seluruh gerbang CI sekaligus (Pint, composer audit, PHPUnit, npm audit, uji JavaScript)
+composer verify
+
+# Menyiapkan mesin baru (dependensi, .env, kunci, SQLite, migrasi, aset); menolak APP_ENV=production
+composer setup
 ```
 
 ### 3.4 Standar Kerapihan Kode (Code Quality Gate)
@@ -197,6 +203,7 @@ Sebelum mengajukan pull request atau menggabungkan kode:
 # Cek dan perbaiki style kode otomatis sesuai standar PSR-12 & Laravel
 ./vendor/bin/pint
 ```
+`composer verify` (§3.3) menjalankan `pint --test` bersama pemeriksaan CI lainnya, sehingga cukup satu perintah sebelum pull request. Panduan kontribusi lengkap ada di `CONTRIBUTING.md`.
 
 ### 3.5 SUT Testing Principle
 Patuhi prinsip **One Test Class per System Under Test (SUT)**. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan yang sangat kuat. Semua skenario uji (termasuk edge-cases dan integrasi) untuk satu fitur/komponen wajib disatukan dalam satu file uji utama miliknya (contoh: seluruh pengujian komponen `MutasiProcess` harus berada utuh di dalam `MutasiProcessTest.php`).
@@ -244,9 +251,9 @@ Sebelum merilis perubahan ke lingkungan produksi:
 - [ ] Semua test suite lolos (`php artisan test` 100% green).
 - [ ] Format kode lolos linter (`./vendor/bin/pint --test`).
 - [ ] Gerbang CI hijau pada pull request dan tidak ada celah tingkat tinggi pada `composer audit` maupun `npm audit`.
-- [ ] `.env` produksi: `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE=Asia/Jakarta`, `APP_LOCALE=id`, `SESSION_SECURE_COOKIE=true`, basis data dengan pengguna berhak akses minimal (bukan root).
+- [ ] `.env` produksi: `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE` tetap `UTC` (desain penjadwal, DOMAIN.md §3.7), `SESSION_SECURE_COOKIE=true`, `DB_QUEUE_RETRY_AFTER=660` (lebih lama dari tugas impor terlama, 600 detik), basis data dengan pengguna berhak akses minimal (bukan root).
 - [ ] Akun awal dibuat dengan `php artisan db:seed --class=UserSeeder --force` (satu administrator dari `HRIS_ADMIN_*`, tanpa akun demo; SECURITY.md §3), lalu `HRIS_ADMIN_PASSWORD` dihapus dari `.env` dan administrator kedua dibuat agar persetujuan empat mata berjalan. Jangan menjalankan `db:seed` penuh atau `migrate:fresh` pada basis data produksi.
 - [ ] Cadangan basis data dan berkas diambil sebelum migrasi, disimpan di luar server, terenkripsi, dan pemulihannya sudah pernah diuji.
 - [ ] Tidak ada hardcoded credentials atau debug helper (`dd()`, `dump()`, `ray()`).
-- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`).
+- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan view:cache`, `php artisan event:cache`; jangan `route:cache`, karena sebagian rute memakai closure).
 - [ ] File log audit mencatat aktivitas dengan benar tanpa error exception.

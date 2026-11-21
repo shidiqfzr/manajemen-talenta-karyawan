@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/shidiqfzr/palm-hris/blob/main/SECURITY.md#6-prosedur-pelaporan-kerentanan-reporting-a-vulnerability
+    about: Do not open a public issue for a security problem. Follow the reporting procedure in the security policy.
