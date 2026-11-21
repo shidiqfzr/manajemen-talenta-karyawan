@@ -1,6 +1,6 @@
 # Shared Data Table — Filter Summary Bar Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the toolbar of every shared table, show one always-visible summary bar: how many records match ("**12** dari 339 riwayat sesuai filter", or "**339** riwayat" when nothing is filtered), the active-filter chips (also while the filter panel is open), and "Reset filter" on the right — and remove the wasted Reset row inside the panel.
 

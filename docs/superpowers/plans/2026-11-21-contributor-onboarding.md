@@ -205,6 +205,16 @@
 - [ ] **Step 6: Run** `php artisan test --filter=DocumentationLinksTest`. Expected: PASS (it now also checks `CONTRIBUTING.md`). Run `pint --test`. Expected: pass.
 - [ ] **Step 7: Commit.** `docs(contributing): add the contribution guide, PR and issue templates, CODEOWNERS, and fix the release checklist timezone and cache lines`
 
+### Task 8: Remove the tool-workflow header line from the existing plans (owner addendum, done before Task 7)
+
+**Files:**
+- Modify: the 16 files in `docs/superpowers/plans/` that begin with a "For agentic workers" line.
+
+- [ ] **Step 1:** Copy the plan folder to a backup. Compute every new file content in memory first (abort without writing anything if a file has other than exactly one matching line or unexpected wording), then write the bytes.
+- [ ] **Step 2:** Replace that line with `> Steps use checkbox (`- [ ]`) syntax for tracking.` (or, for the one plan with a TDD note, `> Steps use TDD (RED then GREEN); commit per task.`).
+- [ ] **Step 3: Verify.** `git diff --numstat -- docs/superpowers/plans` shows 16 files, each `1 1`; a byte comparison against the backup shows no other line changed and no line ending was lost; `git grep -nIwiE "agentic|subagent|executing-plans|writing-plans|superpowers:"` finds nothing in tracked documents.
+- [ ] **Step 4: Commit.** `docs(plans): drop the tool-workflow header line from the existing implementation plans`
+
 ### Task 7: Whole-branch verification
 
 - [ ] **Step 1: Run** `pint --test`, then `php artisan test` in the background (about 10 minutes). Expected: all green; the count is the previous 1523 plus the new tests.

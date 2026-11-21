@@ -1,6 +1,6 @@
 # Master Formasi from Excel Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make `Unit dan Jabatan Karyawan Pimpinan.xlsx` the single master of Karpim formasi so the seeded data, the MPP "Standar Formasi" and employee import validation all derive from it.
 

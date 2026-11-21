@@ -1,6 +1,6 @@
 # Shared Data Table — Audit History Implementation Plan (Spec step 3a)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move the Riwayat Perubahan Master screen (`App\Livewire\Admin\Master\AuditHistory`) onto the shared data table layer, adding the two shared pieces it needs (date filters and an active-filter chip row) and the trait view helpers the final review asked for before step 3.
 

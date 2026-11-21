@@ -1,6 +1,6 @@
 # Mutasi Form Blocking-State UX Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the single-mutation form (`/admin/mutasi/create`) stop the admin early when the placement cannot be processed, show one clear status instead of three overlapping ones, and remove visual noise and misleading signals.
 

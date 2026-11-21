@@ -1,6 +1,6 @@
 # Shared Data Table — Mutasi History Implementation Plan (Spec step 3b)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move the Riwayat Mutasi screen (`App\Livewire\Admin\MutasiHistory`) onto the shared data table layer without duplicating its domain rules, and route its compliance Excel export through the shared permission check, row limit and audit log.
 
