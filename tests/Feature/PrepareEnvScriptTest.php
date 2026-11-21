@@ -55,7 +55,79 @@ class PrepareEnvScriptTest extends TestCase
             'single quoted' => ["APP_ENV='production'"],
             'spaces around the sign' => ['APP_ENV = production'],
             'upper case' => ['APP_ENV=PRODUCTION'],
+            'inline comment' => ['APP_ENV=production # server'],
+            'export prefix' => ['export APP_ENV=production'],
+            'leading tab' => ["\tAPP_ENV=production"],
         ];
+    }
+
+    public function test_production_is_refused_when_the_file_starts_with_a_byte_order_mark(): void
+    {
+        // Notepad on Windows saves UTF-8 files with a BOM; the dotenv parser still reads the first line.
+        $before = "\xEF\xBB\xBFAPP_ENV=production\nAPP_KEY=\n";
+        file_put_contents($this->path('.env'), $before);
+
+        $process = $this->prepare();
+
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString('Refusing to run', $process->getErrorOutput());
+        $this->assertSame($before, file_get_contents($this->path('.env')));
+    }
+
+    public function test_spaced_existing_key_is_never_replaced(): void
+    {
+        $before = 'APP_ENV=local'."\n".'APP_KEY = base64:'.base64_encode(str_repeat('s', 32))."\n";
+        file_put_contents($this->path('.env'), $before);
+
+        $process = $this->prepare();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame($before, file_get_contents($this->path('.env')));
+    }
+
+    public function test_a_filled_key_anywhere_in_the_file_is_kept(): void
+    {
+        $before = "APP_ENV=local\nAPP_KEY=\nAPP_KEY=base64:".base64_encode(str_repeat('f', 32))."\n";
+        file_put_contents($this->path('.env'), $before);
+
+        $process = $this->prepare();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame($before, file_get_contents($this->path('.env')));
+    }
+
+    public function test_an_empty_spaced_key_is_filled_in_place(): void
+    {
+        file_put_contents($this->path('.env'), "APP_ENV=local\nAPP_KEY = \nDB_CONNECTION=mysql\n");
+
+        $process = $this->prepare();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $env = file_get_contents($this->path('.env'));
+        $this->assertSame(1, substr_count($env, 'APP_KEY'));
+        $this->assertMatchesRegularExpression('/^APP_KEY\s*=\s*base64:/m', $env);
+    }
+
+    public function test_a_crlf_env_keeps_its_line_endings(): void
+    {
+        file_put_contents($this->path('.env'), "APP_ENV=local\r\nAPP_KEY=\r\nDB_CONNECTION=mysql\r\n");
+
+        $process = $this->prepare();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $env = file_get_contents($this->path('.env'));
+        $this->assertSame(substr_count($env, "\n"), substr_count($env, "\r\n"), 'every line must still end with CRLF');
+        $this->assertMatchesRegularExpression('/^APP_KEY=base64:/m', $env);
+    }
+
+    public function test_an_inline_comment_after_sqlite_still_creates_the_default_file(): void
+    {
+        file_put_contents($this->path('.env'), "APP_ENV=local\nAPP_KEY=\nDB_CONNECTION=sqlite # local development\n");
+
+        $process = $this->prepare();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertFileExists($this->path('database/database.sqlite'));
     }
 
     public function test_fresh_folder_gets_env_key_and_sqlite_file(): void
