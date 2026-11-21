@@ -208,7 +208,7 @@
 ### Task 8: Remove the tool-workflow header line from the existing plans (owner addendum, done before Task 7)
 
 **Files:**
-- Modify: the 16 files in `docs/superpowers/plans/` that begin with a "For agentic workers" line.
+- Modify: the 16 files in `docs/superpowers/plans/` that begin with the tool-workflow header line.
 
 - [ ] **Step 1:** Copy the plan folder to a backup. Compute every new file content in memory first (abort without writing anything if a file has other than exactly one matching line or unexpected wording), then write the bytes.
 - [ ] **Step 2:** Replace that line with `> Steps use checkbox (`- [ ]`) syntax for tracking.` (or, for the one plan with a TDD note, `> Steps use TDD (RED then GREEN); commit per task.`).
