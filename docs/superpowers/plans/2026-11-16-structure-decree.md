@@ -1,6 +1,6 @@
 # Organisation Structure Decree (SK) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let admins adopt a new organisation structure from an SK workbook on a live database: review a diff, approve (four-eyes), stage until the effective date, apply atomically with an audit trail.
 

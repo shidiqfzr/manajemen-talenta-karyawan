@@ -1,0 +1,13 @@
+# Code owners are asked to review every pull request that touches their paths.
+# When a second developer joins, add them to the general "*" line; otherwise code-owner review would block the
+# owner's own pull requests once required approvals are switched on for main.
+*                          @shidiqfzr
+
+# Reference documents and the places where a mistake is expensive.
+/DOMAIN.md                 @shidiqfzr
+/SECURITY.md               @shidiqfzr
+/AGENTS.md                 @shidiqfzr
+/app/Services/             @shidiqfzr
+/database/migrations/      @shidiqfzr
+/database/data/            @shidiqfzr
+/.github/                  @shidiqfzr

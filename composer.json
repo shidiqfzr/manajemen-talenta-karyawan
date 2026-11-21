@@ -56,6 +56,26 @@
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+        ],
+        "setup": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/prepare-env.php",
+            "@composer install",
+            "@php artisan migrate --seed --ansi",
+            "npm ci",
+            "npm run build"
+        ],
+        "verify": [
+            "Composer\\Config::disableProcessTimeout",
+            "pint --test",
+            "@composer audit",
+            "@php artisan test",
+            "npm audit --audit-level=high",
+            "npm run test:js"
+        ],
+        "demo": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan db:seed --class=DemoEmployeeSeeder --ansi"
         ]
     },
     "extra": {

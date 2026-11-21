@@ -1,6 +1,6 @@
 # Formasi Navigation and DRY Consolidation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans. Steps use TDD (RED then GREEN); commit per task.
+> Steps use TDD (RED then GREEN); commit per task.
 
 **Goal:** Make the Formasi feature (all Master Data sections) follow enterprise HRIS information architecture and the project's DRY principle (ENGINEERING.md §2.4), without changing any business rule.
 

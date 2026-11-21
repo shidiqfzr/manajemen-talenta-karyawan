@@ -1,6 +1,6 @@
 # Shared Data Table — Toolbar Search & Filter UX Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make search and filters in the shared table toolbar clear and easy to use for every table: a big search box, one "Filter" button with a count that opens a panel of labelled fields, removable chips for active filters, and one tidy row for search, filter and export.
 

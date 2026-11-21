@@ -5,9 +5,9 @@
 > Dokumen ini adalah **acuan standar rekayasa perangkat lunak (Single Source of Truth for Engineering & QA)** yang memandu arsitektur teknis, standar implementasi kode, alur perencanaan (planning), dan strategi pengujian (testing) pada aplikasi HRIS & Formasi Talenta PTPN IV Regional V.
 >
 > Dokumen ini melengkapi:
-> - [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) (Logika Bisnis & Kamus Data)
-> - [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) (Design System & UI/UX Guidelines)
-> - [SECURITY.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/SECURITY.md) (Kebijakan Keamanan & Kepatuhan Data)
+> - [DOMAIN.md](DOMAIN.md) (Logika Bisnis & Kamus Data)
+> - [DESIGN.md](DESIGN.md) (Design System & UI/UX Guidelines)
+> - [SECURITY.md](SECURITY.md) (Kebijakan Keamanan & Kepatuhan Data)
 
 ---
 
@@ -38,8 +38,8 @@ Pengembangan modul atau penambahan fitur di repositori ini mengikuti alur **Agil
 ```
 
 ### Tahap 1: Verifikasi Domain & Desain (Pre-Development Alignment)
-- Konsultasikan kebutuhan dengan [DOMAIN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DOMAIN.md) (apakah melibatkan formula pensiun, RM Band, bidang fungsional, atau alur mutasi).
-- Periksa kesesuaian komponen visual dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) (palet warna token, card styling, loading indicator).
+- Konsultasikan kebutuhan dengan [DOMAIN.md](DOMAIN.md) (apakah melibatkan formula pensiun, RM Band, bidang fungsional, atau alur mutasi).
+- Periksa kesesuaian komponen visual dengan [DESIGN.md](DESIGN.md) (palet warna token, card styling, loading indicator).
 
 ### Tahap 2: Implementasi Service & Model (Business Logic First)
 - Bangun logika bisnis murni di dalam `App\Services\` (bukan di dalam Controller atau Blade template).
@@ -189,6 +189,12 @@ php artisan test --stop-on-failure
 
 # Menjalankan pengujian logika JavaScript (modul Alpine tanpa peramban, runner bawaan Node)
 npm run test:js
+
+# Seluruh gerbang CI sekaligus (Pint, composer audit, PHPUnit, npm audit, uji JavaScript)
+composer verify
+
+# Menyiapkan mesin baru (dependensi, .env, kunci, SQLite, migrasi, aset); menolak APP_ENV=production
+composer setup
 ```
 
 ### 3.4 Standar Kerapihan Kode (Code Quality Gate)
@@ -197,6 +203,7 @@ Sebelum mengajukan pull request atau menggabungkan kode:
 # Cek dan perbaiki style kode otomatis sesuai standar PSR-12 & Laravel
 ./vendor/bin/pint
 ```
+`composer verify` (§3.3) menjalankan `pint --test` bersama pemeriksaan CI lainnya, sehingga cukup satu perintah sebelum pull request. Panduan kontribusi lengkap ada di `CONTRIBUTING.md`.
 
 ### 3.5 SUT Testing Principle
 Patuhi prinsip **One Test Class per System Under Test (SUT)**. Dilarang memecah pengujian satu class/komponen ke beberapa file terpisah tanpa alasan yang sangat kuat. Semua skenario uji (termasuk edge-cases dan integrasi) untuk satu fitur/komponen wajib disatukan dalam satu file uji utama miliknya (contoh: seluruh pengujian komponen `MutasiProcess` harus berada utuh di dalam `MutasiProcessTest.php`).
@@ -228,6 +235,13 @@ Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap p
 - **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala. Pembaruan minor dan patch digabung dalam satu pull request per ekosistem dan wajib lolos gerbang yang sama. Peningkatan versi mayor tidak pernah otomatis (misalnya PHPUnit tetap 11 sesuai standar ini); itu keputusan tersendiri yang memperbarui dokumen ini bila standarnya berubah.
 - Perubahan ke `main` hanya melalui pull request; push langsung, push paksa, dan penghapusan cabang `main` dinonaktifkan.
 
+### 3.8 Data Demo Lokal
+Mesin pengembangan memerlukan data karyawan agar layar formasi, mutasi, pensiun, dan 9-box terisi, tetapi data karyawan sungguhan tidak boleh keluar dari server produksi (SECURITY.md §3). Jalankan `composer demo` (`DemoEmployeeSeeder`) pada basis data lokal yang sudah berisi master unit dan formasi (`composer setup`):
+- **Sintetis dan mudah dikenali**: sekitar 60 karyawan bernama "Karyawan Contoh NN", NIK 8 digit berawalan `99`, ditempatkan pada kursi nyata Master Formasi (satu pemangku per kursi, tidak pernah melebihi kuota; jabatan pool tidak diisi), termasuk beberapa pemangku berstatus Pejabat Sementara (Pjs), beberapa karyawan menjelang atau sedang menjalani MBT, dan 40 penilaian yang mengisi kesembilan kuadran 9-box.
+- **Tiga penjaga** (gagal sebelum menulis apa pun): menolak lingkungan produksi, menolak bila tabel karyawan sudah berisi data, dan menolak bila master unit atau formasi belum ada.
+- **Lewat kode domain, bukan salinan rumus**: karyawan dibuat dengan Eloquent (event model aktif) sehingga `EmployeeObserver` mengisi RM Band, tanggal pensiun, dan MBT serta menulis riwayat penempatan awal pada `job_histories`; penilaian ditulis lewat `EvaluationService`. Seluruh proses satu transaksi dan komposisinya sama pada setiap kali jalan (tanggal dihitung relatif terhadap hari menjalankan).
+- Akun `admin` dan `admin2` (hanya lokal) memungkinkan persetujuan empat mata diuji tanpa data produksi.
+
 ---
 
 ## 4. Checklist Rilis & Deployment (Release Verification)
@@ -237,9 +251,9 @@ Sebelum merilis perubahan ke lingkungan produksi:
 - [ ] Semua test suite lolos (`php artisan test` 100% green).
 - [ ] Format kode lolos linter (`./vendor/bin/pint --test`).
 - [ ] Gerbang CI hijau pada pull request dan tidak ada celah tingkat tinggi pada `composer audit` maupun `npm audit`.
-- [ ] `.env` produksi: `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE=Asia/Jakarta`, `APP_LOCALE=id`, `SESSION_SECURE_COOKIE=true`, basis data dengan pengguna berhak akses minimal (bukan root).
+- [ ] `.env` produksi: `APP_ENV=production`, `APP_DEBUG=false`, `APP_TIMEZONE` tetap `UTC` (desain penjadwal, DOMAIN.md §3.7), `SESSION_SECURE_COOKIE=true`, `DB_QUEUE_RETRY_AFTER=660` (lebih lama dari tugas impor terlama, 600 detik), basis data dengan pengguna berhak akses minimal (bukan root).
 - [ ] Akun awal dibuat dengan `php artisan db:seed --class=UserSeeder --force` (satu administrator dari `HRIS_ADMIN_*`, tanpa akun demo; SECURITY.md §3), lalu `HRIS_ADMIN_PASSWORD` dihapus dari `.env` dan administrator kedua dibuat agar persetujuan empat mata berjalan. Jangan menjalankan `db:seed` penuh atau `migrate:fresh` pada basis data produksi.
 - [ ] Cadangan basis data dan berkas diambil sebelum migrasi, disimpan di luar server, terenkripsi, dan pemulihannya sudah pernah diuji.
 - [ ] Tidak ada hardcoded credentials atau debug helper (`dd()`, `dump()`, `ray()`).
-- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`).
+- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`; cache rute sudah diuji pada seluruh rute closure aplikasi dan memberi hasil yang sama dengan tanpa cache).
 - [ ] File log audit mencatat aktivitas dengan benar tanpa error exception.

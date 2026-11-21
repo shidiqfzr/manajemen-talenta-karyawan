@@ -1,6 +1,6 @@
 # Shared Data Table — One Design Modelled on the Employees Directory Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make every shared table look and behave like the Employees directory table the user prefers — search row with "Filter Lanjutan (n)" and "Reset Filter", a labelled filter panel with clearable fields, a "Filter Aktif" row with "Hapus Filter Tambahan", and a table header bar with title, result-count badge, page range and "Ekspor Excel (n)" — while keeping the shared engine (instant filtering, validated URL state, audited export, accessibility).
 

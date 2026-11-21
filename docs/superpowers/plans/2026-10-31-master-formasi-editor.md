@@ -1,6 +1,6 @@
 # Master Formasi Editor (Phase 1) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let an admin add and edit units, jabatan and seats (kuota, bidang) in the app, with every change audited in the same transaction and every employee-orphaning edit refused.
 

@@ -1,6 +1,6 @@
 # Mutasi Blocked-State Critique Follow-up Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** On the single-mutation form, make a hard-blocked placement (formasi still occupied) actionable from the sticky bar, stop offering a dispensation that cannot help, show every outstanding issue at once, and tone down the visual noise.
 

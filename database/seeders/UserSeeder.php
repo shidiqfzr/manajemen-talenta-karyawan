@@ -72,10 +72,12 @@ class UserSeeder extends Seeder
 
     /**
      * Fixed demo accounts for development, automated tests and E2E. Not credentials of any real environment.
+     * Two administrators, so four-eyes approvals (SK, import, mutation chain) can be exercised locally.
      */
     private function seedDemoAccounts(): void
     {
         $this->createUser('Admin User', 'admin', 'admin@example.com', 'ptpn4reg5', 'admin');
+        $this->createUser('Admin Pemeriksa', 'admin2', 'admin2@example.com', 'ptpn4reg5', 'admin');
         $this->createUser('Regular User', 'user', 'user@example.com', 'password', 'user');
     }
 

@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a change or a new capability
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem before the solution. **Never paste real employee data** or screenshots that show it. A change to a business rule needs the owner of that rule to agree first; say who decides.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Who is affected, what they cannot do today, and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would change. Sketches and examples with demo data are welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: documents
+    attributes:
+      label: Reference documents this touches
+      multiple: true
+      options:
+        - DOMAIN.md (business rules, formulas, data model)
+        - DESIGN.md (screens, components, copy)
+        - ENGINEERING.md (code structure, tests, CI, release)
+        - SECURITY.md (data handling, access, audit trail)
+        - None, or not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I confirm this request contains no real employee data and no screenshots showing it.
+          required: true

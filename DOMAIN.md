@@ -4,7 +4,7 @@
 
 > Dokumen ini adalah **acuan domain tunggal (Single Source of Truth for Business Domain & Enterprise Rules)** mengenai tata kelola kepegawaian, struktur organisasi perkebunan, hierarki jabatan manajerial, matriks talenta 9-box, serta aturan bisnis HR di lingkungan **PT Perkebunan Nusantara IV Regional V**.
 >
-> Dokumen ini berpasangan langsung dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) (Single Source of Truth untuk UI/UX & Design System). Setiap AI Model (vibe coding) dan developer wajib membaca dokumen ini sebelum mengimplementasikan model, migrasi, validasi form, service, query scope, atau alur transaksi bisnis HR.
+> Dokumen ini berpasangan langsung dengan [DESIGN.md](DESIGN.md) (Single Source of Truth untuk UI/UX & Design System). Setiap AI Model (vibe coding) dan developer wajib membaca dokumen ini sebelum mengimplementasikan model, migrasi, validasi form, service, query scope, atau alur transaksi bisnis HR.
 
 ---
 
@@ -18,7 +18,7 @@
 7. [Pengembangan Kompetensi & Pelatihan (L&D)](#7-pengembangan-kompetensi--pelatihan-ld)
 8. [Perencanaan Tenaga Kerja (Man Power Planning / MPP)](#8-perencanaan-tenaga-kerja-man-power-planning--mpp)
 9. [Arsitektur Layanan & Kontrak Kode (Service Contracts)](#9-arsitektur-layanan--kontrak-kode-service-contracts)
-10. [Sinkronisasi Domain ke UI ([DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md))](#10-sinkronisasi-domain-ke-ui-designmd)
+10. [Sinkronisasi Domain ke UI ([DESIGN.md](DESIGN.md))](#10-sinkronisasi-domain-ke-ui-designmd)
 11. [Panduan Vibe Coding AI (Agent Prompts & Contracts)](#11-panduan-vibe-coding-ai-agent-prompts--contracts)
 
 ---
@@ -613,9 +613,9 @@ Satu-satunya jalur ubah unit, jabatan, dan kursi formasi. Setiap metode menerima
 - Jabatan penampungan (layar `/admin/master/penampungan`, Livewire `PoolPositions`, tab "Jabatan Penampungan"): `createPoolPosition(array $data, User $user): Position` (jenis Advisor atau Diperbantukan, RM-1 s.d. RM-4, level Karpim, tanpa kuota dan tanpa unit; menolak nama ganda), `openPoolPosition(Unit $unit, Position $position, User $user): int` dan `closePoolPosition(Unit $unit, Position $position, ?string $reason, User $user): void`. Ketiganya berjalan dalam satu `DB::transaction()` dan tercatat pada `master_audit_logs` (`position.created`, `pool.opened`, `pool.closed`); jabatan biasa ditolak. Layar memiliki dua tampilan: Daftar Jabatan (jumlah unit dan karyawan per jabatan) dan Per Unit (bezetting: karyawan pada jabatan penampungan per unit, termasuk yang belum dibuka pada unitnya agar ketidaksesuaian terlihat). `renamePoolPosition(Position $position, string $nama, ?string $reason, User $user): Position` dan `deletePoolPosition(Position $position, ?string $reason, User $user): void` memperbaiki jabatan yang dibuat keliru (wajib beralasan; hapus diblokir selama jabatan masih dibuka pada unit, dijabat, atau tercatat pada riwayat). Penutupan mengunci baris unit (kunci yang sama dengan penjaga penambahan karyawan) dan juga diblokir oleh penugasan sementara Pj/Plt dan mutasi terjadwal menuju jabatan itu pada unit tersebut. Nama jabatan dibandingkan tanpa membedakan huruf besar-kecil, dan panjangnya maksimal 255 karakter. Layar Formasi Unit Kerja dan Sebaran Formasi tidak menghitung jabatan penampungan, dan pesan penghapusan unit atau jabatan menyebut tab Jabatan Penampungan bila hanya tautan penampungan yang menghalangi.
 ---
 
-## 10. Sinkronisasi Domain ke UI ([DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md))
+## 10. Sinkronisasi Domain ke UI ([DESIGN.md](DESIGN.md))
 
-Tampilan UI wajib mencerminkan warna semantik domain yang telah disepakati di [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md):
+Tampilan UI wajib mencerminkan warna semantik domain yang telah disepakati di [DESIGN.md](DESIGN.md):
 
 | Domain Entity | Kategori | Tailwind Classes (DESIGN.md) |
 |---|---|---|
@@ -643,8 +643,8 @@ Saat AI Model menulis kode untuk repositori ini, patuhi aturan mutlak berikut:
 3. **Penyimpanan NIK & Tanggal**:
    - NIK selalu diperlakukan sebagai string (jangan cast ke int agar leading zero tidak hilang).
    - Format tanggal input selalu divalidasi `Y-m-d`.
-4. **Patuhi Pasangan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md)**:
-   - Jika mengubah tampilan atau membuat komponen baru, rujuk [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md) untuk struktur token CSS, modal dialog, formulir input, dan layout kartu enterprise.
+4. **Patuhi Pasangan [DESIGN.md](DESIGN.md)**:
+   - Jika mengubah tampilan atau membuat komponen baru, rujuk [DESIGN.md](DESIGN.md) untuk struktur token CSS, modal dialog, formulir input, dan layout kartu enterprise.
 
 ## 12. Register Keputusan Aturan Bisnis
 
@@ -663,4 +663,4 @@ Aturan di bawah ini ditetapkan sementara oleh tim pengembang karena belum ada ke
 | 9 | Admin membuat, mengubah nama, membuka, menutup, dan menghapus jabatan penampungan; setiap perubahan tercatat pada riwayat perubahan master dengan alasan. | §9.7 | Sementara | Apakah cukup satu admin, atau perubahan perlu persetujuan dua pihak seperti impor Excel? | — |
 
 ---
-*Dokumen ini dirawat sebagai Single Source of Truth Domain PTPN IV Regional V berdampingan dengan [DESIGN.md](file:///c:/Users/achma/.gemini/antigravity-ide/scratch/manajemen-talenta-karyawan/DESIGN.md).*
+*Dokumen ini dirawat sebagai Single Source of Truth Domain PTPN IV Regional V berdampingan dengan [DESIGN.md](DESIGN.md).*

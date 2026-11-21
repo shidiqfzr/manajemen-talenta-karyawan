@@ -26,7 +26,11 @@ yarn-error.log
 /playwright-report
 /tests/e2e/.tmp
 
-# Berkas Excel acuan/data karyawan di akar repositori (berisi data internal; jangan di-commit)
-/*.xlsx
-/*.xls
-/*.csv
+# Employee data exports and database dumps: never commit, anywhere
+# (berkas Excel/CSV acuan dan cadangan basis data berisi data internal karyawan; UU PDP)
+*.xlsx
+*.xls
+*.csv
+*.sql
+*.sql.gz
+*.dump
