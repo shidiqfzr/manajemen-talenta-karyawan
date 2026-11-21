@@ -237,9 +237,9 @@ Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap p
 
 ### 3.8 Data Demo Lokal
 Mesin pengembangan memerlukan data karyawan agar layar formasi, mutasi, pensiun, dan 9-box terisi, tetapi data karyawan sungguhan tidak boleh keluar dari server produksi (SECURITY.md §3). Jalankan `composer demo` (`DemoEmployeeSeeder`) pada basis data lokal yang sudah berisi master unit dan formasi (`composer setup`):
-- **Sintetis dan mudah dikenali**: sekitar 60 karyawan bernama "Karyawan Contoh NN", NIK 8 digit berawalan `99`, ditempatkan pada kursi nyata Master Formasi (satu pemangku per kursi, tidak pernah melebihi kuota; jabatan pool tidak diisi), termasuk beberapa penugasan Plt, beberapa karyawan menjelang atau sedang menjalani MBT, dan 40 penilaian yang mengisi kesembilan kuadran 9-box.
+- **Sintetis dan mudah dikenali**: sekitar 60 karyawan bernama "Karyawan Contoh NN", NIK 8 digit berawalan `99`, ditempatkan pada kursi nyata Master Formasi (satu pemangku per kursi, tidak pernah melebihi kuota; jabatan pool tidak diisi), termasuk beberapa pemangku berstatus Pejabat Sementara (Pjs), beberapa karyawan menjelang atau sedang menjalani MBT, dan 40 penilaian yang mengisi kesembilan kuadran 9-box.
 - **Tiga penjaga** (gagal sebelum menulis apa pun): menolak lingkungan produksi, menolak bila tabel karyawan sudah berisi data, dan menolak bila master unit atau formasi belum ada.
-- **Lewat kode domain, bukan salinan rumus**: karyawan dibuat dengan Eloquent (event model aktif) sehingga `EmployeeObserver` mengisi RM Band, tanggal pensiun, dan MBT serta menulis riwayat penempatan awal pada `job_histories`; penilaian ditulis lewat `EvaluationService`. Seluruh proses satu transaksi dan hasilnya sama pada setiap kali jalan.
+- **Lewat kode domain, bukan salinan rumus**: karyawan dibuat dengan Eloquent (event model aktif) sehingga `EmployeeObserver` mengisi RM Band, tanggal pensiun, dan MBT serta menulis riwayat penempatan awal pada `job_histories`; penilaian ditulis lewat `EvaluationService`. Seluruh proses satu transaksi dan komposisinya sama pada setiap kali jalan (tanggal dihitung relatif terhadap hari menjalankan).
 - Akun `admin` dan `admin2` (hanya lokal) memungkinkan persetujuan empat mata diuji tanpa data produksi.
 
 ---
@@ -255,5 +255,5 @@ Sebelum merilis perubahan ke lingkungan produksi:
 - [ ] Akun awal dibuat dengan `php artisan db:seed --class=UserSeeder --force` (satu administrator dari `HRIS_ADMIN_*`, tanpa akun demo; SECURITY.md §3), lalu `HRIS_ADMIN_PASSWORD` dihapus dari `.env` dan administrator kedua dibuat agar persetujuan empat mata berjalan. Jangan menjalankan `db:seed` penuh atau `migrate:fresh` pada basis data produksi.
 - [ ] Cadangan basis data dan berkas diambil sebelum migrasi, disimpan di luar server, terenkripsi, dan pemulihannya sudah pernah diuji.
 - [ ] Tidak ada hardcoded credentials atau debug helper (`dd()`, `dump()`, `ray()`).
-- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan view:cache`, `php artisan event:cache`; jangan `route:cache`, karena sebagian rute memakai closure).
+- [ ] Konfigurasi cache diperbarui (`php artisan config:cache`, `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache`; cache rute sudah diuji pada seluruh rute closure aplikasi dan memberi hasil yang sama dengan tanpa cache).
 - [ ] File log audit mencatat aktivitas dengan benar tanpa error exception.

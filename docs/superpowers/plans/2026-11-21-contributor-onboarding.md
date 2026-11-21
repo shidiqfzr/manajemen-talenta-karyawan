@@ -111,7 +111,7 @@
 
 **Decisions:**
 - **Eligible seat:** an active unit plus an active position with `is_overflow = false`, `is_diperban = false` and `kuota >= 1`.
-- **Seat selection:** take seats round-robin across units, about 45 Karpim and 15 Karpel. Each chosen seat gets exactly one holder, which cannot exceed any quota of at least 1. `ACTING_COUNT` holders get `status_penugasan = 'Plt'`, the rest `'Definitif'`.
+- **Seat selection:** take seats round-robin across units, about 45 Karpim and 15 Karpel. Each chosen seat gets exactly one holder, which cannot exceed any quota of at least 1. `ACTING_COUNT` holders get `status_penugasan = Employee::STATUS_PJS` (a status in `Employee::ASSIGNMENT_STATUSES`, which the admin form and the import accept; Plt is not), the rest `'Definitif'`.
 - **NIK and names:** NIK `99` plus a zero-padded sequence (`99000001`...); name `Karyawan Contoh 01`...
 - **Golongan:** a small demo table keyed by the position's master band, in the `[Gol]/[Berkala]` format. RM-1 uses IV, RM-2 uses IIIC/IIID, RM-3 or empty uses IIIA/IIIB, Karpel bands use II. This is data, not a rule; the test proves the observer still derives the master band.
 - **Left empty:** `rm_level`, `tanggal_pensiun`, `tanggal_mbt`, `job_grade`, `person_grade`.
@@ -130,7 +130,7 @@
   - `test_pool_positions_and_zero_quota_seats_are_never_filled`: per (unit, jabatan), holders ≤ pivot `kuota`, counting every holder whatever the `status_penugasan`. No holder sits on an `is_overflow` or `is_diperban` position. Set one seat's `kuota` to 0 before running and assert it stays empty.
   - `test_every_demo_employee_gets_observer_derived_fields`: `rm_level`, `tanggal_pensiun` and `tanggal_mbt` are filled. `tanggal_pensiun` equals `KepegawaianPolicy::tanggalPensiun(tanggal_lahir)`. When the master position has an `rm_level`, the employee's `rm_level` equals it. Each employee has exactly one active `job_histories` row with `sumber = JobHistory::SUMBER_DATA_AWAL` and no SK number.
   - `test_retirement_screens_have_data`: `Employee::menjelangMbt()->count() >= 5` and `Employee::mbt()->count() >= 3`, with every employee's `tanggal_pensiun` after today.
-  - `test_both_strata_and_acting_assignments_exist`: some Karpim, some Karpel, and exactly `ACTING_COUNT` with `status_penugasan = 'Plt'`.
+  - `test_both_strata_and_acting_assignments_exist`: some Karpim, some Karpel, and exactly `ACTING_COUNT` with `Employee::STATUS_PJS`; plus `test_every_demo_status_is_one_the_application_accepts`.
   - `test_every_nine_box_cell_has_someone`: `Evaluation::count() === EVALUATED_COUNT`, and each of the 9 `boxValue`s appears at least 4 times.
   - `test_refuses_in_production_and_writes_nothing`, `test_refuses_when_employees_already_exist`, `test_refuses_without_master_data` (no `PositionUnitSeeder`): each expects `RuntimeException` and unchanged counts of employees, evaluations and job histories.
   - `test_same_data_on_every_run`: seed, capture `nik` → `[jabatan, unit_kerja, tanggal_lahir]`, refresh the database, seed again; identical.
@@ -201,7 +201,7 @@
   - §3.3: add `composer verify` (seluruh gerbang CI) and `composer setup`.
   - §3.4: note that `composer verify` runs `pint --test`.
   - Line 240: replace `` `APP_TIMEZONE=Asia/Jakarta`, `APP_LOCALE=id`, `` with `` `APP_TIMEZONE` tetap `UTC` (desain penjadwal, DOMAIN.md §3.7), ``.
-  - Line 244: replace `` `php artisan route:cache`, `` with `` `php artisan event:cache`; jangan `route:cache` karena rute memakai closure ``.
+  - Line 244: replace `` `php artisan route:cache`, `` with `` `php artisan route:cache`, `php artisan view:cache`, `php artisan event:cache` `` (route cache stays: tested on all closure routes, identical behaviour).
 - [ ] **Step 6: Run** `php artisan test --filter=DocumentationLinksTest`. Expected: PASS (it now also checks `CONTRIBUTING.md`). Run `pint --test`. Expected: pass.
 - [ ] **Step 7: Commit.** `docs(contributing): add the contribution guide, PR and issue templates, CODEOWNERS, and fix the release checklist timezone and cache lines`
 
@@ -212,7 +212,7 @@
 
 - [ ] **Step 1:** Copy the plan folder to a backup. Compute every new file content in memory first (abort without writing anything if a file has other than exactly one matching line or unexpected wording), then write the bytes.
 - [ ] **Step 2:** Replace that line with `> Steps use checkbox (`- [ ]`) syntax for tracking.` (or, for the one plan with a TDD note, `> Steps use TDD (RED then GREEN); commit per task.`).
-- [ ] **Step 3: Verify.** `git diff --numstat -- docs/superpowers/plans` shows 16 files, each `1 1`; a byte comparison against the backup shows no other line changed and no line ending was lost; `git grep -nIwiE "agentic|subagent|executing-plans|writing-plans|superpowers:"` finds nothing in tracked documents.
+- [ ] **Step 3: Verify.** `git diff --numstat -- docs/superpowers/plans` shows 16 files, each `1 1`; a byte comparison against the backup shows no other line changed and no line ending was lost; the same `git grep -nIwiE` for the tool-workflow wording, run with `-- ':!docs/superpowers/plans/2026-11-21-contributor-onboarding.md'` (this plan quotes the wording it removes), finds nothing in tracked documents.
 - [ ] **Step 4: Commit.** `docs(plans): drop the tool-workflow header line from the existing implementation plans`
 
 ### Task 7: Whole-branch verification

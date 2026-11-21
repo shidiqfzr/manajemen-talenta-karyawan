@@ -51,7 +51,7 @@ Proyek ini dipandu oleh empat pilar dokumentasi arsitektur utama:
 
 - **PHP 8.4** dengan ekstensi `mbstring`, `intl`, `gd`, `zip`, `bcmath`, `xml`, `fileinfo`, `pdo_sqlite`, dan `sqlite3` (periksa dengan `php -m`).
 - **Composer 2**, **Node.js 22** (versi di `.nvmrc`), dan **Git**.
-- **Windows**: aktifkan ekstensi dengan menghapus tanda `;` di depan baris `extension=...` pada `php.ini`. Laragon sudah menyertakan PHP 8.4; pastikan `php -v` menampilkan 8.4.
+- **Windows**: aktifkan ekstensi dengan menghapus tanda `;` di depan baris `extension=...` pada `php.ini`. Bila memakai Laragon, pilih PHP 8.4 dan pastikan `php -v` menampilkan 8.4.
 
 ### Mulai cepat
 

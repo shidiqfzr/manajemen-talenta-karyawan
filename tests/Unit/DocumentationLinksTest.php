@@ -16,8 +16,7 @@ class DocumentationLinksTest extends TestCase
     ];
 
     /**
-     * Existing documents only (CONTRIBUTING.md is checked once it exists), without fenced code blocks and inline code,
-     * where example links may appear.
+     * Existing documents only (CONTRIBUTING.md is checked once it exists), as written.
      *
      * @return array<string, string> file name => text
      */
@@ -28,16 +27,22 @@ class DocumentationLinksTest extends TestCase
         foreach (self::DOCUMENTS as $name) {
             $path = base_path($name);
 
-            if (! is_file($path)) {
-                continue;
+            if (is_file($path)) {
+                $texts[$name] = (string) file_get_contents($path);
             }
-
-            $text = (string) file_get_contents($path);
-            $text = (string) preg_replace('/```.*?```/s', '', $text);
-            $texts[$name] = (string) preg_replace('/`[^`\n]*`/', '', $text);
         }
 
         return $texts;
+    }
+
+    /**
+     * Without fenced code blocks and inline code, where example links may legitimately appear.
+     */
+    private function withoutCode(string $text): string
+    {
+        $text = (string) preg_replace('/```.*?```/s', '', $text);
+
+        return (string) preg_replace('/`[^`\n]*`/', '', $text);
     }
 
     public function test_the_scan_covers_at_least_the_reference_documents(): void
@@ -45,18 +50,18 @@ class DocumentationLinksTest extends TestCase
         $this->assertGreaterThanOrEqual(6, count($this->documents()));
     }
 
-    public function test_no_document_links_to_a_local_machine_path(): void
+    public function test_no_document_contains_a_local_machine_path_even_inside_code(): void
     {
         foreach ($this->documents() as $name => $text) {
-            $this->assertStringNotContainsString('file:///', $text, "{$name} links to a file:/// address");
-            $this->assertDoesNotMatchRegularExpression('/[a-z]:\/Users\//i', $text, "{$name} contains a local Windows user path");
+            $this->assertStringNotContainsString('file:///', $text, "{$name} contains a file:/// address");
+            $this->assertDoesNotMatchRegularExpression('/[a-z]:[\\\\\/]Users[\\\\\/]/i', $text, "{$name} contains a local Windows user path");
         }
     }
 
     public function test_relative_links_point_to_existing_files(): void
     {
         foreach ($this->documents() as $name => $text) {
-            preg_match_all('/\]\(([^)\s]+)\)/', $text, $matches);
+            preg_match_all('/\]\(([^)\s]+)\)/', $this->withoutCode($text), $matches);
 
             foreach ($matches[1] as $target) {
                 if (preg_match('/^(https?:|mailto:|#)/i', $target) === 1) {

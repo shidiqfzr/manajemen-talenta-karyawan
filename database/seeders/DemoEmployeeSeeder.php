@@ -23,7 +23,7 @@ use RuntimeException;
  * Employees attach to the real master units and positions (one holder per seat, never above a seat's quota) and are
  * created through Eloquent with model events on, so EmployeeObserver derives the RM Band, retirement and MBT dates
  * and writes the initial job_histories row. No formula is copied here. Evaluations go through EvaluationService.
- * The whole run is one transaction, and the data is the same on every run.
+ * The whole run is one transaction, and the mix is the same on every run (dates are relative to the day it runs).
  */
 class DemoEmployeeSeeder extends Seeder
 {
@@ -38,7 +38,10 @@ class DemoEmployeeSeeder extends Seeder
      */
     public const KARPIM_BAND_TARGETS = ['RM-1' => 5, 'RM-2' => 7];
 
-    /** Holders with an acting assignment (Plt); they also count towards the seat's quota. */
+    /**
+     * Holders with an acting assignment as their main job (Pjs, a status the admin form and the import accept); they
+     * also count towards the seat's quota. Plt is a concurrent assignment kept in job_histories, not a main-job status.
+     */
     public const ACTING_COUNT = 4;
 
     /** Employees that receive a 9-box evaluation; the boxes cycle 1 to 9, so every cell has someone. */
@@ -216,7 +219,7 @@ class DemoEmployeeSeeder extends Seeder
             'jabatan' => $position->nama,
             'unit_kerja' => $unit->nama,
             'level' => $position->level === 'Karpel' ? 'Karpel' : 'Karpim',
-            'status_penugasan' => $acting ? Employee::STATUS_PLT : Employee::STATUS_DEFINITIF,
+            'status_penugasan' => $acting ? Employee::STATUS_PJS : Employee::STATUS_DEFINITIF,
             'status_karyawan' => 'Tetap (PKWTT)',
             'golongan' => $this->golongan($position, $rng),
             'tanggal_lahir' => $birth->toDateString(),

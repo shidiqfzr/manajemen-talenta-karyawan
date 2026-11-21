@@ -147,8 +147,17 @@ class DemoEmployeeSeederTest extends TestCase
 
         (new DemoEmployeeSeeder)->run();
 
+        // Without a master band the domain code falls back to golongan and job title, so any RM-1 to RM-7 is a valid
+        // answer for a Karpim position (a title can map to RM-4). Someone on a Karpel position must still land in a
+        // Karpel band (Position::KARPEL_RM_LEVELS), whatever golongan the demo data carries.
+        $karpelPositions = Position::where('level', 'Karpel')->pluck('nama');
+
         foreach (Employee::all() as $employee) {
             $this->assertMatchesRegularExpression('/^RM-[1-7]$/', (string) $employee->rm_level);
+
+            if ($karpelPositions->contains($employee->jabatan)) {
+                $this->assertContains($employee->rm_level, Position::KARPEL_RM_LEVELS, "{$employee->nama} sits on a Karpel position but got {$employee->rm_level}");
+            }
         }
     }
 
@@ -170,7 +179,18 @@ class DemoEmployeeSeederTest extends TestCase
 
         $this->assertGreaterThan(0, Employee::where('level', 'Karpim')->count());
         $this->assertGreaterThan(0, Employee::where('level', 'Karpel')->count());
-        $this->assertSame(DemoEmployeeSeeder::ACTING_COUNT, Employee::where('status_penugasan', 'Plt')->count());
+        $this->assertSame(DemoEmployeeSeeder::ACTING_COUNT, Employee::where('status_penugasan', Employee::STATUS_PJS)->count());
+    }
+
+    public function test_every_demo_status_is_one_the_application_accepts(): void
+    {
+        (new DemoEmployeeSeeder)->run();
+
+        // The admin form and the Excel import validate status_penugasan against this list; a demo employee outside it
+        // could not be edited without the status silently changing.
+        foreach (Employee::query()->distinct()->pluck('status_penugasan') as $status) {
+            $this->assertContains($status, Employee::ASSIGNMENT_STATUSES);
+        }
     }
 
     public function test_karpim_holders_spread_across_the_three_rm_bands(): void
