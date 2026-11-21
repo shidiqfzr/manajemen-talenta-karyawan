@@ -30,13 +30,19 @@ class UserSeederTest extends TestCase
         ], $admin)]);
     }
 
-    public function test_non_production_seeds_the_demo_admin_and_user_with_the_right_roles(): void
+    public function test_non_production_seeds_two_demo_admins_and_a_user_with_the_right_roles(): void
     {
         (new UserSeeder)->run();
 
         $this->assertSame('admin', User::where('username', 'admin')->value('role'));
         $this->assertSame('user', User::where('username', 'user')->value('role'));
         $this->assertTrue(Hash::check('ptpn4reg5', User::where('username', 'admin')->value('password')));
+
+        // A second administrator lets four-eyes approvals (SK, import, mutation chain) be exercised locally.
+        $second = User::where('username', 'admin2')->firstOrFail();
+        $this->assertSame('admin', $second->role);
+        $this->assertSame('admin2@example.com', $second->email);
+        $this->assertTrue(Hash::check('ptpn4reg5', $second->password));
     }
 
     public function test_non_production_seeding_twice_does_not_duplicate_accounts(): void
@@ -44,7 +50,7 @@ class UserSeederTest extends TestCase
         (new UserSeeder)->run();
         (new UserSeeder)->run();
 
-        $this->assertSame(2, User::count());
+        $this->assertSame(3, User::count());
     }
 
     public function test_production_creates_only_the_configured_admin_and_no_demo_accounts(): void
