@@ -228,6 +228,13 @@ Berkas `.github/workflows/ci.yml` berjalan pada setiap pull request dan setiap p
 - **Dependabot** (`.github/dependabot.yml`) mengajukan pembaruan Composer, npm, dan GitHub Actions secara berkala. Pembaruan minor dan patch digabung dalam satu pull request per ekosistem dan wajib lolos gerbang yang sama. Peningkatan versi mayor tidak pernah otomatis (misalnya PHPUnit tetap 11 sesuai standar ini); itu keputusan tersendiri yang memperbarui dokumen ini bila standarnya berubah.
 - Perubahan ke `main` hanya melalui pull request; push langsung, push paksa, dan penghapusan cabang `main` dinonaktifkan.
 
+### 3.8 Data Demo Lokal
+Mesin pengembangan memerlukan data karyawan agar layar formasi, mutasi, pensiun, dan 9-box terisi, tetapi data karyawan sungguhan tidak boleh keluar dari server produksi (SECURITY.md §3). Jalankan `composer demo` (`DemoEmployeeSeeder`) pada basis data lokal yang sudah berisi master unit dan formasi (`composer setup`):
+- **Sintetis dan mudah dikenali**: sekitar 60 karyawan bernama "Karyawan Contoh NN", NIK 8 digit berawalan `99`, ditempatkan pada kursi nyata Master Formasi (satu pemangku per kursi, tidak pernah melebihi kuota; jabatan pool tidak diisi), termasuk beberapa penugasan Plt, beberapa karyawan menjelang atau sedang menjalani MBT, dan 40 penilaian yang mengisi kesembilan kuadran 9-box.
+- **Tiga penjaga** (gagal sebelum menulis apa pun): menolak lingkungan produksi, menolak bila tabel karyawan sudah berisi data, dan menolak bila master unit atau formasi belum ada.
+- **Lewat kode domain, bukan salinan rumus**: karyawan dibuat dengan Eloquent (event model aktif) sehingga `EmployeeObserver` mengisi RM Band, tanggal pensiun, dan MBT serta menulis riwayat penempatan awal pada `job_histories`; penilaian ditulis lewat `EvaluationService`. Seluruh proses satu transaksi dan hasilnya sama pada setiap kali jalan.
+- Akun `admin` dan `admin2` (hanya lokal) memungkinkan persetujuan empat mata diuji tanpa data produksi.
+
 ---
 
 ## 4. Checklist Rilis & Deployment (Release Verification)
