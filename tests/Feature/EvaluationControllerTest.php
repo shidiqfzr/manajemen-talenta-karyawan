@@ -28,7 +28,9 @@ class EvaluationControllerTest extends TestCase
         parent::setUp();
 
         $this->admin = User::factory()->create(['role' => 'admin']);
-        $this->employee = Employee::factory()->create();
+        // A name with an apostrophe and an ampersand, which the page must escape: a random Faker name such as "O'Conner"
+        // used to make the raw-text assertions below fail now and then.
+        $this->employee = Employee::factory()->create(['nama' => "Siti O'Brien & Putra"]);
     }
 
     /** @param array<string, mixed> $overrides */
@@ -312,7 +314,11 @@ class EvaluationControllerTest extends TestCase
         $this->get(route('admin.evaluations.create'))
             ->assertOk()
             ->assertSee('name="employee_nik"', false)
-            ->assertSee($this->employee->nik.' - '.$this->employee->nama, false)
+            // The picker serialises employees as escaped JSON (O'Brien becomes O'Brien), so check the NIK and a plain
+            // part of the name, and that the special characters never reach the page unescaped.
+            ->assertSee($this->employee->nik, false)
+            ->assertSee('Putra', false)
+            ->assertDontSee($this->employee->nama, false)
             ->assertSee('Masa Berlaku Asesmen')
             ->assertSee('Skor Matriks Talenta (9-Box)')
             ->assertDontSee('Expired Asesmen')
@@ -372,7 +378,7 @@ class EvaluationControllerTest extends TestCase
             ->assertOk()
             ->assertSee('value="2026-01-15"', false)
             ->assertSee('value="2028-01-15"', false)
-            ->assertSee($this->employee->nik.' - '.$this->employee->nama, false)
+            ->assertSee(e($this->employee->nik.' - '.$this->employee->nama), false)
             ->assertDontSee('name="employee_nik"', false);
     }
 
